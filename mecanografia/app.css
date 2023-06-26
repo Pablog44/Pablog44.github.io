@@ -84,3 +84,7 @@ textarea {
     border: 1px solid black;
 
 }
+#timeArea{
+    position: absolute;    
+    margin: 0 20px;
+}

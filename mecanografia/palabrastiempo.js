@@ -83,6 +83,7 @@ function reiniciarJuego() {
     areaTiempo.textContent = '';
     tiempoInicio = new Date();
     areaTipear.value = '';
+    typingArea.focus();
 
     if (intervaloTemporizador) {
         clearInterval(intervaloTemporizador);
@@ -99,7 +100,7 @@ function mostrarPulsacionesPorMinuto() {
     let ahora = new Date();
     let tiempoTranscurrido = (ahora - tiempoInicio) / 1000;
 
-    let netoCorrectos = cuentaCorrectas - cuentaIncorrectas;
+    let netoCorrectos = cuentaCorrectas ;
     let pulsacionesPorMinuto = Math.floor((netoCorrectos / tiempoTranscurrido) * 60);
-    areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Pulsaciones por minuto: ' + pulsacionesPorMinuto;
+    areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
 }
