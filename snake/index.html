@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+    <h1>Snake Game</h1>
+    <p id="score">Score: 0</p>
+    <p id="speed">Speed: <span id="minus" style="cursor: pointer; color: lime;">-</span> <span id="speedValue">10</span> <span id="plus" style="cursor: pointer; color: lime;">+</span></p>
+    <p id="timer">Time: 0s</p>
+    <canvas id="gameArea" width="400" height="400"></canvas>
+    <button id="showScoresButton" class="neon-button">Show Scores</button>
+    <button id="resetButton" style="display: none;">Reset Game</button>
+
+    <div id="topScores" style="display: none;"></div>
+    <script src="snake.js" defer></script>
+    <script>
+        document.getElementById('plus').addEventListener('click', function() {
+            let speedElement = document.getElementById('speedValue');
+            let currentSpeed = parseInt(speedElement.innerText);
+            if(currentSpeed < 20) {
+                speedElement.innerText = currentSpeed + 1;
+                speed = currentSpeed + 1; 
+                resetGame();
+            }
+        });
+
+        document.getElementById('minus').addEventListener('click', function() {
+            let speedElement = document.getElementById('speedValue');
+            let currentSpeed = parseInt(speedElement.innerText);
+            if(currentSpeed > 1) {
+                speedElement.innerText = currentSpeed - 1;
+                speed = currentSpeed - 1;
+                resetGame();
+            }
+        });
+
+        document.getElementById('resetButton').addEventListener('click', resetToInitialScreen);
+    </script>
+</body>
+</html>
