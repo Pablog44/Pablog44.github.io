@@ -1,0 +1,86 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: black;
+}
+
+
+.container {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 100px
+}
+h1 {
+    font-size: 2.5rem;
+    color: #00008B;
+}
+
+#displayArea {
+    font-size: 1.3rem;
+    font-weight: bold;
+    width: 200px;
+    overflow-wrap: break-word;
+    margin: 10px
+}
+
+#scoreArea {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #0b0a24;
+}
+
+input {
+    font-size: 1rem;
+    padding: 10px;
+    border: 2px solid #00008B;
+    border-radius: 5px;
+    outline: none;
+}
+
+button {
+    background-color: #00008B;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin: 10px;
+}
+
+button:hover {
+    background-color: #119cff;
+}
+
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: calc(100% - 40px);
+    color: #212529;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),0 0 10px white;
+    text-align: center;
+    margin: 10px;
+}
+
+.footer button {
+    margin: 0 20px;
+}
+textarea {
+    width: 100px;
+    height: 50px;
+    font-size: 1.3rem;
+    border: 1px solid black;
+
+}
