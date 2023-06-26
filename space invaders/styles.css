@@ -1,0 +1,19 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: black;
+}
+
+canvas {
+    border: 1px solid #39ff14;
+}
+
+#resetButton {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 10px;
+}
