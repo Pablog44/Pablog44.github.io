@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de sesión</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link rel="icon" href="5 puntas v3.png" type="image/png">
+</head>
+<body>
+    <div class="background"></div>
+    <div class="container">
+    <h1>Iniciar sesión</h1>
+    <form action="login.php" method="POST" id="login-form">
+        <input type="text" name="usuario" placeholder="Nombre de usuario" required>
+        <input type="password" name="contrasena" placeholder="Contraseña" required>
+    </form>
+    <button type="submit" form="login-form" value="Iniciar sesión">Iniciar sesión</button>
+    <button onclick="location.href='registro.html'">Registrarse</button>
+    <h3>Para jugar es necesario iniciar sesión o registrarse</h3>
+</div>
+</body>
+</html>

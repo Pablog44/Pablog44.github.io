@@ -1,0 +1,145 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: url(../5458940.jpg) no-repeat center center fixed;
+    background-size: cover;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+
+}
+.container {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+h1 {
+    margin-bottom: 2rem;
+    font-size: 2.5rem;
+    color: #00008B;
+}
+
+.word-display {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 2rem;
+}
+
+.button-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+button {
+    background-color: #00008B;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #119cff;
+}
+
+.retry-button {
+    font-size: 1.2rem;
+}
+
+.score-display {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #333;
+    padding: 10px;
+}
+
+.hidden {
+    display: none;
+}
+.fireworks-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: calc(100% - 20px);
+    color: #212529;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),0 0 10px black;
+    text-align: center;
+    margin: 10px;
+}
+.logo {
+    position: absolute;
+    top: 20px; /* Margen superior */
+    left: 20px; /* Margen izquierdo */
+    width: 100px; /* Anchura de la imagen */
+}
+.center {
+        position: absolute;
+        top: 17px;
+        left: 0;
+        right: 0;
+        margin-top: 45px;
+        margin-left: 140px;
+        margin-right: 140px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+.footer button {
+    margin: 0 20px;
+}
+.firework {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background-color: #0077cc;
+    border-radius: 50%;
+    animation: firework 1s linear infinite;
+}
+.firework.red {
+    background-color: #ff0000;
+}
+@keyframes firework {
+    0% {
+        transform: translateY(100%) scale(0.01);
+        opacity: 0;
+    }
+    50% {
+        transform: translateY(calc(100% - 200px)) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-400px) scale(0.01);
+        opacity: 0;
+    }
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link rel="icon" href="5 puntas v3.png" type="image/png">
+</head>
+<body>
+    <div class="container">
+        <h1>Registrarse</h1>
+        <form action="registro.php" method="POST" id="register-form">
+            <input type="text" name="usuario" placeholder="Nombre de usuario" required>
+            <input type="email" name="correo" placeholder="Correo electrónico" required>
+            <input type="password" name="contrasena" placeholder="Contraseña" required>
+            <input type="password" name="confirmacion_contrasena" placeholder="Confirma tu contraseña" required>
+        </form>
+        <button type="submit" form="register-form" value="Registrarse">Registrarse</button>
+        <button onclick="location.href='index.html'">Iniciar sesión</button>
+        <h3>Para jugar es necesario iniciar sesión o registrarse</h3>
+    </div>
+</body>
+</html>
