@@ -24,12 +24,14 @@ let checkDead = setInterval(() => {
 
 window.addEventListener('keydown', function (e) {
     if(e.code == "Space" && !gameover){
+        e.preventDefault();
         jump();
     }
 });
 
 window.addEventListener('touchstart', function (e) {
     if(!gameover){
+        e.preventDefault();
         jump();
     }
 });

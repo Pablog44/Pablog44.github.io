@@ -35,3 +35,13 @@ body {
     0% { right: -50px; }
     100% { right: 100%; }
 }
+
+@keyframes jump {
+    0% { bottom: 0; }
+    50% { bottom: 100px; }
+    100% { bottom: 0; }
+}
+
+.animate {
+    animation: jump 0.5s;
+}
