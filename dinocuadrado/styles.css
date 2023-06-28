@@ -1,5 +1,6 @@
 body {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
@@ -12,6 +13,7 @@ body {
     width: 90%;
     max-width: 600px;
     border: 1px solid black;
+    margin-bottom: 10px;
 }
 
 #player {
@@ -47,24 +49,6 @@ body {
     animation: jump 0.5s;
 }
 
-@media screen and (max-width: 768px) {
-    #game-container {
-        height: 300px;
-    }
-
-    #player {
-        width: 75px;
-        height: 75px;
-    }
-
-    #obstacle {
-        width: 37.5px;
-        height: 75px;
-    }
-
-    @keyframes jump {
-        0% { bottom: 0; }
-        50% { bottom: 150px; }
-        100% { bottom: 0; }
-    }
+.duck {
+    height: 25px !important;
 }
