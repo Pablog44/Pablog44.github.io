@@ -29,7 +29,7 @@ window.addEventListener('keydown', function (e) {
     }
 });
 
-window.addEventListener('touchstart', function (e) {
+document.body.addEventListener('touchstart', function (e) {
     if(!gameover){
         e.preventDefault();
         jump();
