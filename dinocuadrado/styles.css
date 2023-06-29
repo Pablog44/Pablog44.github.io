@@ -16,29 +16,6 @@ body {
     margin-bottom: 10px;
 }
 
-@media (max-width: 768px) {
-    body {
-        padding: 0;
-    }
-
-    #game-container {
-        width: 100%;
-        max-width: 100%;
-    }
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-    #game-container {
-        width: 80%;
-    }
-}
-
-@media (min-width: 1025px) {
-    #game-container {
-        width: 60%;
-    }
-}
-
 #player {
     position: absolute;
     bottom: 0;
@@ -49,12 +26,15 @@ body {
 
 #obstacle {
     position: absolute;
-    bottom: 0;
     right: -50px;
     width: 25px;
     height: 50px;
     background: #F00;
     animation: move 2s infinite linear;
+}
+
+#obstacle.lower {
+    bottom: 30px;
 }
 
 @keyframes move {
