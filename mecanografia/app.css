@@ -88,3 +88,10 @@ textarea {
     position: absolute;    
     margin: 0 20px;
 }
+@media (max-width: 958px) {
+    .container {
+        margin: 0;
+        width: 100vw;
+        height: 100vh;
+    }
+}

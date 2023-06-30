@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aplicación de Mecanografía</title>
     <link rel="stylesheet" href="app.css">
 </head>
@@ -9,7 +10,7 @@
     <div class="container">
         <h1>Aplicación de Mecanografía</h1>
         <textarea id="displayArea" readonly></textarea>
-        <input type="text" id="typingArea" />
+        <input type="text" id="typingArea" autocapitalize="none" />
         <button id="resetBtn">Reiniciar</button>
         <p id="scoreArea">Aciertos: 0 / Fallos: 0</p>
         <p id="timeArea"></p> <!-- This is the timer -->

@@ -29,17 +29,19 @@ function generarPalabras() {
     for (let i = 0; i < 20; i++) {
         palabrasActuales.push(obtenerNuevaPalabra());
     }
+    // Añadir un punto después de la última palabra
+    palabrasActuales[palabrasActuales.length - 1] += ".";
     areaMostrar.innerText = palabrasActuales.join(" ");
 }
 
 function manejarEntrada(e) {
-    const caracterTipeado = e.data;
+    const caracterTipeado = e.key;
     totalCaracteres++;
 
-    if (caracterTipeado === ' ') {
-        if (palabrasActuales[0].length === 0) {
-            cuentaCorrectas++;
+    if (caracterTipeado === ' ' || caracterTipeado === '.') {
+        if (palabrasActuales[0].length === 0 || (caracterTipeado === '.' && palabrasActuales[0] === '.')) {
             palabrasActuales.shift();
+            cuentaCorrectas++;
         } else {
             cuentaIncorrectas++;
         }
@@ -61,12 +63,13 @@ function manejarEntrada(e) {
     }
 }
 
+
 window.onload = function() {
     reiniciarJuego();
     areaTipear.focus();
 }
 
-areaTipear.addEventListener("input", manejarEntrada);
+areaTipear.addEventListener("keydown", manejarEntrada);
 
 botonReiniciar.addEventListener('click', function() {
     mostrarPulsacionesPorMinuto();
