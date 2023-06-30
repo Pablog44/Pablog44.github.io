@@ -11,8 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', loadFile);
 
     clearButton.addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (confirm('¿Estás seguro de que quieres borrar la imagen?')) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
     });
+    
 
     canvas.addEventListener('click', (e) => {
         const { offsetX, offsetY } = e;
@@ -36,12 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     saveButton.addEventListener('click', () => {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = 'edited-image.png';
-        link.click();
+        if (confirm('¿Estás seguro de que quieres guardar la imagen?')) {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'edited-image.png';
+            link.click();
+        }
     });
-
     function loadFile() {
         const file = fileInput.files[0];
         const img = new Image();
