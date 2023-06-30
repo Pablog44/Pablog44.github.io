@@ -11,9 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', loadFile);
 
     clearButton.addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (window.confirm("¿Estás seguro de que quieres borrar la imagen?")) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            imageLoaded = false;
+        }
     });
-
     canvas.addEventListener('click', (e) => {
         const { offsetX, offsetY } = e;
         const targetColor = ctx.getImageData(offsetX, offsetY, 1, 1).data;
@@ -36,10 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     saveButton.addEventListener('click', () => {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = 'edited-image.png';
-        link.click();
+        if (window.confirm("¿Estás seguro de que quieres guardar la imagen?")) {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'edited-image.png';
+            link.click();
+        }
     });
 
     function loadFile() {
