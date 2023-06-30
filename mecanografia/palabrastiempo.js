@@ -34,9 +34,10 @@ function generarPalabras() {
     areaMostrar.innerText = palabrasActuales.join(" ");
 }
 
+areaTipear.addEventListener("input", manejarEntrada);
+
 function manejarEntrada(e) {
-    const caracterTipeado = e.key;
-    totalCaracteres++;
+    const caracterTipeado = e.inputType === 'insertText' ? e.data : ' ';
 
     if (caracterTipeado === ' ' || caracterTipeado === '.') {
         if (palabrasActuales[0].length === 0 || (caracterTipeado === '.' && palabrasActuales[0] === '.')) {
@@ -62,7 +63,6 @@ function manejarEntrada(e) {
         clearInterval(intervaloTemporizador);
     }
 }
-
 
 window.onload = function() {
     reiniciarJuego();
