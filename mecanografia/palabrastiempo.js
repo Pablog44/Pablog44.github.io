@@ -29,20 +29,17 @@ function generarPalabras() {
     for (let i = 0; i < 20; i++) {
         palabrasActuales.push(obtenerNuevaPalabra());
     }
-    // Añadir un punto después de la última palabra
-    palabrasActuales[palabrasActuales.length - 1] += ".";
     areaMostrar.innerText = palabrasActuales.join(" ");
 }
 
-areaTipear.addEventListener("input", manejarEntrada);
-
 function manejarEntrada(e) {
-    const caracterTipeado = e.inputType === 'insertText' ? e.data : ' ';
+    const caracterTipeado = e.data;
+    totalCaracteres++;
 
-    if (caracterTipeado === ' ' || caracterTipeado === '.') {
-        if (palabrasActuales[0].length === 0 || (caracterTipeado === '.' && palabrasActuales[0] === '.')) {
-            palabrasActuales.shift();
+    if (caracterTipeado === ' ') {
+        if (palabrasActuales[0].length === 0) {
             cuentaCorrectas++;
+            palabrasActuales.shift();
         } else {
             cuentaIncorrectas++;
         }
@@ -69,7 +66,7 @@ window.onload = function() {
     areaTipear.focus();
 }
 
-areaTipear.addEventListener("keydown", manejarEntrada);
+areaTipear.addEventListener("input", manejarEntrada);
 
 botonReiniciar.addEventListener('click', function() {
     mostrarPulsacionesPorMinuto();
@@ -86,7 +83,6 @@ function reiniciarJuego() {
     areaTiempo.textContent = '';
     tiempoInicio = new Date();
     areaTipear.value = '';
-    typingArea.focus();
 
     if (intervaloTemporizador) {
         clearInterval(intervaloTemporizador);
@@ -103,7 +99,7 @@ function mostrarPulsacionesPorMinuto() {
     let ahora = new Date();
     let tiempoTranscurrido = (ahora - tiempoInicio) / 1000;
 
-    let netoCorrectos = cuentaCorrectas ;
+    let netoCorrectos = cuentaCorrectas - cuentaIncorrectas;
     let pulsacionesPorMinuto = Math.floor((netoCorrectos / tiempoTranscurrido) * 60);
-    areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
+    areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Pulsaciones por minuto: ' + pulsacionesPorMinuto;
 }
