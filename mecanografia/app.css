@@ -91,7 +91,19 @@ textarea {
 @media (max-width: 958px) {
     .container {
         margin: 0;
+        width: 85vw;
+        height: 70vh;
+    }
+    body {
         width: 100vw;
         height: 100vh;
+    }
+    .footer button {
+        margin: 5 5px;
+    }
+    #timeArea{
+        position: absolute;    
+    
+        padding-top: 10px;
     }
 }
