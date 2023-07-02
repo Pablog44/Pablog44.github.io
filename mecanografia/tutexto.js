@@ -17,6 +17,8 @@ botonTextoNuevo.addEventListener('click', function() {
         textoActual = nuevaAreaTexto.value;
         areaMostrar.innerText = textoActual;
         nuevaAreaTexto.value = '';
+        // Enfocarse en el área de tipeo para abrir el teclado en dispositivos móviles.
+        areaTipear.focus();
         // Inicio del tiempo cuando se presiona enter y se tienen palabras para procesar
         tiempoInicio = new Date();
         if (intervaloTemporizador) {
@@ -30,8 +32,8 @@ botonTextoNuevo.addEventListener('click', function() {
     }
 });
 
-areaTipear.addEventListener("input", function(e) {
-    const caracterTipeado = e.data;
+areaTipear.addEventListener("keyup", function(e) {
+    const caracterTipeado = e.key;
     if (caracterTipeado === textoActual.charAt(0)) {
         textoActual = textoActual.slice(1);
         cuentaCorrectas++;
