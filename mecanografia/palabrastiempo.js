@@ -1,16 +1,16 @@
 const palabras = [
     "hola", "que", "tal", "como", "esta", "yo", "muy", "bien", "tu", "otro", "dia", "soleado", "calor", "frio",
     "fuego", "hielo", "detras", "delante", "arriba", "abajo", "champu", "cepillo", "coleta", "nublado","vida",
-    "salud","mundo","amor","odio","felicidad","tristeza","alegría","envidia","miedo","esperanza","sueño",
+    "salud","mundo","amor","odio","felicidad","tristeza","alegre","envidia","miedo","esperanza","sueño",
     "viaje","cine","libro","música","juego","deporte","naturaleza","mar","sol","luna","cielo","estrella",
     "ciudad","país","casa","perro","gato","auto","comida","agua","aire","fuego","tierra","dinero",
     "amigo","familia","trabajo",
-    "piedra", "papel", "tijera", "rosa", "margarita", "cactus", "nube", "tormenta", "relámpago", "café", 
-    "té", "azúcar", "sal", "pimienta", "bocadillo", "queso", "pan", "leche", "uva", "manzana", "naranja", 
+    "piedra", "papel", "tijera", "rosa", "margarita", "cactus", "nube", "tormenta", "relámpago", "cafetera", 
+    "torilla", "azúcar", "sal", "pimienta", "bocadillo", "queso", "pan", "leche", "uva", "manzana", "naranja", 
     "plátano", "kiwi", "morado", "azul", "verde", "amarillo", "rojo", "blanco", "negro", "gris", "rosado",
     "cortina", "puerta", "ventana", "escalera", "silla", "sofá", "cama", "almohada", "edredón", "pintura",
-    "retrato", "guitarra", "piano", "batería", "saxofón", "violín", "flauta", "arco", "flecha", "escudo",
-    "espada", "casco", "armadura", "dragón", "hada", "sirena", "unicornio", "duende", "bruja", "vampiro"
+    "retrato", "guitarra", "piano", "batería", "saxofón", "violeta", "flauta", "arco", "flecha", "escudo",
+    "espada", "casco", "armadura", "dedo", "hada", "sirena", "unicornio", "duende", "bruja", "vampiro"
 ];
 
 
