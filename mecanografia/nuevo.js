@@ -1,4 +1,19 @@
-const palabras = [
+const areaMostrar = document.getElementById("displayArea");
+const areaTipear = document.getElementById("typingArea");
+const areaPuntuacion = document.getElementById("scoreArea");
+const botonReiniciar = document.getElementById("resetBtn");
+const areaTiempo = document.getElementById("timeArea");
+const nuevaAreaTexto = document.getElementById("newTextArea");
+const botonTextoNuevo = document.getElementById("newTextBtn");
+
+let textoActual = "";
+let cuentaCorrectas = 0;
+let cuentaIncorrectas = 0;
+let tiempoInicio;
+let totalCaracteres = 0;
+let intervaloTemporizador;
+
+let palabras = [
     "hola", "que", "tal", "como", "esta", "yo", "muy", "bien", "tu", "otro", "dia", "soleado", "calor", "frio",
     "fuego", "hielo", "detras", "delante", "arriba", "abajo", "champu", "cepillo", "coleta", "nublado","vida",
     "salud","mundo","amor","odio","felicidad","tristeza","alegría","envidia","miedo","esperanza","sueño",
@@ -13,67 +28,56 @@ const palabras = [
     "espada", "casco", "armadura", "dragón", "hada", "sirena", "unicornio", "duende", "bruja", "vampiro"
 ];
 
-
-const areaMostrar = document.getElementById("displayArea");
-const areaTipear = document.getElementById("typingArea");
-const areaPuntuacion = document.getElementById("scoreArea");
-const botonReiniciar = document.getElementById("resetBtn");
-const areaTiempo = document.getElementById("timeArea");
-
-let palabrasActuales = [];
-let cuentaCorrectas = 0;
-let cuentaIncorrectas = 0;
-let tiempoInicio;
-let totalCaracteres = 0;
-let intervaloTemporizador;
-
 function obtenerNuevaPalabra() {
     const indice = Math.floor(Math.random() * palabras.length);
     return palabras[indice];
 }
 
 function generarPalabras() {
+    palabrasActuales = [];
     for (let i = 0; i < 20; i++) {
         palabrasActuales.push(obtenerNuevaPalabra());
     }
-    areaMostrar.innerText = palabrasActuales.join(" ");
+    textoActual = palabrasActuales.join(" ");
+    areaMostrar.innerText = textoActual;
 }
 
-function manejarEntrada(e) {
+botonTextoNuevo.addEventListener('click', function() {
+    if (nuevaAreaTexto.value.length !== 0) {
+        palabras = nuevaAreaTexto.value.split(" ");
+        nuevaAreaTexto.value = '';
+    }
+    reiniciarJuego();
+    areaTipear.focus();
+});
+
+areaTipear.addEventListener("input", function(e) {
     const caracterTipeado = e.data;
     totalCaracteres++;
 
     if (caracterTipeado === ' ') {
-        if (palabrasActuales[0].length === 0) {
+        if (textoActual[0] === ' ') {
+            textoActual = textoActual.substring(1);
             cuentaCorrectas++;
-            palabrasActuales.shift();
         } else {
             cuentaIncorrectas++;
         }
-    } else if (caracterTipeado === palabrasActuales[0][0]) {
-        palabrasActuales[0] = palabrasActuales[0].substring(1);
+    } else if (caracterTipeado === textoActual[0]) {
+        textoActual = textoActual.substring(1);
         cuentaCorrectas++;
     } else {
         cuentaIncorrectas++;
     }
 
-    areaMostrar.innerText = palabrasActuales.join(" ");
+    areaMostrar.innerText = textoActual;
     areaPuntuacion.textContent = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas;
     areaTipear.value = '';
 
-    // Verificar si todas las palabras han sido completadas
-    if (palabrasActuales.length === 0) {
+    if (textoActual.length === 0) {
         mostrarPulsacionesPorMinuto();
         clearInterval(intervaloTemporizador);
     }
-}
-
-window.onload = function() {
-    reiniciarJuego();
-    areaTipear.focus();
-}
-
-areaTipear.addEventListener("input", manejarEntrada);
+});
 
 botonReiniciar.addEventListener('click', function() {
     mostrarPulsacionesPorMinuto();
@@ -81,7 +85,6 @@ botonReiniciar.addEventListener('click', function() {
 });
 
 function reiniciarJuego() {
-    palabrasActuales = [];
     cuentaCorrectas = 0;
     cuentaIncorrectas = 0;
     totalCaracteres = 0;
@@ -90,7 +93,6 @@ function reiniciarJuego() {
     areaTiempo.textContent = '';
     tiempoInicio = new Date();
     areaTipear.value = '';
-    typingArea.focus();
 
     if (intervaloTemporizador) {
         clearInterval(intervaloTemporizador);
@@ -110,4 +112,9 @@ function mostrarPulsacionesPorMinuto() {
     let netoCorrectos = cuentaCorrectas;
     let pulsacionesPorMinuto = Math.floor((netoCorrectos / tiempoTranscurrido) * 60);
     areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
+}
+
+window.onload = function() {
+    reiniciarJuego();
+    areaTipear.focus();
 }
