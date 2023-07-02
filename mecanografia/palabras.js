@@ -13,18 +13,13 @@ const palabras = [
     "espada", "casco", "armadura", "dragón", "hada", "sirena", "unicornio", "duende", "bruja", "vampiro"
 ];
 
-
-const displayArea = document.getElementById("displayArea");
-const typingArea = document.getElementById("typingArea");
-const scoreArea = document.getElementById('scoreArea');
-
 let currentWords = [];
 let correctCount = 0;
 let wrongCount = 0;
 
 function getNewWord() {
-    const index = Math.floor(Math.random() * words.length);
-    return words[index];
+    const index = Math.floor(Math.random() * palabras.length);
+    return palabras[index];
 }
 
 function generateWords() {
@@ -35,6 +30,7 @@ function generateWords() {
 }
 
 function handleInput(e) {
+    if (!e.data) return; // Handles backspace key
     const typedChar = e.data;
 
     // handle space (word end)
@@ -62,5 +58,9 @@ window.onload = function() {
     generateWords();
     typingArea.focus(); // Automatically selects the text input area
 }
+
+const displayArea = document.getElementById("displayArea");
+const typingArea = document.getElementById("typingArea");
+const scoreArea = document.getElementById('scoreArea');
 
 typingArea.addEventListener("input", handleInput);
