@@ -99,7 +99,7 @@ textarea {
         height: 100vh;
     }
     .footer button {
-        margin: 5 5px;
+        margin: 5 5 5 5px;
     }
     #timeArea{
         position: absolute;    

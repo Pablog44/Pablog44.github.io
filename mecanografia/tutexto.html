@@ -10,18 +10,21 @@
     <div class="container">
         <h1>Aplicación de Mecanografía</h1>
         <textarea id="displayArea" readonly></textarea>
-        <input type="text" id="typingArea" />
+        <input type="text" id="typingArea" autocapitalize="none" />
+        <input type="text" id="newTextArea" placeholder="Introduce nuevo texto aquí" />
+        <button id="newTextBtn">Texto Nuevo</button>
         <button id="resetBtn">Reiniciar</button>
         <p id="scoreArea">Aciertos: 0 / Fallos: 0</p>
+        <p id="timeArea"></p> <!-- This is the timer -->
     </div>
     <footer class="footer">
         <button onclick="location.href='index.html'">Inicio</button>
         <button onclick="location.href='espacios.html'">Espacios</button>
         <button onclick="location.href='palabras.html'">Palabras</button>
-        <button onclick="location.href='ejercicio1.html'">Ejercicio 1</button>
+        <button onclick="location.href='ejercicio1.html'">Ejercicio 1</button>       
         <button onclick="location.href='palabrastiempo.html'">Palabras tiempo</button>   
         <button onclick="location.href='tutexto.html'">Tu texto</button>   
     </footer>
-    <script src="ejercicio1.js"></script>
+    <script src="tutexto.js"></script>
 </body>
 </html>
