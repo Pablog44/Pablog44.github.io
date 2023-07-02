@@ -32,8 +32,8 @@ botonTextoNuevo.addEventListener('click', function() {
     }
 });
 
-areaTipear.addEventListener("keyup", function(e) {
-    const caracterTipeado = e.key;
+areaTipear.addEventListener("input", function(e) {
+    const caracterTipeado = e.data;
     if (caracterTipeado === textoActual.charAt(0)) {
         textoActual = textoActual.slice(1);
         cuentaCorrectas++;
