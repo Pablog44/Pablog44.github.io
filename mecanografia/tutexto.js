@@ -33,12 +33,21 @@ botonTextoNuevo.addEventListener('click', function() {
 });
 
 areaTipear.addEventListener("input", function(e) {
-    const caracterTipeado = e.data;
-    if (caracterTipeado === textoActual.charAt(0)) {
-        textoActual = textoActual.slice(1);
-        cuentaCorrectas++;
+    // Extraer la palabra completa hasta el espacio más cercano
+    let palabraTipeada = e.data.split(' ')[0];
+
+    if (palabraTipeada === textoActual.slice(0, palabraTipeada.length)) {
+        // Si la palabra tipeada coincide con el inicio de la palabra actual, se considera correcta
+        cuentaCorrectas += palabraTipeada.length;
+        textoActual = textoActual.slice(palabraTipeada.length);
     } else {
-        cuentaIncorrectas++;
+        // Si la palabra tipeada no coincide, se considera incorrecta
+        cuentaIncorrectas += palabraTipeada.length;
+    }
+
+    // Si se ha tipeado un espacio o la palabra completa, borrar la entrada
+    if (e.data.includes(' ') || palabraTipeada.length === textoActual.length) {
+        areaTipear.value = '';
     }
 
     areaMostrar.innerText = textoActual;
@@ -50,6 +59,7 @@ areaTipear.addEventListener("input", function(e) {
         clearInterval(intervaloTemporizador);
     }
 });
+
 
 botonReiniciar.addEventListener('click', function() {
     mostrarPulsacionesPorMinuto();
