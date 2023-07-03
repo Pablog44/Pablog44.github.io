@@ -15,11 +15,10 @@
 
         #output-canvas {
             margin-top: 20px;
-            max-width: 90vw;
-            max-height: 90vh;
+
         }
 
-        #download-btn, #image-input {
+        #download-btn, #image-input, #pixel-100-btn, #pixel-50-btn {
             padding: 15px;
             font-size: 1.2em;
         }
@@ -33,34 +32,57 @@
 </head>
 <body>
     <input type="file" id="image-input">
+    <button id="pixel-100-btn">100x100 Pixels</button>
+    <button id="pixel-50-btn">50x50 Pixels</button>
     <canvas id="source-canvas" style="display: none;"></canvas>
     <canvas id="output-canvas"></canvas>
     <button onclick="location.href='nuevo.html'">crea y colorea</button>   
     <button id="download-btn">Descargar imagen</button>
     <script>
+        let pixelSize = 100;
+
         const imageInput = document.getElementById('image-input');
         const sourceCanvas = document.getElementById('source-canvas');
         const outputCanvas = document.getElementById('output-canvas');
         const sourceCtx = sourceCanvas.getContext('2d');
         const outputCtx = outputCanvas.getContext('2d');
         const downloadBtn = document.getElementById('download-btn');
+        const pixel100Btn = document.getElementById('pixel-100-btn');
+        const pixel50Btn = document.getElementById('pixel-50-btn');
 
         imageInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
+            createImage(e.target.files[0]);
+        });
+
+        pixel100Btn.addEventListener('click', function() {
+            pixelSize = 100;
+            if (imageInput.files[0]) {
+                createImage(imageInput.files[0]);
+            }
+        });
+
+        pixel50Btn.addEventListener('click', function() {
+            pixelSize = 50;
+            if (imageInput.files[0]) {
+                createImage(imageInput.files[0]);
+            }
+        });
+
+        function createImage(file) {
             const reader = new FileReader();
 
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    sourceCanvas.width = 100;
-                    sourceCanvas.height = 100;
-                    outputCanvas.width = 1000;
-                    outputCanvas.height = 1000;
+                    sourceCanvas.width = pixelSize;
+                    sourceCanvas.height = pixelSize;
+                    outputCanvas.width = pixelSize * 10;
+                    outputCanvas.height = pixelSize * 10;
 
-                    sourceCtx.drawImage(img, 0, 0, 100, 100);
+                    sourceCtx.drawImage(img, 0, 0, pixelSize, pixelSize);
 
-                    for (let y = 0; y < 100; y++) {
-                        for(let x = 0; x < 100; x++) {
+                    for (let y = 0; y < pixelSize; y++) {
+                        for(let x = 0; x < pixelSize; x++) {
                             const pixelData = sourceCtx.getImageData(x, y, 1, 1).data;
                             outputCtx.fillStyle = `rgba(${pixelData[0]},${pixelData[1]},${pixelData[2]},${pixelData[3]/255})`;
                             outputCtx.fillRect(x*10, y*10, 10, 10);
@@ -70,7 +92,7 @@
                 img.src = e.target.result;
             }
             reader.readAsDataURL(file);
-        });
+        }
 
         downloadBtn.addEventListener('click', function() {
             const dataUrl = outputCanvas.toDataURL('image/png');

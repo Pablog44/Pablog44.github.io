@@ -10,8 +10,7 @@ body {
 
 #output-canvas {
     margin-top: 20px;
-    max-width: 90vw;
-    max-height: 90vh;
+
 }
 
 #download-btn, #image-input {

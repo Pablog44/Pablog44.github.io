@@ -1,3 +1,6 @@
+let pixelSize = 100;
+let selectedColor = 'red';
+
 const imageInput = document.getElementById('image-input');
 const sourceCanvas = document.getElementById('source-canvas');
 const outputCanvas = document.getElementById('output-canvas');
@@ -5,24 +8,41 @@ const sourceCtx = sourceCanvas.getContext('2d');
 const outputCtx = outputCanvas.getContext('2d');
 const downloadBtn = document.getElementById('download-btn');
 const colorPalette = document.getElementById('color-palette');
-let selectedColor = 'red';
+const pixel100Btn = document.getElementById('pixel-100-btn');
+const pixel50Btn = document.getElementById('pixel-50-btn');
 
 imageInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const reader = new FileReader();
+    createImage(e.target.files[0]);
+});
 
+pixel100Btn.addEventListener('click', function() {
+    pixelSize = 100;
+    if (imageInput.files[0]) {
+        createImage(imageInput.files[0]);
+    }
+});
+
+pixel50Btn.addEventListener('click', function() {
+    pixelSize = 50;
+    if (imageInput.files[0]) {
+        createImage(imageInput.files[0]);
+    }
+});
+
+function createImage(file) {
+    const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
-            sourceCanvas.width = 100;
-            sourceCanvas.height = 100;
-            outputCanvas.width = 1000;
-            outputCanvas.height = 1000;
+            sourceCanvas.width = pixelSize;
+            sourceCanvas.height = pixelSize;
+            outputCanvas.width = pixelSize * 10;
+            outputCanvas.height = pixelSize * 10;
 
-            sourceCtx.drawImage(img, 0, 0, 100, 100);
+            sourceCtx.drawImage(img, 0, 0, pixelSize, pixelSize);
 
-            for (let y = 0; y < 100; y++) {
-                for(let x = 0; x < 100; x++) {
+            for (let y = 0; y < pixelSize; y++) {
+                for(let x = 0; x < pixelSize; x++) {
                     const pixelData = sourceCtx.getImageData(x, y, 1, 1).data;
                     outputCtx.fillStyle = `rgba(${pixelData[0]},${pixelData[1]},${pixelData[2]},${pixelData[3]/255})`;
                     outputCtx.fillRect(x*10, y*10, 10, 10);
@@ -32,7 +52,7 @@ imageInput.addEventListener('change', function(e) {
         img.src = e.target.result;
     }
     reader.readAsDataURL(file);
-});
+}
 
 outputCanvas.addEventListener('click', function(e) {
     const rect = outputCanvas.getBoundingClientRect();
