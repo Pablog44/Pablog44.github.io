@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Pixelator</title>
+    <link rel="stylesheet" href="pix.css">
+</head>
+<body>
+    <input type="file" id="image-input">
+    <div id="color-palette">
+        <div class="color selected" style="background-color: red;" data-color="red"></div>
+        <div class="color" style="background-color: black;" data-color="black"></div>
+        <div class="color" style="background-color: blue;" data-color="blue"></div>
+        <div class="color" style="background-color: orange;" data-color="orange"></div>
+        <div class="color" style="background-color: yellow;" data-color="yellow"></div>
+        <div class="color" style="background-color: green;" data-color="green"></div>
+        <div class="color" style="background-color: violet;" data-color="violet"></div>
+        <div class="color" style="background-color: pink;" data-color="pink"></div>
+        <div class="color" style="background-color: purple;" data-color="purple"></div>
+        <div class="color" style="background-color: brown;" data-color="brown"></div>
+        <div class="color" style="background-color: gray;" data-color="gray"></div>
+    </div>
+    <canvas id="source-canvas" style="display: none;"></canvas>
+    <canvas id="output-canvas"></canvas>
+    <button id="download-btn">Descargar imagen</button>
+    <button onclick="location.href='index.html'">crea imagen</button>   
+
+    <script src="pix.js"></script>
+</body>
+</html>
