@@ -1,5 +1,6 @@
 body {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
@@ -29,4 +30,12 @@ body {
 
 .revealed {
     background-color: lightgreen;
+}
+
+#timer {
+    margin-bottom: 20px;
+}
+
+#reset {
+    margin-bottom: 20px;
 }
