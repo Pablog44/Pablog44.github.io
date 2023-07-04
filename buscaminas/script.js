@@ -25,7 +25,7 @@ let timer = null;
 let time = 0;
 let visited = new Set();
 let revealedCount = 0;
-let gameWon = false;  // Variable added to track if the game is already won.
+let gameWon = false;
 
 const baseSize = 20;
 const baseMines = 40;
@@ -43,7 +43,7 @@ async function saveWinner(time) {
     const date = new Date();
     const formattedDate = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
     if (name) {
-        await addDoc(collection(db, "winners" + size), {
+        await addDoc(collection(db, "winners" + size + "x" + size), {
             name: name,
             time: time,
             date: formattedDate
@@ -52,7 +52,7 @@ async function saveWinner(time) {
 }
 
 async function showTop100() {
-    const querySnapshot = await getDocs(query(collection(db, "winners" + size), orderBy("time"), limit(100)));
+    const querySnapshot = await getDocs(query(collection(db, "winners" + size + "x" + size), orderBy("time"), limit(100)));
     let winnersDiv = document.getElementById('winners');
     winnersDiv.innerHTML = '';
     querySnapshot.forEach((doc) => {
@@ -69,7 +69,7 @@ function resetGame(newSize) {
     timer = null;
     time = 0;
     revealedCount = 0;
-    gameWon = false;  // Reset gameWon to false when resetting the game.
+    gameWon = false;
     document.getElementById('timer').textContent = time;
 
     size = newSize;
@@ -109,7 +109,7 @@ function resetGame(newSize) {
         });
     });
 
-    showTop100();
+    showTop100();  // Show top 100 winners when resetting the game.
 }
 
 document.getElementById('reset').addEventListener('click', () => resetGame(size));
@@ -149,7 +149,7 @@ function reveal(i) {
 
     if (!gameWon && revealedCount + mines.size === size * size) {
         clearInterval(timer);
-        gameWon = true; // Set gameWon to true to avoid multiple win alerts and multiple records.
+        gameWon = true;
         saveWinner(time);
     }
 }
