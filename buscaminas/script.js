@@ -109,7 +109,7 @@ function resetGame(newSize) {
         });
     });
 
-    showTop100();  // Show top 100 winners when resetting the game.
+    showTop100(); // Show top 100 winners once the cells are created.
 }
 
 document.getElementById('reset').addEventListener('click', () => resetGame(size));
@@ -153,3 +153,5 @@ function reveal(i) {
         saveWinner(time);
     }
 }
+
+window.onload = showTop100; // Show top 100 winners once the page is loaded.
