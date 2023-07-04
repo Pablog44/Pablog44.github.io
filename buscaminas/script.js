@@ -39,12 +39,13 @@ resetGame(size);
 
 async function saveWinner(time) {
     const name = prompt('¡Has ganado! Ingresa tu nombre:');
-    const date = new Date().toISOString();
+    const date = new Date();
+    const formattedDate = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
     if (name) {
         await addDoc(collection(db, "winners" + size), {
             name: name,
             time: time,
-            date: date
+            date: formattedDate
         });
     }
 }
