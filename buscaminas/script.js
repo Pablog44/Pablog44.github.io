@@ -25,6 +25,7 @@ let timer = null;
 let time = 0;
 let visited = new Set();
 let revealedCount = 0;
+let gameWon = false;  // Variable added to track if the game is already won.
 
 const baseSize = 20;
 const baseMines = 40;
@@ -68,6 +69,7 @@ function resetGame(newSize) {
     timer = null;
     time = 0;
     revealedCount = 0;
+    gameWon = false;  // Reset gameWon to false when resetting the game.
     document.getElementById('timer').textContent = time;
 
     size = newSize;
@@ -145,8 +147,9 @@ function reveal(i) {
         }
     }
 
-    if (revealedCount + mines.size === size * size) {
+    if (!gameWon && revealedCount + mines.size === size * size) {
         clearInterval(timer);
+        gameWon = true; // Set gameWon to true to avoid multiple win alerts and multiple records.
         saveWinner(time);
     }
 }
