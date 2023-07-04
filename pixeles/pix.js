@@ -1,29 +1,27 @@
-let pixelSize = 100;
 let selectedColor = 'red';
 
 const imageInput = document.getElementById('image-input');
 const sourceCanvas = document.getElementById('source-canvas');
 const outputCanvas = document.getElementById('output-canvas');
+const widthInput = document.getElementById('width-input');
+const heightInput = document.getElementById('height-input');
 const sourceCtx = sourceCanvas.getContext('2d');
 const outputCtx = outputCanvas.getContext('2d');
 const downloadBtn = document.getElementById('download-btn');
 const colorPalette = document.getElementById('color-palette');
-const pixel100Btn = document.getElementById('pixel-100-btn');
-const pixel50Btn = document.getElementById('pixel-50-btn');
+const colorPicker = document.getElementById('color-picker');
 
 imageInput.addEventListener('change', function(e) {
     createImage(e.target.files[0]);
 });
 
-pixel100Btn.addEventListener('click', function() {
-    pixelSize = 100;
+widthInput.addEventListener('change', function() {
     if (imageInput.files[0]) {
         createImage(imageInput.files[0]);
     }
 });
 
-pixel50Btn.addEventListener('click', function() {
-    pixelSize = 50;
+heightInput.addEventListener('change', function() {
     if (imageInput.files[0]) {
         createImage(imageInput.files[0]);
     }
@@ -34,15 +32,17 @@ function createImage(file) {
     reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
-            sourceCanvas.width = pixelSize;
-            sourceCanvas.height = pixelSize;
-            outputCanvas.width = pixelSize * 10;
-            outputCanvas.height = pixelSize * 10;
+            const pixelWidth = widthInput.value || 100;  // Use default value if not set
+            const pixelHeight = heightInput.value || 100;  // Use default value if not set
+            sourceCanvas.width = pixelWidth;
+            sourceCanvas.height = pixelHeight;
+            outputCanvas.width = pixelWidth * 10;
+            outputCanvas.height = pixelHeight * 10;
 
-            sourceCtx.drawImage(img, 0, 0, pixelSize, pixelSize);
+            sourceCtx.drawImage(img, 0, 0, pixelWidth, pixelHeight);
 
-            for (let y = 0; y < pixelSize; y++) {
-                for(let x = 0; x < pixelSize; x++) {
+            for (let y = 0; y < pixelHeight; y++) {
+                for(let x = 0; x < pixelWidth; x++) {
                     const pixelData = sourceCtx.getImageData(x, y, 1, 1).data;
                     outputCtx.fillStyle = `rgba(${pixelData[0]},${pixelData[1]},${pixelData[2]},${pixelData[3]/255})`;
                     outputCtx.fillRect(x*10, y*10, 10, 10);
@@ -70,6 +70,10 @@ colorPalette.addEventListener('click', function(e) {
         e.target.classList.add('selected');
         selectedColor = e.target.getAttribute('data-color');
     }
+});
+
+colorPicker.addEventListener('input', function(e) {
+    selectedColor = e.target.value;
 });
 
 downloadBtn.addEventListener('click', function() {
