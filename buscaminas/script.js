@@ -1,3 +1,21 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
+import { getFirestore, addDoc, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCFI75cfMZT5AiO1dIw2gHxZC-srIE4xJU",
+  authDomain: "buscaminas-dbaed.firebaseapp.com",
+  projectId: "buscaminas-dbaed",
+  storageBucket: "buscaminas-dbaed.appspot.com",
+  messagingSenderId: "424846500525",
+  appId: "1:424846500525:web:a19a9b544197990a32dc24",
+  measurementId: "G-87LX1DYVGN"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
 let grid = document.getElementById('grid');
 let size = 20;
 let totalMines = 40;
@@ -10,7 +28,7 @@ let revealedCount = 0;
 
 const baseSize = 20;
 const baseMines = 40;
-const mineRatio = baseMines / (baseSize * baseSize);  // Calcula la proporción de minas
+const mineRatio = baseMines / (baseSize * baseSize);
 
 document.getElementById('size20').addEventListener('click', () => resetGame(20));
 document.getElementById('size15').addEventListener('click', () => resetGame(15));
@@ -18,6 +36,27 @@ document.getElementById('size10').addEventListener('click', () => resetGame(10))
 document.getElementById('size25').addEventListener('click', () => resetGame(25));
 
 resetGame(size);
+
+async function saveWinner(time) {
+    const name = prompt('¡Has ganado! Ingresa tu nombre:');
+    const date = new Date().toISOString();
+    if (name) {
+        await addDoc(collection(db, "winners" + size), {
+            name: name,
+            time: time,
+            date: date
+        });
+    }
+}
+
+async function showTop100() {
+    const querySnapshot = await getDocs(query(collection(db, "winners" + size), orderBy("time"), limit(100)));
+    let winnersDiv = document.getElementById('winners');
+    winnersDiv.innerHTML = '';
+    querySnapshot.forEach((doc) => {
+        winnersDiv.innerHTML += `${doc.data().name} - ${doc.data().time} - ${doc.data().date}<br/>`;
+    });
+}
 
 function resetGame(newSize) {
     grid.innerHTML = '';
@@ -31,7 +70,7 @@ function resetGame(newSize) {
     document.getElementById('timer').textContent = time;
 
     size = newSize;
-    totalMines = Math.floor(mineRatio * size * size);  // Calcula las nuevas minas
+    totalMines = Math.floor(mineRatio * size * size);
 
     while (mines.size < totalMines) {
         mines.add(Math.floor(Math.random() * size * size));
@@ -66,6 +105,8 @@ function resetGame(newSize) {
             cell.textContent = '🚩';
         });
     });
+
+    showTop100();
 }
 
 document.getElementById('reset').addEventListener('click', () => resetGame(size));
@@ -103,9 +144,8 @@ function reveal(i) {
         }
     }
 
-    // Comprobar si el jugador ha ganado
     if (revealedCount + mines.size === size * size) {
         clearInterval(timer);
-        alert('¡Has ganado!');
+        saveWinner(time);
     }
 }
