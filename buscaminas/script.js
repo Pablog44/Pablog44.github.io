@@ -154,4 +154,7 @@ function reveal(i) {
     }
 }
 
-window.onload = showTop100; // Show top 100 winners once the page is loaded.
+(async () => {
+    // Show top 100 winners once the script is loaded.
+    await showTop100();
+})();
