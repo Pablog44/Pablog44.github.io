@@ -41,7 +41,7 @@ resetGame(size);
 async function saveWinner(time) {
     const name = prompt('¡Has ganado! Ingresa tu nombre:');
     const date = new Date();
-    const formattedDate = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+    const formattedDate = `${date.getDate()}-${date.getMonth()+1}-${date.getFullYear()}`;
     if (name) {
         await addDoc(collection(db, "winners" + size + "x" + size), {
             name: name,
@@ -56,7 +56,7 @@ async function showTop100() {
     let winnersDiv = document.getElementById('winners');
     winnersDiv.innerHTML = '';
     querySnapshot.forEach((doc) => {
-        winnersDiv.innerHTML += `${doc.data().name} - ${doc.data().time} - ${doc.data().date}<br/>`;
+        winnersDiv.innerHTML += `${doc.data().name} - ${doc.data().time}s - ${doc.data().date}<br/>`;
     });
 }
 
