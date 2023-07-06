@@ -1,16 +1,16 @@
 const palabras = [
-    "hola", "que", "tal", "como", "esta", "yo", "muy", "bien", "tu", "otro", "dia", "soleado", "calor", "frio",
-    "fuego", "hielo", "detras", "delante", "arriba", "abajo", "champu", "cepillo", "coleta", "nublado","vida",
-    "salud","mundo","amor","odio","felicidad","tristeza","alegre","envidia","miedo","esperanza","sueño",
-    "viaje","cine","libro","música","juego","deporte","naturaleza","mar","sol","luna","cielo","estrella",
-    "ciudad","país","casa","perro","gato","auto","comida","agua","aire","fuego","tierra","dinero",
-    "amigo","familia","trabajo",
-    "piedra", "papel", "tijera", "rosa", "margarita", "cactus", "nube", "tormenta", "relámpago", "cafetera", 
-    "torilla", "azúcar", "sal", "pimienta", "bocadillo", "queso", "pan", "leche", "uva", "manzana", "naranja", 
-    "plátano", "kiwi", "morado", "azul", "verde", "amarillo", "rojo", "blanco", "negro", "gris", "rosado",
-    "cortina", "puerta", "ventana", "escalera", "silla", "sofá", "cama", "almohada", "edredón", "pintura",
-    "retrato", "guitarra", "piano", "batería", "saxofón", "violeta", "flauta", "arco", "flecha", "escudo",
-    "espada", "casco", "armadura", "dedo", "hada", "sirena", "unicornio", "duende", "bruja", "vampiro"
+    "abajo", "agua", "aire", "alegre", "almohada", "amarillo", "amigo", "amor", "arco", "arriba", "auto",
+    "azul", "azulejo", "batería", "bien", "blanco", "bocadillo", "bueno", "bruja", "cama", "casa", "casco",
+    "cepillo", "cine", "cielo", "ciudad", "coleta", "comida", "como", "cortina", "casa", "cafetera", "calor",
+    "cama", "cascada", "casco", "cactus", "café", "champu", "cielo", "ciudad", "coche", "color", "como",
+    "comida", "correr", "dedo", "delante", "deporte", "detrás", "dia", "dinero", "duende", "ego",
+    "enfrente", "envidia", "escalera", "esperanza", "espada", "estrella", "familia", "felicidad", "fuego",
+    "frio", "gato", "guitarra", "gris", "hada", "hielo", "hola", "juego", "kiwi", "luna", "leche", "libro",
+    "margarita", "mar", "miedo", "morado", "mundo", "música", "muy", "naranja", "naturaleza", "negro",
+    "nube", "nublado", "odio", "otro", "papel", "pan", "peseta", "piano", "piedra", "pimienta", "pintura",
+    "plátano", "puerta", "queso", "retrato", "relámpago", "rojo", "rosa", "rosado", "sal", "saxofón",
+    "silla", "sirena", "sofá", "sol", "sueño", "tijera", "tormenta", "tortilla", "trabajo", "tristeza",
+    "tú", "uva", "unicornio", "vampiro", "ventana", "verde", "vida", "viaje", "violeta", "yo"
 ];
 
 
