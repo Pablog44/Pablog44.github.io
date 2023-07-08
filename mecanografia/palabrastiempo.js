@@ -8,7 +8,7 @@ const palabras = [
     "frio", "gato", "guitarra", "gris", "hada", "hielo", "hola", "juego", "kiwi", "luna", "leche", "libro",
     "margarita", "mar", "miedo", "morado", "mundo", "música", "muy", "naranja", "naturaleza", "negro",
     "nube", "nublado", "odio", "otro", "papel", "pan", "peseta", "piano", "piedra", "pimienta", "pintura",
-    "plátano", "puerta", "queso", "retrato", "relámpago", "rojo", "rosa", "rosado", "sal", "saxofón",
+    "plátano", "puerta", "queso", "retrato", "retro", "rojo", "rosa", "rosado", "sal", "saxofón",
     "silla", "sirena", "sofá", "sol", "sueño", "tijera", "tormenta", "tortilla", "trabajo", "tristeza",
     "tú", "uva", "unicornio", "vampiro", "ventana", "verde", "vida", "viaje", "violeta", "yo"
 ];
@@ -33,31 +33,34 @@ function obtenerNuevaPalabra() {
 }
 
 function generarPalabras() {
-    for (let i = 0; i < 20; i++) {
-        palabrasActuales.push(obtenerNuevaPalabra());
+    palabrasActuales = [];
+    for (let i = 0; i < 19; i++) {
+        palabrasActuales.push(obtenerNuevaPalabra() + " ");
     }
-    areaMostrar.innerText = palabrasActuales.join(" ");
+    palabrasActuales.push(obtenerNuevaPalabra() + ".");
+    areaMostrar.innerText = palabrasActuales.join("");
+}
+
+window.onload = function() {
+    reiniciarJuego();
+    areaTipear.focus();
 }
 
 function manejarEntrada(e) {
     const caracterTipeado = e.data;
     totalCaracteres++;
 
-    if (caracterTipeado === ' ') {
-        if (palabrasActuales[0].length === 0) {
-            cuentaCorrectas++;
-            palabrasActuales.shift();
-        } else {
-            cuentaIncorrectas++;
-        }
-    } else if (caracterTipeado === palabrasActuales[0][0]) {
+    if (caracterTipeado === palabrasActuales[0][0]) {
         palabrasActuales[0] = palabrasActuales[0].substring(1);
         cuentaCorrectas++;
+        if (palabrasActuales[0].length === 0) {
+            palabrasActuales.shift();
+        }
     } else {
         cuentaIncorrectas++;
     }
 
-    areaMostrar.innerText = palabrasActuales.join(" ");
+    areaMostrar.innerText = palabrasActuales.join("");
     areaPuntuacion.textContent = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas;
     areaTipear.value = '';
 

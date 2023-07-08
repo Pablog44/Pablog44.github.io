@@ -8,7 +8,7 @@ const palabras = [
     "frio", "gato", "guitarra", "gris", "hada", "hielo", "hola", "juego", "kiwi", "luna", "leche", "libro",
     "margarita", "mar", "miedo", "morado", "mundo", "música", "muy", "naranja", "naturaleza", "negro",
     "nube", "nublado", "odio", "otro", "papel", "pan", "peseta", "piano", "piedra", "pimienta", "pintura",
-    "plátano", "puerta", "queso", "retrato", "relámpago", "rojo", "rosa", "rosado", "sal", "saxofón",
+    "plátano", "puerta", "queso", "retrato", "retro", "rojo", "rosa", "rosado", "sal", "saxofón",
     "silla", "sirena", "sofá", "sol", "sueño", "tijera", "tormenta", "tortilla", "trabajo", "tristeza",
     "tú", "uva", "unicornio", "vampiro", "ventana", "verde", "vida", "viaje", "violeta", "yo"
 ];
