@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Pixelator</title>
+    <link rel="stylesheet" href="pix.css">
+</head>
+<body>
+    <input type="file" id="image-input">
+    <div>
+        <label for="width-input">Ancho de pixel: </label>
+        <input type="number" id="width-input" min="1" max="200" value="100">
+    </div>
+    <div>
+        <label for="height-input">Altura de pixel: </label>
+        <input type="number" id="height-input" min="1" max="200" value="100">
+    </div>
+    <div id="color-palette">
+        <div class="color selected" style="background-color: red;" data-color="red"></div>
+        <div class="color" style="background-color: black;" data-color="black"></div>
+        <div class="color" style="background-color: blue;" data-color="blue"></div>
+        <div class="color" style="background-color: orange;" data-color="orange"></div>
+        <div class="color" style="background-color: yellow;" data-color="yellow"></div>
+        <div class="color" style="background-color: green;" data-color="green"></div>
+        <div class="color" style="background-color: violet;" data-color="violet"></div>
+        <div class="color" style="background-color: pink;" data-color="pink"></div>
+        <div class="color" style="background-color: purple;" data-color="purple"></div>
+        <div class="color" style="background-color: brown;" data-color="brown"></div>
+        <div class="color" style="background-color: gray;" data-color="gray"></div>
+        <input type="color" id="color-picker" value="#ff0000">
+    </div>
+    <canvas id="source-canvas" style="display: none;"></canvas>
+    <canvas id="output-canvas"></canvas>
+    <button id="download-btn">Descargar imagen</button>
+    <button onclick="location.href='index.html'">crea imagen</button>   
+    <button onclick="location.href='rejilla.html'">cuadricula</button>  
+
+    <script src="circ.js"></script>
+</body>
+</html>
