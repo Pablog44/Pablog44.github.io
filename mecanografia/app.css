@@ -89,14 +89,19 @@ textarea {
     margin: 0 20px;
 }
 @media (max-width: 958px) {
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 90vh;
+        margin: 0;
+        padding: 0;
+    }
+    
     .container {
         margin: 0;
         width: 85vw;
-        height: 70vh;
-    }
-    body {
-        width: 100vw;
-        height: 90vh;
+        height: auto;
     }
     .footer button {
         margin: 5px;  
