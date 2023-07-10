@@ -77,6 +77,12 @@ window.onload = function() {
 }
 
 areaTipear.addEventListener("input", manejarEntrada);
+areaTipear.addEventListener("keyup", function(e) {
+    if (e.keyCode === 13) { // Verificar si la tecla presionada es Enter (código 13)
+      reiniciarJuego();
+    }
+  });
+  
 
 botonReiniciar.addEventListener('click', function() {
     mostrarPulsacionesPorMinuto();

@@ -99,7 +99,7 @@ textarea {
     }
     
     .container {
-        margin: 0;
+        margin: 20px 0 0 0;
         width: 85vw;
         height: auto;
     }
