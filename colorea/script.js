@@ -5,17 +5,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     const colors = document.querySelectorAll('.color');
     const saveButton = document.getElementById('save-button');
+    const colorPicker = document.getElementById('color-picker');
 
-    let selectedColor = [0, 0, 0, 255]; // Negro
+    let selectedColor = [0, 0, 0, 255]; // Negro por defecto
 
     fileInput.addEventListener('change', loadFile);
 
     clearButton.addEventListener('click', () => {
         if (window.confirm("¿Estás seguro de que quieres borrar la imagen?")) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            imageLoaded = false;
         }
     });
+
     canvas.addEventListener('click', (e) => {
         const { offsetX, offsetY } = e;
         const targetColor = ctx.getImageData(offsetX, offsetY, 1, 1).data;
@@ -33,8 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     colors.forEach(color => {
         color.addEventListener('click', () => {
-            selectedColor = colorMap[color.id];
+            selectedColor = colorMap[color.id] || hexToRgba(colorPicker.value);
         });
+    });
+
+    colorPicker.addEventListener('input', () => {
+        selectedColor = hexToRgba(colorPicker.value);
     });
 
     saveButton.addEventListener('click', () => {
@@ -67,8 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pixels = imageData.data;
 
         while (pixelStack.length) {
-            const [x, y] = pixelStack.pop();
-            const pixelIndex = (y * canvasWidth + x) * 4;
+            const [newX, newY] = pixelStack.pop();
+            const pixelIndex = (newY * canvasWidth + newX) * 4;
 
             if (!colorMatch(targetColor, pixels.slice(pixelIndex, pixelIndex + 4))) continue;
 
@@ -77,10 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const neighbors = [
-                [x - 1, y],
-                [x + 1, y],
-                [x, y - 1],
-                [x, y + 1],
+                [newX - 1, newY],
+                [newX + 1, newY],
+                [newX, newY - 1],
+                [newX, newY + 1],
             ];
 
             for (const [nx, ny] of neighbors) {
@@ -95,5 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function colorMatch(a, b) {
         return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+    }
+
+    function hexToRgba(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return [r, g, b, 255]; // Asumiendo que el color es completamente opaco
     }
 });
