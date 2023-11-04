@@ -1,18 +1,4 @@
-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    padding: 20px;
-    padding-bottom: 60px; /* Ajustado para acomodar la barra de colores en la parte inferior */
-}
 
-#canvas {
-    border: 1px solid black;
-    margin-top: 20px; /* Separación entre el canvas y los elementos de arriba */
-    margin-bottom: 80px; /* Espacio adicional para evitar que el canvas toque la barra de colores */
-}
 
 #colors {
     position: fixed; /* Fija la barra de colores en la parte inferior */
