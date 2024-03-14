@@ -11,6 +11,35 @@
             document.documentElement.classList.add('dark-mode');
         }
     </script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script>
+      // Firebase configuration
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      firebase.auth().onAuthStateChanged(function(user) {
+        if (!user) {
+          // Sign in anonymously if no user is signed in
+          firebase.auth().signInAnonymously().catch(function(error) {
+            var errorCode = error.code;
+            var errorMessage = error.message;
+            console.log("Error [" + errorCode + "]: " + errorMessage);
+          });
+        }
+      });
+    </script>
 </head>
 <body>
 <a href="index.html">

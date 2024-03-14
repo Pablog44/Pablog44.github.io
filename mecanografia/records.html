@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Records de Mecanografía</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Top 25 Records de Palabras aleatorias</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>UID</th>
+                    <th>Ppm</th>
+                    <th>Fallos</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="resultados-container">
+                <!-- Los resultados se insertarán aquí -->
+            </tbody>
+        </table>
+    </div>
+    <footer class="footer1">
+        <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+        <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>
+        <button onclick="location.href='tutexto.html'">Tu texto</button>
+        <button onclick="location.href='index.html'">Inicio</button>
+    </footer>
+    <script>
+        const db = firebase.firestore();
+
+        function mostrarResultados(resultados) {
+            const resultadosContainer = document.getElementById('resultados-container');
+            resultados.forEach(doc => {
+                const data = doc.data();
+                const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
+                resultadosContainer.innerHTML += `
+                    <tr>
+                        <td>${data.uid}</td>
+                        <td>${data.ppm}</td>
+                        <td>${data.fallos}</td>
+                        <td>${fecha}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        db.collection("resultados").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+            mostrarResultados(snapshot.docs);
+        }).catch(error => {
+            console.log("Error al obtener documentos: ", error);
+        });
+    </script>
+</body>
+</html>
