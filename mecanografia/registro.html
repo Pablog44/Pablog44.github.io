@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Aplicación de Mecanografía</title>
+    <link rel="stylesheet" type="text/css" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Registrarse en Mecanografía</h1>
+        <form action="registro.php" method="POST" id="register-form">
+            <input type="text" name="usuario" placeholder="Nombre de usuario" required>
+            <input type="email" name="correo" placeholder="Correo electrónico" required>
+            <input type="password" name="contrasena" placeholder="Contraseña" required>
+            <input type="password" name="confirmacion_contrasena" placeholder="Confirma tu contraseña" required>
+            <button type="submit" form="register-form" value="Registrarse">Registrarse</button>
+        </form>
+        <h3 id="error-message" style="display: none; color: red;"></h3>
+        <button onclick="location.href='index.html'">Iniciar sesión</button>
+        <h3>Para usar la aplicación de mecanografía es necesario registrarse o iniciar sesión</h3>
+    </div>
+    <script>
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    if (error) {
+        let errorMessage = '';
+        switch(error) {
+            case 'password_mismatch':
+                errorMessage = 'Las contraseñas no coinciden.';
+                break;
+            case 'register_failed':
+                errorMessage = 'Error al registrar el usuario.';
+                break;
+            case 'invalid_password':
+                errorMessage = 'La contraseña debe tener al menos 8 caracteres, incluir una letra y un número.';
+                break;
+            case 'username_taken':
+                errorMessage = 'El nombre de usuario ya está en uso.';
+                break;
+          
+        }
+
+        // Mostrar el mensaje de error
+        if (errorMessage) {
+            const errorMessageElement = document.getElementById('error-message');
+            errorMessageElement.textContent = errorMessage;
+            errorMessageElement.style.display = 'block';
+        }
+    }
+};
+    </script>
+</body>
+</html>

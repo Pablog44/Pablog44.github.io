@@ -1,29 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aplicación de Mecanografía</title>
     <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Mecanografía</h1>
-        <textarea id="displayArea" readonly></textarea>
-        <input type="text" id="typingArea" />
-        <button id="resetBtn">Reiniciar</button>
-        <p id="scoreArea">Aciertos: 0 / Fallos: 0</p>
+        <h1>Bienvenido a la app de Mecanografía</h1>
+        <h4>Para reiniciar más rápido pulsa la tecla enter.</h4>
+        <div class="button-container">
+            <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>
+            <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+        </div>
+        <h4>Introduce tu propio texto.</h4>
+        <div class="button-container">
+            <button onclick="location.href='tutexto.html'">Tu texto</button>  
+            <button onclick="location.href='indepenpp.html'">Independientes</button>  
+        </div>
+        <h4>Puedes ver tus clasificaciones y las de otros usuarios</h4>
+        <div class="button-container">
+            <button onclick="location.href='records.html'">Records en palabras aleatorias</button>
+            <button onclick="location.href='recordsejercicios.html'">Records en ejercicios</button>
+        </div>
+        <h4>Usuario</h4>
+        <div class="button-container">
+            <button onclick="location.href='usuario.html'">Ajustes</button>
+            <button onclick="location.href='cerrar.html'">Cerrar Sesión</button> 
+        </div>
     </div>
-    <footer class="footer">
-        <button onclick="location.href='index.html'">Inicio</button>
-        <button onclick="location.href='espacios.html'">Espacios</button>
-        <button onclick="location.href='palabras.html'">Palabras</button>
-        <button onclick="location.href='ejercicio1.html'">Ejercicio 1</button>
-        <button onclick="location.href='palabrastiempo.html'">Palabras tiempo</button>   
-        <button onclick="location.href='tutexto.html'">Tu texto</button>   
 
+    <script>
+      // Configuración de Firebase
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
 
-    </footer>
-    <script src="script.js"></script>
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      // Registrar un usuario anónimo
+      firebase.auth().signInAnonymously().catch(function(error) {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        console.log(errorCode, errorMessage);
+      });
+    </script>
 </body>
 </html>

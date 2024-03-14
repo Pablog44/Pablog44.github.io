@@ -1,18 +1,8 @@
 const palabras = [
-    "abajo", "agua", "aire", "alegre", "almohada", "amarillo", "amigo", "amor", "arco", "arriba", "auto",
-    "azul", "azulejo", "batería", "bien", "blanco", "bocadillo", "bueno", "bruja", "cama", "casa", "casco",
-    "cepillo", "cine", "cielo", "ciudad", "coleta", "comida", "como", "cortina", "casa", "cafetera", "calor",
-    "cama", "cascada", "casco", "cactus", "café", "champu", "cielo", "ciudad", "coche", "color", "como",
-    "comida", "correr", "dedo", "delante", "deporte", "detrás", "dia", "dinero", "duende", "ego",
-    "enfrente", "envidia", "escalera", "esperanza", "espada", "estrella", "familia", "felicidad", "fuego",
-    "frio", "gato", "guitarra", "gris", "hada", "hielo", "hola", "juego", "kiwi", "luna", "leche", "libro",
-    "margarita", "mar", "miedo", "morado", "mundo", "música", "muy", "naranja", "naturaleza", "negro",
-    "nube", "nublado", "odio", "otro", "papel", "pan", "peseta", "piano", "piedra", "pimienta", "pintura",
-    "plátano", "puerta", "queso", "retrato", "retro", "rojo", "rosa", "rosado", "sal", "saxofón",
-    "silla", "sirena", "sofá", "sol", "sueño", "tijera", "tormenta", "tortilla", "trabajo", "tristeza",
-    "tú", "uva", "unicornio", "vampiro", "ventana", "verde", "vida", "viaje", "violeta", "yo"
+    "a", "b", "q", "w", "r", "l", "t", "y", "u", "i", "o",
+    "p", "g", "s", "d", "f", "h", "j", "k", "ñ", "z", "x",
+    "c", "v", ",", "n", "m", ".", "-"
 ];
-
 
 const areaMostrar = document.getElementById("displayArea");
 const areaTipear = document.getElementById("typingArea");
@@ -24,7 +14,6 @@ let palabrasActuales = [];
 let cuentaCorrectas = 0;
 let cuentaIncorrectas = 0;
 let tiempoInicio;
-let totalCaracteres = 0;
 let intervaloTemporizador;
 
 function obtenerNuevaPalabra() {
@@ -34,28 +23,27 @@ function obtenerNuevaPalabra() {
 
 function generarPalabras() {
     palabrasActuales = [];
-    for (let i = 0; i < 19; i++) {
-        palabrasActuales.push(obtenerNuevaPalabra() + " ");
+    for (let i = 0; i < 50; i++) { // Generar 50 caracteres
+        palabrasActuales.push(obtenerNuevaPalabra());
     }
-    palabrasActuales.push(obtenerNuevaPalabra() + ".");
     areaMostrar.innerText = palabrasActuales.join("");
 }
 
 window.onload = function() {
     reiniciarJuego();
     areaTipear.focus();
-
 };
+
 function manejarEntrada(e) {
     const caracterTipeado = e.data;
-    totalCaracteres++;
 
-    if (caracterTipeado === palabrasActuales[0][0]) {
-        palabrasActuales[0] = palabrasActuales[0].substring(1);
+    if (palabrasActuales.length === 0) {
+        return; // No hacer nada si el juego ya ha terminado
+    }
+
+    if (caracterTipeado === palabrasActuales[0]) {
         cuentaCorrectas++;
-        if (palabrasActuales[0].length === 0) {
-            palabrasActuales.shift();
-        }
+        palabrasActuales.shift();
     } else {
         cuentaIncorrectas++;
     }
@@ -64,13 +52,11 @@ function manejarEntrada(e) {
     areaPuntuacion.textContent = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas;
     areaTipear.value = '';
 
-    // Verificar si todas las palabras han sido completadas
     if (palabrasActuales.length === 0) {
         mostrarPulsacionesPorMinuto();
         clearInterval(intervaloTemporizador);
     }
 }
-
 
 areaTipear.addEventListener("input", manejarEntrada);
 areaTipear.addEventListener("keyup", function(e) {
@@ -78,7 +64,6 @@ areaTipear.addEventListener("keyup", function(e) {
       reiniciarJuego();
     }
   });
-  
 
 botonReiniciar.addEventListener('click', function() {
     reiniciarJuego();
@@ -88,7 +73,6 @@ function reiniciarJuego() {
     palabrasActuales = [];
     cuentaCorrectas = 0;
     cuentaIncorrectas = 0;
-    totalCaracteres = 0;
     generarPalabras();
     areaPuntuacion.textContent = 'Aciertos: 0 / Fallos: 0';
     areaTiempo.textContent = '';
@@ -110,11 +94,23 @@ function reiniciarJuego() {
 function mostrarPulsacionesPorMinuto() {
     let ahora = new Date();
     let tiempoTranscurrido = (ahora - tiempoInicio) / 1000;
-
-    let netoCorrectos = cuentaCorrectas;
-    let pulsacionesPorMinuto = Math.floor((netoCorrectos / tiempoTranscurrido) * 60);
+    let pulsacionesPorMinuto = Math.floor((cuentaCorrectas / tiempoTranscurrido) * 60);
     areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
-
-
+    guardarRecord(pulsacionesPorMinuto, cuentaIncorrectas);
 }
-
+function guardarRecord(pulsacionesPorMinuto, fallos) {
+    fetch('guardarindepen.php', { // Cambia a 'guardarindepen.php'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `pulsaciones=${pulsacionesPorMinuto}&fallos=${fallos}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Success:', data);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}

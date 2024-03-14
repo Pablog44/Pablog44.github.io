@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión - Aplicación de Mecanografía</title>
+    <link rel="stylesheet" type="text/css" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Iniciar sesión en Mecanografía</h1>
+        <form action="iniciar.php" method="POST" id="login-form">
+            <input type="text" name="usuario" placeholder="Nombre de usuario" required>
+            <input type="password" name="contrasena" placeholder="Contraseña" required>
+            <button type="submit" form="login-form" value="Iniciar sesión">Iniciar sesión</button>
+        </form>
+        <button onclick="location.href='registro.html'">Registrarse</button>
+        <h3 id="error-message" style="display: none; color: red;"></h3>
+        <h3>Para usar la aplicación de mecanografía es necesario registrarse o iniciar sesión</h3>
+    </div>
+    <script>
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+            const errorMessageElement = document.getElementById('error-message');
+            let errorMessage = '';
+            switch(error) {
+                case 'invalid_credentials':
+                    errorMessage = 'Contraseña incorrecta. Intentalo de nuevo.';
+                    break;
+                case 'user_not_found':
+                    errorMessage = 'Usuario no encontrado. ¿Estás registrado?';
+                    break;
+            
+            }
+            if (errorMessage) {
+                errorMessageElement.textContent = errorMessage;
+                errorMessageElement.style.display = 'block';
+            }
+        }
+    };
+    </script>
+</body>
+</html>

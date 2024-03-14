@@ -1,0 +1,76 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aplicación de Mecanografía</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+<a href="index.html">
+    <img src="logo.png" alt="Logo" class="logo"/>
+</a>
+    <div class="container">
+        <h1>Ajustes de Usuario</h1>
+        <h2>Cambiar Contraseña</h2>
+        <h3 id="error-message" style="display: none; color: red;"></h3>
+        <form action="cambiarcontraseña.php" method="POST">
+            <input type="password" name="current_password" placeholder="Contraseña Actual" required>
+            <input type="password" name="new_password" placeholder="Nueva Contraseña" required>
+            <input type="password" name="confirm_new_password" placeholder="Confirmar Nueva Contraseña" required>
+            <button type="submit">Cambiar Contraseña</button>
+            <h2>Eliminar Usuario</h2>
+        </form>
+        <form action="usuario.php" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar tu cuenta? Esta acción no se puede deshacer.');">
+            <button type="submit" name="eliminar_cuenta">Eliminar Mi Cuenta</button>
+        </form>
+        <h2>Activar o deactivar el modo noche</h2>
+        <button id="toggleDarkMode">Modo Noche</button>
+    </div>
+    <footer class="footer1" >
+        <button onclick="location.href='ejercicios.html'">Ejercicios</button>       
+        <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>   
+        <button onclick="location.href='tutexto.html'">Tu texto</button>   
+        <button onclick="location.href='index.html'">Inicio</button>
+    </footer>
+    <script>
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+            let errorMessage = '';
+            switch(error) {
+                case 'password_mismatch':
+                    errorMessage = 'Las contraseñas no coinciden.';
+                    break;
+                case 'account_deletion_failed':
+                    errorMessage = 'Error al eliminar la cuenta.';
+                    break;
+                case 'invalid_password':
+                    errorMessage = 'La contraseña debe tener al menos 8 caracteres, incluir una letra y un número.';
+                    break;
+                case 'invalid_current_password':
+                    errorMessage = 'La contraseña actual es incorrecta.';
+                    break;        
+                
+            }
+
+            if (errorMessage) {
+                const errorMessageElement = document.getElementById('error-message');
+                errorMessageElement.textContent = errorMessage;
+                errorMessageElement.style.display = 'block';
+            }
+        }
+    };
+    </script>
+    <script src="modonoche.js"></script>
+</body>
+</html>
+

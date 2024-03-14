@@ -1,36 +1,44 @@
+
 <!DOCTYPE html>
 <html>
 <head>
+<script>
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.documentElement.classList.add('dark-mode');
+    }
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aplicación de Mecanografía</title>
     <link rel="stylesheet" href="app.css">
     <link rel="icon" href="logo.png" type="image/png">
-    <script>
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.documentElement.classList.add('dark-mode');
-        }
-    </script>
 </head>
 <body>
 <a href="index.html">
     <img src="logo.png" alt="Logo" class="logo"/>
 </a>
     <div class="container">
-        <h1>Palabras aleatorias</h1>
+    <h1>5 Ejercicios</h1>
+    <div class="botones-horizontal">
+    <button id="secuencia1Btn">1</button>
+        <button id="secuencia2Btn">2</button>
+        <button id="secuencia3Btn">3</button>
+        <button id="secuencia4Btn">4</button>
+        <button id="secuencia5Btn">5</button>
+        </div>
         <textarea id="displayArea" readonly></textarea>
-        <p id="timeArea"></p>
+        <p id="timeArea"></p> 
         <input type="text" id="typingArea" autocapitalize="none" />
         <button id="resetBtn">Reiniciar</button>
         <p id="scoreArea">Aciertos: 0 / Fallos: 0</p>
     </div>
-    <footer class="footer">
-        <button onclick="location.href='ejercicios.html'">Ejercicios</button>       
+    <footer class="footer">     
+        <button onclick="location.href='ejercicios.html'">Ejercicios</button>     
         <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>   
         <button onclick="location.href='tutexto.html'">Tu texto</button>  
-        <button onclick="location.href='records.html'">Records</button>
-        <button onclick="location.href='index.html'">Inicio</button> 
+        <button onclick="location.href='recordsejercicios.html'">Records</button>
+        <button onclick="location.href='index.html'">Inicio</button>    
     </footer>
-    <script src="palabrastiempo.js"></script>
+    <script src="ejercicio1.js"></script>
 </body>
 </html>
