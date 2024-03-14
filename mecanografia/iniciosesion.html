@@ -6,6 +6,23 @@
     <title>Iniciar sesión - Aplicación de Mecanografía</title>
     <link rel="stylesheet" type="text/css" href="app.css">
     <link rel="icon" href="logo.png" type="image/png">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script>
+        var firebaseConfig = {
+            apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+            authDomain: "mecano-29f6d.firebaseapp.com",
+            projectId: "mecano-29f6d",
+            storageBucket: "mecano-29f6d.appspot.com",
+            messagingSenderId: "155050813671",
+            appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+            measurementId: "G-4FSZ7V801W"
+        };
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+    </script>
     <script>
         if (localStorage.getItem('darkMode') === 'true') {
             document.documentElement.classList.add('dark-mode');
@@ -15,37 +32,28 @@
 <body>
     <div class="container">
         <h1>Iniciar sesión en Mecanografía</h1>
-        <form action="iniciar.php" method="POST" id="login-form">
-            <input type="text" name="usuario" placeholder="Nombre de usuario" required>
-            <input type="password" name="contrasena" placeholder="Contraseña" required>
-            <button type="submit" form="login-form" value="Iniciar sesión">Iniciar sesión</button>
+        <form id="login-form">
+            <input type="email" id="correo" placeholder="Correo electrónico" required>
+            <input type="password" id="contrasena" placeholder="Contraseña" required>
+            <button type="button" id="login-btn">Iniciar sesión</button>
         </form>
         <button onclick="location.href='registro.html'">Registrarse</button>
         <h3 id="error-message" style="display: none; color: red;"></h3>
         <h3>Para usar la aplicación de mecanografía es necesario registrarse o iniciar sesión</h3>
     </div>
     <script>
-    window.onload = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const error = urlParams.get('error');
-        if (error) {
+        document.getElementById('login-btn').addEventListener('click', function() {
+            const email = document.getElementById('correo').value;
+            const password = document.getElementById('contrasena').value;
             const errorMessageElement = document.getElementById('error-message');
-            let errorMessage = '';
-            switch(error) {
-                case 'invalid_credentials':
-                    errorMessage = 'Contraseña incorrecta. Intentalo de nuevo.';
-                    break;
-                case 'user_not_found':
-                    errorMessage = 'Usuario no encontrado. ¿Estás registrado?';
-                    break;
-            
-            }
-            if (errorMessage) {
-                errorMessageElement.textContent = errorMessage;
+
+            auth.signInWithEmailAndPassword(email, password).then(cred => {
+                window.location.href = 'index.html'; // Redirige al usuario a la página principal
+            }).catch(error => {
+                errorMessageElement.textContent = 'Error al iniciar sesión. Verifique sus credenciales.';
                 errorMessageElement.style.display = 'block';
-            }
-        }
-    };
+            });
+        });
     </script>
 </body>
 </html>

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,17 +19,11 @@
     <div class="container">
         <h1>Ajustes de Usuario</h1>
         <h2>Cambiar Contraseña</h2>
+        <input type="text" name="new_password" placeholder="Nombre de Usuario" required>
+        <input type="text" name="confirm_new_password" placeholder="Confirmar nombre de usuario" required>
+        <button type="submit">Cambiar Nobre de Usuario</button>
         <h3 id="error-message" style="display: none; color: red;"></h3>
-        <form action="cambiarcontraseña.php" method="POST">
-            <input type="password" name="current_password" placeholder="Contraseña Actual" required>
-            <input type="password" name="new_password" placeholder="Nueva Contraseña" required>
-            <input type="password" name="confirm_new_password" placeholder="Confirmar Nueva Contraseña" required>
-            <button type="submit">Cambiar Contraseña</button>
-            <h2>Eliminar Usuario</h2>
-        </form>
-        <form action="usuario.php" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar tu cuenta? Esta acción no se puede deshacer.');">
-            <button type="submit" name="eliminar_cuenta">Eliminar Mi Cuenta</button>
-        </form>
+        <!-- Eliminado el formulario de cambio de contraseña y eliminación de cuenta -->
         <h2>Activar o deactivar el modo noche</h2>
         <button id="toggleDarkMode">Modo Noche</button>
     </div>
@@ -50,16 +43,10 @@
                 case 'password_mismatch':
                     errorMessage = 'Las contraseñas no coinciden.';
                     break;
-                case 'account_deletion_failed':
-                    errorMessage = 'Error al eliminar la cuenta.';
-                    break;
                 case 'invalid_password':
                     errorMessage = 'La contraseña debe tener al menos 8 caracteres, incluir una letra y un número.';
                     break;
-                case 'invalid_current_password':
-                    errorMessage = 'La contraseña actual es incorrecta.';
-                    break;        
-                
+                // Considera manejar los errores directamente en JavaScript si es relevante para tu aplicación
             }
 
             if (errorMessage) {
@@ -73,4 +60,3 @@
     <script src="modonoche.js"></script>
 </body>
 </html>
-

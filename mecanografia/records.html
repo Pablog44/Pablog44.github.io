@@ -18,7 +18,7 @@
         appId: "1:155050813671:web:5649e1df37a5967e8cda42",
         measurementId: "G-4FSZ7V801W"
       };
-        firebase.initializeApp(firebaseConfig);
+      firebase.initializeApp(firebaseConfig);
     </script>
     <script>
         if (localStorage.getItem('darkMode') === 'true') {
@@ -32,7 +32,8 @@
         <table>
             <thead>
                 <tr>
-                    <th>UID</th>
+                    <th>Posición</th>
+                    <th>Usuario</th>
                     <th>Ppm</th>
                     <th>Fallos</th>
                     <th>Fecha</th>
@@ -51,23 +52,47 @@
     </footer>
     <script>
         const db = firebase.firestore();
-
+    
         function mostrarResultados(resultados) {
             const resultadosContainer = document.getElementById('resultados-container');
-            resultados.forEach(doc => {
+            const userPromises = [];
+    
+            resultados.forEach((doc, index) => {
                 const data = doc.data();
                 const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
-                resultadosContainer.innerHTML += `
-                    <tr>
-                        <td>${data.uid}</td>
-                        <td>${data.ppm}</td>
-                        <td>${data.fallos}</td>
-                        <td>${fecha}</td>
-                    </tr>
-                `;
+                
+                const userPromise = db.collection('users').doc(data.uid).get().then(userDoc => {
+                    const userName = userDoc.exists && userDoc.data().username ? userDoc.data().username : 'Usuario anónimo';
+                    return {
+                        posicion: index + 1,
+                        userName,
+                        ppm: data.ppm,
+                        fallos: data.fallos,
+                        fecha
+                    };
+                });
+                userPromises.push(userPromise);
+            });
+    
+            Promise.all(userPromises).then(results => {
+                let htmlContent = '';
+                results.forEach(result => {
+                    htmlContent += `
+                        <tr>
+                            <td>${result.posicion}</td>
+                            <td>${result.userName}</td>
+                            <td>${result.ppm}</td>
+                            <td>${result.fallos}</td>
+                            <td>${result.fecha}</td>
+                        </tr>
+                    `;
+                });
+                resultadosContainer.innerHTML = htmlContent;
+            }).catch(error => {
+                console.log("Error al obtener los nombres de usuario: ", error);
             });
         }
-
+    
         db.collection("resultados").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
             mostrarResultados(snapshot.docs);
         }).catch(error => {
