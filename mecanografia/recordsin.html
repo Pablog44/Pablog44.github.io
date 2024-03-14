@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Records de Mecanografía</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script>
+      // Configuración de Firebase
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
+      // Inicialización de Firebase
+      firebase.initializeApp(firebaseConfig);
+    </script>
+    <script>
+        // Configuración del modo oscuro
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Top 25 Records de letras aleatorias</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Usuario</th>
+                    <th>Ppm</th>
+                    <th>Fallos</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="resultados-container">
+                <!-- Los resultados se insertarán aquí -->
+            </tbody>
+        </table>
+    </div>
+    <footer class="footer1">
+        <button onclick="location.href='ejercicios.html'">Ejercicios</button>
+        <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>
+        <button onclick="location.href='tutexto.html'">Tu texto</button>
+        <button onclick="location.href='index.html'">Inicio</button>
+    </footer>
+    <script>
+        const db = firebase.firestore();
+
+        function mostrarResultados(docs) {
+            const resultadosContainer = document.getElementById('resultados-container');
+            const userPromises = [];
+        
+            docs.forEach((doc, index) => {
+                const data = doc.data();
+                const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
+                
+                const userPromise = db.collection('users').doc(data.uid).get().then(userDoc => {
+                    const userName = userDoc.exists && userDoc.data().username ? userDoc.data().username : 'Usuario anónimo';
+                    return {
+                        posicion: index + 1,
+                        userName,
+                        ppm: data.ppm,
+                        fallos: data.fallos,
+                        fecha
+                    };
+                });
+                userPromises.push(userPromise);
+            });
+        
+            Promise.all(userPromises).then(results => {
+                let htmlContent = '';
+                results.forEach(result => {
+                    htmlContent += `
+                        <tr>
+                            <td>${result.posicion}</td>
+                            <td>${result.userName}</td>
+                            <td>${result.ppm}</td>
+                            <td>${result.fallos}</td>
+                            <td>${result.fecha}</td>
+                        </tr>
+                    `;
+                });
+                resultadosContainer.innerHTML = htmlContent;
+            }).catch(error => {
+                console.log("Error al obtener los nombres de usuario: ", error);
+            });
+        }
+    
+        db.collection("resultados2").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+            mostrarResultados(snapshot.docs);
+        }).catch(error => {
+            console.log("Error al obtener documentos: ", error);
+        });
+    </script>
+</body>
+</html>

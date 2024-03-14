@@ -96,21 +96,32 @@ function mostrarPulsacionesPorMinuto() {
     let tiempoTranscurrido = (ahora - tiempoInicio) / 1000;
     let pulsacionesPorMinuto = Math.floor((cuentaCorrectas / tiempoTranscurrido) * 60);
     areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
-    guardarRecord(pulsacionesPorMinuto, cuentaIncorrectas);
+
+    // Guardar los resultados en Firestore en la colección "resultados2"
+    guardarResultados(pulsacionesPorMinuto, cuentaIncorrectas);
 }
-function guardarRecord(pulsacionesPorMinuto, fallos) {
-    fetch('guardarindepen.php', { // Cambia a 'guardarindepen.php'
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `pulsaciones=${pulsacionesPorMinuto}&fallos=${fallos}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Success:', data);
-    })
-    .catch((error) => {
-        console.error('Error:', error);
-    });
+function guardarResultados(ppm, fallos) {
+    // Verificar si Firebase ha sido inicializado
+    if (!firebase.apps.length) {
+        console.log("Firebase no ha sido inicializado. No se guardará el resultado.");
+        return; // Salir de la función si Firebase no está inicializado
+    }
+
+    const user = firebase.auth().currentUser;
+
+    if (user) {
+        const db = firebase.firestore();
+        db.collection("resultados2").add({
+            uid: user.uid,
+            ppm: ppm,
+            fallos: fallos,
+            fecha: firebase.firestore.Timestamp.fromDate(new Date())
+        }).then(function(docRef) {
+            console.log("Documento escrito con ID: ", docRef.id);
+        }).catch(function(error) {
+            console.error("Error añadiendo el documento: ", error);
+        });
+    } else {
+        console.log("No hay usuario autenticado para guardar los resultados");
+    }
 }
