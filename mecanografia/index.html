@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,9 +12,30 @@
             document.documentElement.classList.add('dark-mode');
         }
     </script>
-    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
-    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script>
+      // Firebase configuration
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      // Sign in anonymously
+      firebase.auth().signInAnonymously().catch(function(error) {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        console.log("Error [" + errorCode + "]: " + errorMessage);
+      });
+    </script>
 </head>
 <body>
     <div class="container">
@@ -39,28 +61,5 @@
             <button onclick="location.href='cerrar.html'">Cerrar Sesión</button> 
         </div>
     </div>
-
-    <script>
-      // Configuración de Firebase
-      var firebaseConfig = {
-        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscXyusO1e0f1Rk",
-        authDomain: "mecano-29f6d.firebaseapp.com",
-        projectId: "mecano-29f6d",
-        storageBucket: "mecano-29f6d.appspot.com",
-        messagingSenderId: "155050813671",
-        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
-        measurementId: "G-4FSZ7V801W"
-      };
-
-      // Inicializar Firebase
-      firebase.initializeApp(firebaseConfig);
-
-      // Registrar un usuario anónimo
-      firebase.auth().signInAnonymously().catch(function(error) {
-        var errorCode = error.code;
-        var errorMessage = error.message;
-        console.log(errorCode, errorMessage);
-      });
-    </script>
 </body>
 </html>
