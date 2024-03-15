@@ -30,6 +30,9 @@
     </script>
 </head>
 <body>
+    <a href="index.html">
+        <img src="logo.png" alt="Logo" class="logo"/>
+    </a>
     <div class="container">
         <h1>Top 25 Records de letras aleatorias</h1>
         <table>
@@ -65,7 +68,7 @@
                 const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
                 
                 const userPromise = db.collection('users').doc(data.uid).get().then(userDoc => {
-                    const userName = userDoc.exists && userDoc.data().username ? userDoc.data().username : 'Usuario anónimo';
+                    const userName = userDoc.exists && userDoc.data().username ? userDoc.data().username : 'Anónimo';
                     return {
                         posicion: index + 1,
                         userName,
