@@ -14,6 +14,13 @@ body {
     justify-content: center;
     margin: 60px
 }
+.container table {
+    width: 40%; /* O el ancho que prefieras */
+    margin: auto; /* Centra la tabla horizontalmente dentro del contenedor */
+}
+.container td, .container th {
+    text-align: center;
+}
 h1 {
     font-size: 2.5rem;
     color: #00008B;

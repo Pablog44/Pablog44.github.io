@@ -8,6 +8,7 @@
     <link rel="icon" href="logo.png" type="image/png">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script>
       var firebaseConfig = {
         apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
@@ -30,6 +31,33 @@
     <a href="index.html">
         <img src="logo.png" alt="Logo" class="logo"/>
     </a>
+
+    <!-- Sección para Top 25 Personal -->
+    <div class="container" id="top-personal-container" style="display:none;">
+        <h1>Tus Top 25 Records Personales</h1>
+        <table>
+            <div>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Ppm</th>
+                    <th>Fallos</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="resultados-personales-container">
+                <!-- Los resultados personales se insertarán aquí -->
+            </tbody>
+        </div>
+        </table>
+    </div>
+
+    <!-- Mensaje para Usuarios Anónimos -->
+    <div id="mensaje-anonimos" style="display:none;">
+        <p>Para guardar los records con nombre y guardar el top 25 personal debes registrarte o iniciar sesión.</p>
+    </div>
+
+    <!-- Sección para el Top 25 de Palabras Aleatorias -->
     <div class="container">
         <h1>Top 25 Records de Palabras aleatorias</h1>
         <table>
@@ -47,19 +75,63 @@
             </tbody>
         </table>
     </div>
+
     <footer class="footer1">
         <button onclick="location.href='ejercicios.html'">Ejercicios</button>
         <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>
         <button onclick="location.href='tutexto.html'">Tu texto</button>
         <button onclick="location.href='index.html'">Inicio</button>
     </footer>
+
     <script>
         const db = firebase.firestore();
-    
+
+        firebase.auth().onAuthStateChanged(user => {
+            if (user && !user.isAnonymous) {
+                // Usuario autenticado con email y contraseña
+                document.getElementById('top-personal-container').style.display = 'block';
+                mostrarResultadosPersonales(user.uid);
+            } else {
+                // Usuario anónimo o no autenticado
+                document.getElementById('mensaje-anonimos').style.display = 'block';
+            }
+        });
+
+        function mostrarResultadosPersonales(uid) {
+            db.collection("resultados").where("uid", "==", uid).orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+                const resultadosContainer = document.getElementById('resultados-personales-container');
+                let htmlContent = '';
+
+                snapshot.docs.forEach((doc, index) => {
+                    const data = doc.data();
+                    const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
+                    
+                    htmlContent += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${data.ppm}</td>
+                            <td>${data.fallos}</td>
+                            <td>${fecha}</td>
+                        </tr>
+                    `;
+                });
+
+                resultadosContainer.innerHTML = htmlContent;
+            }).catch(error => {
+                console.error("Error al obtener documentos personales: ", error);
+            });
+        }
+
+        db.collection("resultados").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+            mostrarResultados(snapshot.docs);
+        }).catch(error => {
+            console.error("Error al obtener documentos: ", error);
+        });
+
         function mostrarResultados(resultados) {
             const resultadosContainer = document.getElementById('resultados-container');
             const userPromises = [];
-    
+
             resultados.forEach((doc, index) => {
                 const data = doc.data();
                 const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
@@ -76,7 +148,7 @@
                 });
                 userPromises.push(userPromise);
             });
-    
+
             Promise.all(userPromises).then(results => {
                 let htmlContent = '';
                 results.forEach(result => {
@@ -92,15 +164,9 @@
                 });
                 resultadosContainer.innerHTML = htmlContent;
             }).catch(error => {
-                console.log("Error al obtener los nombres de usuario: ", error);
+                console.error("Error al obtener los nombres de usuario: ", error);
             });
         }
-    
-        db.collection("resultados").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
-            mostrarResultados(snapshot.docs);
-        }).catch(error => {
-            console.log("Error al obtener documentos: ", error);
-        });
     </script>
 </body>
 </html>
