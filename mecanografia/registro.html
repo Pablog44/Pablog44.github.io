@@ -42,34 +42,10 @@
             <button type="button" id="register-btn">Registrarse</button>
         </form>
         <h3 id="error-message" style="display: none; color: red;"></h3>
-        <button onclick="location.href='iniciarsesion.html'">Iniciar sesión</button>
-        <button id="google-sign-in-btn">Iniciar sesión con Google</button>
+        <button onclick="location.href='iniciosesion.html'">Iniciar sesión</button>
+        <button onclick="location.href='index.html'" >Continua como anónimo</button>
         <h3>Para usar la aplicación de mecanografía es necesario registrarse o iniciar sesión</h3>
     </div>
-    <script>
-document.getElementById('google-sign-in-btn').addEventListener('click', function() {
-    var provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).then(function(result) {
-        // Esto te da un token de acceso de Google. Puedes usarlo para acceder a la API de Google.
-        var token = result.credential.accessToken;
-        // La información del usuario que ha iniciado sesión.
-        var user = result.user;
-        // Redirige al usuario o maneja la sesión aquí.
-        window.location.href = 'tuPaginaPrincipal.html'; // Cambia esto por la URL a la que quieras redirigir tras el login.
-    }).catch(function(error) {
-        // Manejo de errores aquí.
-        var errorCode = error.code;
-        var errorMessage = error.message;
-        // El correo electrónico de la cuenta del usuario usado.
-        var email = error.email;
-        // El tipo de AuthCredential que se usó.
-        var credential = error.credential;
-        // Muestra el mensaje de error en tu UI o consola.
-        console.error("Error de autenticación: ", errorMessage);
-    });
-});
-
-    </script>
     <script>
         document.getElementById('register-btn').addEventListener('click', function() {
             const username = document.getElementById('usuario').value;
