@@ -19,11 +19,11 @@
         messagingSenderId: "155050813671",
         appId: "1:155050813671:web:5649e1df37a5967e8cda42",
         measurementId: "G-4FSZ7V801W"
-        };
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+      };
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
     </script>
     <script>
         if (localStorage.getItem('darkMode') === 'true') {
@@ -43,29 +43,37 @@
         </form>
         <h3 id="error-message" style="display: none; color: red;"></h3>
         <button onclick="location.href='iniciosesion.html'">Iniciar sesión</button>
-        <button onclick="location.href='index.html'" >Continua como anónimo</button>
+        <button onclick="location.href='index.html'" >Continuar como anónimo</button>
         <h3>Para usar la aplicación de mecanografía es necesario registrarse o iniciar sesión</h3>
     </div>
     <script>
         document.getElementById('register-btn').addEventListener('click', function() {
-            const username = document.getElementById('usuario').value;
-            const email = document.getElementById('correo').value;
+            const username = document.getElementById('usuario').value.trim();
+            const email = document.getElementById('correo').value.trim();
             const password = document.getElementById('contrasena').value;
             const confirmPassword = document.getElementById('confirmacion_contrasena').value;
             const errorMessageElement = document.getElementById('error-message');
-
+    
+            // Verificar que el campo del nombre de usuario no esté vacío
+            if (username === '') {
+                errorMessageElement.textContent = 'Por favor, ingresa un nombre de usuario.';
+                errorMessageElement.style.display = 'block';
+                return;
+            }
+    
             if (password !== confirmPassword) {
                 errorMessageElement.textContent = 'Las contraseñas no coinciden.';
                 errorMessageElement.style.display = 'block';
                 return;
             }
-
-            // Comprobar si el nombre de usuario o correo ya está registrado
+    
+            // Comprobar si el nombre de usuario ya está registrado
             db.collection('users').where('username', '==', username).get().then(snapshot => {
                 if (!snapshot.empty) {
-                    errorMessageElement.textContent = 'El nombre de usuario ya está en uso.';
+                    errorMessageElement.textContent = 'El nombre de usuario ya está en uso. Por favor, elige uno diferente.';
                     errorMessageElement.style.display = 'block';
-                    return Promise.reject('El nombre de usuario ya está en uso.');
+                    // Rechazar explícitamente la promesa con un Error para evitar entrar en el siguiente bloque then
+                    return Promise.reject(new Error('El nombre de usuario ya está en uso.'));
                 } else {
                     return auth.createUserWithEmailAndPassword(email, password);
                 }
@@ -77,8 +85,11 @@
             }).then(() => {
                 window.location.href = 'index.html'; // Redirige al usuario
             }).catch(error => {
-                errorMessageElement.textContent = error.message;
-                errorMessageElement.style.display = 'block';
+                // Solo actualizar el mensaje de error si no se ha establecido antes
+                if (errorMessageElement.textContent === '') {
+                    errorMessageElement.textContent = error.message || 'Error al registrar el usuario. Intenta nuevamente.';
+                    errorMessageElement.style.display = 'block';
+                }
             });
         });
     </script>
