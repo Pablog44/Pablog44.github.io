@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Records de Mecanografía</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyBpWXuE6QI4K8csUfPJscxXyusO1e0f1Rk",
+        authDomain: "mecano-29f6d.firebaseapp.com",
+        projectId: "mecano-29f6d",
+        storageBucket: "mecano-29f6d.appspot.com",
+        messagingSenderId: "155050813671",
+        appId: "1:155050813671:web:5649e1df37a5967e8cda42",
+        measurementId: "G-4FSZ7V801W"
+      };
+      firebase.initializeApp(firebaseConfig);
+    </script>
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+</head>
+<body>
+    <a href="index.html">
+        <img src="logo.png" alt="Logo" class="logo"/>
+    </a>
+
+    <!-- Sección para Top 25 Personal -->
+    <div class="container" id="top-personal-container" style="display:none;">
+        <h1>Tus Top 25 Personal en palabras aleatorias</h1>
+        <table>
+            <div>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Ppm</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="resultados-personales-container">
+                <!-- Los resultados personales se insertarán aquí -->
+            </tbody>
+        </div>
+        </table>
+        
+    </div>
+
+    <!-- Mensaje para Usuarios Anónimos -->
+
+
+    <!-- Sección para el Top 25 de Palabras Aleatorias -->
+    <div class="container">
+        <h1>Top 25 en Palabras aleatorias</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Usuario</th>
+                    <th>Ppm</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="resultados-container">
+                <!-- Los resultados se insertarán aquí -->
+            </tbody>
+        </table>
+        <div id="mensaje-anonimos" style="display:none;">
+            <p>Para guardar los récords con nombre y guardar el top 25 personal debes  <a href="registro.html">registrarte</a> o <a href="iniciosesion.html">iniciar sesión</a>.</p>
+        </div>
+    </div>
+
+    <footer class="footer1">
+        <button onclick="location.href='indepenpp.html'">Carácteres aleatorios</button>
+        <button onclick="location.href='palabrastiempo.html'">Palabras aleatorias</button>
+        <button onclick="location.href='tutexto.html'">Tu texto</button>
+        <button onclick="location.href='index.html'">Inicio</button>
+    </footer>
+
+    <script>
+        const db = firebase.firestore();
+
+        firebase.auth().onAuthStateChanged(user => {
+            if (user && !user.isAnonymous) {
+                // Usuario autenticado con email y contraseña
+                document.getElementById('top-personal-container').style.display = 'block';
+                mostrarResultadosPersonales(user.uid);
+            } else {
+                // Usuario anónimo o no autenticado
+                document.getElementById('mensaje-anonimos').style.display = 'block';
+            }
+        });
+
+        function mostrarResultadosPersonales(uid) {
+            db.collection("resultados3").where("uid", "==", uid).orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+                const resultadosContainer = document.getElementById('resultados-personales-container');
+                let htmlContent = '';
+
+                snapshot.docs.forEach((doc, index) => {
+                    const data = doc.data();
+                    const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
+                    
+                    htmlContent += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${data.ppm}</td>
+                            <td>${fecha}</td>
+                        </tr>
+                    `;
+                });
+
+                resultadosContainer.innerHTML = htmlContent;
+            }).catch(error => {
+                console.error("Error al obtener documentos personales: ", error);
+            });
+        }
+
+        db.collection("resultados3").orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+            mostrarResultados(snapshot.docs);
+        }).catch(error => {
+            console.error("Error al obtener documentos: ", error);
+        });
+
+        function mostrarResultados(resultados) {
+            const resultadosContainer = document.getElementById('resultados-container');
+            const userPromises = [];
+
+            resultados.forEach((doc, index) => {
+                const data = doc.data();
+                const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString("es-ES") : 'Sin fecha';
+                
+                const userPromise = db.collection('users').doc(data.uid).get().then(userDoc => {
+                    const userName = userDoc.exists && userDoc.data().username ? userDoc.data().username : 'Anónimo';
+                    return {
+                        posicion: index + 1,
+                        userName,
+                        ppm: data.ppm,
+                        fecha
+                    };
+                });
+                userPromises.push(userPromise);
+            });
+
+            Promise.all(userPromises).then(results => {
+                let htmlContent = '';
+                results.forEach(result => {
+                    htmlContent += `
+                        <tr>
+                            <td>${result.posicion}</td>
+                            <td>${result.userName}</td>
+                            <td>${result.ppm}</td>
+                            <td>${result.fecha}</td>
+                        </tr>
+                    `;
+                });
+                resultadosContainer.innerHTML = htmlContent;
+            }).catch(error => {
+                console.error("Error al obtener los nombres de usuario: ", error);
+            });
+        }
+    </script>
+</body>
+</html>
