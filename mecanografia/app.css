@@ -66,7 +66,10 @@ button {
 button:hover {
     background-color: #119cff;
 }
-
+.error {
+    color: red;
+    font-weight: bold;
+}
 .footer {
     position: fixed;
     left: 0;
@@ -110,6 +113,23 @@ textarea {
     border: 1px solid black;
 
 }
+#displayArea2 {
+
+    height: 40px; /* O la altura que prefieras */
+    border: 1px solid #ccc; /* Un borde para parecerse a un área de texto */
+    padding: 1px; /* Algo de padding */
+    overflow-y: auto; /* Para que sea scrollable si el contenido es muy largo */
+    background-color: white; /* Fondo blanco como un área de texto */
+    color: black; /* Texto negro */
+    font-size: 1.3rem;
+    font-weight: bold;
+    width: 200px;
+    text-align: left; 
+  
+    margin: 10px
+    
+}
+
 #timeArea{
     position: relative;    
     margin: 0 20px;
