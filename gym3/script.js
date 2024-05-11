@@ -58,7 +58,7 @@ async function initializeMuscleGroups() {
         await setDoc(userDocRef, { muscleGroups: initialMuscleGroups, exerciseRecords: [] });
     }
 
-    updateMuscleGroupOptions();
+    await updateMuscleGroupOptions();
 }
 
 // Actualiza las opciones de los grupos musculares
@@ -78,7 +78,7 @@ async function updateMuscleGroupOptions() {
             muscleGroupSelect.appendChild(option);
         }
 
-        updateExerciseOptions();
+        await updateExerciseOptions();
     }
 }
 
@@ -158,7 +158,6 @@ async function displayExerciseRecords(records = null) {
         exerciseRecordsList.appendChild(listItem);
     });
 }
-
 // Elimina un registro del historial
 async function deleteRecord(index) {
     if (!currentUser) return;
@@ -188,7 +187,7 @@ async function addMuscleGroup() {
             if (!muscleGroups[newGroup]) {
                 muscleGroups[newGroup] = [];
                 await updateDoc(userDocRef, { muscleGroups });
-                updateMuscleGroupOptions();
+                await updateMuscleGroupOptions();
                 newMuscleGroupInput.value = "";
             } else {
                 alert("El grupo muscular ya existe.");
@@ -214,7 +213,7 @@ async function addExercise() {
             if (muscleGroups[selectedGroup] && !muscleGroups[selectedGroup].includes(newExercise)) {
                 muscleGroups[selectedGroup].push(newExercise);
                 await updateDoc(userDocRef, { muscleGroups });
-                updateExerciseOptions();
+                await updateExerciseOptions();
                 newExerciseInput.value = "";
             } else {
                 alert("El ejercicio ya existe en ese grupo muscular.");
@@ -239,8 +238,8 @@ loginButton.addEventListener("click", async () => {
         currentUser = result.user;
         loginButton.classList.add("hidden");
         logoutButton.classList.remove("hidden");
-        initializeMuscleGroups();
-        displayExerciseRecords();
+        await initializeMuscleGroups();
+        await displayExerciseRecords();
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
     }
