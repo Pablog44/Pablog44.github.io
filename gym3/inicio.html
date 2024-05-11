@@ -98,39 +98,48 @@
     <main>
         <div class="form-container">
             <button id="login">Iniciar Sesión con Google</button>
-            <button onclick="location.href='index.html'">volver</button>
+            <button onclick="location.href='index.html'">Volver</button>
         </div>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
       
         const firebaseConfig = {
-          apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
-          authDomain: "apuntagym.firebaseapp.com",
-          projectId: "apuntagym",
-          storageBucket: "apuntagym.appspot.com",
-          messagingSenderId: "522093591127",
-          appId: "1:522093591127:web:27e2e56085d50c85b18112",
-          measurementId: "G-PY9MT94G92"
+            apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
+            authDomain: "apuntagym.firebaseapp.com",
+            projectId: "apuntagym",
+            storageBucket: "apuntagym.appspot.com",
+            messagingSenderId: "522093591127",
+            appId: "1:522093591127:web:27e2e56085d50c85b18112",
+            measurementId: "G-PY9MT94G92"
         };
-      
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
-      
-        document.getElementById('login').addEventListener('click', () => {
-          signInWithPopup(auth, provider)
-            .then((result) => {
-              const user = result.user;
-              console.log('Autenticación exitosa:', user);
-              alert(`Hola ${user.displayName}, has iniciado sesión con éxito!`);
-            }).catch((error) => {
-              console.error('Error durante la autenticación:', error);
-              alert(`Error de autenticación: ${error.message}`);
-            });
+
+        // Redirige si el usuario ya está autenticado
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.location.href = 'index.html';
+            }
         });
-      </script>
+
+        document.getElementById('login').addEventListener('click', () => {
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    const user = result.user;
+                    console.log('Autenticación exitosa:', user);
+                    alert(`Hola ${user.displayName}, has iniciado sesión con éxito!`);
+                    // Redirigir después del inicio de sesión
+                    window.location.href = 'index.html';
+                }).catch((error) => {
+                    console.error('Error durante la autenticación:', error);
+                    alert(`Error de autenticación: ${error.message}`);
+                });
+        });
+    </script>
 </body>
 </html>
