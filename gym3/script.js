@@ -1,30 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
-
-// Configuración de Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
-    authDomain: "apuntagym.firebaseapp.com",
-    projectId: "apuntagym",
-    storageBucket: "apuntagym.appspot.com",
-    messagingSenderId: "522093591127",
-    appId: "1:522093591127:web:27e2e56085d50c85b18112",
-    measurementId: "G-PY9MT94G92"
-};
-
-// Inicializa Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
-const db = getFirestore(app);
-
-// Variables generales
-let currentUser = null;
-
-// Variables DOM
-const loginButton = document.getElementById("login-google");
-const logoutButton = document.getElementById("logout");
+// Variables
 const muscleGroupSelect = document.getElementById("muscle-group");
 const exerciseSelect = document.getElementById("exercise");
 const weightInput = document.getElementById("weight");
@@ -47,73 +21,43 @@ const initialMuscleGroups = {
     "Hombros": ["Press Militar", "Elevaciones Laterales", "Pájaro"]
 };
 
-// Función para inicializar los grupos musculares en Firestore
-async function initializeMuscleGroups() {
-    if (!currentUser) return;
-
-    const userDocRef = doc(db, "users", currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (!userDocSnap.exists()) {
-        await setDoc(userDocRef, { muscleGroups: initialMuscleGroups, exerciseRecords: [] });
-    } else {
-        // Si el documento existe pero no tiene grupos musculares, agrégaselos
-        const data = userDocSnap.data();
-        if (!data.muscleGroups) {
-            await updateDoc(userDocRef, { muscleGroups: initialMuscleGroups });
-        }
-    }
-
-    await updateMuscleGroupOptions();
+// Función para inicializar los grupos musculares
+function initializeMuscleGroups() {
+    const storedGroups = JSON.parse(localStorage.getItem("muscleGroups")) || initialMuscleGroups;
+    localStorage.setItem("muscleGroups", JSON.stringify(storedGroups));
+    updateMuscleGroupOptions();
 }
 
 // Actualiza las opciones de los grupos musculares
-async function updateMuscleGroupOptions() {
-    if (!currentUser) return;
-
-    const userDocRef = doc(db, "users", currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-        const muscleGroups = userDocSnap.data().muscleGroups;
-        muscleGroupSelect.innerHTML = "";
-        for (const group in muscleGroups) {
-            const option = document.createElement("option");
-            option.value = group;
-            option.textContent = group;
-            muscleGroupSelect.appendChild(option);
-        }
-
-        await updateExerciseOptions();
+function updateMuscleGroupOptions() {
+    const muscleGroups = JSON.parse(localStorage.getItem("muscleGroups"));
+    muscleGroupSelect.innerHTML = "";
+    for (const group in muscleGroups) {
+        const option = document.createElement("option");
+        option.value = group;
+        option.textContent = group;
+        muscleGroupSelect.appendChild(option);
     }
+    updateExerciseOptions();
 }
 
 // Actualiza las opciones de ejercicio según el grupo muscular seleccionado
-async function updateExerciseOptions() {
-    if (!currentUser) return;
-
+function updateExerciseOptions() {
     const selectedGroup = muscleGroupSelect.value;
-    const userDocRef = doc(db, "users", currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
+    const muscleGroups = JSON.parse(localStorage.getItem("muscleGroups"));
+    const exercises = muscleGroups[selectedGroup] || [];
 
-    if (userDocSnap.exists()) {
-        const muscleGroups = userDocSnap.data().muscleGroups;
-        const exercises = muscleGroups[selectedGroup] || [];
-
-        exerciseSelect.innerHTML = "";
-        exercises.forEach(exercise => {
-            const option = document.createElement("option");
-            option.value = exercise;
-            option.textContent = exercise;
-            exerciseSelect.appendChild(option);
-        });
-    }
+    exerciseSelect.innerHTML = "";
+    exercises.forEach(exercise => {
+        const option = document.createElement("option");
+        option.value = exercise;
+        option.textContent = exercise;
+        exerciseSelect.appendChild(option);
+    });
 }
 
-// Guarda el ejercicio en el historial y en Firestore
-async function saveExercise() {
-    if (!currentUser) return;
-
+// Guarda el ejercicio en el historial y en el localStorage
+function saveExercise() {
     const muscleGroup = muscleGroupSelect.value;
     const exercise = exerciseSelect.value;
     const weight = weightInput.value;
@@ -129,31 +73,19 @@ async function saveExercise() {
             dateTime
         };
 
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const exerciseRecords = userDocSnap.data().exerciseRecords || [];
-            exerciseRecords.push(record);
-            await updateDoc(userDocRef, { exerciseRecords });
-            displayExerciseRecords(exerciseRecords);
-            clearForm();
-        }
+        const records = JSON.parse(localStorage.getItem("exerciseRecords")) || [];
+        records.push(record);
+        localStorage.setItem("exerciseRecords", JSON.stringify(records));
+        displayExerciseRecords();
+        clearForm();
     } else {
         alert("Por favor, completa todos los campos.");
     }
 }
 
 // Muestra el historial de ejercicios
-async function displayExerciseRecords(records = null) {
-    if (!currentUser) return;
-
-    if (!records) {
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        records = userDocSnap.exists() ? userDocSnap.data().exerciseRecords || [] : [];
-    }
-
+function displayExerciseRecords() {
+    const records = JSON.parse(localStorage.getItem("exerciseRecords")) || [];
     exerciseRecordsList.innerHTML = "";
     records.forEach((record, index) => {
         const listItem = document.createElement("li");
@@ -166,39 +98,25 @@ async function displayExerciseRecords(records = null) {
 }
 
 // Elimina un registro del historial
-async function deleteRecord(index) {
-    if (!currentUser) return;
-
-    const userDocRef = doc(db, "users", currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-        const exerciseRecords = userDocSnap.data().exerciseRecords || [];
-        exerciseRecords.splice(index, 1);
-        await updateDoc(userDocRef, { exerciseRecords });
-        displayExerciseRecords(exerciseRecords);
-    }
+function deleteRecord(index) {
+    const records = JSON.parse(localStorage.getItem("exerciseRecords")) || [];
+    records.splice(index, 1);
+    localStorage.setItem("exerciseRecords", JSON.stringify(records));
+    displayExerciseRecords();
 }
 
 // Añade un nuevo grupo muscular
-async function addMuscleGroup() {
-    if (!currentUser) return;
-
+function addMuscleGroup() {
     const newGroup = newMuscleGroupInput.value.trim();
     if (newGroup) {
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const muscleGroups = userDocSnap.data().muscleGroups || {};
-            if (!muscleGroups[newGroup]) {
-                muscleGroups[newGroup] = [];
-                await updateDoc(userDocRef, { muscleGroups });
-                await updateMuscleGroupOptions();
-                newMuscleGroupInput.value = "";
-            } else {
-                alert("El grupo muscular ya existe.");
-            }
+        const muscleGroups = JSON.parse(localStorage.getItem("muscleGroups")) || {};
+        if (!muscleGroups[newGroup]) {
+            muscleGroups[newGroup] = [];
+            localStorage.setItem("muscleGroups", JSON.stringify(muscleGroups));
+            updateMuscleGroupOptions();
+            newMuscleGroupInput.value = "";
+        } else {
+            alert("El grupo muscular ya existe.");
         }
     } else {
         alert("Por favor, introduce un nombre para el grupo muscular.");
@@ -206,25 +124,18 @@ async function addMuscleGroup() {
 }
 
 // Añade un nuevo ejercicio al grupo muscular seleccionado
-async function addExercise() {
-    if (!currentUser) return;
-
+function addExercise() {
     const selectedGroup = muscleGroupSelect.value;
     const newExercise = newExerciseInput.value.trim();
     if (selectedGroup && newExercise) {
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const muscleGroups = userDocSnap.data().muscleGroups || {};
-            if (muscleGroups[selectedGroup] && !muscleGroups[selectedGroup].includes(newExercise)) {
-                muscleGroups[selectedGroup].push(newExercise);
-                await updateDoc(userDocRef, { muscleGroups });
-                await updateExerciseOptions();
-                newExerciseInput.value = "";
-            } else {
-                alert("El ejercicio ya existe en ese grupo muscular.");
-            }
+        const muscleGroups = JSON.parse(localStorage.getItem("muscleGroups")) || {};
+        if (muscleGroups[selectedGroup] && !muscleGroups[selectedGroup].includes(newExercise)) {
+            muscleGroups[selectedGroup].push(newExercise);
+            localStorage.setItem("muscleGroups", JSON.stringify(muscleGroups));
+            updateExerciseOptions();
+            newExerciseInput.value = "";
+        } else {
+            alert("El ejercicio ya existe en ese grupo muscular.");
         }
     } else {
         alert("Por favor, selecciona un grupo muscular e introduce el nombre del ejercicio.");
@@ -238,55 +149,11 @@ function clearForm() {
     exerciseDateInput.value = "";
 }
 
-// Iniciar sesión con Google
-loginButton.addEventListener("click", async () => {
-    try {
-        const result = await signInWithPopup(auth, provider);
-        currentUser = result.user;
-        loginButton.classList.add("hidden");
-        logoutButton.classList.remove("hidden");
-        await initializeMuscleGroups();
-        await displayExerciseRecords();
-    } catch (error) {
-        console.error("Error al iniciar sesión:", error);
-    }
-});
-
-// Cerrar sesión
-logoutButton.addEventListener("click", async () => {
-    try {
-        await signOut(auth);
-        currentUser = null;
-        loginButton.classList.remove("hidden");
-        logoutButton.classList.add("hidden");
-        muscleGroupSelect.innerHTML = "";
-        exerciseSelect.innerHTML = "";
-        exerciseRecordsList.innerHTML = "";
-    } catch (error) {
-        console.error("Error al cerrar sesión:", error);
-    }
-});
-
-// Mantén al usuario autenticado entre recargas de la página
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        currentUser = user;
-        loginButton.classList.add("hidden");
-        logoutButton.classList.remove("hidden");
-        initializeMuscleGroups();
-        displayExerciseRecords();
-    } else {
-        currentUser = null;
-        loginButton.classList.remove("hidden");
-        logoutButton.classList.add("hidden");
-        muscleGroupSelect.innerHTML = "";
-        exerciseSelect.innerHTML = "";
-        exerciseRecordsList.innerHTML = "";
-    }
-});
-
 // Inicializa los eventos y la pantalla
 function initializeApp() {
+    initializeMuscleGroups();
+    displayExerciseRecords();
+
     muscleGroupSelect.addEventListener("change", updateExerciseOptions);
     saveExerciseButton.addEventListener("click", saveExercise);
     addMuscleGroupButton.addEventListener("click", addMuscleGroup);
