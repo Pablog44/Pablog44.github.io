@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
 // Configuración de Firebase
@@ -56,6 +56,12 @@ async function initializeMuscleGroups() {
 
     if (!userDocSnap.exists()) {
         await setDoc(userDocRef, { muscleGroups: initialMuscleGroups, exerciseRecords: [] });
+    } else {
+        // Si el documento existe pero no tiene grupos musculares, agrégaselos
+        const data = userDocSnap.data();
+        if (!data.muscleGroups) {
+            await updateDoc(userDocRef, { muscleGroups: initialMuscleGroups });
+        }
     }
 
     await updateMuscleGroupOptions();
@@ -158,6 +164,7 @@ async function displayExerciseRecords(records = null) {
         exerciseRecordsList.appendChild(listItem);
     });
 }
+
 // Elimina un registro del historial
 async function deleteRecord(index) {
     if (!currentUser) return;
