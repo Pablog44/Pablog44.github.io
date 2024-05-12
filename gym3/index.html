@@ -49,7 +49,7 @@
     </main>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -76,10 +76,13 @@
         const addExerciseButton = document.getElementById('add-exercise');
         const exerciseRecordsList = document.getElementById('exercise-records');
 
+        let currentUser;
+
         onAuthStateChanged(auth, user => {
             if (!user) {
                 window.location.href = 'inicio.html';
             } else {
+                currentUser = user;
                 initializeMuscleGroups();
                 displayExerciseRecords();
             }
@@ -169,18 +172,18 @@
         function addMuscleGroup() {
             const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
             if (newMuscleGroupName) {
-                setDoc(doc(db, "muscleGroups", newMusleGroupName), { exercises: [] })
+                setDoc(doc(db, "muscleGroups", newMuscleGroupName), { exercises: [] })
                     .then(() => {
-                        console.log("New muscle group added:", newMuscleGroupName);
+                        console.log("Nuevo grupo muscular añadido:", newMuscleGroupName);
                         document.getElementById('debug-info').innerText = "Nuevo grupo muscular añadido: " + newMuscleGroupName;
-                        muscleGroupSelect.innerHTML = ''; // Clear existing options
+                        muscleGroupSelect.innerHTML = ''; // Limpiar opciones existentes
                         initializeMuscleGroups();
                     }).catch(error => {
-                        console.error("Error adding muscle group:", error);
+                        console.error("Error añadiendo grupo muscular:", error);
                         document.getElementById('debug-info').innerText = "Error añadiendo grupo muscular: " + error;
                     });
             } else {
-                console.log("No muscle group name entered");
+                console.log("No se introdujo nombre de grupo muscular.");
                 document.getElementById('debug-info').innerText = "No se introdujo nombre de grupo muscular.";
             }
         }
@@ -193,34 +196,32 @@
                 const groupRef = doc(db, "muscleGroups", muscleGroup);
                 getDoc(groupRef).then(docSnap => {
                     if (docSnap.exists()) {
-                        const exercises = docSnap.data().exercises
+                        const exercises = docSnap.data().exercises;
                         if (!exercises.includes(newExerciseName)) {
                             exercises.push(newExerciseName);
                             setDoc(groupRef, { exercises }).then(() => {
-                                console.log("Exercise added:", newExerciseName);
+                                console.log("Ejercicio añadido:", newExerciseName);
                                 document.getElementById('debug-info').innerText = "Ejercicio añadido: " + newExerciseName;
-                                // Actualizar el desplegable de ejercicios
                                 updateExerciseOptions();
-                                // Limpiar el campo de texto para el nuevo ejercicio
-                                document.getElementById('new-exercise').value = '';
+                                document.getElementById('new-exercise').value = ''; // Limpiar el campo de texto
                             }).catch(error => {
-                                console.error("Error adding new exercise:", error);
+                                console.error("Error añadiendo nuevo ejercicio:", error);
                                 document.getElementById('debug-info').innerText = "Error añadiendo nuevo ejercicio: " + error;
                             });
                         } else {
-                            console.log("Exercise already exists:", newExerciseName);
+                            console.log("El ejercicio ya existe:", newExerciseName);
                             document.getElementById('debug-info').innerText = "El ejercicio ya existe: " + newExerciseName;
                         }
                     } else {
-                        console.log("Muscle group does not exist:", muscleGroup);
+                        console.log("El grupo muscular no existe:", muscleGroup);
                         document.getElementById('debug-info').innerText = "El grupo muscular no existe: " + muscleGroup;
                     }
                 }).catch(error => {
-                    console.error("Error fetching muscle group:", error);
+                    console.error("Error obteniendo grupo muscular:", error);
                     document.getElementById('debug-info').innerText = "Error obteniendo grupo muscular: " + error;
                 });
             } else {
-                console.log("No exercise name or muscle group selected");
+                console.log("No se seleccionó grupo muscular o nombre de ejercicio.");
                 document.getElementById('debug-info').innerText = "No se seleccionó grupo muscular o nombre de ejercicio.";
             }
         }
@@ -232,30 +233,41 @@
             const repetitions = repetitionsInput.value;
             const dateTime = exerciseDateInput.value || new Date().toISOString();
 
-            if (muscleGroup && exercise && weight && repetitions && dateTime) {
+            if (muscleGroup && exercise && weight && repetitions && dateTime && currentUser) {
                 addDoc(collection(db, "exerciseRecords"), {
+                    userId: currentUser.uid,
                     muscleGroup,
                     exercise,
                     weight: Number(weight),
                     repetitions: Number(repetitions),
                     dateTime
                 }).then(() => {
-                    console.log("Exercise record saved:", { muscleGroup, exercise, weight, repetitions, dateTime });
+                    console.log("Registro de ejercicio guardado:", { muscleGroup, exercise, weight, repetitions, dateTime });
                     document.getElementById('debug-info').innerText = "Registro de ejercicio guardado: " + exercise;
                     displayExerciseRecords();
                     clearForm();
                 }).catch(error => {
-                    console.error("Error saving exercise record:", error);
+                    console.error("Error guardando registro de ejercicio:", error);
                     document.getElementById('debug-info').innerText = "Error guardando registro de ejercicio: " + error;
                 });
             } else {
-                console.log("Incomplete form data");
+                console.log("Datos del formulario incompletos.");
                 document.getElementById('debug-info').innerText = "Datos del formulario incompletos.";
             }
         }
 
         function displayExerciseRecords() {
-            getDocs(query(collection(db, "exerciseRecords"), orderBy("dateTime", "desc"))).then(snapshot => {
+            if (!currentUser) {
+                return;
+            }
+
+            const recordsQuery = query(
+                collection(db, "exerciseRecords"),
+                where("userId", "==", currentUser.uid),
+                orderBy("dateTime", "desc")
+            );
+
+            getDocs(recordsQuery).then(snapshot => {
                 exerciseRecordsList.innerHTML = '';
                 snapshot.forEach(docSnap => {
                     const data = docSnap.data();
@@ -265,18 +277,18 @@
                     exerciseRecordsList.appendChild(listItem);
                 });
             }).catch(error => {
-                console.error("Error displaying exercise records:", error);
+                console.error("Error mostrando registros de ejercicios:", error);
                 document.getElementById('debug-info').innerText = "Error mostrando registros de ejercicios: " + error;
             });
         }
 
         function deleteRecord(docId) {
             deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
-                console.log("Exercise record deleted:", docId);
+                console.log("Registro de ejercicio eliminado:", docId);
                 document.getElementById('debug-info').innerText = "Registro de ejercicio eliminado: " + docId;
                 displayExerciseRecords();
             }).catch(error => {
-                console.error("Error deleting exercise record:", error);
+                console.error("Error eliminando registro de ejercicio:", error);
                 document.getElementById('debug-info').innerText = "Error eliminando registro de ejercicio: " + error;
             });
         }
