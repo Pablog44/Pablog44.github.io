@@ -44,6 +44,11 @@ h1, h2 {
     border: 2px solid #388e3c;
 }
 
+.obstacle {
+    background-color: #000;
+    border: 2px solid #222;
+}
+
 .food {
     background-color: #ff5722;
     border: 2px solid #e64a19;
