@@ -64,7 +64,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-
+        const defaultMuscleGroups = {
+    Pecho: ['Press Banca', 'Press Inclinado', 'Aperturas'],
+    Espalda: ['Dominadas', 'Remo con Barra', 'Jalón al Pecho'],
+    Brazos: ['Curl con Barra', 'Tríceps Fondo', 'Martillo'],
+    Piernas: ['Sentadilla', 'Prensa', 'Peso Muerto'],
+    Hombros: ['Press Militar', 'Elevaciones Laterales', 'Pájaro']
+};
         onAuthStateChanged(auth, user => {
             if (!user) {
                 window.location.href = 'inicio.html';
@@ -83,24 +89,35 @@
         });
 
         function initializeMuscleGroups() {
-            const muscleGroupsRef = collection(db, "muscleGroups");
-            getDocs(muscleGroupsRef).then(snapshot => {
-                if (snapshot.empty) {
-                    console.log("No muscle groups found, initializing default groups.");
-                    initializeDefaultMuscleGroups(muscleGroupsRef);
-                } else {
-                    snapshot.forEach(doc => {
-                        const option = document.createElement("option");
-                        option.textContent = doc.id;
-                        option.value = doc.id;
-                        muscleGroupSelect.appendChild(option);
-                    });
-                    updateExerciseOptions();
+    // Llenar los desplegables con los grupos musculares por defecto
+    Object.keys(defaultMuscleGroups).forEach(group => {
+        const option = document.createElement("option");
+        option.textContent = group;
+        option.value = group;
+        muscleGroupSelect.appendChild(option);
+    });
+    updateExerciseOptions();
+
+    // Consultar Firestore para ver si hay más grupos musculares
+    const muscleGroupsRef = collection(db, "muscleGroups");
+    getDocs(muscleGroupsRef).then(snapshot => {
+        if (snapshot.empty) {
+            console.log("No muscle groups found in Firestore, using default groups.");
+            initializeDefaultMuscleGroups(muscleGroupsRef);
+        } else {
+            snapshot.forEach(doc => {
+                if (!muscleGroupSelect.querySelector(`option[value="${doc.id}"]`)) {
+                    const option = document.createElement("option");
+                    option.textContent = doc.id;
+                    option.value = doc.id;
+                    muscleGroupSelect.appendChild(option);
                 }
-            }).catch(error => {
-                console.error("Error loading muscle groups:", error);
             });
         }
+    }).catch(error => {
+        console.error("Error loading muscle groups:", error);
+    });
+}
 
         function initializeDefaultMuscleGroups(muscleGroupsRef) {
             const initialGroups = {
@@ -116,23 +133,34 @@
         }
 
         function updateExerciseOptions() {
-            const selectedGroup = muscleGroupSelect.value;
-            const groupRef = doc(db, "muscleGroups", selectedGroup);
-            getDoc(groupRef).then(doc => {
-                if (doc.exists()) {
-                    const data = doc.data();
-                    exerciseSelect.innerHTML = ''; // Limpiar opciones anteriores
-                    data.exercises.forEach(exercise => {
-                        const option = document.createElement("option");
-                        option.value = exercise;
-                        option.textContent = exercise;
-                        exerciseSelect.appendChild(option);
-                    });
+    const selectedGroup = muscleGroupSelect.value;
+    const exercises = defaultMuscleGroups[selectedGroup] || [];
+    exerciseSelect.innerHTML = ''; // Limpiar opciones anteriores
+    exercises.forEach(exercise => {
+        const option = document.createElement("option");
+        option.value = exercise;
+        option.textContent = exercise;
+        exerciseSelect.appendChild(option);
+    });
+
+    // Consultar Firestore para ver si hay más ejercicios
+    const groupRef = doc(db, "muscleGroups", selectedGroup);
+    getDoc(groupRef).then(doc => {
+        if (doc.exists()) {
+            const data = doc.data();
+            data.exercises.forEach(exercise => {
+                if (!exerciseSelect.querySelector(`option[value="${exercise}"]`)) {
+                    const option = document.createElement("option");
+                    option.value = exercise;
+                    option.textContent = exercise;
+                    exerciseSelect.appendChild(option);
                 }
-            }).catch(error => {
-                console.error("Error loading exercises:", error);
             });
         }
+    }).catch(error => {
+        console.error("Error loading exercises:", error);
+    });
+}
 
         function saveExercise() {
             const muscleGroup = muscleGroupSelect.value;
