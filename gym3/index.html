@@ -169,7 +169,7 @@
         function addMuscleGroup() {
             const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
             if (newMuscleGroupName) {
-                setDoc(doc(db, "muscleGroups", newMusleGroupName), { exercises: [] })
+                setDoc(doc(db, "muscleGroups", newMuscleGroupName), { exercises: [] })
                     .then(() => {
                         console.log("New muscle group added:", newMuscleGroupName);
                         document.getElementById('debug-info').innerText = "Nuevo grupo muscular añadido: " + newMuscleGroupName;
