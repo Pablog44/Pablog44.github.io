@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Ejercicios</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Historial de Ejercicios</h1>
+        <button id="logout-button">Cerrar Sesión</button>
+        <a href="index.html"><button>Registrar Nuevo Ejercicio</button></a>
+    </header>
+    <main>
+        <section id="records-section">
+            <h2>Historial de Ejercicios</h2>
+            <ul id="exercise-records"></ul>
+        </section>
+        <div id="debug-info"></div>
+    </main>
+    <script src="historial.js" type="module"></script>
+</body>
+</html>
