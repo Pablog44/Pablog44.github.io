@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -24,7 +24,6 @@ const exerciseDateInput = document.getElementById('exercise-date');
 const saveExerciseButton = document.getElementById('save-exercise');
 const addMuscleGroupButton = document.getElementById('add-muscle-group');
 const addExerciseButton = document.getElementById('add-exercise');
-const exerciseRecordsList = document.getElementById('exercise-records');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
@@ -35,7 +34,6 @@ onAuthStateChanged(auth, user => {
     } else {
         currentUser = user;
         initializeMuscleGroups();
-        displayExerciseRecords();
     }
 });
 
@@ -120,7 +118,7 @@ function updateExerciseOptions() {
 }
 
 function addMuscleGroup() {
-    const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
+    const newMuscleGroupName = document.getElementById('new-muscle-group'). value.trim();
     if (newMuscleGroupName) {
         setDoc(doc(db, "muscleGroups", newMuscleGroupName), { exercises: [] }).then(() => {
             console.log("Nuevo grupo muscular añadido:", newMuscleGroupName);
@@ -193,7 +191,6 @@ function saveExercise() {
         }).then(() => {
             console.log("Registro de ejercicio guardado:", { muscleGroup, exercise, weight, repetitions, dateTime });
             debugInfo.innerText = "Registro de ejercicio guardado: " + exercise;
-            displayExerciseRecords();
             clearForm();
         }).catch(error => {
             console.error("Error guardando registro de ejercicio:", error);
@@ -203,53 +200,6 @@ function saveExercise() {
         console.log("Datos del formulario incompletos.");
         debugInfo.innerText = "Datos del formulario incompletos.";
     }
-}
-
-function displayExerciseRecords() {
-    if (!currentUser) {
-        return;
-    }
-
-    const recordsQuery = query(
-        collection(db, "exerciseRecords"),
-        where("userId", "==", currentUser.uid),
-        orderBy("dateTime", "desc")
-    );
-
-    getDocs(recordsQuery).then(snapshot => {
-        exerciseRecordsList.innerHTML = '';
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            const formattedDateTime = new Date(data.dateTime).toLocaleString('es-ES', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-
-            const listItem = document.createElement("li");
-            listItem.innerHTML = `
-                ${formattedDateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
-                <button onclick="deleteRecord('${docSnap.id}')">Eliminar</button>
-            `;
-            exerciseRecordsList.appendChild(listItem);
-        });
-    }).catch(error => {
-        console.error("Error mostrando registros de ejercicios:", error);
-        debugInfo.innerText = "Error mostrando registros de ejercicios: " + error;
-    });
-}
-
-function deleteRecord(docId) {
-    deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
-        console.log("Registro de ejercicio eliminado:", docId);
-        debugInfo.innerText = "Registro de ejercicio eliminado: " + docId;
-        displayExerciseRecords();
-    }).catch(error => {
-        console.error("Error eliminando registro de ejercicio:", error);
-        debugInfo.innerText = "Error eliminando registro de ejercicio: " + error;
-    });
 }
 
 function clearForm() {
@@ -262,5 +212,3 @@ muscleGroupSelect.addEventListener('change', updateExerciseOptions);
 saveExerciseButton.addEventListener('click', saveExercise);
 addMuscleGroupButton.addEventListener('click', addMuscleGroup);
 addExerciseButton.addEventListener('click', addExercise);
-
-window.deleteRecord = deleteRecord;
