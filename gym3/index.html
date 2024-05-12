@@ -64,9 +64,9 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, (user) => {
             if (!user) {
-                window.location.href = 'inicio.html'; // Redirect if not logged in
+                window.location.href = 'inicio.html';
             } else {
                 initializeMuscleGroups();
                 displayExerciseRecords();
@@ -76,16 +76,33 @@
         function initializeMuscleGroups() {
             const muscleGroupsRef = collection(db, "muscleGroups");
             getDocs(muscleGroupsRef).then(snapshot => {
-                muscleGroupSelect.innerHTML = ''; // Clear existing options
-                snapshot.forEach(doc => {
-                    const option = document.createElement("option");
-                    option.value = doc.id;
-                    option.textContent = doc.id;
-                    muscleGroupSelect.appendChild(option);
-                });
-                updateExerciseOptions(); // Initialize exercises for the first group
+                if (snapshot.empty) {
+                    console.log("No muscle groups found, initializing default groups.");
+                    initializeDefaultMuscleGroups(muscleGroupsRef);
+                } else {
+                    snapshot.forEach(doc => {
+                        const option = document.createElement("option");
+                        option.textContent = doc.id;
+                        option.value = doc.id;
+                        muscleGroupSelect.appendChild(option);
+                    });
+                    updateExerciseOptions();
+                }
             }).catch(error => {
-                console.error("Failed to load muscle groups:", error);
+                console.error("Error loading muscle groups:", error);
+            });
+        }
+
+        function initializeDefaultMuscleGroups(muscleGroupsRef) {
+            const initialGroups = {
+                Pecho: ['Press Banca', 'Press Inclinado', 'Aperturas'],
+                Espalda: ['Dominadas', 'Remo con Barra', 'Jalón al Pecho'],
+                Brazos: ['Curl con Barra', 'Tríceps Fondo', 'Martillo'],
+                Piernas: ['Sentadilla', 'Prensa', 'Peso Muerto'],
+                Hombros: ['Press Militar', 'Elevaciones Laterales', 'Pájaro']
+            };
+            Object.keys(initialGroups).forEach(group => {
+                setDoc(doc(muscleGroupsRef, group), { exercises: initialGroups[group] });
             });
         }
 
@@ -93,9 +110,10 @@
             const selectedGroup = muscleGroupSelect.value;
             const groupRef = doc(db, "muscleGroups", selectedGroup);
             getDoc(groupRef).then(doc => {
-                exerciseSelect.innerHTML = ''; // Clear existing options
                 if (doc.exists()) {
-                    doc.data().exercises.forEach(exercise => {
+                    const data = doc.data();
+                    exerciseSelect.innerHTML = ''; // Limpiar opciones anteriores
+                    data.exercises.forEach(exercise => {
                         const option = document.createElement("option");
                         option.value = exercise;
                         option.textContent = exercise;
@@ -103,7 +121,7 @@
                     });
                 }
             }).catch(error => {
-                console.error("Failed to load exercises:", error);
+                console.error("Error loading exercises:", error);
             });
         }
 
@@ -123,22 +141,22 @@
                 displayExerciseRecords();
                 clearForm();
             }).catch(error => {
-                console.error("Failed to save exercise:", error);
+                console.error("Error saving exercise:", error);
             });
         }
 
         function displayExerciseRecords() {
             getDocs(query(collection(db, "exerciseRecords"), orderBy("dateTime"))).then(snapshot => {
-                exerciseRecordsList.innerHTML = ''; // Clear existing records
+                exerciseRecordsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const listItem = document.createElement("li");
                     listItem.innerHTML = `${data.dateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
-                        <button onclick='deleteRecord("${doc.id}")'>Eliminar</button>`;
+                        <button onclick="deleteRecord('${doc.id}')">Eliminar</button>`;
                     exerciseRecordsList.appendChild(listItem);
                 });
             }).catch(error => {
-                console.error("Failed to display records:", error);
+                console.error("Error displaying records:", error);
             });
         }
 
@@ -146,7 +164,7 @@
             deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
                 displayExerciseRecords();
             }).catch(error => {
-                console.error("Failed to delete record:", error);
+                console.error("Error deleting record:", error);
             });
         }
 
