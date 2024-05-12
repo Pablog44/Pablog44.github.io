@@ -1,135 +1,141 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, where, orderBy, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
+// Configuración de Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
-    authDomain: "apuntagym.firebaseapp.com",
-    projectId: "apuntagym",
-    storageBucket: "apuntagym.appspot.com",
-    messagingSenderId: "522093591127",
-    appId: "1:522093591127:web:27e2e56085d50c85b18112",
-    measurementId: "G-PY9MT94G92"
+    apiKey: "tu-api-key",
+    authDomain: "tu-auth-domain",
+    projectId: "tu-project-id",
+    storageBucket: "tu-storage-bucket",
+    messagingSenderId: "tu-sender-id",
+    appId: "tu-app-id",
+    measurementId: "tu-measurement-id"
 };
 
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-document.addEventListener('DOMContentLoaded', function () {
-    checkAuthState();
+// Comprobar estado de autenticación
+onAuthStateChanged(auth, user => {
+    if (!user) {
+        window.location.href = 'inicio.html'; // Redireccionar a la página de inicio de sesión
+    }
 });
 
-function checkAuthState() {
-    onAuthStateChanged(auth, (user) => {
-        if (!user) {
-            window.location.href = 'inicio.html'; // Redirige a inicio de sesión si no está autenticado
-        } else {
-            initializeMuscleGroups();
-            displayExerciseRecords();
-        }
-    });
-}
-
+// Inicializar grupos musculares desde Firestore
 function initializeMuscleGroups() {
-    getDocs(collection(db, "muscleGroups")).then((snapshot) => {
+    const muscleGroupsRef = collection(db, "muscleGroups");
+    getDocs(muscleGroupsRef).then(snapshot => {
         if (snapshot.empty) {
-            setDoc(doc(db, "muscleGroups", "default"), initialMuscleGroups);
-            updateMuscleGroupOptions(initialMuscleGroups);
+            // Si no hay datos, inicializa con los grupos musculares predeterminados
+            snapshot.forEach(doc => {
+                setDoc(doc(db, "muscleGroups", "default"), initialMuscleGroups);
+            });
         } else {
-            snapshot.forEach((doc) => {
+            snapshot.forEach(doc => {
                 updateMuscleGroupOptions(doc.data());
             });
         }
+    }).catch(error => {
+        console.error("Error al obtener los grupos musculares:", error);
     });
 }
 
-function updateMuscleGroupOptions(groups) {
+// Actualizar opciones de grupo muscular en el DOM
+function updateMuscleGroupOptions(muscleGroups) {
     muscleGroupSelect.innerHTML = '';
-    Object.keys(groups).forEach((group) => {
-        const option = document.createElement('option');
+    Object.keys(muscleGroups).forEach(group => {
+        let option = document.createElement('option');
         option.value = group;
         option.textContent = group;
         muscleGroupSelect.appendChild(option);
     });
-    updateExerciseOptions();
+    updateExerciseOptions(); // Actualizar ejercicios del primer grupo disponible
 }
 
+// Actualizar opciones de ejercicios basado en el grupo seleccionado
 function updateExerciseOptions() {
     const selectedGroup = muscleGroupSelect.value;
-    const docRef = doc(db, "muscleGroups", "default");
-    getDocs(collection(db, "muscleGroups")).then((snapshot) => {
-        snapshot.forEach((doc) => {
-            const groups = doc.data();
-            const exercises = groups[selectedGroup];
-            exerciseSelect.innerHTML = '';
-            exercises.forEach((exercise) => {
-                const option = document.createElement('option');
-                option.value = exercise;
-                option.textContent = exercise;
-                exerciseSelect.appendChild(option);
-            });
+    const exercisesRef = doc(db, "muscleGroups", "default");
+    getDocs(collection(db, "exercises", exercisesRef.id, selectedGroup)).then(snapshot => {
+        exerciseSelect.innerHTML = '';
+        snapshot.forEach(doc => {
+            let exercise = doc.data().name;
+            let option = document.createElement('option');
+            option.value = exercise;
+            option.textContent = exercise;
+            exerciseSelect.appendChild(option);
         });
+    }).catch(error => {
+        console.error("Error al obtener ejercicios:", error);
     });
 }
 
+// Guardar ejercicio
 function saveExercise() {
     const muscleGroup = muscleGroupSelect.value;
     const exercise = exerciseSelect.value;
-    const weight = parseInt(weightInput.value);
-    const repetitions = parseInt(repetitionsInput.value);
+    const weight = weightInput.value;
+    const repetitions = repetitionsInput.value;
     const dateTime = exerciseDateInput.value || new Date().toISOString();
 
     if (muscleGroup && exercise && weight && repetitions) {
-        addDoc(collection(db, "exercises"), {
-            muscleGroup,
-            exercise,
-            weight,
-            repetitions,
-            dateTime
+        addDoc(collection(db, "exerciseRecords"), {
+            muscleGroup, exercise, weight, repetitions, dateTime
         }).then(() => {
             displayExerciseRecords();
             clearForm();
         }).catch(error => {
-            console.error("Error adding document: ", error);
+            console.error("Error al guardar el ejercicio:", error);
         });
     } else {
         alert("Por favor, completa todos los campos.");
     }
 }
 
+// Mostrar registros de ejercicios
 function displayExerciseRecords() {
-    const exercisesRef = collection(db, "exercises");
-    const q = query(exercisesRef, orderBy("dateTime"));
-    getDocs(q).then((snapshot) => {
+    const recordsRef = collection(db, "exerciseRecords");
+    getDocs(recordsRef).then(snapshot => {
         exerciseRecordsList.innerHTML = '';
-        snapshot.forEach((doc) => {
-            const record = doc.data();
-            const listItem = document.createElement('li');
+        snapshot.forEach(doc => {
+            let record = doc.data();
+            let listItem = document.createElement('li');
             listItem.innerHTML = `${record.dateTime} - ${record.muscleGroup}: ${record.exercise} (${record.weight} kg x ${record.repetitions} reps)
                 <button onclick="deleteRecord('${doc.id}')">Eliminar</button>`;
             exerciseRecordsList.appendChild(listItem);
         });
+    }).catch(error => {
+        console.error("Error al mostrar registros:", error);
     });
 }
 
-function deleteRecord(id) {
-    const docRef = doc(db, "exercises", id);
-    deleteDoc(docRef).then(() => {
+// Eliminar un registro
+function deleteRecord(docId) {
+    deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
         displayExerciseRecords();
     }).catch(error => {
-        console.error("Error removing document: ", error);
+        console.error("Error al eliminar registro:", error);
     });
 }
 
+// Limpiar formulario
 function clearForm() {
     weightInput.value = '';
     repetitionsInput.value = '';
     exerciseDateInput.value = '';
 }
 
+// Añadir eventos
 muscleGroupSelect.addEventListener("change", updateExerciseOptions);
 saveExerciseButton.addEventListener("click", saveExercise);
 addMuscleGroupButton.addEventListener("click", addMuscleGroup);
 addExerciseButton.addEventListener("click", addExercise);
 
+document.addEventListener("DOMContentLoaded", () => {
+    initializeMuscleGroups();
+    displayExerciseRecords();
+});
