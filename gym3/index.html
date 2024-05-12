@@ -169,7 +169,7 @@
         function addMuscleGroup() {
             const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
             if (newMuscleGroupName) {
-                setDoc(doc(db, "muscleGroups", newMuscleGroupName), { exercises: [] })
+                setDoc(doc(db, "muscleGroups", newMusleGroupName), { exercises: [] })
                     .then(() => {
                         console.log("New muscle group added:", newMuscleGroupName);
                         document.getElementById('debug-info').innerText = "Nuevo grupo muscular añadido: " + newMuscleGroupName;
@@ -226,60 +226,49 @@
         }
 
         function saveExercise() {
-    const user = auth.currentUser;
-    if (user) {
-        const muscleGroup = muscleGroupSelect.value;
-        const exercise = exerciseSelect.value;
-        const weight = weightInput.value;
-        const repetitions = repetitionsInput.value;
-        const dateTime = exerciseDateInput.value || new Date().toISOString();
+            const muscleGroup = muscleGroupSelect.value;
+            const exercise = exerciseSelect.value;
+            const weight = weightInput.value;
+            const repetitions = repetitionsInput.value;
+            const dateTime = exerciseDateInput.value || new Date().toISOString();
 
-        if (muscleGroup && exercise && weight && repetitions && dateTime) {
-            addDoc(collection(db, "exerciseRecords"), {
-                userId: user.uid, // Asocia el registro con el ID de usuario
-                muscleGroup,
-                exercise,
-                weight: Number(weight),
-                repetitions: Number(repetitions),
-                dateTime
-            }).then(() => {
-                displayExerciseRecords();
-                clearForm();
-            }).catch(error => {
-                console.error("Error saving exercise record:", error);
-                document.getElementById('debug-info').innerText = "Error guardando registro de ejercicio: " + error;
-            });
-        } else {
-            console.log("Incomplete form data");
-            document.getElementById('debug-info').innerText = "Datos del formulario incompletos.";
+            if (muscleGroup && exercise && weight && repetitions && dateTime) {
+                addDoc(collection(db, "exerciseRecords"), {
+                    muscleGroup,
+                    exercise,
+                    weight: Number(weight),
+                    repetitions: Number(repetitions),
+                    dateTime
+                }).then(() => {
+                    console.log("Exercise record saved:", { muscleGroup, exercise, weight, repetitions, dateTime });
+                    document.getElementById('debug-info').innerText = "Registro de ejercicio guardado: " + exercise;
+                    displayExerciseRecords();
+                    clearForm();
+                }).catch(error => {
+                    console.error("Error saving exercise record:", error);
+                    document.getElementById('debug-info').innerText = "Error guardando registro de ejercicio: " + error;
+                });
+            } else {
+                console.log("Incomplete form data");
+                document.getElementById('debug-info').innerText = "Datos del formulario incompletos.";
+            }
         }
-    } else {
-        console.log("No user signed in");
-    }
-}
 
-function displayExerciseRecords() {
-    const user = auth.currentUser;
-    if (user) {
-        const q = query(collection(db, "exerciseRecords"), where("userId", "==", user.uid), orderBy("dateTime", "desc"));
-        getDocs(q).then(snapshot => {
-            exerciseRecordsList.innerHTML = '';
-            snapshot.forEach(docSnap => {
-                const data = docSnap.data();
-                const listItem = document.createElement("li");
-                listItem.innerHTML = `${data.dateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
-                    <button onclick="deleteRecord('${docSnap.id}')">Eliminar</button>`;
-                exerciseRecordsList.appendChild(listItem);
+        function displayExerciseRecords() {
+            getDocs(query(collection(db, "exerciseRecords"), orderBy("dateTime", "desc"))).then(snapshot => {
+                exerciseRecordsList.innerHTML = '';
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const listItem = document.createElement("li");
+                    listItem.innerHTML = `${data.dateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
+                        <button onclick="deleteRecord('${docSnap.id}')">Eliminar</button>`;
+                    exerciseRecordsList.appendChild(listItem);
+                });
+            }).catch(error => {
+                console.error("Error displaying exercise records:", error);
+                document.getElementById('debug-info').innerText = "Error mostrando registros de ejercicios: " + error;
             });
-        }).catch(error => {
-            console.error("Error displaying exercise records:", error);
-            document.getElementById('debug-info').innerText = "Error mostrando registros de ejercicios: " + error;
-        });
-    } else {
-        console.log("No user signed in");
-    }
-}
-
+        }
 
         function deleteRecord(docId) {
             deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
