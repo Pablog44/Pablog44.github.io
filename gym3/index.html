@@ -74,20 +74,30 @@
         });
 
         function initializeMuscleGroups() {
-            const groupsRef = collection(db, "muscleGroups");
-            getDocs(groupsRef).then(snapshot => {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const option = document.createElement("option");
-                    option.value = doc.id;
-                    option.textContent = doc.id; // Asumiendo que el id del documento es el nombre del grupo muscular
-                    muscleGroupSelect.appendChild(option);
-                });
-                updateExerciseOptions(); // Carga inicial de ejercicios
-            }).catch(error => {
-                console.error("Error loading muscle groups: ", error);
+    const muscleGroupsRef = collection(db, "muscleGroups");
+    getDocs(muscleGroupsRef).then(snapshot => {
+        if (snapshot.empty) {
+            // Crear grupos musculares si no existen
+            const initialGroups = {
+                Pecho: ['Press Banca', 'Press Inclinado', 'Aperturas'],
+                Espalda: ['Dominadas', 'Remo con Barra', 'Jalón al Pecho'],
+                Brazos: ['Curl con Barra', 'Tríceps Fondo', 'Martillo'],
+                Piernas: ['Sentadilla', 'Prensa', 'Peso Muerto'],
+                Hombros: ['Press Militar', 'Elevaciones Laterales', 'Pájaro']
+            };
+            Object.keys(initialGroups).forEach(group => {
+                setDoc(doc(muscleGroupsRef, group), { exercises: initialGroups[group] });
+            });
+        } else {
+            snapshot.forEach(doc => {
+                updateMuscleGroupOptions(doc);
             });
         }
+    }).catch(error => {
+        console.error("Error al obtener los grupos musculares:", error);
+    });
+}
+
 
         function updateExerciseOptions() {
             const selectedGroup = muscleGroupSelect.value;
