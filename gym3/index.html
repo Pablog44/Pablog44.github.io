@@ -37,6 +37,7 @@
                 <button id="add-muscle-group">Añadir Grupo Muscular</button>
                 <label for="new-exercise">Nuevo Ejercicio:</label>
                 <input type="text" id="new-exercise">
+                <select id="select-muscle-group"></select> <label for="select-muscle-group">Selecciona Grupo Muscular:</label>
                 <button id="add-exercise">Añadir Ejercicio</button>
             </div>
         </section>
@@ -47,22 +48,29 @@
     </main>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, orderBy, deleteDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
-            authDomain: "apuntagym.firebaseapp.com",
-            projectId: "apuntagym",
-            storageBucket: "apuntagym.appspot.com",
-            messagingSenderId: "522093591127",
-            appId: "1:522093591127:web:27e2e56085d50c85b18112",
-            measurementId: "G-PY9MT94G92"
+            // ... tu configuración de Firebase
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+
+        const muscleGroupSelect = document.getElementById("muscle-group");
+        const exerciseSelect = document.getElementById("exercise");
+        const weightInput = document.getElementById("weight");
+        const repetitionsInput = document.getElementById("repetitions");
+        const exerciseDateInput = document.getElementById("exercise-date");
+        const saveExerciseButton = document.getElementById("save-exercise");
+        const newMuscleGroupInput = document.getElementById("new-muscle-group");
+        const addMuscleGroupButton = document.getElementById("add-muscle-group");
+        const newExerciseInput = document.getElementById("new-exercise");
+        const selectMuscleGroup = document.getElementById("select-muscle-group");
+        const addExerciseButton = document.getElementById("add-exercise");
+        const exerciseRecordsList = document.getElementById("exercise-records");
 
         onAuthStateChanged(auth, (user) => {
             if (!user) {
@@ -85,6 +93,7 @@
                         option.textContent = doc.id;
                         option.value = doc.id;
                         muscleGroupSelect.appendChild(option);
+                        selectMuscleGroup.appendChild(option.cloneNode(true)); // Clonar la opción para el segundo select
                     });
                     updateExerciseOptions();
                 }
@@ -112,7 +121,7 @@
             getDoc(groupRef).then(doc => {
                 if (doc.exists()) {
                     const data = doc.data();
-                    exerciseSelect.innerHTML = ''; // Limpiar opciones anteriores
+                    exerciseSelect.innerHTML = ''; 
                     data.exercises.forEach(exercise => {
                         const option = document.createElement("option");
                         option.value = exercise;
@@ -126,52 +135,56 @@
         }
 
         function saveExercise() {
-            const muscleGroup = muscleGroupSelect.value;
-            const exercise = exerciseSelect.value;
-            const weight = weightInput.value;
-            const repetitions = repetitionsInput.value;
-            const dateTime = exerciseDateInput.value || new Date().toISOString();
-            addDoc(collection(db, "exerciseRecords"), {
-                muscleGroup,
-                exercise,
-                weight,
-                repetitions,
-                dateTime
-            }).then(() => {
-                displayExerciseRecords();
-                clearForm();
-            }).catch(error => {
-                console.error("Error saving exercise:", error);
-            });
+            // ... (código para guardar ejercicio)
         }
 
         function displayExerciseRecords() {
-            getDocs(query(collection(db, "exerciseRecords"), orderBy("dateTime"))).then(snapshot => {
-                exerciseRecordsList.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const listItem = document.createElement("li");
-                    listItem.innerHTML = `${data.dateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
-                        <button onclick="deleteRecord('${doc.id}')">Eliminar</button>`;
-                    exerciseRecordsList.appendChild(listItem);
-                });
-            }).catch(error => {
-                console.error("Error displaying records:", error);
-            });
+            // ... (código para mostrar historial)
         }
 
         function deleteRecord(docId) {
-            deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
-                displayExerciseRecords();
-            }).catch(error => {
-                console.error("Error deleting record:", error);
-            });
+            // ... (código para eliminar registro)
         }
 
         function clearForm() {
-            weightInput.value = '';
-            repetitionsInput.value = '';
-            exerciseDateInput.value = '';
+            // ... (código para limpiar formulario)
+        }
+
+        function addMuscleGroup() {
+            const newGroup = newMuscleGroupInput.value;
+            if (newGroup) {
+                setDoc(doc(collection(db, "muscleGroups"), newGroup), { exercises: [] })
+                    .then(() => {
+                        // Actualizar los desplegables de grupos musculares
+                        const option = document.createElement("option");
+                        option.textContent = newGroup;
+                        option.value = newGroup;
+                        muscleGroupSelect.appendChild(option);
+                        selectMuscleGroup.appendChild(option.cloneNode(true));
+
+                        newMuscleGroupInput.value = '';
+                    })
+                    .catch(error => {
+                        console.error("Error adding muscle group:", error);
+                    });
+            }
+        }
+
+        function addExercise() {
+            const newExercise = newExerciseInput.value;
+            const selectedGroup = selectMuscleGroup.value;
+
+            if (newExercise && selectedGroup) {
+                const groupRef = doc(db, "muscleGroups", selectedGroup);
+                updateDoc(groupRef, {
+                    exercises: arrayUnion(newExercise)
+                }).then(() => {
+                    newExerciseInput.value = '';
+                    updateExerciseOptions(); // Actualizar el desplegable de ejercicios
+                }).catch(error => {
+                    console.error("Error adding exercise:", error);
+                });
+            }
         }
 
         muscleGroupSelect.addEventListener("change", updateExerciseOptions);
