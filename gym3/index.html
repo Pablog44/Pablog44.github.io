@@ -4,106 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de Marcas en el Gimnasio</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        header {
-            margin-bottom: 20px;
-        }
-
-        h1, h2 {
-            text-align: center;
-            color: #333;
-        }
-
-        main {
-            width: 90%; /* Ajustado para mejor visualización en móviles */
-            max-width: 600px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .form-container {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        label {
-            font-weight: bold;
-        }
-
-        input, select, button {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1em;
-        }
-
-        button {
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        #records-section ul {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        #records-section li {
-            background-color: #fff;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        @media (max-width: 600px) {
-            main {
-                width: 100%;
-                padding: 10px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header>
-        <h1>Registro de Marcas en el Gimnasio</h1>
-        <h2 id="welcome-message">Bienvenido a Mi App</h2>
+        <h1>Bienvenido a Mi App de Gimnasio</h1>
     </header>
     <main>
-        <button id="login" class="form-container">Iniciar Sesión con Google</button>
-        <button id="logout" class="form-container hidden">Cerrar Sesión</button>
+        <div class="form-container" id="login-container">
+            <h2>Inicia sesión con tu cuenta de Google</h2>
+            <button id="login">Iniciar Sesión con Google</button>
+            <button id="logout" style="display:none;">Cerrar Sesión</button>
+        </div>
 
-        <section id="form-section" class="hidden">
+        <section id="form-section" style="display:none;">
             <div class="form-container">
                 <label for="muscle-group">Grupo Muscular:</label>
                 <select id="muscle-group"></select>
@@ -124,7 +38,7 @@
             </div>
         </section>
 
-        <section id="custom-section" class="hidden">
+        <section id="custom-section" style="display:none;">
             <div class="form-container">
                 <h2>Añadir Nuevos Grupos/Ejercicios</h2>
                 <label for="new-muscle-group">Nuevo Grupo Muscular:</label>
@@ -137,283 +51,11 @@
             </div>
         </section>
 
-        <section id="records-section" class="hidden">
+        <section id="records-section" style="display:none;">
             <h2>Historial de Ejercicios</h2>
             <ul id="exercise-records"></ul>
         </section>
-
     </main>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
-            authDomain: "apuntagym.firebaseapp.com",
-            projectId: "apuntagym",
-            storageBucket: "apuntagym.appspot.com",
-            messagingSenderId: "522093591127",
-            appId: "1:522093591127:web:27e2e56085d50c85b18112",
-            measurementId: "G-PY9MT94G92"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-
-        const loginButton = document.getElementById("login");
-        const logoutButton = document.getElementById("logout");
-        const formSection = document.getElementById("form-section");
-        const customSection = document.getElementById("custom-section");
-        const recordsSection = document.getElementById("records-section");
-
-        const muscleGroupSelect = document.getElementById("muscle-group");
-        const exerciseSelect = document.getElementById("exercise");
-        const weightInput = document.getElementById("weight");
-        const repetitionsInput = document.getElementById("repetitions");
-        const exerciseDateInput = document.getElementById("exercise-date");
-        const saveExerciseButton = document.getElementById("save-exercise");
-
-        const newMuscleGroupInput = document.getElementById("new-muscle-group");
-        const addMuscleGroupButton = document.getElementById("add-muscle-group");
-        const newExerciseInput = document.getElementById("new-exercise");
-        const addExerciseButton = document.getElementById("add-exercise");
-
-        const exerciseRecordsList = document.getElementById("exercise-records");
-
-        const initialMuscleGroups = {
-            "Pecho": ["Press Banca", "Press Inclinado", "Aperturas"],
-            "Espalda": ["Dominadas", "Remo con Barra", "Jalón al Pecho"],
-            "Brazos": ["Curl with Bar", "Tríceps Fondo", "Martillo"],
-            "Piernas": ["Sentadilla", "Prensa", "Peso Muerto"],
-            "Hombros": ["Press Militar", "Elevaciones Laterales", "Pájaro"]
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("Usuario autenticado:", user);
-                initializeUser(user);
-                loginButton.classList.add("hidden");
-                logoutButton.classList.remove("hidden");
-                formSection.classList.remove("hidden");
-                customSection.classList.remove("hidden");
-                recordsSection.classList.remove("hidden");
-            } else {
-                console.log("No hay usuario autenticado");
-                loginButton.classList.remove("hidden");
-                logoutButton.classList.add("hidden");
-                formSection.classList.add("hidden");
-                customSection.classList.add("hidden");
-                recordsSection.classList.add("hidden");
-            }
-        });
-
-        loginButton.addEventListener("click", async () => {
-            try {
-                const result = await signInWithPopup(auth, provider);
-                console.log("Usuario autenticado:", result.user);
-            } catch (error) {
-                console.error("Error al iniciar sesión:", error);
-                alert("Error al iniciar sesión: " + error.message);
-            }
-        });
-
-        logoutButton.addEventListener("click", async () => {
-            try {
-                await signOut(auth);
-                console.log("Sesión cerrada");
-            } catch (error) {
-                console.error("Error al cerrar sesión:", error);
-            }
-        });
-
-        async function initializeUser(user) {
-    console.log("Inicializando usuario:", user.uid);
-
-    const userDocRef = doc(db, "users", user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (!userDocSnap.exists()) {
-        console.log("Creando datos iniciales para el usuario");
-        await setDoc(userDocRef, {
-            muscleGroups: initialMuscleGroups,
-            exerciseRecords: []
-        });
-    }
-
-    // Después de asegurar que el usuario tiene datos, actualizar la UI
-    updateMuscleGroupOptions(user.uid);
-    displayExerciseRecords(user.uid);
-}
-async function updateMuscleGroupOptions(userId) {
-    console.log("Actualizando grupos musculares para el usuario:", userId);
-
-    const userDocRef = doc(db, "users", userId);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-        const muscleGroups = userDocSnap.data().muscleGroups;
-        muscleGroupSelect.innerHTML = Object.keys(muscleGroups).map(group =>
-            `<option value="${group}">${group}</option>`
-        ).join("");
-
-        // Actualizar los ejercicios para el grupo inicialmente seleccionado
-        if (Object.keys(muscleGroups).length > 0) {
-            updateExerciseOptions(userId, Object.keys(muscleGroups)[0]);
-        }
-    }
-}
-async function updateExerciseOptions(userId, selectedGroup) {
-    console.log("Actualizando ejercicios para el grupo:", selectedGroup);
-
-    const userDocRef = doc(db, "users", userId);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-        const muscleGroups = userDocSnap.data().muscleGroups;
-        const exercises = muscleGroups[selectedGroup] || [];
-
-        exerciseSelect.innerHTML = exercises.map(exercise =>
-            `<option value="${exercise}">${exercise}</option>`
-        ).join("");
-    }
-}
-async function saveExercise() {
-    const userId = auth.currentUser.uid;
-    const muscleGroup = muscleGroupSelect.value;
-    const exercise = exerciseSelect.value;
-    const weight = weightInput.value;
-    const repetitions = repetitionsInput.value;
-    const dateTime = exerciseDateInput.value || new Date().toISOString();
-
-    console.log("Guardando ejercicio:", { muscleGroup, exercise, weight, repetitions, dateTime });
-
-    if (muscleGroup && exercise && weight && repetitions) {
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const exerciseRecords = userDocSnap.data().exerciseRecords || [];
-            exerciseRecords.push({ muscleGroup, exercise, weight, repetitions, dateTime });
-
-            await updateDoc(userDocRef, { exerciseRecords });
-            console.log("Ejercicio guardado con éxito");
-            displayExerciseRecords(userId);
-            clearForm();
-        }
-    } else {
-        alert("Por favor, completa todos los campos.");
-    }
-}
-async function displayExerciseRecords(userId) {
-    console.log("Mostrando registros de ejercicios para el usuario:", userId);
-
-    const userDocRef = doc(db, "users", userId);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-        const exerciseRecords = userDocSnap.data().exerciseRecords || [];
-        console.log("Registros de ejercicios encontrados:", exerciseRecords);
-
-        exerciseRecordsList.innerHTML = exerciseRecords.map((record, index) =>
-            `<li>${record.dateTime} - ${record.muscleGroup}: ${record.exercise} (${record.weight} kg x ${record.repetitions} reps)
-            <button onclick="deleteRecord('${userId}', ${index})">Eliminar</button>
-            </li>`
-        ).join('');
-    }
-}
-async function addMuscleGroup() {
-    const userId = auth.currentUser.uid;
-    const newGroup = newMuscleGroupInput.value.trim();
-
-    console.log("Añadiendo nuevo grupo muscular:", newGroup);
-
-    if (newGroup) {
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const muscleGroups = userDocSnap.data().muscleGroups || {};
-            if (!muscleGroups.hasOwnProperty(newGroup)) {
-                muscleGroups[newGroup] = [];
-                await updateDoc(userDocRef, { muscleGroups });
-                console.log("Grupo muscular añadido:", newGroup);
-                updateMuscleGroupOptions(userId);
-                newMuscleGroupInput.value = "";
-            } else {
-                alert("El grupo muscular ya existe.");
-            }
-        }
-    } else {
-        alert("Por favor, introduce un nombre para el grupo muscular.");
-    }
-}
-
-async function addExercise() {
-    const userId = auth.currentUser.uid;
-    const selectedGroup = muscleGroupSelect.value;
-    const newExercise = newExerciseInput.value.trim();
-
-    console.log("Añadiendo nuevo ejercicio:", newExercise, "al grupo", selectedGroup);
-
-    if (selectedGroup && newExercise) {
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const muscleGroups = userDocSnap.data().muscleGroups || {};
-            if (muscleGroups[selectedGroup] && !muscleGroups[selectedGroup].includes(newExercise)) {
-                muscleGroups[selectedGroup].push(newExercise);
-                await updateDoc(userDocRef, { muscleGroups });
-                console.log("Ejercicio añadido:", newExercise);
-                updateExerciseOptions(userId, selectedGroup);
-                newExerciseInput.value = "";
-            } else {
-                alert("El ejercicio ya existe en ese grupo muscular.");
-            }
-        }
-    } else {
-        alert("Por favor, selecciona un grupo muscular e introduce el nombre del ejercicio.");
-    }
-}
-function initializeApp() {
-    muscleGroupSelect.addEventListener("change", async () => {
-        const userId = auth.currentUser.uid;
-        const selectedGroup = muscleGroupSelect.value;
-        updateExerciseOptions(userId, selectedGroup);
-    });
-
-    saveExerciseButton.addEventListener("click", saveExercise);
-    addMuscleGroupButton.addEventListener("click", addMuscleGroup);
-    addExerciseButton.addEventListener("click", addExercise);
-
-    onAuthStateChanged(auth, user => {
-        if (user) {
-            console.log("Usuario autenticado:", user);
-            initializeUser(user);
-            document.getElementById("welcome-message").textContent = `Bienvenido, ${user.displayName}`;
-            loginButton.classList.add("hidden");
-            logoutButton.classList.remove("hidden");
-            formSection.classList.remove("hidden");
-            customSection.classList.remove("hidden");
-            recordsSection.classList.remove("hidden");
-        } else {
-            console.log("No hay usuario autenticado");
-            document.getElementById("welcome-message").textContent = "Bienvenido a Mi App";
-            loginButton.classList.remove("hidden");
-            logoutButton.classList.add("hidden");
-            formSection.classList.add("hidden");
-            customSection.classList.add("hidden");
-            recordsSection.classList.add("hidden");
-        }
-    });
-}
-
-initializeApp();
-
-</script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

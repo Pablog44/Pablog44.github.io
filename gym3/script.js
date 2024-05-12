@@ -1,3 +1,55 @@
+// Import Firebase modules at the beginning of your script.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+import { getAuth, signInWithPopup, signOut, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+// Initialize Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
+    authDomain: "apuntagym.firebaseapp.com",
+    projectId: "apuntagym",
+    storageBucket: "apuntagym.appspot.com",
+    messagingSenderId: "522093591127",
+    appId: "1:522093591127:web:27e2e56085d50c85b18112",
+    measurementId: "G-PY9MT94G92"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+document.getElementById('login').addEventListener('click', () => {
+    signInWithPopup(auth, provider).catch(error => {
+        alert(`Error de autenticación: ${error.message}`);
+    });
+});
+
+document.getElementById('logout').addEventListener('click', () => {
+    signOut(auth).then(() => {
+        alert('Has cerrado sesión con éxito.');
+        window.location.reload();
+    }).catch(error => {
+        console.error('Error al cerrar sesión:', error);
+    });
+});
+
+onAuthStateChanged(auth, user => {
+    if (user) {
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('form-section').style.display = '';
+        document.getElementById('custom-section').style.display = '';
+        document.getElementById('records-section').style.display = '';
+        document.getElementById('logout').style.display = '';
+    } else {
+        document.getElementById('login-container').style.display = '';
+        document.getElementById('form-section').style.display = 'none';
+        document.getElementById('custom-section').style.display = 'none';
+        document.getElementById('records-section').style.display = 'none';
+        document.getElementById('logout').style.display = 'none';
+    }
+});
+
 // Variables
 const muscleGroupSelect = document.getElementById("muscle-group");
 const exerciseSelect = document.getElementById("exercise");
