@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -77,7 +77,7 @@ function initializeUserMuscleGroups() {
     getDocs(userMuscleGroupsQuery).then(snapshot => {
         snapshot.forEach(doc => {
             const option = document.createElement("option");
-            option.textContent = doc.id;
+            option.textContent = doc.id.replace("Personalizado-", "");
             option.value = `${doc.id} (Personalizado)`;
             muscleGroupSelect.appendChild(option);
         });
@@ -111,9 +111,9 @@ function initializeDefaultMuscleGroups(muscleGroupsRef) {
 }
 
 function updateExerciseOptions() {
-    const selectedGroup = muscleGroupSelect.value.replace(" (Personalizado)", "");
+    const selectedGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `${currentUser.uid}_${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
+    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
 
     getDoc(groupRef).then(docSnap => {
         if (docSnap.exists()) {
@@ -138,7 +138,7 @@ function updateExerciseOptions() {
 function addMuscleGroup() {
     const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
     if (newMuscleGroupName && currentUser) {
-        const newGroupRef = doc(db, "userMuscleGroups", `${currentUser.uid}_${newMuscleGroupName}`);
+        const newGroupRef = doc(db, "userMuscleGroups", `Personalizado-${newMuscleGroupName}`);
         setDoc(newGroupRef, {
             userId: currentUser.uid,
             exercises: []
@@ -147,7 +147,7 @@ function addMuscleGroup() {
             debugInfo.innerText = "Nuevo grupo muscular personalizado añadido: " + newMuscleGroupName;
             const option = document.createElement("option");
             option.textContent = `${newMuscleGroupName} (Personalizado)`;
-            option.value = `${newMuscleGroupName} (Personalizado)`;
+            option.value = `Personalizado-${newMuscleGroupName} (Personalizado)`;
             muscleGroupSelect.appendChild(option);
             document.getElementById('new-muscle-group').value = ''; // Limpiar el campo de texto
             updateExerciseOptions();
@@ -163,10 +163,10 @@ function addMuscleGroup() {
 
 function addExercise() {
     const newExerciseName = document.getElementById('new-exercise').value.trim();
-    const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "");
+    const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
 
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `${currentUser.uid}_${muscleGroup}`) : null;
+    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : null;
 
     if (newExerciseName && groupRef) {
         getDoc(groupRef).then(docSnap => {
@@ -202,7 +202,7 @@ function addExercise() {
 }
 
 function saveExercise() {
-    const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "");
+    const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const exercise = exerciseSelect.value;
     const weight = weightInput.value;
@@ -212,7 +212,7 @@ function saveExercise() {
     if (muscleGroup && exercise && weight && repetitions && dateTime && currentUser) {
         addDoc(collection(db, "exerciseRecords"), {
             userId: currentUser.uid,
-            muscleGroup: isCustomGroup ? `${muscleGroup} (Personalizado)` : muscleGroup,
+            muscleGroup: isCustomGroup ? `Personalizado-${muscleGroup}` : muscleGroup,
             exercise,
             weight: Number(weight),
             repetitions: Number(repetitions),
