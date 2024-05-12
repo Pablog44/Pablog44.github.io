@@ -17,33 +17,70 @@
             <div class="form-container">
                 <label for="muscle-group">Grupo Muscular:</label>
                 <select id="muscle-group"></select>
+
                 <label for="exercise">Ejercicio:</label>
                 <select id="exercise"></select>
+
                 <label for="weight">Peso (kg):</label>
                 <input type="number" id="weight" min="0" step="1">
+
                 <label for="repetitions">Repeticiones:</label>
                 <input type="number" id="repetitions" min="0" step="1">
+
                 <label for="exercise-date">Fecha:</label>
                 <input type="datetime-local" id="exercise-date">
+
                 <button id="save-exercise">Guardar Ejercicio</button>
             </div>
         </section>
+
         <section id="custom-section">
             <div class="form-container">
                 <h2>Añadir Nuevos Grupos/Ejercicios</h2>
                 <label for="new-muscle-group">Nuevo Grupo Muscular:</label>
                 <input type="text" id="new-muscle-group">
                 <button id="add-muscle-group">Añadir Grupo Muscular</button>
+
                 <label for="new-exercise">Nuevo Ejercicio:</label>
                 <input type="text" id="new-exercise">
                 <button id="add-exercise">Añadir Ejercicio</button>
             </div>
         </section>
+
         <section id="records-section">
             <h2>Historial de Ejercicios</h2>
             <ul id="exercise-records"></ul>
         </section>
     </main>
-    <script type="module" src="script.js"></script> <!-- Incluyendo script.js -->
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB8sWu3ZG6NWvlEKQHRi23c7CgPPy_6yag",
+            authDomain: "apuntagym.firebaseapp.com",
+            projectId: "apuntagym",
+            storageBucket: "apuntagym.appspot.com",
+            messagingSenderId: "522093591127",
+            appId: "1:522093591127:web:27e2e56085d50c85b18112",
+            measurementId: "G-PY9MT94G92"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Si no hay usuario autenticado, redirigir a la página de inicio de sesión
+                window.location.href = 'inicio.html'; // Asegúrate de cambiar esto a la URL correcta de tu página de inicio de sesión
+            } else {
+                // Usuario autenticado, cargar o mostrar contenido que requiere autenticación
+                console.log("Usuario autenticado:", user.email);
+                // Aquí puedes activar el código para cargar datos o interactuar con la base de datos
+            }
+        });
+    </script>
+      <script type="module" src="script.js"></script>
 </body>
 </html>
