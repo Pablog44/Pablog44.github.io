@@ -117,21 +117,24 @@
         }
 
         function updateExerciseOptions() {
-            const selectedGroup = muscleGroupSelect.value;
-            const exercisesRef = doc(db, "muscleGroups", selectedGroup);
-            getDocs(collection(db, "exercises", exercisesRef.id)).then(snapshot => {
-                exerciseSelect.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const option = document.createElement("option");
-                    option.value = data.name;
-                    option.textContent = data.name;
-                    exerciseSelect.appendChild(option);
-                });
-            }).catch(error => {
-                console.error("Error loading exercises:", error);
+    const selectedGroup = muscleGroupSelect.value;
+    const groupRef = doc(db, "muscleGroups", selectedGroup);
+    getDoc(groupRef).then(doc => {
+        if (doc.exists()) {
+            const data = doc.data();
+            exerciseSelect.innerHTML = ''; // Limpiar opciones anteriores
+            data.exercises.forEach(exercise => {
+                const option = document.createElement("option");
+                option.value = exercise;
+                option.textContent = exercise;
+                exerciseSelect.appendChild(option);
             });
         }
+    }).catch(error => {
+        console.error("Error loading exercises:", error);
+    });
+}
+
 
         function saveExercise() {
             const muscleGroup = muscleGroupSelect.value;
