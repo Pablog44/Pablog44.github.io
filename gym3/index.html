@@ -18,33 +18,42 @@
             <div class="form-container">
                 <label for="muscle-group">Grupo Muscular:</label>
                 <select id="muscle-group"></select>
+
                 <label for="exercise">Ejercicio:</label>
                 <select id="exercise"></select>
+
                 <label for="weight">Peso (kg):</label>
                 <input type="number" id="weight" min="0" step="1">
+
                 <label for="repetitions">Repeticiones:</label>
                 <input type="number" id="repetitions" min="0" step="1">
+
                 <label for="exercise-date">Fecha:</label>
                 <input type="datetime-local" id="exercise-date">
+
                 <button id="save-exercise">Guardar Ejercicio</button>
             </div>
         </section>
+
         <section id="custom-section">
             <div class="form-container">
                 <h2>Añadir Nuevos Grupos/Ejercicios</h2>
                 <label for="new-muscle-group">Nuevo Grupo Muscular:</label>
                 <input type="text" id="new-muscle-group">
                 <button id="add-muscle-group">Añadir Grupo Muscular</button>
+
                 <label for="new-exercise">Nuevo Ejercicio:</label>
                 <input type="text" id="new-exercise">
                 <button id="add-exercise">Añadir Ejercicio</button>
             </div>
         </section>
+
         <section id="records-section">
             <h2>Historial de Ejercicios</h2>
             <ul id="exercise-records"></ul>
         </section>
     </main>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
         import { getFirestore, collection, getDocs, doc, addDoc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
@@ -66,7 +75,7 @@
 
         onAuthStateChanged(auth, (user) => {
             if (!user) {
-                window.location.href = 'inicio.html'; // Redirige si no está autenticado
+                window.location.href = 'inicio.html';
             } else {
                 initializeMuscleGroups();
                 displayExerciseRecords();
@@ -74,10 +83,27 @@
         });
 
         function initializeMuscleGroups() {
-    const muscleGroupsRef = collection(db, "muscleGroups");
-    getDocs(muscleGroupsRef).then(snapshot => {
-        if (snapshot.empty) {
-            // Crear grupos musculares si no existen
+            const muscleGroupsRef = collection(db, "muscleGroups");
+            getDocs(muscleGroupsRef).then(snapshot => {
+                if (snapshot.empty) {
+                    console.log("No muscle groups found, initializing default groups.");
+                    initializeDefaultMuscleGroups(muscleGroupsRef);
+                } else {
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const option = document.createElement("option");
+                        option.textContent = doc.id;
+                        option.value = doc.id;
+                        muscleGroupSelect.appendChild(option);
+                    });
+                    updateExerciseOptions();
+                }
+            }).catch(error => {
+                console.error("Error loading muscle groups:", error);
+            });
+        }
+
+        function initializeDefaultMuscleGroups(muscleGroupsRef) {
             const initialGroups = {
                 Pecho: ['Press Banca', 'Press Inclinado', 'Aperturas'],
                 Espalda: ['Dominadas', 'Remo con Barra', 'Jalón al Pecho'],
@@ -88,16 +114,7 @@
             Object.keys(initialGroups).forEach(group => {
                 setDoc(doc(muscleGroupsRef, group), { exercises: initialGroups[group] });
             });
-        } else {
-            snapshot.forEach(doc => {
-                updateMuscleGroupOptions(doc);
-            });
         }
-    }).catch(error => {
-        console.error("Error al obtener los grupos musculares:", error);
-    });
-}
-
 
         function updateExerciseOptions() {
             const selectedGroup = muscleGroupSelect.value;
@@ -108,11 +125,11 @@
                     const data = doc.data();
                     const option = document.createElement("option");
                     option.value = data.name;
-                    option.textContent = data.name; // Asumiendo que 'name' es el campo del nombre del ejercicio
+                    option.textContent = data.name;
                     exerciseSelect.appendChild(option);
                 });
             }).catch(error => {
-                console.error("Error loading exercises: ", error);
+                console.error("Error loading exercises:", error);
             });
         }
 
@@ -132,7 +149,7 @@
                 displayExerciseRecords();
                 clearForm();
             }).catch(error => {
-                console.error("Error saving exercise: ", error);
+                console.error("Error saving exercise:", error);
             });
         }
 
@@ -147,7 +164,7 @@
                     exerciseRecordsList.appendChild(listItem);
                 });
             }).catch(error => {
-                console.error("Error displaying records: ", error);
+                console.error("Error displaying records:", error);
             });
         }
 
@@ -155,7 +172,7 @@
             deleteDoc(doc(db, "exerciseRecords", docId)).then(() => {
                 displayExerciseRecords();
             }).catch(error => {
-                console.error("Error deleting record: ", error);
+                console.error("Error deleting record:", error);
             });
         }
 
