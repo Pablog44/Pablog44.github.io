@@ -62,7 +62,7 @@ function displayExerciseRecords() {
             const listItem = document.createElement("li");
             listItem.innerHTML = `
                 ${formattedDateTime} - ${data.muscleGroup}: ${data.exercise} (${data.weight} kg x ${data.repetitions} reps)
-                <button onclick="deleteRecord('${docSnap.id}')">Eliminar</button>
+                <button onclick="confirmDeleteRecord('${docSnap.id}', '${data.muscleGroup}', '${data.exercise}')">Eliminar</button>
             `;
             exerciseRecordsList.appendChild(listItem);
         });
@@ -70,6 +70,13 @@ function displayExerciseRecords() {
         console.error("Error mostrando registros de ejercicios:", error);
         debugInfo.innerText = "Error mostrando registros de ejercicios: " + error;
     });
+}
+
+function confirmDeleteRecord(docId, muscleGroup, exercise) {
+    const confirmation = confirm(`¿Estás seguro que deseas eliminar el ejercicio "${exercise}" del grupo muscular "${muscleGroup}"?`);
+    if (confirmation) {
+        deleteRecord(docId);
+    }
 }
 
 function deleteRecord(docId) {
@@ -83,4 +90,4 @@ function deleteRecord(docId) {
     });
 }
 
-window.deleteRecord = deleteRecord;
+window.confirmDeleteRecord = confirmDeleteRecord;
