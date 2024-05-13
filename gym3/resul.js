@@ -98,30 +98,37 @@ function initializeUserMuscleGroups() {
 }
 
 function updateExerciseOptions() {
-  const selectedGroup = muscleGroupFilter.value.replace(" (Personalizado)", "");
-  const isCustomGroup = muscleGroupFilter.value.includes(" (Personalizado)");
-  const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
+    let selectedGroup = muscleGroupFilter.value;
+    const isCustomGroup = selectedGroup.includes(" (Personalizado)");
 
-  getDoc(groupRef)
-    .then(docSnap => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        exerciseFilter.innerHTML = '<option value="">Todos</option>';
-        data.exercises.forEach(exercise => {
-          const option = document.createElement("option");
-          option.value = exercise;
-          option.textContent = exercise;
-          exerciseFilter.appendChild(option);
-        });
-      } else {
-        console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
-        debugInfo.innerText = `No se encontraron ejercicios para el grupo ${selectedGroup}.`;
-      }
-    })
-    .catch(error => {
-      console.error("Error cargando ejercicios:", error);
-      debugInfo.innerText = `Error cargando ejercicios: ${error}`;
-    });
+    // If it's a custom group, we need to handle the ID format
+    if (isCustomGroup) {
+        selectedGroup = selectedGroup.replace(" (Personalizado)", "");
+        selectedGroup = `Personalizado-${selectedGroup}`;
+    }
+
+    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", selectedGroup) : doc(db, "muscleGroups", selectedGroup);
+
+    getDoc(groupRef)
+      .then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          exerciseFilter.innerHTML = '<option value="">Todos</option>';
+          data.exercises.forEach(exercise => {
+            const option = document.createElement("option");
+            option.value = exercise;
+            option.textContent = exercise;
+            exerciseFilter.appendChild(option);
+          });
+        } else {
+          console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
+          debugInfo.innerText = `No se encontraron ejercicios para el grupo ${selectedGroup}.`;
+        }
+      })
+      .catch(error => {
+        console.error("Error cargando ejercicios:", error);
+        debugInfo.innerText = `Error cargando ejercicios: ${error}`;
+      });
 }
 
 function loadExerciseRecords() {
