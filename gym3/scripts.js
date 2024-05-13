@@ -166,9 +166,9 @@ function addExercise() {
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
 
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : null;
+    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
 
-    if (newExerciseName && groupRef) {
+    if (newExerciseName && muscleGroup) {
         getDoc(groupRef).then(docSnap => {
             if (docSnap.exists()) {
                 const exercises = docSnap.data().exercises;
@@ -188,16 +188,16 @@ function addExercise() {
                     debugInfo.innerText = "El ejercicio ya existe: " + newExerciseName;
                 }
             } else {
-                console.log("El grupo muscular personalizado no existe:", muscleGroup);
-                debugInfo.innerText = "El grupo muscular personalizado no existe: " + muscleGroup;
+                console.log(`El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe:`, muscleGroup);
+                debugInfo.innerText = `El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe: ${muscleGroup}`;
             }
         }).catch(error => {
-            console.error("Error obteniendo grupo muscular personalizado:", error);
-            debugInfo.innerText = "Error obteniendo grupo muscular personalizado: " + error;
+            console.error("Error obteniendo grupo muscular:", error);
+            debugInfo.innerText = `Error obteniendo grupo muscular: ${error}`;
         });
     } else {
-        console.log("No se seleccionó grupo muscular personalizado o nombre de ejercicio.");
-        debugInfo.innerText = "No se seleccionó grupo muscular personalizado o nombre de ejercicio.";
+        console.log("No se seleccionó grupo muscular o nombre de ejercicio.");
+        debugInfo.innerText = "No se seleccionó grupo muscular o nombre de ejercicio.";
     }
 }
 
