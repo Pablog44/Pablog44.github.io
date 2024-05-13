@@ -85,7 +85,7 @@ function initializeUserMuscleGroups() {
       snapshot.forEach(doc => {
         const option = document.createElement("option");
         option.textContent = `${doc.id.replace("Personalizado-", "")} (Personalizado)`;
-        option.value = `Personalizado-${doc.id.replace("Personalizado-", "")}`;
+        option.value = doc.id;  // Usar el ID correcto del documento personalizado
         muscleGroupFilter.appendChild(option);
       });
       // Update exercise options after loading custom muscle groups
