@@ -390,3 +390,257 @@ addExerciseButton.addEventListener('click', addExercise);
 </html>
 
 quiero un html con su js para poder filtrar los resultados del usuario por  ejercicio deben salir todos los ejercicios del usuario los de los gurpos musculars añadidos por el usuario y los demas tambien, y ademas  ordenados por peso  y para los que tienen el mismo peso que salgan arriba o primero los de mas repeticiones.
+
+
+Sí, es posible crear una red neuronal que aprenda a jugar al juego de Snake utilizando HTML, CSS y JavaScript. Este proceso implica varios pasos y conceptos clave que incluyen la creación del juego Snake, la implementación de una red neuronal y el uso de algoritmos de aprendizaje automático, como el aprendizaje por refuerzo, para entrenar la red neuronal.
+
+Aquí te presento una guía paso a paso para lograrlo:
+
+1. Crear el Juego de Snake
+Primero, necesitas tener una versión funcional del juego de Snake. Este juego se puede programar usando HTML, CSS y JavaScript. Aquí tienes una estructura básica de cómo podrías implementarlo:
+
+Estructura HTML
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Snake Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script src="script.js"></script>
+</body>
+</html>
+Estilos CSS (style.css)
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+}
+
+canvas {
+    background-color: #000;
+}
+JavaScript del Juego (script.js)
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scale = 20;
+const rows = canvas.height / scale;
+const columns = canvas.width / scale;
+
+let snake;
+
+(function setup() {
+    snake = new Snake();
+    fruit = new Fruit();
+    fruit.pickLocation();
+
+    window.setInterval(() => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        fruit.draw();
+        snake.update();
+        snake.draw();
+
+        if (snake.eat(fruit)) {
+            fruit.pickLocation();
+        }
+
+        snake.checkCollision();
+        document.querySelector('.score').innerText = snake.total;
+    }, 250);
+}());
+
+window.addEventListener('keydown', e => {
+    const direction = e.key.replace('Arrow', '');
+    snake.changeDirection(direction);
+});
+
+function Snake() {
+    this.x = 0;
+    this.y = 0;
+    this.xSpeed = scale * 1;
+    this.ySpeed = 0;
+    this.total = 0;
+    this.tail = [];
+
+    this.draw = function() {
+        ctx.fillStyle = "#FFFFFF";
+
+        for (let i=0; i<this.tail.length; i++) {
+            ctx.fillRect(this.tail[i].x, this.tail[i].y, scale, scale);
+        }
+
+        ctx.fillRect(this.x, this.y, scale, scale);
+    };
+
+    this.update = function() {
+        for (let i=0; i<this.tail.length - 1; i++) {
+            this.tail[i] = this.tail[i+1];
+        }
+
+        this.tail[this.total - 1] = { x: this.x, y: this.y };
+
+        this.x += this.xSpeed;
+        this.y += this.ySpeed;
+
+        if (this.x >= canvas.width) {
+            this.x = 0;
+        }
+
+        if (this.y >= canvas.height) {
+            this.y = 0;
+        }
+
+        if (this.x < 0) {
+            this.x = canvas.width - scale;
+        }
+
+        if (this.y < 0) {
+            this.y = canvas.height - scale;
+        }
+    };
+
+    this.changeDirection = function(direction) {
+        switch(direction) {
+            case 'Up':
+                if (this.ySpeed === 0) {
+                    this.xSpeed = 0;
+                    this.ySpeed = -scale * 1;
+                }
+                break;
+            case 'Down':
+                if (this.ySpeed === 0) {
+                    this.xSpeed = 0;
+                    this.ySpeed = scale * 1;
+                }
+                break;
+            case 'Left':
+                if (this.xSpeed === 0) {
+                    this.xSpeed = -scale * 1;
+                    this.ySpeed = 0;
+                }
+                break;
+            case 'Right':
+                if (this.xSpeed === 0) {
+                    this.xSpeed = scale * 1;
+                    this.ySpeed = 0;
+                }
+                break;
+        }
+    };
+
+    this.eat = function(fruit) {
+        if (this.x === fruit.x && this.y === fruit.y) {
+            this.total++;
+            return true;
+        }
+
+        return false;
+    };
+
+    this.checkCollision = function() {
+        for (let i=0; i<this.tail.length; i++) {
+            if (this.x === this.tail[i].x && this.y === this.tail[i].y) {
+                this.total = 0;
+                this.tail = [];
+            }
+        }
+    };
+}
+
+function Fruit() {
+    this.x;
+    this.y;
+
+    this.pickLocation = function() {
+        this.x = (Math.floor(Math.random() * rows - 1) + 1) * scale;
+        this.y = (Math.floor(Math.random() * columns - 1) + 1) * scale;
+    };
+
+    this.draw = function() {
+        ctx.fillStyle = "#4cafab";
+        ctx.fillRect(this.x, this.y, scale, scale);
+    };
+}
+2. Implementar la Red Neuronal
+Para que una red neuronal controle el juego, puedes usar una biblioteca de JavaScript como TensorFlow.js. Esta biblioteca facilita la implementación de redes neuronales en el navegador.
+
+Estructura Básica de la Red Neuronal
+
+// Import TensorFlow.js - Puedes agregar esto en tu HTML
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+// Definir la red neuronal
+const model = tf.sequential();
+
+model.add(tf.layers.dense({inputShape: [number_of_inputs], units: 24, activation: 'relu'}));
+model.add(tf.layers.dense({units: 16, activation: 'relu'}));
+model.add(tf.layers.dense({units: 4, activation: 'softmax'})); // 4 direcciones de salida: arriba, abajo, izquierda, derecha
+
+// Compilar el modelo
+model.compile({
+  optimizer: 'adam',
+  loss: 'categoricalCrossentropy',
+  metrics: ['accuracy']
+});
+3. Entrenar la Red Neuronal
+Para entrenar la red neuronal, necesitas simular muchas sesiones de juego y utilizar el aprendizaje por refuerzo. Aquí, el objetivo es maximizar la puntuación (la cantidad de frutas que come el snake).
+
+
+async function trainModel() {
+    // Datos de entrenamiento: Estados del juego, movimientos y recompensas
+    const xs = tf.tensor2d(data.map(item => item.state));
+    const ys = tf.tensor2d(data.map(item => item.action));
+
+    // Entrenar el modelo
+    await model.fit(xs, ys, {
+        epochs: 10,
+        shuffle: true,
+        callbacks: {
+            onEpochEnd: (epoch, log) => console.log(`Epoch ${epoch}: loss = ${log.loss}`)
+        }
+    });
+}
+4. Integrar la Red Neuronal con el Juego
+Finalmente, necesitas modificar el bucle del juego para usar la red neuronal para decidir los movimientos en lugar de esperar la entrada del usuario.
+
+
+(function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    fruit.draw();
+    snake.update();
+    snake.draw();
+
+    if (snake.eat(fruit)) {
+        fruit.pickLocation();
+    }
+
+    snake.checkCollision();
+
+    // Predecir el próximo movimiento
+    const predictions = model.predict(tf.tensor2d([getState()]));
+    const move = predictions.argMax(1).dataSync()[0];
+
+    snake.changeDirection(['Up', 'Down', 'Left', 'Right'][move]);
+
+    setTimeout(update, 250);
+}());
+
+function getState() {
+    // Convertir el estado del juego a una forma que la red pueda procesar
+    return [snake.x, snake.y, snake.xSpeed, snake.ySpeed, fruit.x, fruit.y];
+}
+5. Observaciones y Mejoras
+Entrenamiento: Para obtener buenos resultados, necesitarás simular y entrenar con miles de juegos.
+Optimización: Puedes experimentar con diferentes arquitecturas de red, hiperparámetros y funciones de recompensa.
+Depuración: Asegúrate de que la red no solo aprende a evitar colisiones, sino también a perseguir frutas activamente.
+Este es un proyecto complejo pero fascinante que combina desarrollo web con aprendizaje automático. ¡Buena suerte!
+
+

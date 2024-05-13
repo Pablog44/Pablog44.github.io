@@ -26,6 +26,7 @@ const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
 let exerciseRecords = [];
+let filteredRecords = [];
 
 onAuthStateChanged(auth, user => {
     if (!user) {
@@ -99,7 +100,7 @@ function populateExerciseFilter() {
 function applyFilters() {
     const selectedGroup = filterMuscleGroupSelect.value;
     const selectedExercise = filterExerciseSelect.value;
-    let filteredRecords = exerciseRecords;
+    filteredRecords = exerciseRecords;
 
     if (selectedGroup) {
         filteredRecords = filteredRecords.filter(record => record.muscleGroup === selectedGroup);
@@ -108,25 +109,22 @@ function applyFilters() {
         filteredRecords = filteredRecords.filter(record => record.exercise === selectedExercise);
     }
 
-    displayResults(filteredRecords);
+    sortAndDisplayResults();
 }
 
-function sortResults() {
+function sortAndDisplayResults() {
     const sortCriteria = sortCriteriaSelect.value;
-    const sortedRecords = [...exerciseRecords];
 
-    sortedRecords.sort((a, b) => {
+    filteredRecords.sort((a, b) => {
         if (a[sortCriteria] !== b[sortCriteria]) {
-            return b[sortCriteria] -a[sortCriteria];
+            return b[sortCriteria] - a[sortCriteria];
         }
 
-        // Si el peso es igual, ordenamos por repeticiones
+        // Si el criterio principal es igual, ordenamos por repeticiones
         return b.repetitions - a.repetitions;
     });
 
-    // Aplicar filtros nuevamente antes de mostrar los resultados ordenados
-    applyFilters();
-    displayResults(sortedRecords);
+    displayResults(filteredRecords);
 }
 
 function displayResults(records) {
@@ -153,5 +151,5 @@ function displayResults(records) {
 }
 
 applyFiltersButton.addEventListener('click', applyFilters);
-sortResultsButton.addEventListener('click', sortResults);
+sortResultsButton.addEventListener('click', sortAndDisplayResults);
 filterMuscleGroupSelect.addEventListener('change', populateExerciseFilter);
