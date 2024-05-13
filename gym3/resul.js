@@ -77,53 +77,51 @@ function initializeMuscleGroups() {
 }
 
 function initializeUserMuscleGroups() {
-  const userMuscleGroupsRef = collection(db, "userMuscleGroups");
-  const userMuscleGroupsQuery = query(userMuscleGroupsRef, where("userId", "==", currentUser.uid));
-
-  getDocs(userMuscleGroupsQuery)
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        const option = document.createElement("option");
-        option.textContent = `${doc.id.replace("Personalizado-", "")} (Personalizado)`;
-        option.value = doc.id;  // Usar el ID correcto del documento personalizado
-        muscleGroupFilter.appendChild(option);
-      });
-      // Update exercise options after loading custom muscle groups
-      updateExerciseOptions(); 
-    })
-    .catch(error => {
-      console.error("Error cargando grupos musculares personalizados:", error);
-      debugInfo.innerText = `Error cargando grupos musculares personalizados: ${error}`;
-    });
-}
-
-function updateExerciseOptions() {
-  const selectedGroup = muscleGroupFilter.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-  const isCustomGroup = muscleGroupFilter.value.includes(" (Personalizado)");
-  const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
-
-  getDoc(groupRef)
-    .then(docSnap => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        exerciseFilter.innerHTML = '<option value="">Todos</option>';
-        data.exercises.forEach(exercise => {
+    const userMuscleGroupsRef = collection(db, "userMuscleGroups");
+    const userMuscleGroupsQuery = query(userMuscleGroupsRef, where("userId", "==", currentUser.uid));
+  
+    getDocs(userMuscleGroupsQuery)
+      .then(snapshot => {
+        snapshot.forEach(doc => {
           const option = document.createElement("option");
-          option.value = exercise;
-          option.textContent = exercise;
-          exerciseFilter.appendChild(option);
+          option.textContent = `${doc.id.replace("Personalizado-", "")} (Personalizado)`;
+          option.value = doc.id;  // Usar el ID correcto del documento personalizado
+          muscleGroupFilter.appendChild(option);
         });
-      } else {
-        console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
-        debugInfo.innerText = `No se encontraron ejercicios para el grupo ${selectedGroup}.`;
-      }
-    })
-    .catch(error => {
-      console.error("Error cargando ejercicios:", error);
-      debugInfo.innerText = `Error cargando ejercicios: ${error}`;
-    });
-}
-
+        // Update exercise options after loading custom muscle groups
+        updateExerciseOptions(); 
+      })
+      .catch(error => {
+        console.error("Error cargando grupos musculares personalizados:", error);
+        debugInfo.innerText = `Error cargando grupos musculares personalizados: ${error}`;
+      });
+  }
+function updateExerciseOptions() {
+    const selectedGroup = muscleGroupFilter.value.replace(" (Personalizado)", "");
+    const isCustomGroup = muscleGroupFilter.value.includes(" (Personalizado)");
+    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", selectedGroup) : doc(db, "muscleGroups", selectedGroup);
+  
+    getDoc(groupRef)
+      .then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          exerciseFilter.innerHTML = '<option value="">Todos</option>';
+          data.exercises.forEach(exercise => {
+            const option = document.createElement("option");
+            option.value = exercise;
+            option.textContent = exercise;
+            exerciseFilter.appendChild(option);
+          });
+        } else {
+          console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
+          debugInfo.innerText = `No se encontraron ejercicios para el grupo ${selectedGroup}.`;
+        }
+      })
+      .catch(error => {
+        console.error("Error cargando ejercicios:", error);
+        debugInfo.innerText = `Error cargando ejercicios: ${error}`;
+      });
+  }
 function loadExerciseRecords() {
   const exerciseRecordsRef = collection(db, "exerciseRecords");
   const userQuery = query(exerciseRecordsRef, where("userId", "==", currentUser.uid));
