@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -16,13 +16,13 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-const muscleGroupFilter = document.getElementById('muscle-group-filter');
-const exerciseFilter = document.getElementById('exercise-filter');
-const exerciseList = document.getElementById('exercise-list');
+const muscleGroupSelect = document.getElementById('filter-muscle-group');
+const exerciseSelect = document.getElementById('filter-exercise');
+const resultsBody = document.getElementById('results-body');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
-let exerciseRecords = [];
+let muscleGroups = {};
 
 onAuthStateChanged(auth, user => {
     if (!user) {
@@ -38,23 +38,20 @@ document.getElementById('logout-button').addEventListener('click', () => {
         window.location.href = 'inicio.html';
     }).catch(error => {
         console.error('Error al cerrar sesión:', error);
+        debugInfo.innerText = "Error al cerrar sesión: " + error;
     });
 });
 
 function initializeMuscleGroups() {
     const muscleGroupsRef = collection(db, "muscleGroups");
     getDocs(muscleGroupsRef).then(snapshot => {
-        muscleGroupFilter.innerHTML = '<option value="">Todos</option>';
         snapshot.forEach(doc => {
-            const option = document.createElement("option");
-            option.textContent = doc.id;
-            option.value = doc.id;
-            muscleGroupFilter.appendChild(option);
+            muscleGroups[doc.id] = doc.data().exercises;
         });
-
         initializeUserMuscleGroups();
     }).catch(error => {
         console.error("Error cargando grupos musculares:", error);
+        debugInfo.innerText = "Error cargando grupos musculares: " + error;
     });
 }
 
@@ -63,90 +60,75 @@ function initializeUserMuscleGroups() {
     const userMuscleGroupsQuery = query(userMuscleGroupsRef, where("userId", "==", currentUser.uid));
     getDocs(userMuscleGroupsQuery).then(snapshot => {
         snapshot.forEach(doc => {
-            const option = document.createElement("option");
-            option.textContent = `${doc.id.replace("Personalizado-", "")} (Personalizado)`;
-            option.value = doc.id;
-            muscleGroupFilter.appendChild(option);
+            muscleGroups[doc.id.replace("Personalizado-", "")] = doc.data().exercises;
         });
-
-        loadExerciseRecords();
+        populateMuscleGroupOptions();
     }).catch(error => {
         console.error("Error cargando grupos musculares personalizados:", error);
+        debugInfo.innerText = "Error cargando grupos musculares personalizados: " + error;
     });
 }
 
-function loadExerciseRecords() {
-    const exerciseRecordsRef = collection(db, "exerciseRecords");
-    const userExerciseRecordsQuery = query(exerciseRecordsRef, where("userId", "==", currentUser.uid));
-    getDocs(userExerciseRecordsQuery).then(snapshot => {
-        exerciseRecords = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        populateExerciseOptions();
-        displayExerciseRecords(exerciseRecords);
-    }).catch(error => {
-        console.error("Error cargando registros de ejercicios:", error);
-    });
-}
-
-function populateExerciseOptions() {
-    const selectedGroup = muscleGroupFilter.value;
-    const relevantExercises = exerciseRecords
-        .filter(record => !selectedGroup || record.muscleGroup === selectedGroup)
-        .map(record => record.exercise);
-
-    const uniqueExercises = [...new Set(relevantExercises)];
-
-    exerciseFilter.innerHTML = '<option value="">Todos</option>';
-    uniqueExercises.forEach(exercise => {
+function populateMuscleGroupOptions() {
+    muscleGroupSelect.innerHTML = '<option value="">Todos</option>';
+    Object.keys(muscleGroups).forEach(group => {
         const option = document.createElement("option");
-        option.value = exercise;
-        option.textContent = exercise;
-        exerciseFilter.appendChild(option);
+        option.value = group;
+        option.textContent = group;
+        muscleGroupSelect.appendChild(option);
     });
+    muscleGroupSelect.addEventListener('change', updateExerciseOptions);
+    updateExerciseOptions();
 }
 
-function displayExerciseRecords(records) {
-    exerciseList.innerHTML = '';
+function updateExerciseOptions() {
+    const selectedGroup = muscleGroupSelect.value;
+    exerciseSelect.innerHTML = '<option value="">Todos</option>';
+    if (selectedGroup && muscleGroups[selectedGroup]) {
+        muscleGroups[selectedGroup].forEach(exercise => {
+            const option = document.createElement("option");
+            option.value = exercise;
+            option.textContent = exercise;
+            exerciseSelect.appendChild(option);
+        });
+    }
+}
 
-    if (records.length === 0) {
-        exerciseList.innerHTML = '<li>No se encontraron registros.</li>';
-        return;
+function fetchExerciseRecords() {
+    const selectedGroup = muscleGroupSelect.value;
+    const selectedExercise = exerciseSelect.value;
+
+    let recordsQuery = query(collection(db, "exerciseRecords"), where("userId", "==", currentUser.uid));
+    
+    if (selectedGroup) {
+        recordsQuery = query(recordsQuery, where("muscleGroup", "==", selectedGroup));
     }
 
-    records.forEach(record => {
-        const listItem = document.createElement('li');
-        listItem.textContent = `${record.muscleGroup} - ${record.exercise}: ${record.weight} kg, ${record.repetitions} reps (${new Date(record.dateTime).toLocaleString()})`;
-        exerciseList.appendChild(listItem);
+    if (selectedExercise) {
+        recordsQuery = query(recordsQuery, where("exercise", "==", selectedExercise));
+    }
+
+    recordsQuery = query(recordsQuery, orderBy("weight", "desc"), orderBy("repetitions", "desc"));
+
+    getDocs(recordsQuery).then(snapshot => {
+        resultsBody.innerHTML = '';
+        snapshot.forEach(doc => {
+            const record = doc.data();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${record.muscleGroup.replace("Personalizado-", "")}</td>
+                <td>${record.exercise}</td>
+                <td>${record.weight}</td>
+                <td>${record.repetitions}</td>
+                <td>${new Date(record.dateTime).toLocaleString()}</td>
+            `;
+            resultsBody.appendChild(row);
+        });
+        debugInfo.innerText = "Resultados cargados.";
+    }).catch(error => {
+        console.error("Error cargando registros de ejercicios:", error);
+        debugInfo.innerText = "Error cargando registros de ejercicios: " + error;
     });
 }
 
-function filterExerciseRecords() {
-    const selectedGroup = muscleGroupFilter.value;
-    const selectedExercise = exerciseFilter.value;
-
-    const filteredRecords = exerciseRecords.filter(record => {
-        const matchesGroup = !selectedGroup || record.muscleGroup === selectedGroup;
-        const matchesExercise = !selectedExercise || record.exercise === selectedExercise;
-        return matchesGroup && matchesExercise;
-    });
-
-    displayExerciseRecords(filteredRecords);
-}
-
-function sortExerciseRecords() {
-    const sortedRecords = exerciseRecords.sort((a, b) => {
-        if (a.weight !== b.weight) {
-            return b.weight - a.weight; // Ordenar por peso descendente
-        } else {
-            return b.repetitions - a.repetitions; // Ordenar por repeticiones descendente
-        }
-    });
-
-    filterExerciseRecords(sortedRecords);
-}
-
-muscleGroupFilter.addEventListener('change', populateExerciseOptions);
-document.getElementById('filter-exercises').addEventListener('click', filterExerciseRecords);
-document.getElementById('sort-exercises').addEventListener('click', sortExerciseRecords);
+document.getElementById('filter-button').addEventListener('click', fetchExerciseRecords);

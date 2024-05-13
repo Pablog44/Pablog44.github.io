@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Ejercicios</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Importar los scripts de Firebase y el archivo JavaScript personalizado -->
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js"></script>
@@ -13,24 +14,34 @@
     <header>
         <h1>Historial de Ejercicios</h1>
         <button id="logout-button">Cerrar Sesión</button>
-        <a href="index.html"><button>Registrar Ejercicio</button></a>
+        <a href="registro.html"><button>Registrar Nuevo Ejercicio</button></a>
     </header>
     <main>
-        <section>
-            <div class="form-container">
-                <label for="muscle-group-filter">Grupo Muscular:</label>
-                <select id="muscle-group-filter"></select>
-                <label for="exercise-filter">Ejercicio:</label>
-                <select id="exercise-filter"></select>
-                <button id="filter-exercises">Filtrar Ejercicios</button>
-                <button id="sort-exercises">Ordenar por Peso y Repeticiones</button>
-            </div>
+        <section class="form-container">
+            <h2>Filtrar Historial</h2>
+            <label for="filter-muscle-group">Grupo Muscular:</label>
+            <select id="filter-muscle-group"></select>
+            <label for="filter-exercise">Ejercicio:</label>
+            <select id="filter-exercise"></select>
+            <button id="filter-button">Filtrar</button>
         </section>
         <section>
-            <ul id="exercise-list"></ul>
+            <h2>Resultados</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Grupo Muscular</th>
+                        <th>Ejercicio</th>
+                        <th>Peso (kg)</th>
+                        <th>Repeticiones</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+            </table>
         </section>
         <div id="debug-info"></div>
     </main>
-    <script src="historial.js" type="module"></script>
+    <script src="scripts-historial.js" type="module"></script>
 </body>
 </html>
