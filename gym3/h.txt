@@ -389,4 +389,4 @@ addExerciseButton.addEventListener('click', addExercise);
 </body>
 </html>
 
-quiero un html con su css para poder filtrar los resultados del usuario por grupo muscular y despues por ejercicio, y ademas poder ordenarlos por peso  y para los que tienen el mismo peso que salgan arriba o primero los de mas repeticiones.
+quiero un html con su js para poder filtrar los resultados del usuario por  ejercicio deben salir todos los ejercicios del usuario los de los gurpos musculars añadidos por el usuario y los demas tambien, y ademas  ordenados por peso  y para los que tienen el mismo peso que salgan arriba o primero los de mas repeticiones.

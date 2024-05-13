@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Ejercicios</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Importar los scripts de Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Historial de Ejercicios</h1>
+        <button id="logout-button">Cerrar Sesión</button>
+        <a href="registro.html"><button>Registrar Ejercicio</button></a>
+        <a href="resultado.html"><button>Resultados</button></a>
+    </header>
+    <main>
+        <section id="filter-section">
+            <div class="form-container">
+                <label for="filter-muscle-group">Grupo Muscular:</label>
+                <select id="filter-muscle-group">
+                    <option value="">Todos</option>
+                </select>
+                <label for="filter-exercise">Ejercicio:</label>
+                <select id="filter-exercise">
+                    <option value="">Todos</option>
+                </select>
+                <button id="apply-filters">Aplicar Filtros</button>
+            </div>
+        </section>
+        <section id="sort-section">
+            <div class="form-container">
+                <h2>Ordenar Resultados</h2>
+                <label for="sort-criteria">Criterio:</label>
+                <select id="sort-criteria">
+                    <option value="weight">Peso</option>
+                    <option value="repetitions">Repeticiones</option>
+                </select>
+                <button id="sort-results">Ordenar</button>
+            </div>
+        </section>
+        <section id="results-section">
+            <h2>Resultados</h2>
+            <ul id="results-list"></ul>
+        </section>
+        <div id="debug-info"></div>
+    </main>
+    <script src="ts.js" type="module"></script>
+</body>
+</html>
