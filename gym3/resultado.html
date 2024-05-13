@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Ejercicios</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Historial de Ejercicios</h1>
+        <a href="registro.html"><button>Registrar Ejercicio</button></a>
+        <a href="index.html"><button>Registrar Nuevo Ejercicio</button></a>
+    </header>
+    <main>
+        <section id="filter-section">
+            <div class="form-container">
+                <label for="muscle-group-filter">Grupo Muscular:</label>
+                <select id="muscle-group-filter"></select>
+                <label for="exercise-filter">Ejercicio:</label>
+                <select id="exercise-filter"></select>
+                <button id="filter-exercise">Filtrar</button>
+                <label for="sort-criteria">Ordenar Por:</label>
+                <select id="sort-criteria">
+                    <option value="date-desc">Fecha (Reciente a Antiguo)</option>
+                    <option value="date-asc">Fecha (Antiguo a Reciente)</option>
+                    <option value="reps-max">Repeticiones Máximas</option>
+                </select>
+                <button id="sort-exercise">Ordenar</button>
+            </div>
+        </section>
+        <section id="history-section">
+            <table id="exercise-history">
+                <thead>
+                    <tr>
+                        <th>Grupo Muscular</th>
+                        <th>Ejercicio</th>
+                        <th>Peso (kg)</th>
+                        <th>Repeticiones</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+        <div id="debug-info"></div>
+    </main>
+    <script src="resul.js" type="module"></script>
+</body>
+</html>
