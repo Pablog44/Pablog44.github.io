@@ -116,12 +116,16 @@ function sortAndDisplayResults() {
     const sortCriteria = sortCriteriaSelect.value;
 
     filteredRecords.sort((a, b) => {
-        if (a[sortCriteria] !== b[sortCriteria]) {
-            return b[sortCriteria] - a[sortCriteria];
-        }
+        if (sortCriteria === "dateTime") {
+            return new Date(b.dateTime) - new Date(a.dateTime);
+        } else {
+            if (a[sortCriteria] !== b[sortCriteria]) {
+                return b[sortCriteria] - a[sortCriteria];
+            }
 
-        // Si el criterio principal es igual, ordenamos por repeticiones
-        return b.repetitions - a.repetitions;
+            // Si el criterio principal es igual, ordenamos por repeticiones
+            return b.repetitions - a.repetitions;
+        }
     });
 
     displayResults(filteredRecords);
