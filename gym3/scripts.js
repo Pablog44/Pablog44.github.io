@@ -201,6 +201,7 @@ function addExercise() {
     }
 }
 
+
 function saveExercise() {
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
