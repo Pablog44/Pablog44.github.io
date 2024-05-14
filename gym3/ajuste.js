@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, deleteDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -48,6 +48,7 @@ function initializeMuscleGroups() {
 
     Promise.all([getDocs(muscleGroupsRef), getDocs(userMuscleGroupsRef)]).then(([muscleGroupsSnapshot, userMuscleGroupsSnapshot]) => {
         muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
+        exercisesData = {}; // Limpiar los datos existentes
 
         muscleGroupsSnapshot.forEach(doc => {
             const option = document.createElement("option");
