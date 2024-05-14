@@ -57,6 +57,14 @@
     <div class="game-container">
         <canvas id="gameCanvas" width="400" height="400"></canvas>
     </div>
+    <div class="mobile-controls">
+        <button id="upButton">Arriba</button>
+        <div>
+            <button id="leftButton">Izquierda</button>
+            <button id="rightButton">Derecha</button>
+        </div>
+        <button id="downButton">Abajo</button>
+    </div>
     <div class="controls">
         <label for="speed">Velocidad (1-10): </label>
         <input type="range" id="speed" min="1" max="10" value="5">
@@ -69,14 +77,6 @@
         <button onclick="startGame()">Reiniciar Juego</button>
         <p>Puntuación Final: <span id="finalScore">0</span></p>
         <a href="resultados.html"><button>Records</button></a>
-    </div>
-    <div class="mobile-controls">
-        <button id="upButton">Arriba</button>
-        <div>
-            <button id="leftButton">Izquierda</button>
-            <button id="rightButton">Derecha</button>
-        </div>
-        <button id="downButton">Abajo</button>
     </div>
     <script src="script.js"></script>
 </body>
