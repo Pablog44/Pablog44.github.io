@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajuste de Ejercicios</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Ajuste de Ejercicios</h1>
+        <button id="logout-button">Cerrar Sesión</button>
+    </header>
+    <main>
+        <section id="delete-section">
+            <div class="form-container">
+                <h2>Eliminar Grupos/Ejercicios</h2>
+                <label for="muscle-group">Grupo Muscular:</label>
+                <select id="muscle-group"></select>
+                <label for="exercise">Ejercicio:</label>
+                <select id="exercise"></select>
+                <button id="delete-muscle-group">Eliminar Grupo Muscular</button>
+                <button id="delete-exercise">Eliminar Ejercicio</button>
+            </div>
+        </section>
+        <div id="debug-info"></div>
+    </main>
+    <script src="ajuste.js" type="module"></script>
+</body>
+</html>
