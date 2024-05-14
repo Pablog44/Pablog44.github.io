@@ -82,8 +82,8 @@ function updateExerciseOptions() {
             exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
             data.exercises.forEach(exercise => {
                 const option = document.createElement("option");
-                option.value = exercise;
-                option.textContent = exercise;
+                option.value = exercise.name; // Asumimos que cada ejercicio tiene una propiedad "name"
+                option.textContent = exercise.name;
                 exerciseSelect.appendChild(option);
             });
 
@@ -117,31 +117,36 @@ function deleteMuscleGroup() {
 }
 
 function deleteExercise() {
-    const exercise = exerciseSelect.value;
+    const exerciseName = exerciseSelect.value;
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
 
-    if (confirm(`¿Estás seguro de que deseas eliminar el ejercicio ${exercise} del grupo muscular ${muscleGroup}?`)) {
-        getDoc(groupRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const exercises = docSnap.data().exercises;
-                const updatedExercises = exercises.filter(ex => ex !== exercise);
+    getDoc(groupRef).then(docSnap => {
+        if (docSnap.exists()) {
+            const exercises = docSnap.data().exercises;
+            const exercise = exercises.find(ex => ex.name === exerciseName);
+
+            if (exercise.isCustom) { // Verificar si el ejercicio es personalizado
+                const updatedExercises = exercises.filter(ex => ex.name !== exerciseName);
 
                 updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
-                    console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
-                    debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
+                    console.log(`Ejercicio ${exerciseName} eliminado del grupo muscular ${muscleGroup}.`);
+                    debugInfo.innerText = `Ejercicio ${exerciseName} eliminado del grupo muscular ${muscleGroup}.`;
                     updateExerciseOptions();
                 }).catch(error => {
-                    console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
-                    debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+                    console.error(`Error eliminando el ejercicio ${exerciseName} del grupo muscular ${muscleGroup}:`, error);
+                    debugInfo.innerText = `Error eliminando el ejercicio ${exerciseName} del grupo muscular ${muscleGroup}: ${error}`;
                 });
+            } else {
+                console.log(`El ejercicio ${exerciseName} no es personalizado y no puede ser eliminado.`);
+                debugInfo.innerText = `El ejercicio ${exerciseName} no es personalizado y no puede ser eliminado.`;
             }
-        }).catch(error => {
-            console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
-            debugInfo.innerText = `Error obteniendo el grupo muscular ${muscleGroup}: ${error}`;
-        });
-    }
+        }
+    }).catch(error => {
+        console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
+        debugInfo.innerText = `Error obteniendo el grupo muscular ${muscleGroup}: ${error}`;
+    });
 }
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);
