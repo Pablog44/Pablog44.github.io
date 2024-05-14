@@ -44,17 +44,17 @@ document.getElementById('logout-button').addEventListener('click', () => {
 function initializeMuscleGroups() {
     const muscleGroupsRef = collection(db, "muscleGroups");
     const userMuscleGroupsRef = collection(db, "userMuscleGroups");
-    
+
     Promise.all([getDocs(muscleGroupsRef), getDocs(userMuscleGroupsRef)]).then(([muscleGroupsSnapshot, userMuscleGroupsSnapshot]) => {
         muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
-        
+
         muscleGroupsSnapshot.forEach(doc => {
             const option = document.createElement("option");
             option.textContent = doc.id;
             option.value = doc.id;
             muscleGroupSelect.appendChild(option);
         });
-        
+
         userMuscleGroupsSnapshot.forEach(doc => {
             if (doc.data().userId === currentUser.uid) {
                 const option = document.createElement("option");
@@ -86,6 +86,9 @@ function updateExerciseOptions() {
                 option.textContent = exercise;
                 exerciseSelect.appendChild(option);
             });
+
+            // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
+            deleteMuscleGroupButton.disabled = !isCustomGroup;
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
             debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
@@ -99,9 +102,9 @@ function updateExerciseOptions() {
 function deleteMuscleGroup() {
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
+    const groupRef = doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`);
 
-    if (confirm(`¿Estás seguro de que deseas eliminar el grupo muscular ${muscleGroup}?`)) {
+    if (isCustomGroup && confirm(`¿Estás seguro de que deseas eliminar el grupo muscular ${muscleGroup}?`)) {
         deleteDoc(groupRef).then(() => {
             console.log(`Grupo muscular ${muscleGroup} eliminado.`);
             debugInfo.innerText = `Grupo muscular ${muscleGroup} eliminado.`;
