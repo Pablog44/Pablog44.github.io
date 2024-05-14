@@ -23,6 +23,7 @@ const deleteExerciseButton = document.getElementById('delete-exercise');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
+let exercisesData = {};
 
 onAuthStateChanged(auth, user => {
     if (!user) {
@@ -53,6 +54,7 @@ function initializeMuscleGroups() {
             option.textContent = doc.id;
             option.value = doc.id;
             muscleGroupSelect.appendChild(option);
+            exercisesData[doc.id] = doc.data().exercises.map(ex => ({ name: ex, isCustom: false }));
         });
 
         userMuscleGroupsSnapshot.forEach(doc => {
@@ -61,6 +63,7 @@ function initializeMuscleGroups() {
                 option.textContent = doc.id.replace("Personalizado-", "");
                 option.value = `${doc.id} (Personalizado)`;
                 muscleGroupSelect.appendChild(option);
+                exercisesData[doc.id] = doc.data().exercises.map(ex => ({ name: ex, isCustom: true }));
             }
         });
 
@@ -82,13 +85,14 @@ function updateExerciseOptions() {
             exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
             data.exercises.forEach(exercise => {
                 const option = document.createElement("option");
-                option.value = exercise.name; // Asumimos que cada ejercicio tiene una propiedad "name"
-                option.textContent = exercise.name;
+                option.value = exercise;
+                option.textContent = exercise;
                 exerciseSelect.appendChild(option);
             });
 
             // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
             deleteMuscleGroupButton.disabled = !isCustomGroup;
+            checkExerciseDeletable();
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
             debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
@@ -97,6 +101,25 @@ function updateExerciseOptions() {
         console.error("Error cargando ejercicios:", error);
         debugInfo.innerText = "Error cargando ejercicios: " + error;
     });
+}
+
+function checkExerciseDeletable() {
+    const selectedExercise = exerciseSelect.value;
+    const selectedGroup = muscleGroupSelect.value;
+    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
+
+    const exercise = exercisesData[selectedGroup]?.find(ex => ex.name === selectedExercise);
+    if (exercise && !exercise.isCustom) {
+        deleteExerciseButton.disabled = true;
+        deleteExerciseButton.addEventListener('click', showAlert, { once: true });
+    } else {
+        deleteExerciseButton.disabled = false;
+        deleteExerciseButton.removeEventListener('click', showAlert);
+    }
+}
+
+function showAlert() {
+    alert('Solo se pueden eliminar los grupos musculares y ejercicios personalizados.');
 }
 
 function deleteMuscleGroup() {
@@ -117,7 +140,7 @@ function deleteMuscleGroup() {
 }
 
 function deleteExercise() {
-    const exerciseName = exerciseSelect.value;
+    const exercise = exerciseSelect.value;
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
@@ -125,23 +148,16 @@ function deleteExercise() {
     getDoc(groupRef).then(docSnap => {
         if (docSnap.exists()) {
             const exercises = docSnap.data().exercises;
-            const exercise = exercises.find(ex => ex.name === exerciseName);
+            const updatedExercises = exercises.filter(ex => ex !== exercise);
 
-            if (exercise.isCustom) { // Verificar si el ejercicio es personalizado
-                const updatedExercises = exercises.filter(ex => ex.name !== exerciseName);
-
-                updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
-                    console.log(`Ejercicio ${exerciseName} eliminado del grupo muscular ${muscleGroup}.`);
-                    debugInfo.innerText = `Ejercicio ${exerciseName} eliminado del grupo muscular ${muscleGroup}.`;
-                    updateExerciseOptions();
-                }).catch(error => {
-                    console.error(`Error eliminando el ejercicio ${exerciseName} del grupo muscular ${muscleGroup}:`, error);
-                    debugInfo.innerText = `Error eliminando el ejercicio ${exerciseName} del grupo muscular ${muscleGroup}: ${error}`;
-                });
-            } else {
-                console.log(`El ejercicio ${exerciseName} no es personalizado y no puede ser eliminado.`);
-                debugInfo.innerText = `El ejercicio ${exerciseName} no es personalizado y no puede ser eliminado.`;
-            }
+            updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
+                console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
+                debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
+                updateExerciseOptions();
+            }).catch(error => {
+                console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
+                debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+            });
         }
     }).catch(error => {
         console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
@@ -150,5 +166,6 @@ function deleteExercise() {
 }
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);
+exerciseSelect.addEventListener('change', checkExerciseDeletable);
 deleteMuscleGroupButton.addEventListener('click', deleteMuscleGroup);
 deleteExerciseButton.addEventListener('click', deleteExercise);
