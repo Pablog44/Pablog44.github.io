@@ -7,6 +7,11 @@ const speedControl = document.getElementById('speed');
 const gameOverScreen = document.getElementById('gameOver');
 const highScoreText = document.getElementById('highScore');
 
+const upButton = document.getElementById('upButton');
+const downButton = document.getElementById('downButton');
+const leftButton = document.getElementById('leftButton');
+const rightButton = document.getElementById('rightButton');
+
 const grid = 20;
 let count = 0;
 let score = 0;
@@ -17,10 +22,9 @@ let dy = 0;
 let speed = 5;
 
 async function loadHighScore(level) {
-    const db = firebase.firestore();
     const q = query(
         collection(db, "highscores"),
-        where("level", "==", level),
+        where("level", "==", parseInt(level, 10)),
         orderBy("score", "desc"),
         limit(1)
     );
@@ -116,30 +120,59 @@ function startGame() {
     scoreText.textContent = score;
     gameOverScreen.style.display = 'none';
     placeApple();
-    loadHighScore(speedControl.value);  // Load high score for the current level
+    loadHighScore(speedControl.value);
     gameLoop();
 }
 
 function gameOver() {
     finalScore.textContent = score;
     gameOverScreen.style.display = 'block';
-    saveHighScore(score, speedControl.value);  // Save score with the current level
+    saveHighScore(score, speedControl.value);
 }
 
 startButton.addEventListener('click', startGame);
 
 document.addEventListener('keydown', function (e) {
-    if (e.which === 37 && dx === 0) {
+    e.preventDefault(); // Evitar el desplazamiento de la página con las teclas de flecha
+    if (e.key === "ArrowLeft" && dx === 0) {
         dx = -grid;
         dy = 0;
-    } else if (e.which === 38 && dy === 0) {
+    } else if (e.key === "ArrowUp" && dy === 0) {
         dx = 0;
         dy = -grid;
-    } else if (e.which === 39 && dx === 0) {
+    } else if (e.key === "ArrowRight" && dx === 0) {
         dx = grid;
         dy = 0;
-    } else if (e.which === 40 && dy === 0) {
+    } else if (e.key === "ArrowDown" && dy === 0) {
         dx = 0;
         dy = grid;
+    }
+});
+
+upButton.addEventListener('click', () => {
+    if (dy === 0) {
+        dx = 0;
+        dy = -grid;
+    }
+});
+
+downButton.addEventListener('click', () => {
+    if (dy === 0) {
+        dx = 0;
+        dy = grid;
+    }
+});
+
+leftButton.addEventListener('click', () => {
+    if (dx === 0) {
+        dx = -grid;
+        dy = 0;
+    }
+});
+
+rightButton.addEventListener('click', () => {
+    if (dx === 0) {
+        dx = grid;
+        dy = 0;
     }
 });

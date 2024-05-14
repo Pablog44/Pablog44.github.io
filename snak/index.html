@@ -5,12 +5,10 @@
     <title>Snake Game</title>
     <link rel="stylesheet" href="style.css">
     <script type="module">
-        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCkxm_JlbWtOqANplQfGa5kbg_Dh4yvuN8",
             authDomain: "snake-36408.firebaseapp.com",
@@ -21,12 +19,10 @@
             measurementId: "G-CG81DR9TDG"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        // Sign in anonymously
         onAuthStateChanged(auth, user => {
             if (!user) {
                 signInAnonymously(auth).catch(error => {
@@ -36,24 +32,23 @@
         });
 
         window.saveHighScore = async (score, level) => {
-    const user = auth.currentUser;
-    if (user) {
-        try {
-            await addDoc(collection(db, "highscores"), {
-                uid: user.uid,
-                score: score,
-                level: parseInt(level, 10),  // Asegúrate de que 'level' se guarda como número
-                timestamp: new Date()
-            });
-            console.log("Score saved successfully!");
-        } catch (error) {
-            console.error("Error saving score: ", error);
-        }
-    } else {
-        console.log("No user is signed in to save score.");
-    }
-};
-
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    await addDoc(collection(db, "highscores"), {
+                        uid: user.uid,
+                        score: score,
+                        level: parseInt(level, 10),
+                        timestamp: new Date()
+                    });
+                    console.log("Score saved successfully!");
+                } catch (error) {
+                    console.error("Error saving score: ", error);
+                }
+            } else {
+                console.log("No user is signed in to save score.");
+            }
+        };
     </script>
 </head>
 <body>
@@ -73,6 +68,14 @@
         <button onclick="startGame()">Reiniciar Juego</button>
         <p>Puntuación Final: <span id="finalScore">0</span></p>
         <a href="resultados.html"><button>Records</button></a>
+    </div>
+    <div class="mobile-controls">
+        <button id="upButton">Arriba</button>
+        <div>
+            <button id="leftButton">Izquierda</button>
+            <button id="rightButton">Derecha</button>
+        </div>
+        <button id="downButton">Abajo</button>
     </div>
     <script src="script.js"></script>
 </body>
