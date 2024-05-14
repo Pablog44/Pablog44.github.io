@@ -30,23 +30,28 @@
 
             const q = query(
                 collection(db, "highscores"),
-                where("level", "==", parseInt(level)),
+                where("level", "==", parseInt(level, 10)),  // Asegúrate de comparar con número
                 orderBy("score", "desc"),
                 limit(25)
             );
 
-            const querySnapshot = await getDocs(q);
-            scoresList.innerHTML = '';
+            try {
+                const querySnapshot = await getDocs(q);
+                scoresList.innerHTML = '';
 
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                const listItem = document.createElement('li');
-                listItem.textContent = `Puntuación: ${data.score} - Fecha: ${data.timestamp.toDate().toLocaleString()}`;
-                scoresList.appendChild(listItem);
-            });
-
-            if (querySnapshot.empty) {
-                scoresList.innerHTML = '<li>No hay puntuaciones para este nivel.</li>';
+                if (querySnapshot.empty) {
+                    scoresList.innerHTML = '<li>No hay puntuaciones para este nivel.</li>';
+                } else {
+                    querySnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `Puntuación: ${data.score} - Fecha: ${data.timestamp.toDate().toLocaleString()}`;
+                        scoresList.appendChild(listItem);
+                    });
+                }
+            } catch (error) {
+                console.error("Error obteniendo los documentos: ", error);
+                scoresList.innerHTML = '<li>Error al cargar las puntuaciones.</li>';
             }
         }
 

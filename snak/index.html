@@ -36,23 +36,24 @@
         });
 
         window.saveHighScore = async (score, level) => {
-            const user = auth.currentUser;
-            if (user) {
-                try {
-                    await addDoc(collection(db, "highscores"), {
-                        uid: user.uid,
-                        score: score,
-                        level: level,
-                        timestamp: new Date()
-                    });
-                    console.log("Score saved successfully!");
-                } catch (error) {
-                    console.error("Error saving score: ", error);
-                }
-            } else {
-                console.log("No user is signed in to save score.");
-            }
-        };
+    const user = auth.currentUser;
+    if (user) {
+        try {
+            await addDoc(collection(db, "highscores"), {
+                uid: user.uid,
+                score: score,
+                level: parseInt(level, 10),  // Asegúrate de que 'level' se guarda como número
+                timestamp: new Date()
+            });
+            console.log("Score saved successfully!");
+        } catch (error) {
+            console.error("Error saving score: ", error);
+        }
+    } else {
+        console.log("No user is signed in to save score.");
+    }
+};
+
     </script>
 </head>
 <body>
