@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Snake Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkxm_JlbWtOqANplQfGa5kbg_Dh4yvuN8",
+            authDomain: "snake-36408.firebaseapp.com",
+            projectId: "snake-36408",
+            storageBucket: "snake-36408.appspot.com",
+            messagingSenderId: "343388178717",
+            appId: "1:343388178717:web:a494759e4e3dcfee1379f4",
+            measurementId: "G-CG81DR9TDG"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Sign in anonymously
+        onAuthStateChanged(auth, user => {
+            if (!user) {
+                signInAnonymously(auth).catch(error => {
+                    console.log("Error [" + error.code + "]: " + error.message);
+                });
+            }
+        });
+
+        window.saveHighScore = async (score, level) => {
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    await addDoc(collection(db, "highscores"), {
+                        uid: user.uid,
+                        score: score,
+                        level: level,
+                        timestamp: new Date()
+                    });
+                    console.log("Score saved successfully!");
+                } catch (error) {
+                    console.error("Error saving score: ", error);
+                }
+            } else {
+                console.log("No user is signed in to save score.");
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Juego de Snake</h1>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+    </div>
+    <div class="controls">
+        <label for="speed">Velocidad (1-10): </label>
+        <input type="range" id="speed" min="1" max="10" value="5">
+        <button id="startButton">Iniciar Juego</button>
+    </div>
+    <p>Puntuación: <span id="score">0</span></p>
+    <p>Récord Actual: <span id="highScore">0</span></p>
+    <div id="gameOver" class="game-over">
+        <p>¡Game Over!</p>
+        <button onclick="startGame()">Reiniciar Juego</button>
+        <p>Puntuación Final: <span id="finalScore">0</span></p>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
