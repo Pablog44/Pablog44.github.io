@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, deleteDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -23,7 +23,6 @@ const deleteExerciseButton = document.getElementById('delete-exercise');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
-let exercisesData = {};
 
 onAuthStateChanged(auth, user => {
     if (!user) {
@@ -48,14 +47,12 @@ function initializeMuscleGroups() {
 
     Promise.all([getDocs(muscleGroupsRef), getDocs(userMuscleGroupsRef)]).then(([muscleGroupsSnapshot, userMuscleGroupsSnapshot]) => {
         muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
-        exercisesData = {}; // Limpiar los datos existentes
 
         muscleGroupsSnapshot.forEach(doc => {
             const option = document.createElement("option");
             option.textContent = doc.id;
             option.value = doc.id;
             muscleGroupSelect.appendChild(option);
-            exercisesData[doc.id] = doc.data().exercises.map(ex => ({ name: ex, isCustom: false }));
         });
 
         userMuscleGroupsSnapshot.forEach(doc => {
@@ -64,7 +61,6 @@ function initializeMuscleGroups() {
                 option.textContent = doc.id.replace("Personalizado-", "");
                 option.value = `${doc.id} (Personalizado)`;
                 muscleGroupSelect.appendChild(option);
-                exercisesData[doc.id] = doc.data().exercises.map(ex => ({ name: ex, isCustom: true }));
             }
         });
 
@@ -93,7 +89,6 @@ function updateExerciseOptions() {
 
             // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
             deleteMuscleGroupButton.disabled = !isCustomGroup;
-            checkExerciseDeletable();
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
             debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
@@ -102,25 +97,6 @@ function updateExerciseOptions() {
         console.error("Error cargando ejercicios:", error);
         debugInfo.innerText = "Error cargando ejercicios: " + error;
     });
-}
-
-function checkExerciseDeletable() {
-    const selectedExercise = exerciseSelect.value;
-    const selectedGroup = muscleGroupSelect.value;
-    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-
-    const exercise = exercisesData[selectedGroup]?.find(ex => ex.name === selectedExercise);
-    if (exercise && !exercise.isCustom) {
-        deleteExerciseButton.disabled = true;
-        deleteExerciseButton.addEventListener('click', showAlert, { once: true });
-    } else {
-        deleteExerciseButton.disabled = false;
-        deleteExerciseButton.removeEventListener('click', showAlert);
-    }
-}
-
-function showAlert() {
-    alert('Solo se pueden eliminar los grupos musculares y ejercicios personalizados.');
 }
 
 function deleteMuscleGroup() {
@@ -146,27 +122,28 @@ function deleteExercise() {
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
 
-    getDoc(groupRef).then(docSnap => {
-        if (docSnap.exists()) {
-            const exercises = docSnap.data().exercises;
-            const updatedExercises = exercises.filter(ex => ex !== exercise);
+    if (confirm(`¿Estás seguro de que deseas eliminar el ejercicio ${exercise} del grupo muscular ${muscleGroup}?`)) {
+        getDoc(groupRef).then(docSnap => {
+            if (docSnap.exists()) {
+                const exercises = docSnap.data().exercises;
+                const updatedExercises = exercises.filter(ex => ex !== exercise);
 
-            updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
-                console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
-                debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
-                updateExerciseOptions();
-            }).catch(error => {
-                console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
-                debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
-            });
-        }
-    }).catch(error => {
-        console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
-        debugInfo.innerText = `Error obteniendo el grupo muscular ${muscleGroup}: ${error}`;
-    });
+                updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
+                    console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
+                    debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
+                    updateExerciseOptions();
+                }).catch(error => {
+                    console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
+                    debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+                });
+            }
+        }).catch(error => {
+            console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
+            debugInfo.innerText = `Error obteniendo el grupo muscular ${muscleGroup}: ${error}`;
+        });
+    }
 }
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);
-exerciseSelect.addEventListener('change', checkExerciseDeletable);
 deleteMuscleGroupButton.addEventListener('click', deleteMuscleGroup);
 deleteExerciseButton.addEventListener('click', deleteExercise);
