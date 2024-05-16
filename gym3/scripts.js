@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -22,8 +22,6 @@ const weightInput = document.getElementById('weight');
 const repetitionsInput = document.getElementById('repetitions');
 const exerciseDateInput = document.getElementById('exercise-date');
 const saveExerciseButton = document.getElementById('save-exercise');
-const addMuscleGroupButton = document.getElementById('add-muscle-group');
-const addExerciseButton = document.getElementById('add-exercise');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
@@ -135,73 +133,6 @@ function updateExerciseOptions() {
     });
 }
 
-function addMuscleGroup() {
-    const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
-    if (newMuscleGroupName && currentUser) {
-        const newGroupRef = doc(db, "userMuscleGroups", `Personalizado-${newMuscleGroupName}`);
-        setDoc(newGroupRef, {
-            userId: currentUser.uid,
-            exercises: []
-        }).then(() => {
-            console.log("Nuevo grupo muscular personalizado añadido:", newMuscleGroupName);
-            debugInfo.innerText = "Nuevo grupo muscular personalizado añadido: " + newMuscleGroupName;
-            const option = document.createElement("option");
-            option.textContent = `${newMuscleGroupName} (Personalizado)`;
-            option.value = `Personalizado-${newMuscleGroupName} (Personalizado)`;
-            muscleGroupSelect.appendChild(option);
-            document.getElementById('new-muscle-group').value = ''; // Limpiar el campo de texto
-            updateExerciseOptions();
-        }).catch(error => {
-            console.error("Error añadiendo grupo muscular personalizado:", error);
-            debugInfo.innerText = "Error añadiendo grupo muscular personalizado: " + error;
-        });
-    } else {
-        console.log("No se introdujo nombre de grupo muscular.");
-        debugInfo.innerText = "No se introdujo nombre de grupo muscular.";
-    }
-}
-
-function addExercise() {
-    const newExerciseName = document.getElementById('new-exercise').value.trim();
-    const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
-
-    if (newExerciseName && muscleGroup) {
-        getDoc(groupRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const exercises = docSnap.data().exercises;
-                if (!exercises.includes(newExerciseName)) {
-                    exercises.push(newExerciseName);
-                    setDoc(groupRef, { exercises }, { merge: true }).then(() => {
-                        console.log("Ejercicio añadido:", newExerciseName);
-                        debugInfo.innerText = "Ejercicio añadido: " + newExerciseName;
-                        updateExerciseOptions();
-                        document.getElementById('new-exercise').value = ''; // Limpiar el campo de texto
-                    }).catch(error => {
-                        console.error("Error añadiendo nuevo ejercicio:", error);
-                        debugInfo.innerText = "Error añadiendo nuevo ejercicio: " + error;
-                    });
-                } else {
-                    console.log("El ejercicio ya existe:", newExerciseName);
-                    debugInfo.innerText = "El ejercicio ya existe: " + newExerciseName;
-                }
-            } else {
-                console.log(`El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe:`, muscleGroup);
-                debugInfo.innerText = `El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe: ${muscleGroup}`;
-            }
-        }).catch(error => {
-            console.error("Error obteniendo grupo muscular:", error);
-            debugInfo.innerText = `Error obteniendo grupo muscular: ${error}`;
-        });
-    } else {
-        console.log("No se seleccionó grupo muscular o nombre de ejercicio.");
-        debugInfo.innerText = "No se seleccionó grupo muscular o nombre de ejercicio.";
-    }
-}
-
-
 function saveExercise() {
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
@@ -240,5 +171,3 @@ function clearForm() {
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);
 saveExerciseButton.addEventListener('click', saveExercise);
-addMuscleGroupButton.addEventListener('click', addMuscleGroup);
-addExerciseButton.addEventListener('click', addExercise);
