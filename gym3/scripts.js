@@ -112,6 +112,8 @@ function updateExerciseOptions() {
     const selectedGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
     const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
+    const userExercisesRef = collection(db, "userExercises");
+    const userExercisesQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", selectedGroup));
 
     getDoc(groupRef).then(docSnap => {
         if (docSnap.exists()) {
@@ -122,6 +124,20 @@ function updateExerciseOptions() {
                 option.value = exercise;
                 option.textContent = exercise;
                 exerciseSelect.appendChild(option);
+            });
+
+            // Agregar ejercicios personalizados del usuario
+            getDocs(userExercisesQuery).then(snapshot => {
+                snapshot.forEach(doc => {
+                    const exercise = doc.data().exercise;
+                    const option = document.createElement("option");
+                    option.value = exercise;
+                    option.textContent = exercise + " (Personalizado)";
+                    exerciseSelect.appendChild(option);
+                });
+            }).catch(error => {
+                console.error("Error cargando ejercicios personalizados:", error);
+                debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
             });
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
