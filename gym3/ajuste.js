@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, deleteDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -42,26 +42,16 @@ document.getElementById('logout-button').addEventListener('click', () => {
 });
 
 function initializeMuscleGroups() {
-    const muscleGroupsRef = collection(db, "muscleGroups");
     const userMuscleGroupsRef = collection(db, "userMuscleGroups");
 
-    Promise.all([getDocs(muscleGroupsRef), getDocs(userMuscleGroupsRef)]).then(([muscleGroupsSnapshot, userMuscleGroupsSnapshot]) => {
+    getDocs(query(userMuscleGroupsRef, where("userId", "==", currentUser.uid))).then(userMuscleGroupsSnapshot => {
         muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
 
-        muscleGroupsSnapshot.forEach(doc => {
-            const option = document.createElement("option");
-            option.textContent = doc.id;
-            option.value = doc.id;
-            muscleGroupSelect.appendChild(option);
-        });
-
         userMuscleGroupsSnapshot.forEach(doc => {
-            if (doc.data().userId === currentUser.uid) {
-                const option = document.createElement("option");
-                option.textContent = doc.id.replace("Personalizado-", "");
-                option.value = `${doc.id} (Personalizado)`;
-                muscleGroupSelect.appendChild(option);
-            }
+            const option = document.createElement("option");
+            option.textContent = doc.id.replace("Personalizado-", "");
+            option.value = `${doc.id} (Personalizado)`;
+            muscleGroupSelect.appendChild(option);
         });
 
         updateExerciseOptions();
@@ -73,22 +63,30 @@ function initializeMuscleGroups() {
 
 function updateExerciseOptions() {
     const selectedGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`) : doc(db, "muscleGroups", selectedGroup);
+    const groupRef = doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`);
+    const userExercisesRef = collection(db, "userExercises");
+    const userExercisesQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", selectedGroup));
 
     getDoc(groupRef).then(docSnap => {
         if (docSnap.exists()) {
-            const data = docSnap.data();
             exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
-            data.exercises.forEach(exercise => {
-                const option = document.createElement("option");
-                option.value = exercise;
-                option.textContent = exercise;
-                exerciseSelect.appendChild(option);
+
+            // Agregar ejercicios personalizados del usuario
+            getDocs(userExercisesQuery).then(snapshot => {
+                snapshot.forEach(doc => {
+                    const exercise = doc.data().exercise;
+                    const option = document.createElement("option");
+                    option.value = exercise;
+                    option.textContent = exercise;
+                    exerciseSelect.appendChild(option);
+                });
+            }).catch(error => {
+                console.error("Error cargando ejercicios personalizados:", error);
+                debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
             });
 
             // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
-            deleteMuscleGroupButton.disabled = !isCustomGroup;
+            deleteMuscleGroupButton.disabled = false;
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
             debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
@@ -101,10 +99,9 @@ function updateExerciseOptions() {
 
 function deleteMuscleGroup() {
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const groupRef = doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`);
 
-    if (isCustomGroup && confirm(`¿Estás seguro de que deseas eliminar el grupo muscular ${muscleGroup}?`)) {
+    if (confirm(`¿Estás seguro de que deseas eliminar el grupo muscular ${muscleGroup}?`)) {
         deleteDoc(groupRef).then(() => {
             console.log(`Grupo muscular ${muscleGroup} eliminado.`);
             debugInfo.innerText = `Grupo muscular ${muscleGroup} eliminado.`;
@@ -119,16 +116,13 @@ function deleteMuscleGroup() {
 function deleteExercise() {
     const exercise = exerciseSelect.value;
     const muscleGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
+    const userExercisesRef = collection(db, "userExercises");
+    const userExerciseQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", muscleGroup), where("exercise", "==", exercise));
 
-    if (confirm(`¿Estás seguro de que deseas eliminar el ejercicio ${exercise} del grupo muscular ${muscleGroup}?`)) {
-        getDoc(groupRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const exercises = docSnap.data().exercises;
-                const updatedExercises = exercises.filter(ex => ex !== exercise);
-
-                updateDoc(groupRef, { exercises: updatedExercises }).then(() => {
+    getDocs(userExerciseQuery).then(snapshot => {
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => {
+                deleteDoc(doc.ref).then(() => {
                     console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
                     debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
                     updateExerciseOptions();
@@ -136,12 +130,15 @@ function deleteExercise() {
                     console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
                     debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
                 });
-            }
-        }).catch(error => {
-            console.error(`Error obteniendo el grupo muscular ${muscleGroup}:`, error);
-            debugInfo.innerText = `Error obteniendo el grupo muscular ${muscleGroup}: ${error}`;
-        });
-    }
+            });
+        } else {
+            console.log(`No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`);
+            debugInfo.innerText = `No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`;
+        }
+    }).catch(error => {
+        console.error(`Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
+        debugInfo.innerText = `Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+    });
 }
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);
