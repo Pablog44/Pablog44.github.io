@@ -122,26 +122,28 @@ function deleteExercise() {
     const userExercisesRef = collection(db, "userExercises");
     const userExerciseQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", muscleGroup), where("exercise", "==", exercise));
 
-    getDocs(userExerciseQuery).then(snapshot => {
-        if (!snapshot.empty) {
-            snapshot.forEach(doc => {
-                deleteDoc(doc.ref).then(() => {
-                    console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
-                    debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
-                    updateExerciseOptions();
-                }).catch(error => {
-                    console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
-                    debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+    if (confirm(`¿Estás seguro de que deseas eliminar el ejercicio ${exercise} del grupo muscular ${muscleGroup}?`)) {
+        getDocs(userExerciseQuery).then(snapshot => {
+            if (!snapshot.empty) {
+                snapshot.forEach(doc => {
+                    deleteDoc(doc.ref).then(() => {
+                        console.log(`Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`);
+                        debugInfo.innerText = `Ejercicio ${exercise} eliminado del grupo muscular ${muscleGroup}.`;
+                        updateExerciseOptions();
+                    }).catch(error => {
+                        console.error(`Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
+                        debugInfo.innerText = `Error eliminando el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+                    });
                 });
-            });
-        } else {
-            console.log(`No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`);
-            debugInfo.innerText = `No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`;
-        }
-    }).catch(error => {
-        console.error(`Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
-        debugInfo.innerText = `Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
-    });
+            } else {
+                console.log(`No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`);
+                debugInfo.innerText = `No se encontró el ejercicio ${exercise} en el grupo muscular ${muscleGroup}.`;
+            }
+        }).catch(error => {
+            console.error(`Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}:`, error);
+            debugInfo.innerText = `Error obteniendo el ejercicio ${exercise} del grupo muscular ${muscleGroup}: ${error}`;
+        });
+    }
 }
 
 muscleGroupSelect.addEventListener('change', updateExerciseOptions);

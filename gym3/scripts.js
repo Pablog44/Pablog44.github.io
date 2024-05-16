@@ -115,37 +115,38 @@ function updateExerciseOptions() {
     const userExercisesRef = collection(db, "userExercises");
     const userExercisesQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", selectedGroup));
 
+    exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
+
+    const exercisesSet = new Set();
+
     getDoc(groupRef).then(docSnap => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
             data.exercises.forEach(exercise => {
-                const option = document.createElement("option");
-                option.value = exercise;
-                option.textContent = exercise;
-                exerciseSelect.appendChild(option);
-            });
-
-            // Agregar ejercicios personalizados del usuario
-            getDocs(userExercisesQuery).then(snapshot => {
-                snapshot.forEach(doc => {
-                    const exercise = doc.data().exercise;
-                    const option = document.createElement("option");
-                    option.value = exercise;
-                    option.textContent = exercise + " (Personalizado)";
-                    exerciseSelect.appendChild(option);
-                });
-            }).catch(error => {
-                console.error("Error cargando ejercicios personalizados:", error);
-                debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
+                exercisesSet.add(exercise);
             });
         } else {
             console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
             debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
         }
+
+        // Agregar ejercicios personalizados del usuario
+        return getDocs(userExercisesQuery);
+    }).then(snapshot => {
+        snapshot.forEach(doc => {
+            const exercise = doc.data().exercise;
+            exercisesSet.add(exercise);
+        });
+
+        exercisesSet.forEach(exercise => {
+            const option = document.createElement("option");
+            option.value = exercise;
+            option.textContent = exercise;
+            exerciseSelect.appendChild(option);
+        });
     }).catch(error => {
-        console.error("Error cargando ejercicios:", error);
-        debugInfo.innerText = "Error cargando ejercicios: " + error;
+        console.error("Error cargando ejercicios personalizados:", error);
+        debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
     });
 }
 
