@@ -87,41 +87,20 @@ function addExercise() {
     const isCustomGroup = selectedOption.includes(" (Personalizado)");
 
     if (newExerciseName && muscleGroup) {
-        const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
         const userExerciseRef = collection(db, "userExercises");
 
-        getDoc(groupRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const exercises = docSnap.data().exercises;
-                if (!exercises.includes(newExerciseName)) {
-                    exercises.push(newExerciseName);
-                    const updateGroup = setDoc(groupRef, { exercises }, { merge: true });
-                    const addUserExercise = addDoc(userExerciseRef, {
-                        userId: currentUser.uid,
-                        muscleGroup,
-                        exercise: newExerciseName,
-                        isCustomGroup
-                    });
-
-                    Promise.all([updateGroup, addUserExercise]).then(() => {
-                        console.log("Ejercicio añadido:", newExerciseName);
-                        debugInfo.innerText = "Ejercicio añadido: " + newExerciseName;
-                        document.getElementById('new-exercise').value = ''; // Limpiar el campo de texto
-                    }).catch(error => {
-                        console.error("Error añadiendo nuevo ejercicio:", error);
-                        debugInfo.innerText = "Error añadiendo nuevo ejercicio: " + error;
-                    });
-                } else {
-                    console.log("El ejercicio ya existe:", newExerciseName);
-                    debugInfo.innerText = "El ejercicio ya existe: " + newExerciseName;
-                }
-            } else {
-                console.log(`El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe:`, muscleGroup);
-                debugInfo.innerText = `El grupo muscular ${isCustomGroup ? 'personalizado' : ''} no existe: ${muscleGroup}`;
-            }
+        addDoc(userExerciseRef, {
+            userId: currentUser.uid,
+            muscleGroup,
+            exercise: newExerciseName,
+            isCustomGroup
+        }).then(() => {
+            console.log("Ejercicio añadido:", newExerciseName);
+            debugInfo.innerText = "Ejercicio añadido: " + newExerciseName;
+            document.getElementById('new-exercise').value = ''; // Limpiar el campo de texto
         }).catch(error => {
-            console.error("Error obteniendo grupo muscular:", error);
-            debugInfo.innerText = `Error obteniendo grupo muscular: ${error}`;
+            console.error("Error añadiendo nuevo ejercicio:", error);
+            debugInfo.innerText = "Error añadiendo nuevo ejercicio: " + error;
         });
     } else {
         console.log("No se seleccionó grupo muscular o nombre de ejercicio.");
