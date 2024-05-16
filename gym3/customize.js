@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -18,6 +18,7 @@ const auth = getAuth(app);
 
 const addMuscleGroupButton = document.getElementById('add-muscle-group');
 const addExerciseButton = document.getElementById('add-exercise');
+const muscleGroupSelect = document.getElementById('muscle-group-select');
 const debugInfo = document.getElementById('debug-info');
 
 let currentUser;
@@ -27,8 +28,35 @@ onAuthStateChanged(auth, user => {
         window.location.href = 'inicio.html';
     } else {
         currentUser = user;
+        loadMuscleGroups();
     }
 });
+
+function loadMuscleGroups() {
+    const muscleGroupsRef = collection(db, "muscleGroups");
+    const userMuscleGroupsRef = collection(db, "userMuscleGroups");
+
+    Promise.all([getDocs(muscleGroupsRef), getDocs(query(userMuscleGroupsRef, where("userId", "==", currentUser.uid)))]).then(([nativeSnapshot, userSnapshot]) => {
+        muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
+
+        nativeSnapshot.forEach(doc => {
+            const option = document.createElement("option");
+            option.textContent = doc.id;
+            option.value = doc.id;
+            muscleGroupSelect.appendChild(option);
+        });
+
+        userSnapshot.forEach(doc => {
+            const option = document.createElement("option");
+            option.textContent = doc.id.replace("Personalizado-", "") + " (Personalizado)";
+            option.value = doc.id + " (Personalizado)";
+            muscleGroupSelect.appendChild(option);
+        });
+    }).catch(error => {
+        console.error("Error cargando grupos musculares:", error);
+        debugInfo.innerText = "Error cargando grupos musculares: " + error;
+    });
+}
 
 function addMuscleGroup() {
     const newMuscleGroupName = document.getElementById('new-muscle-group').value.trim();
@@ -41,6 +69,7 @@ function addMuscleGroup() {
             console.log("Nuevo grupo muscular personalizado añadido:", newMuscleGroupName);
             debugInfo.innerText = "Nuevo grupo muscular personalizado añadido: " + newMuscleGroupName;
             document.getElementById('new-muscle-group').value = ''; // Limpiar el campo de texto
+            loadMuscleGroups(); // Recargar los grupos musculares
         }).catch(error => {
             console.error("Error añadiendo grupo muscular personalizado:", error);
             debugInfo.innerText = "Error añadiendo grupo muscular personalizado: " + error;
@@ -53,18 +82,28 @@ function addMuscleGroup() {
 
 function addExercise() {
     const newExerciseName = document.getElementById('new-exercise').value.trim();
-    const muscleGroup = document.getElementById('muscle-group').value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const isCustomGroup = document.getElementById('muscle-group').value.includes(" (Personalizado)");
-
-    const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
+    const selectedOption = muscleGroupSelect.value;
+    const muscleGroup = selectedOption.replace(" (Personalizado)", "").replace("Personalizado-", "");
+    const isCustomGroup = selectedOption.includes(" (Personalizado)");
 
     if (newExerciseName && muscleGroup) {
+        const groupRef = isCustomGroup ? doc(db, "userMuscleGroups", `Personalizado-${muscleGroup}`) : doc(db, "muscleGroups", muscleGroup);
+        const userExerciseRef = collection(db, "userExercises");
+
         getDoc(groupRef).then(docSnap => {
             if (docSnap.exists()) {
                 const exercises = docSnap.data().exercises;
                 if (!exercises.includes(newExerciseName)) {
                     exercises.push(newExerciseName);
-                    setDoc(groupRef, { exercises }, { merge: true }).then(() => {
+                    const updateGroup = setDoc(groupRef, { exercises }, { merge: true });
+                    const addUserExercise = addDoc(userExerciseRef, {
+                        userId: currentUser.uid,
+                        muscleGroup,
+                        exercise: newExerciseName,
+                        isCustomGroup
+                    });
+
+                    Promise.all([updateGroup, addUserExercise]).then(() => {
                         console.log("Ejercicio añadido:", newExerciseName);
                         debugInfo.innerText = "Ejercicio añadido: " + newExerciseName;
                         document.getElementById('new-exercise').value = ''; // Limpiar el campo de texto
