@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, deleteDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -42,14 +42,22 @@ document.getElementById('logout-button').addEventListener('click', () => {
 });
 
 function initializeMuscleGroups() {
+    const muscleGroupsRef = collection(db, "muscleGroups");
     const userMuscleGroupsRef = collection(db, "userMuscleGroups");
 
-    getDocs(query(userMuscleGroupsRef, where("userId", "==", currentUser.uid))).then(userMuscleGroupsSnapshot => {
+    Promise.all([getDocs(muscleGroupsRef), getDocs(query(userMuscleGroupsRef, where("userId", "==", currentUser.uid)))]).then(([muscleGroupsSnapshot, userMuscleGroupsSnapshot]) => {
         muscleGroupSelect.innerHTML = ''; // Limpiar las opciones existentes
+
+        muscleGroupsSnapshot.forEach(doc => {
+            const option = document.createElement("option");
+            option.textContent = doc.id;
+            option.value = doc.id;
+            muscleGroupSelect.appendChild(option);
+        });
 
         userMuscleGroupsSnapshot.forEach(doc => {
             const option = document.createElement("option");
-            option.textContent = doc.id.replace("Personalizado-", "");
+            option.textContent = doc.id.replace("Personalizado-", "") + " (Personalizado)";
             option.value = `${doc.id} (Personalizado)`;
             muscleGroupSelect.appendChild(option);
         });
@@ -63,38 +71,33 @@ function initializeMuscleGroups() {
 
 function updateExerciseOptions() {
     const selectedGroup = muscleGroupSelect.value.replace(" (Personalizado)", "").replace("Personalizado-", "");
-    const groupRef = doc(db, "userMuscleGroups", `Personalizado-${selectedGroup}`);
+    const isCustomGroup = muscleGroupSelect.value.includes(" (Personalizado)");
     const userExercisesRef = collection(db, "userExercises");
     const userExercisesQuery = query(userExercisesRef, where("userId", "==", currentUser.uid), where("muscleGroup", "==", selectedGroup));
 
-    getDoc(groupRef).then(docSnap => {
-        if (docSnap.exists()) {
-            exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
+    exerciseSelect.innerHTML = ''; // Limpiar las opciones anteriores
 
-            // Agregar ejercicios personalizados del usuario
-            getDocs(userExercisesQuery).then(snapshot => {
-                snapshot.forEach(doc => {
-                    const exercise = doc.data().exercise;
-                    const option = document.createElement("option");
-                    option.value = exercise;
-                    option.textContent = exercise;
-                    exerciseSelect.appendChild(option);
-                });
-            }).catch(error => {
-                console.error("Error cargando ejercicios personalizados:", error);
-                debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
+    // Agregar ejercicios personalizados del usuario
+    getDocs(userExercisesQuery).then(snapshot => {
+        if (!snapshot.empty) {
+            snapshot.forEach(doc => {
+                const exercise = doc.data().exercise;
+                const option = document.createElement("option");
+                option.value = exercise;
+                option.textContent = exercise;
+                exerciseSelect.appendChild(option);
             });
-
-            // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
-            deleteMuscleGroupButton.disabled = false;
         } else {
-            console.log(`No se encontraron ejercicios para el grupo ${selectedGroup}`);
-            debugInfo.innerText = "No se encontraron ejercicios para el grupo seleccionado.";
+            console.log(`No se encontraron ejercicios personalizados para el grupo ${selectedGroup}`);
+            debugInfo.innerText = "No se encontraron ejercicios personalizados para el grupo seleccionado.";
         }
     }).catch(error => {
-        console.error("Error cargando ejercicios:", error);
-        debugInfo.innerText = "Error cargando ejercicios: " + error;
+        console.error("Error cargando ejercicios personalizados:", error);
+        debugInfo.innerText = "Error cargando ejercicios personalizados: " + error;
     });
+
+    // Deshabilitar el botón de eliminar grupo muscular si no es personalizado
+    deleteMuscleGroupButton.disabled = !isCustomGroup;
 }
 
 function deleteMuscleGroup() {
