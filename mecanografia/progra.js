@@ -1,16 +1,29 @@
 const palabras = [
-    "abajo", "agua", "aire", "alegre", "almohada", "amarillo", "amigo", "amor", "arco", "arriba", "auto",
-    "azul", "azulejo", "batería", "bien", "blanco", "bocadillo", "bueno", "bruja", "cama", "casa", "casco",
-    "cepillo", "cine", "cielo", "ciudad", "coleta", "comida", "como", "cortina", "casa", "cafetera", "calor",
-    "cama", "cascada", "casco", "cactus", "café", "champu", "cielo", "ciudad", "coche", "color", "como",
-    "comida", "correr", "dedo", "delante", "deporte", "detrás", "dia", "dinero", "duende", "ego",
-    "enfrente", "envidia", "escalera", "esperanza", "espada", "estrella", "familia", "felicidad", "fuego",
-    "frio", "gato", "guitarra", "gris", "hada", "hielo", "hola", "juego", "kiwi", "luna", "leche", "libro",
-    "margarita", "mar", "miedo", "morado", "mundo", "música", "muy", "naranja", "naturaleza", "negro",
-    "nube", "nublado", "odio", "otro", "papel", "pan", "peseta", "piano", "piedra", "pimienta", "pintura",
-    "plátano", "puerta", "queso", "retrato", "retro", "rojo", "rosa", "rosado", "sal", "saxofón",
-    "silla", "sirena", "sofá", "sol", "sueño", "tijera", "tormenta", "tortilla", "trabajo", "tristeza",
-    "tú", "uva", "unicornio", "vampiro", "ventana", "verde", "vida", "viaje", "violeta", "yo"
+    "var variableName; - Declara una variable con alcance de función o global",
+    "let variableName; - Declara una variable con alcance de bloque",
+    "const constantName = value; - Declara una constante con alcance de bloque",
+    "function functionName() {} - Define una función",
+    "() => {} - Define una función flecha, útil para funciones anónimas y el manejo de 'this'",
+    "if (condition) {} - Estructura de control para ejecutar código si se cumple una condición",
+    "for (initialization; condition; increment) {} - Bucle for, ejecuta código múltiples veces hasta que una condición deja de cumplirse",
+    "array.forEach(element => {}) - Método que llama a una función para cada elemento de un array",
+    "JSON.parse(jsonString) - Convierte un string JSON en un objeto JavaScript",
+    "JSON.stringify(object) - Convierte un objeto JavaScript en una cadena JSON",
+    "document.querySelector(selector) - Selecciona el primer elemento del DOM que coincida con el selector",
+    "addEventListener('event', function) - Adjunta un manejador de eventos a un elemento del DOM",
+    "window.localStorage - Permite almacenar datos de manera local en el navegador del usuario",
+    "Promise - Representa el resultado eventual de una operación asíncrona",
+    "async function functionName() {} - Define una función asíncrona que devuelve una promesa",
+    "await - Pausa la ejecución de una función asíncrona y espera la resolución de la Promise",
+    "console.log(message) - Imprime un mensaje en la consola del navegador, útil para depuración",
+    "typeof variable - Determina el tipo de una variable",
+    "Array.isArray(variable) - Verifica si una variable es un array",
+    "String(variable) - Convierte una variable a tipo string",
+    "Number(variable) - Convierte una variable a tipo número",
+    "Boolean(variable) - Convierte una variable a tipo booleano",
+    "null - Representa la ausencia intencional de cualquier valor de objeto",
+    "undefined - Indica que una variable no ha sido asignada",
+    "NaN - Representa 'No es un Número', resultado de operaciones matemáticas indefinidas"
 ];
 
 // Elementos del DOM
@@ -37,7 +50,7 @@ function obtenerNuevaPalabra() {
 // Función para generar el conjunto de palabras para el juego actual
 function generarPalabras() {
     palabrasActuales = [];
-    for (let i = 0; i < 19; i++) {
+    for (let i = 0; i < 2; i++) {
         palabrasActuales.push(obtenerNuevaPalabra() + " ");
     }
     palabrasActuales.push(obtenerNuevaPalabra() + ".");
@@ -103,31 +116,8 @@ function mostrarPulsacionesPorMinuto() {
     let pulsacionesPorMinuto = Math.floor((netoCorrectos / tiempoTranscurrido) * 60);
     areaPuntuacion.innerText = 'Aciertos: ' + cuentaCorrectas + ' / Fallos: ' + cuentaIncorrectas + ' / Ppm: ' + pulsacionesPorMinuto;
 
-    // Obtén el usuario actual
-    const user = firebase.auth().currentUser;
-
-    if (user) {
-        // Usuario está autenticado, guardamos sus resultados
-        guardarResultados(user.uid, pulsacionesPorMinuto, cuentaIncorrectas, firebase.firestore.Timestamp.fromDate(new Date()));
-    } else {
-        console.log("No hay usuario autenticado para guardar los resultados");
-    }
 }
 
-// Función para guardar los resultados del usuario en Firestore
-function guardarResultados(uid, ppm, fallos, fecha) {
-    const db = firebase.firestore();
-    db.collection("resultados").add({
-        uid: uid,
-        ppm: ppm,
-        fallos: fallos,
-        fecha: fecha
-    }).then(function(docRef) {
-        console.log("Documento escrito con ID: ", docRef.id);
-    }).catch(function(error) {
-        console.error("Error añadiendo el documento: ", error);
-    });
-}
 
 // Event listeners para el input de tipeo y el botón de reinicio
 areaTipear.addEventListener("input", manejarEntrada);

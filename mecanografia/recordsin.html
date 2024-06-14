@@ -96,7 +96,7 @@
         });
 
         function mostrarResultadosPersonales(uid) {
-            db.collection("resultados2").where("uid", "==", uid).orderBy("ppm", "desc").limit(25).get().then(snapshot => {
+            db.collection("resultados3").where("uid", "==", uid).orderBy("ppm", "desc").limit(25).get().then(snapshot => {
                 const resultadosContainer = document.getElementById('resultados-personales-container');
                 let htmlContent = '';
 
