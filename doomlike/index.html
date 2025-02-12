@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Juego tipo Doom – Cruz Cristiana (3D Completo)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <script>
+    // ─── CONFIGURACIÓN DEL CANVAS ─────────────────────────────
+    const canvas = document.getElementById('gameCanvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    const screenWidth = canvas.width;
+    const screenHeight = canvas.height;
+
+    // ─── FUNCIONES DE AYUDA ─────────────────────────────
+    // Para probar localmente, es recomendable usar un servidor web
+    // (por ejemplo, ejecutando "python -m http.server" en la carpeta del proyecto).
+
+    // Función para cargar texturas con CORS habilitado (muy útil al usar archivos locales servidos desde un servidor)
+    function loadTexture(src) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = src;
+      return img;
+    }
+
+    // ─── CARGA DE TEXTURAS ─────────────────────────────
+    const wallTexture = loadTexture('wall.png');
+    const floorTexture = loadTexture('floor.png');
+    const ceilingTexture = loadTexture('ceiling.png');
+
+    // Variables para almacenar los datos (pixel data) de floor y ceiling
+    let floorData = null, ceilingData = null;
+    let texturesLoaded = 0;
+    function onTextureLoaded() {
+      texturesLoaded++;
+      // Cuando las 3 texturas se han cargado...
+      if (texturesLoaded === 3) {
+        // Preparamos un canvas offscreen para extraer los píxeles de la textura del suelo
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = floorTexture.width;
+        floorCanvas.height = floorTexture.height;
+        const floorCtx = floorCanvas.getContext('2d');
+        floorCtx.drawImage(floorTexture, 0, 0);
+        floorData = floorCtx.getImageData(0, 0, floorTexture.width, floorTexture.height).data;
+
+        // Preparamos un canvas offscreen para extraer los píxeles de la textura del techo
+        const ceilingCanvas = document.createElement('canvas');
+        ceilingCanvas.width = ceilingTexture.width;
+        ceilingCanvas.height = ceilingTexture.height;
+        const ceilingCtx = ceilingCanvas.getContext('2d');
+        ceilingCtx.drawImage(ceilingTexture, 0, 0);
+        ceilingData = ceilingCtx.getImageData(0, 0, ceilingTexture.width, ceilingTexture.height).data;
+
+        // Inicia el bucle del juego
+        requestAnimationFrame(gameLoop);
+      }
+    }
+    wallTexture.onload = onTextureLoaded;
+    floorTexture.onload = onTextureLoaded;
+    ceilingTexture.onload = onTextureLoaded;
+
+    // ─── DEFINICIÓN DEL MAPA (15x15) ─────────────────────────────
+    // Se crea un mapa de 15x15 con bordes de muros (valor 1) y se “cava” una cruz (valor 0)
+    const MAP_WIDTH = 15, MAP_HEIGHT = 15;
+    const map = [];
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      const row = [];
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        row.push(1);
+      }
+      map.push(row);
+    }
+    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
+    for (let y = 1; y <= 4; y++) {
+      for (let x = 3; x <= 11; x++) {
+        map[y][x] = 0;
+      }
+    }
+    // Barra vertical (filas 4 a 13, columnas 6 a 8)
+    for (let y = 4; y <= 13; y++) {
+      for (let x = 6; x <= 8; x++) {
+        map[y][x] = 0;
+      }
+    }
+
+    // ─── VARIABLES DEL JUGADOR ─────────────────────────────
+    let posX = 7.5, posY = 3.5;  // Debe estar dentro del área abierta (la cruz)
+    let angle = 0;             // Ángulo inicial (en radianes)
+    const fov = Math.PI / 3;   // Campo de visión (60°)
+
+    // ─── CONTROLES (WASD y FLECHAS) ─────────────────────────────
+    const moveSpeed = 0.05;
+    const rotSpeed = 0.03;
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    function update() {
+      // Movimiento hacia adelante
+      if (keys["ArrowUp"] || keys["w"]) {
+        let newX = posX + Math.cos(angle) * moveSpeed;
+        let newY = posY + Math.sin(angle) * moveSpeed;
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+          posX = newX;
+          posY = newY;
+        }
+      }
+      // Movimiento hacia atrás
+      if (keys["ArrowDown"] || keys["s"]) {
+        let newX = posX - Math.cos(angle) * moveSpeed;
+        let newY = posY - Math.sin(angle) * moveSpeed;
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+          posX = newX;
+          posY = newY;
+        }
+      }
+      // Rotación
+      if (keys["ArrowLeft"] || keys["a"]) {
+        angle -= rotSpeed;
+      }
+      if (keys["ArrowRight"] || keys["d"]) {
+        angle += rotSpeed;
+      }
+    }
+
+    function render() {
+      // ─── LIMPIA EL CANVAS ─────────────────────────────
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, screenWidth, screenHeight);
+
+      // Calcula el plano de cámara (se usa tanto para paredes como para floor/ceiling)
+      const planeX = -Math.sin(angle) * Math.tan(fov / 2);
+      const planeY = Math.cos(angle) * Math.tan(fov / 2);
+
+      // ─── FLOOR & CEILING CASTING EN PERSPECTIVA ─────────────────────────────
+      const halfHeight = screenHeight / 2;
+      const posZ = halfHeight; // Altura de la cámara respecto al suelo
+      // Rayos para el borde izquierdo y derecho
+      const rayDirX0 = Math.cos(angle) - planeX;
+      const rayDirY0 = Math.sin(angle) - planeY;
+      const rayDirX1 = Math.cos(angle) + planeX;
+      const rayDirY1 = Math.sin(angle) + planeY;
+
+      // Se obtiene el ImageData para modificar píxel a píxel
+      const imgData = ctx.getImageData(0, 0, screenWidth, screenHeight);
+      const data = imgData.data;
+
+      // Recorre cada fila de la parte inferior (suelo) y refleja para el techo
+      for (let y = halfHeight; y < screenHeight; y++) {
+        let p = y - halfHeight;
+        if (p === 0) p = 1; // Evita división por cero
+        const rowDistance = posZ / p;
+
+        // Paso en el mundo por cada píxel horizontal
+        const floorStepX = rowDistance * (rayDirX1 - rayDirX0) / screenWidth;
+        const floorStepY = rowDistance * (rayDirY1 - rayDirY0) / screenWidth;
+        // Coordenadas del mundo para el primer píxel de la fila actual
+        let floorX = posX + rowDistance * rayDirX0;
+        let floorY = posY + rowDistance * rayDirY0;
+
+        for (let x = 0; x < screenWidth; x++) {
+          // Determina en qué celda estamos (para extraer la parte fraccionaria)
+          const cellX = Math.floor(floorX);
+          const cellY = Math.floor(floorY);
+          let txFloor = Math.floor((floorX - cellX) * floorTexture.width);
+          let tyFloor = Math.floor((floorY - cellY) * floorTexture.height);
+          // Aseguramos que los índices estén en rango (con módulo)
+          txFloor = ((txFloor % floorTexture.width) + floorTexture.width) % floorTexture.width;
+          tyFloor = ((tyFloor % floorTexture.height) + floorTexture.height) % floorTexture.height;
+          const floorTexIndex = (tyFloor * floorTexture.width + txFloor) * 4;
+          const pixIndex = (y * screenWidth + x) * 4;
+          data[pixIndex    ] = floorData[floorTexIndex    ];
+          data[pixIndex + 1] = floorData[floorTexIndex + 1];
+          data[pixIndex + 2] = floorData[floorTexIndex + 2];
+          data[pixIndex + 3] = 255;
+
+          // Para el techo se usa la fila simétrica
+          const ceilingY = screenHeight - y - 1;
+          const ceilPixIndex = (ceilingY * screenWidth + x) * 4;
+          let txCeil = Math.floor((floorX - cellX) * ceilingTexture.width);
+          let tyCeil = Math.floor((floorY - cellY) * ceilingTexture.height);
+          txCeil = ((txCeil % ceilingTexture.width) + ceilingTexture.width) % ceilingTexture.width;
+          tyCeil = ((tyCeil % ceilingTexture.height) + ceilingTexture.height) % ceilingTexture.height;
+          const ceilTexIndex = (tyCeil * ceilingTexture.width + txCeil) * 4;
+          data[ceilPixIndex    ] = ceilingData[ceilTexIndex    ];
+          data[ceilPixIndex + 1] = ceilingData[ceilTexIndex + 1];
+          data[ceilPixIndex + 2] = ceilingData[ceilTexIndex + 2];
+          data[ceilPixIndex + 3] = 255;
+
+          floorX += floorStepX;
+          floorY += floorStepY;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      // ─── RENDERIZADO DE LAS PAREDES (RAYCASTING) ─────────────────────────────
+      for (let x = 0; x < screenWidth; x++) {
+        const cameraX = 2 * x / screenWidth - 1;
+        const rayDirX = Math.cos(angle) + planeX * cameraX;
+        const rayDirY = Math.sin(angle) + planeY * cameraX;
+        let mapX = Math.floor(posX);
+        let mapY = Math.floor(posY);
+
+        const deltaDistX = Math.abs(1 / rayDirX);
+        const deltaDistY = Math.abs(1 / rayDirY);
+        let stepX, stepY, sideDistX, sideDistY;
+        if (rayDirX < 0) {
+          stepX = -1;
+          sideDistX = (posX - mapX) * deltaDistX;
+        } else {
+          stepX = 1;
+          sideDistX = (mapX + 1 - posX) * deltaDistX;
+        }
+        if (rayDirY < 0) {
+          stepY = -1;
+          sideDistY = (posY - mapY) * deltaDistY;
+        } else {
+          stepY = 1;
+          sideDistY = (mapY + 1 - posY) * deltaDistY;
+        }
+
+        let hit = false;
+        let side;
+        while (!hit) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX;
+            mapX += stepX;
+            side = 0;
+          } else {
+            sideDistY += deltaDistY;
+            mapY += stepY;
+            side = 1;
+          }
+          if (map[mapY][mapX] > 0) hit = true;
+        }
+
+        let perpWallDist;
+        if (side === 0)
+          perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX;
+        else
+          perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
+
+        const lineHeight = Math.floor(screenHeight / perpWallDist);
+        let drawStart = Math.floor(-lineHeight / 2 + screenHeight / 2);
+        if (drawStart < 0) drawStart = 0;
+        let drawEnd = Math.floor(lineHeight / 2 + screenHeight / 2);
+        if (drawEnd >= screenHeight) drawEnd = screenHeight - 1;
+
+        let wallX;
+        if (side === 0)
+          wallX = posY + perpWallDist * rayDirY;
+        else
+          wallX = posX + perpWallDist * rayDirX;
+        wallX -= Math.floor(wallX);
+        let texX = Math.floor(wallX * wallTexture.width);
+        if (side === 0 && rayDirX > 0) texX = wallTexture.width - texX - 1;
+        if (side === 1 && rayDirY < 0) texX = wallTexture.width - texX - 1;
+
+        if (wallTexture.complete) {
+          ctx.drawImage(
+            wallTexture,
+            texX, 0, 1, wallTexture.height,
+            x, drawStart, 1, drawEnd - drawStart
+          );
+        } else {
+          ctx.fillStyle = (side === 1) ? "#888" : "#aaa";
+          ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+        }
+      }
+    }
+
+    function gameLoop() {
+      update();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
