@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Juego tipo Doom </title>
+  <title>Juego tipo Doom</title>
   <style>
     html, body {
       margin: 0;
@@ -17,6 +17,8 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+
+  <!-- Script principal del juego -->
   <script>
     // ─── CONFIGURACIÓN DEL CANVAS ─────────────────────────────
     const canvas = document.getElementById('gameCanvas');
@@ -130,7 +132,7 @@
     });
 
     // ─── ENEMIGOS ─────────────────────────────
-    // Cada enemigo tiene posición, estado (alive) y un posible cooldown para disparar (no implementado aquí)
+    // Cada enemigo tiene posición, estado (alive)
     const enemies = [
       { x: 5.5,  y: 2.5,  alive: true },
       { x: 7.5,  y: 10.5, alive: true },
@@ -219,7 +221,7 @@
       const planeY = Math.cos(angle) * Math.tan(fov / 2);
       const dirX = Math.cos(angle);
       const dirY = Math.sin(angle);
-      // ¡IMPORTANTE! Corrección en el cálculo de invDet para que la transformación de sprites funcione correctamente:
+      // ¡IMPORTANTE! Corrección en el cálculo de invDet para la transformación de sprites:
       const invDet = 1.0 / (planeX * dirY - dirX * planeY);
       const halfHeight = screenHeight / 2;
       const posZ = halfHeight; // Altura de la cámara respecto al suelo
@@ -235,8 +237,8 @@
         let rowDistance = posZ / Math.abs(p);
 
         // Paso en el mundo por cada píxel horizontal
-        const floorStepX = rowDistance * ( (dirX + planeX) - (dirX - planeX) ) / screenWidth;
-        const floorStepY = rowDistance * ( (dirY + planeY) - (dirY - planeY) ) / screenWidth;
+        const floorStepX = rowDistance * ((dirX + planeX) - (dirX - planeX)) / screenWidth;
+        const floorStepY = rowDistance * ((dirY + planeY) - (dirY - planeY)) / screenWidth;
         let worldX = posX + rowDistance * (dirX - planeX);
         let worldY = posY + rowDistance * (dirY - planeY);
 
@@ -399,5 +401,8 @@
       requestAnimationFrame(gameLoop);
     }
   </script>
+
+  <!-- Se carga el script externo del minimapa -->
+  <script src="minimap.js"></script>
 </body>
 </html>
