@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // Se crea (o se obtiene) el footer para el minimapa y controles móviles
+  // Creamos (o recuperamos) el footer y lo estilizamos como un contenedor flex horizontal.
   let footer = document.getElementById("gameFooter");
   if (!footer) {
     footer = document.createElement("footer");
@@ -10,82 +10,100 @@ document.addEventListener("DOMContentLoaded", function () {
     footer.style.width = "100%";
     footer.style.height = "15vh"; // 15% de la altura de la pantalla
     footer.style.background = "#222";
-    footer.style.color = "#fff";
-    footer.style.padding = "5px";
     footer.style.boxSizing = "border-box";
     footer.style.display = "flex";
-    footer.style.flexDirection = "column";
+    footer.style.justifyContent = "space-between";
     footer.style.alignItems = "center";
+    footer.style.padding = "0 5px";
     document.body.appendChild(footer);
   }
 
-  // Se crea el canvas del minimapa (70% de la altura del footer)
+  // Se crea el contenedor para el botón de disparo (a la izquierda)
+  const shootContainer = document.createElement("div");
+  shootContainer.style.flex = "0 0 auto";
+  shootContainer.style.display = "flex";
+  shootContainer.style.alignItems = "center";
+  // Se crea el botón de disparo
+  const shootBtn = document.createElement("button");
+  shootBtn.id = "shootBtn";
+  shootBtn.innerHTML = "Disparar";
+  // El tamaño se define en relación al alto del footer (80% de 15vh ≈ 12vh)
+  shootBtn.style.width = "12vh";
+  shootBtn.style.height = "12vh";
+  shootBtn.style.borderRadius = "50%";
+  shootBtn.style.fontSize = "1rem";
+  shootBtn.style.cursor = "pointer";
+  shootContainer.appendChild(shootBtn);
+
+  // Se crea el contenedor central para el minimapa
+  const minimapContainer = document.createElement("div");
+  minimapContainer.style.flex = "0 0 auto";
+  minimapContainer.style.display = "flex";
+  minimapContainer.style.alignItems = "center";
+  // Creamos un canvas cuadrado para el minimapa (80% de la altura del footer)
+  const minimapSize = footer.clientHeight * 0.8; // aproximadamente 80%
   const minimapCanvas = document.createElement("canvas");
   minimapCanvas.id = "minimapCanvas";
-  minimapCanvas.width = footer.clientWidth;
-  minimapCanvas.height = footer.clientHeight * 0.7;
+  minimapCanvas.width = minimapSize;
+  minimapCanvas.height = minimapSize;
   minimapCanvas.style.background = "#000";
-  footer.appendChild(minimapCanvas);
+  minimapContainer.appendChild(minimapCanvas);
   const minimapCtx = minimapCanvas.getContext("2d");
 
-  // Se crea el contenedor de controles móviles (30% del footer)
-  const mobileControls = document.createElement("div");
-  mobileControls.id = "mobileControls";
-  mobileControls.style.width = "100%";
-  mobileControls.style.height = "30%";
-  mobileControls.style.display = "flex";
-  mobileControls.style.justifyContent = "space-between";
-  mobileControls.style.alignItems = "center";
-  footer.appendChild(mobileControls);
-
-  // Se crea la cruz direccional (D-pad)
+  // Se crea el contenedor para la cruz direccional (D-pad) a la derecha
+  const dpadContainer = document.createElement("div");
+  dpadContainer.style.flex = "0 0 auto";
+  dpadContainer.style.display = "flex";
+  dpadContainer.style.alignItems = "center";
+  // Se crea la cruz direccional con grid (cuadrado de tamaño similar al minimapa)
+  const dpadSize = footer.clientHeight * 0.8;
   const dpad = document.createElement("div");
   dpad.id = "dpad";
   dpad.style.display = "grid";
-  dpad.style.gridTemplateColumns = "50px 50px 50px";
-  dpad.style.gridTemplateRows = "50px 50px 50px";
-  dpad.style.gap = "5px";
-  // Botón arriba
+  dpad.style.gridTemplateColumns = "repeat(3, 1fr)";
+  dpad.style.gridTemplateRows = "repeat(3, 1fr)";
+  dpad.style.width = dpadSize + "px";
+  dpad.style.height = dpadSize + "px";
+  dpad.style.gap = "2px";
+  // Se crean los botones para arriba, izquierda, abajo y derecha.
   const btnUp = document.createElement("button");
   btnUp.id = "btn-up";
   btnUp.innerHTML = "▲";
   btnUp.style.gridColumn = "2 / 3";
   btnUp.style.gridRow = "1 / 2";
-  // Botón izquierda
   const btnLeft = document.createElement("button");
   btnLeft.id = "btn-left";
   btnLeft.innerHTML = "◀";
   btnLeft.style.gridColumn = "1 / 2";
   btnLeft.style.gridRow = "2 / 3";
-  // Botón abajo
   const btnDown = document.createElement("button");
   btnDown.id = "btn-down";
   btnDown.innerHTML = "▼";
   btnDown.style.gridColumn = "2 / 3";
   btnDown.style.gridRow = "3 / 4";
-  // Botón derecha
   const btnRight = document.createElement("button");
   btnRight.id = "btn-right";
   btnRight.innerHTML = "▶";
   btnRight.style.gridColumn = "3 / 4";
   btnRight.style.gridRow = "2 / 3";
+  // Opcional: estiliza los botones del D-pad
+  [btnUp, btnLeft, btnDown, btnRight].forEach(btn => {
+    btn.style.fontSize = "1rem";
+    btn.style.cursor = "pointer";
+  });
   // Se agregan los botones al D-pad
   dpad.appendChild(btnUp);
   dpad.appendChild(btnLeft);
   dpad.appendChild(btnDown);
   dpad.appendChild(btnRight);
-  mobileControls.appendChild(dpad);
+  dpadContainer.appendChild(dpad);
 
-  // Se crea el botón de disparo
-  const shootBtn = document.createElement("button");
-  shootBtn.id = "shootBtn";
-  shootBtn.innerHTML = "Disparar";
-  shootBtn.style.width = "70px";
-  shootBtn.style.height = "70px";
-  shootBtn.style.borderRadius = "50%";
-  mobileControls.appendChild(shootBtn);
+  // Se agrega al footer en orden: disparo (izquierda), minimapa (centro), D-pad (derecha)
+  footer.appendChild(shootContainer);
+  footer.appendChild(minimapContainer);
+  footer.appendChild(dpadContainer);
 
-  // Función para añadir eventos táctiles y de mouse a cada botón direccional
+  // ─── Funciones de eventos para los controles táctiles y de mouse ───
   function addButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
       e.preventDefault();
@@ -95,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
       e.preventDefault();
       window.keys[key] = false;
     });
-    // Soporte para mouse en pruebas de escritorio
+    // Soporte para mouse (pruebas en escritorio)
     button.addEventListener("mousedown", function(e) {
       e.preventDefault();
       window.keys[key] = true;
@@ -105,29 +123,23 @@ document.addEventListener("DOMContentLoaded", function () {
       window.keys[key] = false;
     });
   }
-
-  // Se añaden eventos a los botones del D-pad
+  // Asignamos eventos a los botones del D-pad
   addButtonEvents(btnUp, "ArrowUp");
   addButtonEvents(btnLeft, "ArrowLeft");
   addButtonEvents(btnDown, "ArrowDown");
   addButtonEvents(btnRight, "ArrowRight");
-
   // Evento para el botón de disparo
   shootBtn.addEventListener("touchstart", function(e) {
     e.preventDefault();
-    if (typeof shootBullet === "function") {
-      shootBullet();
-    }
+    if (typeof shootBullet === "function") shootBullet();
   });
   shootBtn.addEventListener("mousedown", function(e) {
     e.preventDefault();
-    if (typeof shootBullet === "function") {
-      shootBullet();
-    }
+    if (typeof shootBullet === "function") shootBullet();
   });
 
-  // ─── DIBUJO DEL MINIMAPA ─────────────────────────────
-  // Se usan las dimensiones del mapa global
+  // ─── DIBUJO DEL MINIMAPA ───
+  // Se asume que la variable global "map" ya está definida en el juego
   const MAP_WIDTH = map[0].length;
   const MAP_HEIGHT = map.length;
   const cellSize = minimapCanvas.width / MAP_WIDTH;
@@ -154,7 +166,7 @@ document.addEventListener("DOMContentLoaded", function () {
         minimapCtx.fill();
       }
     }
-    // Dibuja la vida del jugador
+    // Dibuja la vida del jugador (se usa window.playerLife o 100 por defecto)
     let playerLife = window.playerLife || 100;
     minimapCtx.fillStyle = "white";
     minimapCtx.font = "16px sans-serif";

@@ -11,7 +11,7 @@
       background: #000;
       overflow: hidden;
     }
-    /* El canvas se centra horizontalmente */
+    /* El canvas del juego se centrará horizontalmente y usará el 85% de la altura */
     #gameCanvas {
       display: block;
       margin: 0 auto;
@@ -25,7 +25,7 @@
   <!-- Script principal del juego -->
   <script>
     // ─── CONFIGURACIÓN DEL CANVAS ─────────────────────────────
-    // Se usa el 85% de la altura para el juego (la otra parte para el footer)
+    // Se usa el 85% de la altura para el juego (el footer ocupará el 15% restante)
     const canvas = document.getElementById('gameCanvas');
     const availableHeight = window.innerHeight * 0.85;
     // Para que el juego sea casi cuadrado se usa el mínimo entre ancho y 85% de alto
@@ -51,7 +51,7 @@
     const weaponTexture  = loadTexture('weapon.png');
     const enemyTexture   = loadTexture('enemy.png');
 
-    // Variables para los datos de píxeles de piso y techo
+    // Variables para extraer los píxeles de piso y techo
     let floorData = null, ceilingData = null;
     let texturesLoaded = 0;
     function onTextureLoaded() {
@@ -104,16 +104,16 @@
     }
 
     // ─── VARIABLES DEL JUGADOR ─────────────────────────────
-    let posX = 7.5, posY = 3.5;  // posición inicial (dentro de la cruz)
-    let angle = 0;             // ángulo en radianes
-    const fov = Math.PI / 3;   // campo de visión (60°)
+    let posX = 7.5, posY = 3.5;  // Posición inicial (dentro de la cruz)
+    let angle = 0;             // Ángulo en radianes
+    const fov = Math.PI / 3;   // Campo de visión (60°)
 
     // Velocidades
     const moveSpeed = 0.2;
     const rotSpeed  = 0.2;
 
     // ─── CONTROLES ─────────────────────────────
-    // Se guarda en window para que los botones táctiles (minimap.js) puedan usarlos
+    // Se expone en window para que el script del minimapa pueda acceder a ellos
     const keys = {};
     window.keys = keys;
     window.addEventListener('keydown', e => {
@@ -130,7 +130,7 @@
     let lastShotTime = 0;
     const shootCooldown = 300; // milisegundos
 
-    // Función para disparar (llamada desde teclado o botón táctil)
+    // Función para disparar (usada tanto por teclado como por controles táctiles)
     function shootBullet() {
       const currentTime = Date.now();
       if (currentTime - lastShotTime > shootCooldown) {
@@ -171,7 +171,7 @@
       if (keys["ArrowRight"] || keys["d"]) {
         angle += rotSpeed;
       }
-      // Actualiza proyectiles
+      // Actualiza los proyectiles
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += Math.cos(b.angle) * bulletSpeed;
