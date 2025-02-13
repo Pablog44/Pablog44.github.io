@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Juego tipo Doom – Cruz Cristiana (3D Completo) con Enemigos y Disparos</title>
+  <title>Juego tipo Doom </title>
   <style>
     html, body {
       margin: 0;
@@ -219,7 +219,8 @@
       const planeY = Math.cos(angle) * Math.tan(fov / 2);
       const dirX = Math.cos(angle);
       const dirY = Math.sin(angle);
-      const invDet = 1.0 / (dirX * planeY - dirY * planeX);
+      // ¡IMPORTANTE! Corrección en el cálculo de invDet para que la transformación de sprites funcione correctamente:
+      const invDet = 1.0 / (planeX * dirY - dirX * planeY);
       const halfHeight = screenHeight / 2;
       const posZ = halfHeight; // Altura de la cámara respecto al suelo
 
@@ -373,10 +374,10 @@
         const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
         if (transformY > 0) {
           const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
-          const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8; // tamaño reducido
+          const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
           const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
           const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
-          ctx.fillStyle = "red";
+          ctx.fillStyle = "yellow"; // La bala se dibuja en amarillo
           ctx.beginPath();
           ctx.arc(drawStartX + spriteSize/2, drawStartY + spriteSize/2, spriteSize/2, 0, 2 * Math.PI);
           ctx.fill();
@@ -384,7 +385,6 @@
       }
 
       // ─── DIBUJA EL ARMA (HUD) ─────────────────────────────
-      // Se muestra en primer plano (centrada en la parte inferior)
       const weaponWidth = screenWidth * 0.5;
       const weaponHeight = weaponTexture.height * (weaponWidth / weaponTexture.width);
       const weaponX = (screenWidth - weaponWidth) / 2;
