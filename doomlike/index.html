@@ -104,7 +104,7 @@
     }
 
     // ─── VARIABLES DEL JUGADOR ─────────────────────────────
-    let posX = 7.5, posY = 3.5;  // Posición inicial (dentro de la cruz)
+    let posX = 7.5, posY = 3.5;  // Posición inicial
     let angle = 0;             // Ángulo en radianes
     const fov = Math.PI / 3;   // Campo de visión (60°)
 
@@ -113,7 +113,7 @@
     const rotSpeed  = 0.2;
 
     // ─── CONTROLES ─────────────────────────────
-    // Se expone en window para que el script del minimapa pueda acceder a ellos
+    // Se exponen en window para que el script del minimapa pueda acceder a ellos
     const keys = {};
     window.keys = keys;
     window.addEventListener('keydown', e => {
@@ -184,7 +184,7 @@
           if (enemy.alive) {
             let dx = enemy.x - b.x;
             let dy = enemy.y - b.y;
-            if (Math.sqrt(dx*dx + dy*dy) < 0.3) {
+            if (Math.sqrt(dx * dx + dy * dy) < 0.3) {
               enemy.alive = false;
               bullets.splice(i, 1);
               break;
@@ -197,10 +197,10 @@
         if (enemy.alive) {
           let dx = posX - enemy.x;
           let dy = posY - enemy.y;
-          let dist = Math.sqrt(dx*dx + dy*dy);
+          let dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0.5) {
-            let newX = enemy.x + (dx/dist)*enemySpeed;
-            let newY = enemy.y + (dy/dist)*enemySpeed;
+            let newX = enemy.x + (dx / dist) * enemySpeed;
+            let newY = enemy.y + (dy / dist) * enemySpeed;
             if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
               enemy.x = newX;
               enemy.y = newY;
@@ -357,7 +357,6 @@
         const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
         const spriteWidth  = spriteHeight;
         const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
-        const drawEndY = drawStartY + spriteHeight;
         const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
         const drawEndX = drawStartX + spriteWidth;
         for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
@@ -386,7 +385,7 @@
           const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
           ctx.fillStyle = "yellow";
           ctx.beginPath();
-          ctx.arc(drawStartX + spriteSize/2, drawStartY + spriteSize/2, spriteSize/2, 0, 2 * Math.PI);
+          ctx.arc(drawStartX + spriteSize / 2, drawStartY + spriteSize / 2, spriteSize / 2, 0, 2 * Math.PI);
           ctx.fill();
         }
       }
@@ -407,7 +406,7 @@
     }
   </script>
 
-  <!-- Se carga el script externo del minimapa y controles móviles -->
+  <!-- Se carga el script externo para el minimapa y controles móviles -->
   <script src="minimap.js"></script>
 </body>
 </html>
