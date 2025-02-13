@@ -216,7 +216,10 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, screenWidth, screenHeight);
 
-      // Calcula parámetros de cámara
+      // Crea un zBuffer para almacenar la distancia de las paredes por columna
+      const zBuffer = new Array(screenWidth);
+
+      // Parámetros de cámara
       const planeX = -Math.sin(angle) * Math.tan(fov / 2);
       const planeY = Math.cos(angle) * Math.tan(fov / 2);
       const dirX = Math.cos(angle);
@@ -322,6 +325,9 @@
         else
           perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
 
+        // Guarda la distancia de la pared para esta columna
+        zBuffer[x] = perpWallDist;
+
         const lineHeight = Math.floor(screenHeight / perpWallDist);
         let drawStart = Math.floor(-lineHeight / 2 + screenHeight / 2);
         if (drawStart < 0) drawStart = 0;
@@ -351,19 +357,45 @@
       }
 
       // ─── RENDERIZADO DE ENEMIGOS (SPRITES) ─────────────────────────────
+      // Primero se prepara un arreglo con los enemigos transformados y se ordenan de atrás hacia adelante.
+      const spriteData = [];
       for (let enemy of enemies) {
-        if (enemy.alive) {
-          const spriteX = enemy.x - posX;
-          const spriteY = enemy.y - posY;
-          const transformX = invDet * (dirY * spriteX - dirX * spriteY);
-          const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
-          if (transformY > 0) {
-            const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
-            const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
-            const spriteWidth  = spriteHeight; // Suponemos sprite cuadrado
-            const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
-            const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
-            ctx.drawImage(enemyTexture, drawStartX, drawStartY, spriteWidth, spriteHeight);
+        if (!enemy.alive) continue;
+        const spriteX = enemy.x - posX;
+        const spriteY = enemy.y - posY;
+        const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+        const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+        if (transformY <= 0) continue; // Si está detrás de la cámara
+        spriteData.push({ enemy, transformX, transformY });
+      }
+      // Se ordena: los que tengan mayor transformY (más lejanos) se dibujan primero
+      spriteData.sort((a, b) => b.transformY - a.transformY);
+
+      // Renderiza cada enemigo sprite por columnas (para poder comprobar la colisión con el zBuffer)
+      for (let sprite of spriteData) {
+        const { transformX, transformY } = sprite;
+        // Posición horizontal en pantalla del sprite
+        const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+        // Tamaño del sprite en pantalla (se asume cuadrado)
+        const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
+        const spriteWidth  = spriteHeight;
+        const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
+        const drawEndY = drawStartY + spriteHeight;
+        const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
+        const drawEndX = drawStartX + spriteWidth;
+
+        // Dibuja columna por columna
+        for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
+          if (stripe < 0 || stripe >= screenWidth) continue;
+          // Sólo dibuja la columna si el enemigo está delante de la pared en ese píxel
+          if (transformY < zBuffer[stripe]) {
+            // Calcula la columna (texel) correspondiente de la textura del enemigo
+            const texX = Math.floor((stripe - drawStartX) * enemyTexture.width / spriteWidth);
+            ctx.drawImage(
+              enemyTexture,
+              texX, 0, 1, enemyTexture.height,
+              stripe, drawStartY, 1, spriteHeight
+            );
           }
         }
       }
