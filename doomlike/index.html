@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Juego tipo Doom – Cruz Cristiana (3D Completo)</title>
+  <title>Juego tipo Doom – Cruz Cristiana (3D Completo) con Enemigos y Disparos</title>
   <style>
     html, body {
       margin: 0;
@@ -36,17 +36,19 @@
     }
 
     // ─── CARGA DE TEXTURAS ─────────────────────────────
-    const wallTexture = loadTexture('wall.png');
-    const floorTexture = loadTexture('floor.png');
+    const wallTexture    = loadTexture('wall.png');
+    const floorTexture   = loadTexture('floor.png');
     const ceilingTexture = loadTexture('ceiling.png');
+    const weaponTexture  = loadTexture('weapon.png');
+    const enemyTexture   = loadTexture('enemy.png');
 
     // Variables para almacenar los datos (pixel data) de floor y ceiling
     let floorData = null, ceilingData = null;
     let texturesLoaded = 0;
     function onTextureLoaded() {
       texturesLoaded++;
-      if (texturesLoaded === 3) {
-        // Canvas offscreen para extraer píxeles de la textura del suelo
+      if (texturesLoaded === 5) {
+        // Extrae los píxeles de la textura del suelo
         const floorCanvas = document.createElement('canvas');
         floorCanvas.width = floorTexture.width;
         floorCanvas.height = floorTexture.height;
@@ -54,7 +56,7 @@
         floorCtx.drawImage(floorTexture, 0, 0);
         floorData = floorCtx.getImageData(0, 0, floorTexture.width, floorTexture.height).data;
 
-        // Canvas offscreen para extraer píxeles de la textura del techo
+        // Extrae los píxeles de la textura del techo
         const ceilingCanvas = document.createElement('canvas');
         ceilingCanvas.width = ceilingTexture.width;
         ceilingCanvas.height = ceilingTexture.height;
@@ -66,12 +68,14 @@
         requestAnimationFrame(gameLoop);
       }
     }
-    wallTexture.onload = onTextureLoaded;
-    floorTexture.onload = onTextureLoaded;
+    wallTexture.onload    = onTextureLoaded;
+    floorTexture.onload   = onTextureLoaded;
     ceilingTexture.onload = onTextureLoaded;
+    weaponTexture.onload  = onTextureLoaded;
+    enemyTexture.onload   = onTextureLoaded;
 
     // ─── DEFINICIÓN DEL MAPA (15x15) ─────────────────────────────
-    // Se crea un mapa de 15x15 con bordes de muros (valor 1) y se “cava” una cruz (valor 0)
+    // Mapa de 15x15: bordes de muros (valor 1) y “cava” una cruz (valor 0)
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
     const map = [];
     for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -95,17 +99,46 @@
     }
 
     // ─── VARIABLES DEL JUGADOR ─────────────────────────────
-    let posX = 7.5, posY = 3.5;  // Posición dentro del área abierta (la cruz)
+    let posX = 7.5, posY = 3.5;  // Posición inicial (dentro de la cruz)
     let angle = 0;             // Ángulo inicial (en radianes)
     const fov = Math.PI / 3;   // Campo de visión (60°)
 
+    // Velocidades aumentadas para un movimiento más rápido
+    const moveSpeed = 0.2;
+    const rotSpeed  = 0.06;
+
     // ─── CONTROLES (WASD y FLECHAS) ─────────────────────────────
-    const moveSpeed = 0.05;
-    const rotSpeed = 0.03;
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key] = true; });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+    // ─── SISTEMA DE DISPAROS ─────────────────────────────
+    const bullets = [];
+    const bulletSpeed = 0.5;
+    let lastShotTime = 0;
+    const shootCooldown = 300; // en milisegundos
+
+    // Dispara al presionar la barra espaciadora
+    window.addEventListener('keydown', e => {
+      if (e.code === "Space") {
+        const currentTime = Date.now();
+        if (currentTime - lastShotTime > shootCooldown) {
+          bullets.push({ x: posX, y: posY, angle: angle });
+          lastShotTime = currentTime;
+        }
+      }
+    });
+
+    // ─── ENEMIGOS ─────────────────────────────
+    // Cada enemigo tiene posición, estado (alive) y un posible cooldown para disparar (no implementado aquí)
+    const enemies = [
+      { x: 5.5,  y: 2.5,  alive: true },
+      { x: 7.5,  y: 10.5, alive: true },
+      { x: 10.5, y: 4.5,  alive: true }
+    ];
+    const enemySpeed = 0.02;
+
+    // ─── ACTUALIZACIÓN DEL ESTADO ─────────────────────────────
     function update() {
       // Movimiento hacia adelante
       if (keys["ArrowUp"] || keys["w"]) {
@@ -132,53 +165,88 @@
       if (keys["ArrowRight"] || keys["d"]) {
         angle += rotSpeed;
       }
+
+      // Actualización de los proyectiles
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.x += Math.cos(b.angle) * bulletSpeed;
+        b.y += Math.sin(b.angle) * bulletSpeed;
+        // Si el proyectil golpea un muro, se elimina
+        if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
+          bullets.splice(i, 1);
+          continue;
+        }
+        // Colisión con enemigos
+        for (let enemy of enemies) {
+          if (enemy.alive) {
+            let dx = enemy.x - b.x;
+            let dy = enemy.y - b.y;
+            if (Math.sqrt(dx*dx + dy*dy) < 0.3) { // umbral de colisión
+              enemy.alive = false;
+              bullets.splice(i, 1);
+              break;
+            }
+          }
+        }
+      }
+
+      // Movimiento simple de enemigos: se mueven lentamente hacia el jugador
+      for (let enemy of enemies) {
+        if (enemy.alive) {
+          let dx = posX - enemy.x;
+          let dy = posY - enemy.y;
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > 0.5) { // se aproxima hasta cierta distancia
+            let newX = enemy.x + (dx/dist)*enemySpeed;
+            let newY = enemy.y + (dy/dist)*enemySpeed;
+            if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+              enemy.x = newX;
+              enemy.y = newY;
+            }
+          }
+        }
+      }
     }
 
+    // ─── RENDERIZADO ─────────────────────────────
     function render() {
-      // ─── LIMPIA EL CANVAS ─────────────────────────────
+      // Limpia el canvas
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, screenWidth, screenHeight);
 
-      // Calcula el plano de cámara (se usa para paredes y para floor/ceiling)
+      // Calcula parámetros de cámara
       const planeX = -Math.sin(angle) * Math.tan(fov / 2);
       const planeY = Math.cos(angle) * Math.tan(fov / 2);
-      const rayDirX0 = Math.cos(angle) - planeX;
-      const rayDirY0 = Math.sin(angle) - planeY;
-      const rayDirX1 = Math.cos(angle) + planeX;
-      const rayDirY1 = Math.sin(angle) + planeY;
-
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const invDet = 1.0 / (dirX * planeY - dirY * planeX);
       const halfHeight = screenHeight / 2;
       const posZ = halfHeight; // Altura de la cámara respecto al suelo
 
-      // ─── FLOOR & CEILING CASTING (RECORRIENDO TODAS LAS FILAS) ─────────────────────────────
-      // Se usa un solo bucle para recorrer de arriba a abajo y, según la posición, se renderiza techo o piso.
+      // ─── FLOOR & CEILING CASTING ─────────────────────────────
+      // Se obtiene el ImageData del canvas para modificar píxel a píxel
       const imgData = ctx.getImageData(0, 0, screenWidth, screenHeight);
       const data = imgData.data;
 
       for (let y = 0; y < screenHeight; y++) {
-        // Calcula la distancia de la fila respecto al centro (horizonte)
         let p = y - halfHeight;
         if (p === 0) p = 1; // Evitar división por cero
-        // La distancia se toma como absoluta (para piso y techo)
         let rowDistance = posZ / Math.abs(p);
 
         // Paso en el mundo por cada píxel horizontal
-        const floorStepX = rowDistance * (rayDirX1 - rayDirX0) / screenWidth;
-        const floorStepY = rowDistance * (rayDirY1 - rayDirY0) / screenWidth;
-        // Coordenadas del mundo para el primer píxel de la fila actual
-        let worldX = posX + rowDistance * rayDirX0;
-        let worldY = posY + rowDistance * rayDirY0;
+        const floorStepX = rowDistance * ( (dirX + planeX) - (dirX - planeX) ) / screenWidth;
+        const floorStepY = rowDistance * ( (dirY + planeY) - (dirY - planeY) ) / screenWidth;
+        let worldX = posX + rowDistance * (dirX - planeX);
+        let worldY = posY + rowDistance * (dirY - planeY);
 
         for (let x = 0; x < screenWidth; x++) {
           const cellX = Math.floor(worldX);
           const cellY = Math.floor(worldY);
-          let tx, ty;
           const pixelIndex = (y * screenWidth + x) * 4;
-
           if (y > halfHeight) {
-            // ─── PISO ─────────────────
-            tx = Math.floor((worldX - cellX) * floorTexture.width);
-            ty = Math.floor((worldY - cellY) * floorTexture.height);
+            // Piso
+            let tx = Math.floor((worldX - cellX) * floorTexture.width);
+            let ty = Math.floor((worldY - cellY) * floorTexture.height);
             tx = ((tx % floorTexture.width) + floorTexture.width) % floorTexture.width;
             ty = ((ty % floorTexture.height) + floorTexture.height) % floorTexture.height;
             const texIndex = (ty * floorTexture.width + tx) * 4;
@@ -187,9 +255,9 @@
             data[pixelIndex + 2] = floorData[texIndex + 2];
             data[pixelIndex + 3] = 255;
           } else if (y < halfHeight) {
-            // ─── TECHO ─────────────────
-            tx = Math.floor((worldX - cellX) * ceilingTexture.width);
-            ty = Math.floor((worldY - cellY) * ceilingTexture.height);
+            // Techo
+            let tx = Math.floor((worldX - cellX) * ceilingTexture.width);
+            let ty = Math.floor((worldY - cellY) * ceilingTexture.height);
             tx = ((tx % ceilingTexture.width) + ceilingTexture.width) % ceilingTexture.width;
             ty = ((ty % ceilingTexture.height) + ceilingTexture.height) % ceilingTexture.height;
             const texIndex = (ty * ceilingTexture.width + tx) * 4;
@@ -207,8 +275,8 @@
       // ─── RENDERIZADO DE LAS PAREDES (RAYCASTING) ─────────────────────────────
       for (let x = 0; x < screenWidth; x++) {
         const cameraX = 2 * x / screenWidth - 1;
-        const rayDirX = Math.cos(angle) + planeX * cameraX;
-        const rayDirY = Math.sin(angle) + planeY * cameraX;
+        const rayDirX = dirX + planeX * cameraX;
+        const rayDirY = dirY + planeY * cameraX;
         let mapX = Math.floor(posX);
         let mapY = Math.floor(posY);
 
@@ -278,8 +346,53 @@
           ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
         }
       }
+
+      // ─── RENDERIZADO DE ENEMIGOS (SPRITES) ─────────────────────────────
+      for (let enemy of enemies) {
+        if (enemy.alive) {
+          const spriteX = enemy.x - posX;
+          const spriteY = enemy.y - posY;
+          const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+          const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+          if (transformY > 0) {
+            const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+            const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
+            const spriteWidth  = spriteHeight; // Suponemos sprite cuadrado
+            const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
+            const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
+            ctx.drawImage(enemyTexture, drawStartX, drawStartY, spriteWidth, spriteHeight);
+          }
+        }
+      }
+
+      // ─── RENDERIZADO DE PROYECTILES ─────────────────────────────
+      for (let bullet of bullets) {
+        const spriteX = bullet.x - posX;
+        const spriteY = bullet.y - posY;
+        const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+        const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+        if (transformY > 0) {
+          const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+          const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8; // tamaño reducido
+          const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
+          const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
+          ctx.fillStyle = "red";
+          ctx.beginPath();
+          ctx.arc(drawStartX + spriteSize/2, drawStartY + spriteSize/2, spriteSize/2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+
+      // ─── DIBUJA EL ARMA (HUD) ─────────────────────────────
+      // Se muestra en primer plano (centrada en la parte inferior)
+      const weaponWidth = screenWidth * 0.5;
+      const weaponHeight = weaponTexture.height * (weaponWidth / weaponTexture.width);
+      const weaponX = (screenWidth - weaponWidth) / 2;
+      const weaponY = screenHeight - weaponHeight;
+      ctx.drawImage(weaponTexture, weaponX, weaponY, weaponWidth, weaponHeight);
     }
 
+    // ─── BUCLE DEL JUEGO ─────────────────────────────
     function gameLoop() {
       update();
       render();
