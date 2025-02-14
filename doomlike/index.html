@@ -12,57 +12,63 @@
       background: #000;
       overflow: hidden;
     }
-    /* El canvas del juego se centrará y usará el 85% de la altura */
+    /* El canvas se centrará y usará el 85% de la altura */
     #gameCanvas {
       display: block;
       margin: 0 auto;
       background: #000;
     }
   </style>
+  <!-- Incluir Three.js antes de nuestro código -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@<version>/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@<version>/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
-  <!-- Canvas para Three.js -->
   <canvas id="gameCanvas"></canvas>
-  <!-- El arma (HUD) se mostrará mediante un elemento de imagen -->
-  <img id="weaponHUD" src="weapon.png" alt="Weapon HUD" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);pointer-events:none;max-width:50%;">
-  
-  <!-- Three.js se carga desde CDN (¡debe cargarse antes de nuestro código!) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
   
   <!-- Script principal del juego -->
   <script>
-    /***** CONFIGURACIÓN Y VARIABLES GLOBALES *****/
+    /***** CONFIGURACIÓN DE THREE.JS Y VARIABLES GLOBALES *****/
     const canvas = document.getElementById('gameCanvas');
     const availableHeight = window.innerHeight * 0.85;
     const canvasSize = Math.min(window.innerWidth, availableHeight);
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     
-    // Creamos el renderer usando el canvas existente
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvasSize, canvasSize);
-    renderer.setClearColor(0x000000);
     
     // Creamos la escena y la cámara
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, canvasSize/canvasSize, 0.1, 1000);
     
-    // Variables del jugador
-    let posX = 7.5, posY = 3.5; // Coordenadas en el mapa (x y z)
-    let angle = 0;            // Ángulo en radianes
-    const playerHeight = 0.5;
-    const moveSpeed = 0.2, rotSpeed = 0.2;
-    const keys = {};
-    window.keys = keys; // para el minimapa y controles externos
+    // Variables del jugador (usaremos posX y posY para la posición en el mapa, y angle para la dirección)
+    let posX = 7.5, posY = 3.5;
+    let angle = 0;
+    const moveSpeed = 0.2;
+    const rotSpeed = 0.2;
+    
+    // La cámara seguirá al jugador: usaremos la posición (X, 0.5, Y)
+    camera.position.set(posX, 0.5, posY);
+    camera.rotation.y = -angle;
+    
+    // Exponemos algunas variables para que el minimapa (minimap.js) pueda acceder a ellas
+    window.posX = posX;
+    window.posY = posY;
     
     /***** CARGA DE TEXTURAS *****/
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin("anonymous");
-    const wallTexture    = loader.load('wall.png');
-    const floorTexture   = loader.load('floor.png');
-    const ceilingTexture = loader.load('ceiling.png');
-    const enemyTexture   = loader.load('enemy.png');
-    // weapon.png se usa en el HUD (elemento <img>)
+    const textureLoader = new THREE.TextureLoader();
+    const wallTexture    = textureLoader.load('wall.png');
+    const floorTexture   = textureLoader.load('floor.png');
+    const ceilingTexture = textureLoader.load('ceiling.png');
+    const enemyTexture   = textureLoader.load('enemy.png');
+    // weapon.png se usa en el HUD (más adelante en el render 2D)
     
     /***** DEFINICIÓN DEL MAPA (15x15) *****/
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
@@ -74,22 +80,22 @@
       }
       map.push(row);
     }
-    // Barra horizontal: filas 1 a 4, columnas 3 a 11 = 0 (camino libre)
+    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
     for (let y = 1; y <= 4; y++) {
       for (let x = 3; x <= 11; x++) {
         map[y][x] = 0;
       }
     }
-    // Barra vertical: filas 4 a 13, columnas 6 a 8 = 0
+    // Barra vertical (filas 4 a 13, columnas 6 a 8)
     for (let y = 4; y <= 13; y++) {
       for (let x = 6; x <= 8; x++) {
         map[y][x] = 0;
       }
     }
-    window.map = map; // para que el minimapa acceda al mapa
+    window.map = map; // para el minimapa
     
     /***** CREACIÓN DEL ESCENARIO 3D *****/
-    // Suelo: plano texturizado
+    // Suelo
     const floorGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -97,7 +103,7 @@
     floorMesh.position.set(MAP_WIDTH / 2, 0, MAP_HEIGHT / 2);
     scene.add(floorMesh);
     
-    // Techo: plano texturizado, a altura 1
+    // Techo
     const ceilingGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
@@ -113,7 +119,7 @@
       for (let x = 0; x < MAP_WIDTH; x++) {
         if (map[y][x] === 1) {
           const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-          // Centramos el cubo en la celda (x+0.5, 0.5, y+0.5)
+          // Centrado en la celda: (x+0.5, 0.5, y+0.5)
           wall.position.set(x + 0.5, 0.5, y + 0.5);
           wallGroup.add(wall);
         }
@@ -122,12 +128,13 @@
     scene.add(wallGroup);
     
     /***** ENEMIGOS (SPRITES) *****/
-    const enemiesData = [
-      { x: 5.5,  y: 2.5,  alive: true },
-      { x: 7.5,  y: 10.5, alive: true },
-      { x: 10.5, y: 4.5,  alive: true }
+    const enemies = [
+      { x: 5.5, y: 2.5, alive: true },
+      { x: 7.5, y: 10.5, alive: true },
+      { x: 10.5, y: 4.5, alive: true }
     ];
-    enemiesData.forEach(enemy => {
+    window.enemies = enemies;
+    enemies.forEach(enemy => {
       const spriteMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
       const sprite = new THREE.Sprite(spriteMaterial);
       sprite.scale.set(0.8, 0.8, 0.8);
@@ -135,7 +142,6 @@
       scene.add(sprite);
       enemy.sprite = sprite;
     });
-    window.enemies = enemiesData;
     
     /***** SISTEMA DE DISPAROS *****/
     const bullets = [];
@@ -145,10 +151,10 @@
     function shootBullet() {
       const currentTime = Date.now();
       if (currentTime - lastShotTime > shootCooldown) {
-        // Se crea una bala como una esfera pequeña amarilla
-        const geometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-        const bulletMesh = new THREE.Mesh(geometry, material);
+        // Crea una bala como una esfera pequeña amarilla
+        const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
         bulletMesh.position.set(posX, 0.5, posY);
         scene.add(bulletMesh);
         bullets.push({ x: posX, y: posY, angle: angle, mesh: bulletMesh });
@@ -157,20 +163,22 @@
     }
     window.shootBullet = shootBullet;
     
-    /***** EVENTOS DE TECLADO *****/
+    /***** CONTROLES *****/
+    const keys = {};
+    window.keys = keys;
     window.addEventListener('keydown', e => {
       keys[e.key] = true;
       if (e.code === "Space") shootBullet();
     });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
     
-    /***** ACTUALIZACIÓN DEL ESTADO DEL JUEGO *****/
+    /***** ACTUALIZACIÓN DEL ESTADO *****/
     function update() {
-      // Movimiento del jugador
+      // Movimiento del jugador (validando colisiones en el mapa)
       if (keys["ArrowUp"] || keys["w"]) {
         let newX = posX + Math.cos(angle) * moveSpeed;
         let newY = posY + Math.sin(angle) * moveSpeed;
-        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
@@ -178,33 +186,34 @@
       if (keys["ArrowDown"] || keys["s"]) {
         let newX = posX - Math.cos(angle) * moveSpeed;
         let newY = posY - Math.sin(angle) * moveSpeed;
-        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
       }
-      if (keys["ArrowLeft"] || keys["a"]) angle -= rotSpeed;
-      if (keys["ArrowRight"] || keys["d"]) angle += rotSpeed;
+      if (keys["ArrowLeft"] || keys["a"]) {
+        angle -= rotSpeed;
+      }
+      if (keys["ArrowRight"] || keys["d"]) {
+        angle += rotSpeed;
+      }
+      // Actualizar la cámara para seguir al jugador
+      camera.position.set(posX, 0.5, posY);
+      camera.rotation.y = -angle;
       
-      // Actualizar posición y orientación de la cámara
-      camera.position.set(posX, playerHeight, posY);
-      const lookTarget = new THREE.Vector3(posX + Math.cos(angle), playerHeight, posY + Math.sin(angle));
-      camera.lookAt(lookTarget);
-      
-      // Actualizar las balas
+      // Actualizar balas
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += Math.cos(b.angle) * bulletSpeed;
         b.y += Math.sin(b.angle) * bulletSpeed;
         b.mesh.position.set(b.x, 0.5, b.y);
-        // Si la bala impacta en una pared, se elimina
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
           scene.remove(b.mesh);
           bullets.splice(i, 1);
           continue;
         }
         // Colisión con enemigos
-        for (let enemy of enemiesData) {
+        for (let enemy of enemies) {
           if (enemy.alive) {
             let dx = enemy.x - b.x;
             let dy = enemy.y - b.y;
@@ -219,8 +228,8 @@
         }
       }
       
-      // Movimiento simple de enemigos
-      enemiesData.forEach(enemy => {
+      // Movimiento simple de enemigos (persiguiendo al jugador)
+      enemies.forEach(enemy => {
         if (enemy.alive) {
           let dx = posX - enemy.x;
           let dy = posY - enemy.y;
@@ -237,10 +246,9 @@
         }
       });
       
-      // Exponer variables para el minimapa
       window.posX = posX;
       window.posY = posY;
-      window.playerLife = 100; // valor fijo (dummy)
+      window.playerLife = 100; // Valor fijo para ejemplo
     }
     
     /***** BUCLE DEL JUEGO *****/
@@ -251,7 +259,7 @@
     }
     gameLoop();
     
-    // Ajustar renderer y cámara al redimensionar la ventana
+    // Adaptar tamaño al redimensionar
     window.addEventListener('resize', () => {
       const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
       renderer.setSize(newSize, newSize);
