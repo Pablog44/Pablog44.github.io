@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function drawMinimap() {
     minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
 
-    // Dibuja el mapa: paredes en gris oscuro, suelo en gris claro
+    // Dibuja el mapa: paredes = gris oscuro, suelo = gris claro
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
         const isWall = (window.map && window.map[y][x] === 1);

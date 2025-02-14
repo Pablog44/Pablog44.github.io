@@ -12,7 +12,7 @@
       background: #000;
       overflow: hidden;
     }
-    /* El canvas se centrará y usará el 85% de la altura */
+    /* El canvas del juego se centrará y usará el 85% de la altura */
     #gameCanvas {
       display: block;
       margin: 0 auto;
@@ -28,51 +28,61 @@
   
   <!-- 2. Script principal del juego (usa THREE como global) -->
   <script>
-    /***** CONFIGURACIÓN DE THREE.JS Y VARIABLES GLOBALES *****/
+    /***** CONFIGURACIÓN DEL CANVAS Y VARIABLES GLOBALES *****/
     const canvas = document.getElementById('gameCanvas');
     const availableHeight = window.innerHeight * 0.85;
     const canvasSize = Math.min(window.innerWidth, availableHeight);
     canvas.width = canvasSize;
     canvas.height = canvasSize;
-    
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.setSize(canvasSize, canvasSize);
-    
-    // Escena y cámara
-    const scene = new THREE.Scene();
-    // Nota: La relación de aspecto se define para un canvas cuadrado
-    const camera = new THREE.PerspectiveCamera(75, canvasSize / canvasSize, 0.1, 1000);
-    
-    // Variables del jugador: posX y posY representan la posición en el mapa (plano 2D),
-    // y "angle" es el ángulo de rotación. Con angle = 0, la cámara mira hacia -Z.
-    let posX = 7.5, posY = 3.5;
-    let angle = 0;
-    const moveSpeed = 0.2;
-    const rotSpeed  = 0.2;
-    
-    // Posición inicial de la cámara (y = 0.5 para simular la altura del ojo)
-    camera.position.set(posX, 0.5, posY);
-    // Con angle = 0, queremos que la cámara mire hacia -Z (por eso usamos rotation.y = angle)
-    camera.rotation.y = angle;
-    
-    // Exponemos variables para el minimapa (minimap.js)
-    window.posX = posX;
-    window.posY = posY;
-    
-    /***** CARGA DE TEXTURAS *****/
-    const textureLoader = new THREE.TextureLoader();
-    const wallTexture    = textureLoader.load('wall.png');
-    const floorTexture   = textureLoader.load('floor.png');
-    const ceilingTexture = textureLoader.load('ceiling.png');
-    const enemyTexture   = textureLoader.load('enemy.png');
-    // Nota: weapon.png se usará en el HUD (por ejemplo, como overlay en 2D)
-    
-    // Configuramos que las texturas de suelo y techo se repitan:
-    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
-    ceilingTexture.wrapS = ceilingTexture.wrapT = THREE.RepeatWrapping;
-    
-    /***** DEFINICIÓN DEL MAPA (15x15) *****/
+    const ctx = canvas.getContext('2d');
+    const screenWidth = canvas.width;
+    const screenHeight = canvas.height;
+
+    // ─── FUNCIONES DE AYUDA ───
+    function loadTexture(src) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = src;
+      return img;
+    }
+
+    // ─── CARGA DE TEXTURAS ───
+    const wallTexture    = loadTexture('wall.png');
+    const floorTexture   = loadTexture('floor.png');
+    const ceilingTexture = loadTexture('ceiling.png');
+    const weaponTexture  = loadTexture('weapon.png');
+    const enemyTexture   = loadTexture('enemy.png');
+
+    // Variables para extraer píxeles de piso y techo (para el raycasting)
+    let floorData = null, ceilingData = null;
+    let texturesLoaded = 0;
+    function onTextureLoaded() {
+      texturesLoaded++;
+      if (texturesLoaded === 5) {
+        // Extrae píxeles de la textura del piso
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = floorTexture.width;
+        floorCanvas.height = floorTexture.height;
+        const floorCtx = floorCanvas.getContext('2d');
+        floorCtx.drawImage(floorTexture, 0, 0);
+        floorData = floorCtx.getImageData(0, 0, floorTexture.width, floorTexture.height).data;
+        // Extrae píxeles de la textura del techo
+        const ceilingCanvas = document.createElement('canvas');
+        ceilingCanvas.width = ceilingTexture.width;
+        ceilingCanvas.height = ceilingTexture.height;
+        const ceilingCtx = ceilingCanvas.getContext('2d');
+        ceilingCtx.drawImage(ceilingTexture, 0, 0);
+        ceilingData = ceilingCtx.getImageData(0, 0, ceilingTexture.width, ceilingTexture.height).data;
+        requestAnimationFrame(gameLoop);
+      }
+    }
+    wallTexture.onload    = onTextureLoaded;
+    floorTexture.onload   = onTextureLoaded;
+    ceilingTexture.onload = onTextureLoaded;
+    weaponTexture.onload  = onTextureLoaded;
+    enemyTexture.onload   = onTextureLoaded;
+
+    // ─── DEFINICIÓN DEL MAPA (15x15) ───
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
     const map = [];
     for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -82,126 +92,78 @@
       }
       map.push(row);
     }
-    // Se define una barra horizontal en filas 1 a 4 y columnas 3 a 11:
+    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
     for (let y = 1; y <= 4; y++) {
       for (let x = 3; x <= 11; x++) {
         map[y][x] = 0;
       }
     }
-    // Se define una barra vertical en filas 4 a 13 y columnas 6 a 8:
+    // Barra vertical (filas 4 a 13, columnas 6 a 8)
     for (let y = 4; y <= 13; y++) {
       for (let x = 6; x <= 8; x++) {
         map[y][x] = 0;
       }
     }
-    window.map = map; // para acceso en minimap.js
-    
-    /***** CREACIÓN DEL ESCENARIO 3D *****/
-    // Configuramos la repetición de la textura para que se muestre una imagen completa por celda:
-    floorTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
-    ceilingTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
-    
-    // Suelo
-    const floorGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
-    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
-    const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(MAP_WIDTH / 2, 0, MAP_HEIGHT / 2);
-    scene.add(floorMesh);
-    
-    // Techo
-    const ceilingGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
-    const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
-    const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    ceilingMesh.rotation.x = Math.PI / 2;
-    // Colocamos el techo a altura 1 (simulando 1 metro)
-    ceilingMesh.position.set(MAP_WIDTH / 2, 1, MAP_HEIGHT / 2);
-    scene.add(ceilingMesh);
-    
-    // Paredes: por cada celda del mapa con valor 1 se crea un cubo 1×1×1
-    const wallGroup = new THREE.Group();
-    const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        if (map[y][x] === 1) {
-          const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-          // Se centra el cubo en la celda: (x+0.5, 0.5, y+0.5)
-          wall.position.set(x + 0.5, 0.5, y + 0.5);
-          wallGroup.add(wall);
-        }
+
+    // ─── VARIABLES DEL JUGADOR ───
+    let posX = 7.5, posY = 3.5;  // Posición inicial (dentro del mapa)
+    let angle = 0;             // Ángulo en radianes (0 → mirando hacia -Z en nuestro sistema)
+    const fov = Math.PI / 3;   // Campo de visión (60°)
+
+    // Velocidades
+    const moveSpeed = 0.2;
+    const rotSpeed  = 0.2;
+
+    // ─── CONTROLES ───
+    // Exponemos el objeto de controles para el minimapa
+    const keys = {};
+    window.keys = keys;
+    window.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (e.code === "Space") {
+        shootBullet();
+      }
+    });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // ─── SISTEMA DE DISPAROS ───
+    const bullets = [];
+    const bulletSpeed = 0.5;
+    let lastShotTime = 0;
+    const shootCooldown = 300; // milisegundos
+
+    function shootBullet() {
+      const currentTime = Date.now();
+      if (currentTime - lastShotTime > shootCooldown) {
+        bullets.push({ x: posX, y: posY, angle: angle });
+        lastShotTime = currentTime;
       }
     }
-    scene.add(wallGroup);
-    
-    /***** ENEMIGOS (SPRITES) *****/
+
+    // ─── ENEMIGOS ───
     const enemies = [
       { x: 5.5,  y: 2.5,  alive: true },
       { x: 7.5,  y: 10.5, alive: true },
       { x: 10.5, y: 4.5,  alive: true }
     ];
-    window.enemies = enemies;
-    enemies.forEach(enemy => {
-      const spriteMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(0.8, 0.8, 0.8);
-      sprite.position.set(enemy.x, 0.5, enemy.y);
-      scene.add(sprite);
-      enemy.sprite = sprite;
-    });
-    
-    /***** SISTEMA DE DISPAROS *****/
-    const bullets = [];
-    const bulletSpeed = 0.5;
-    let lastShotTime = 0;
-    const shootCooldown = 300; // milisegundos
-    
-    function shootBullet() {
-      const currentTime = Date.now();
-      if (currentTime - lastShotTime > shootCooldown) {
-        const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-        const bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
-        bulletMesh.position.set(posX, 0.5, posY);
-        scene.add(bulletMesh);
-        bullets.push({ x: posX, y: posY, angle: angle, mesh: bulletMesh });
-        lastShotTime = currentTime;
-      }
-    }
-    window.shootBullet = shootBullet; // para accesos externos
-    
-    /***** CONTROLES (TECLADO) *****/
-    const keys = {};
-    window.keys = keys;
-    window.addEventListener('keydown', e => {
-      keys[e.key] = true;
-      if (e.code === "Space") shootBullet();
-    });
-    window.addEventListener('keyup', e => {
-      keys[e.key] = false;
-    });
-    
-    /***** ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) *****/
+    const enemySpeed = 0.02;
+
+    // Actualización del estado: Movimiento y lógica
     function update() {
-      // Definimos el vector "forward" en base al ángulo actual:
-      // Con angle = 0 la cámara mira -Z, por lo que:
-      // forwardX = sin(angle)
-      // forwardY = -cos(angle)
-      const forwardX = Math.sin(angle);
-      const forwardY = -Math.cos(angle);
-      
+      // Usamos el mismo vector forward que en el código que funciona:
+      // forwardX = cos(angle), forwardY = sin(angle)
       if (keys["ArrowUp"] || keys["w"]) {
-        const newX = posX + forwardX * moveSpeed;
-        const newY = posY + forwardY * moveSpeed;
-        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        let newX = posX + Math.cos(angle) * moveSpeed;
+        let newY = posY + Math.sin(angle) * moveSpeed;
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
       }
       if (keys["ArrowDown"] || keys["s"]) {
-        const newX = posX - forwardX * moveSpeed;
-        const newY = posY - forwardY * moveSpeed;
-        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        let newX = posX - Math.cos(angle) * moveSpeed;
+        let newY = posY - Math.sin(angle) * moveSpeed;
+        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
@@ -213,80 +175,243 @@
         angle += rotSpeed;
       }
       
-      // Actualizamos la posición y orientación de la cámara
-      camera.position.set(posX, 0.5, posY);
-      camera.rotation.y = angle;
-      
-      // Actualizar balas
+      // Actualizamos las posiciones globales para el minimapa
+      window.posX = posX;
+      window.posY = posY;
+
+      // Actualizamos los proyectiles
       for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
-        // Utilizamos el mismo vector forward para la bala
-        b.x += Math.sin(b.angle) * bulletSpeed;
-        b.y -= Math.cos(b.angle) * bulletSpeed;
-        b.mesh.position.set(b.x, 0.5, b.y);
-        
-        // Si la bala choca con una pared
+        let b = bullets[i];
+        // Usamos la misma fórmula que para el movimiento del jugador
+        b.x += Math.cos(b.angle) * bulletSpeed;
+        b.y += Math.sin(b.angle) * bulletSpeed;
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
-          scene.remove(b.mesh);
           bullets.splice(i, 1);
           continue;
         }
-        // Colisión con enemigos
         for (let enemy of enemies) {
           if (enemy.alive) {
             let dx = enemy.x - b.x;
             let dy = enemy.y - b.y;
             if (Math.sqrt(dx * dx + dy * dy) < 0.3) {
               enemy.alive = false;
-              scene.remove(enemy.sprite);
-              scene.remove(b.mesh);
               bullets.splice(i, 1);
               break;
             }
           }
         }
       }
-      
-      // Movimiento de enemigos: persiguen al jugador
-      enemies.forEach(enemy => {
+      // Movimiento simple de enemigos (persiguiendo al jugador)
+      for (let enemy of enemies) {
         if (enemy.alive) {
           let dx = posX - enemy.x;
           let dy = posY - enemy.y;
           let dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0.5) {
-            const speed = 0.02;
-            let newX = enemy.x + (dx / dist) * speed;
-            let newY = enemy.y + (dy / dist) * speed;
-            if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
+            let newX = enemy.x + (dx / dist) * enemySpeed;
+            let newY = enemy.y + (dy / dist) * enemySpeed;
+            if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
               enemy.x = newX;
               enemy.y = newY;
-              enemy.sprite.position.set(newX, 0.5, newY);
             }
           }
         }
-      });
-      
-      // Exponemos la posición actual para el minimapa
-      window.posX = posX;
-      window.posY = posY;
-      window.playerLife = 100; // Valor fijo de ejemplo
+      }
+      // Exponemos un valor de vida para el minimapa (valor fijo de ejemplo)
+      window.playerLife = 100;
     }
-    
-    /***** BUCLE DEL JUEGO *****/
+
+    // ─── RENDERIZADO (raycasting 2D) ───
+    function render() {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, screenWidth, screenHeight);
+
+      const zBuffer = new Array(screenWidth);
+      const planeX = -Math.sin(angle) * Math.tan(fov / 2);
+      const planeY = Math.cos(angle) * Math.tan(fov / 2);
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const invDet = 1.0 / (planeX * dirY - dirX * planeY);
+      const halfHeight = screenHeight / 2;
+      const posZ = halfHeight;
+
+      // Floor & ceiling casting
+      const imgData = ctx.getImageData(0, 0, screenWidth, screenHeight);
+      const data = imgData.data;
+      for (let y = 0; y < screenHeight; y++) {
+        let p = y - halfHeight;
+        if (p === 0) p = 1;
+        let rowDistance = posZ / Math.abs(p);
+        const floorStepX = rowDistance * ((dirX + planeX) - (dirX - planeX)) / screenWidth;
+        const floorStepY = rowDistance * ((dirY + planeY) - (dirY - planeY)) / screenWidth;
+        let worldX = posX + rowDistance * (dirX - planeX);
+        let worldY = posY + rowDistance * (dirY - planeY);
+        for (let x = 0; x < screenWidth; x++) {
+          const cellX = Math.floor(worldX);
+          const cellY = Math.floor(worldY);
+          const pixelIndex = (y * screenWidth + x) * 4;
+          if (y > halfHeight) {
+            let tx = Math.floor((worldX - cellX) * floorTexture.width);
+            let ty = Math.floor((worldY - cellY) * floorTexture.height);
+            tx = ((tx % floorTexture.width) + floorTexture.width) % floorTexture.width;
+            ty = ((ty % floorTexture.height) + floorTexture.height) % floorTexture.height;
+            const texIndex = (ty * floorTexture.width + tx) * 4;
+            data[pixelIndex    ] = floorData[texIndex    ];
+            data[pixelIndex + 1] = floorData[texIndex + 1];
+            data[pixelIndex + 2] = floorData[texIndex + 2];
+            data[pixelIndex + 3] = 255;
+          } else if (y < halfHeight) {
+            let tx = Math.floor((worldX - cellX) * ceilingTexture.width);
+            let ty = Math.floor((worldY - cellY) * ceilingTexture.height);
+            tx = ((tx % ceilingTexture.width) + ceilingTexture.width) % ceilingTexture.width;
+            ty = ((ty % ceilingTexture.height) + ceilingTexture.height) % ceilingTexture.height;
+            const texIndex = (ty * ceilingTexture.width + tx) * 4;
+            data[pixelIndex    ] = ceilingData[texIndex    ];
+            data[pixelIndex + 1] = ceilingData[texIndex + 1];
+            data[pixelIndex + 2] = ceilingData[texIndex + 2];
+            data[pixelIndex + 3] = 255;
+          }
+          worldX += floorStepX;
+          worldY += floorStepY;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      // Raycasting de paredes
+      for (let x = 0; x < screenWidth; x++) {
+        const cameraX = 2 * x / screenWidth - 1;
+        const rayDirX = dirX + planeX * cameraX;
+        const rayDirY = dirY + planeY * cameraX;
+        let mapX = Math.floor(posX);
+        let mapY = Math.floor(posY);
+        const deltaDistX = Math.abs(1 / rayDirX);
+        const deltaDistY = Math.abs(1 / rayDirY);
+        let stepX, stepY, sideDistX, sideDistY;
+        if (rayDirX < 0) {
+          stepX = -1;
+          sideDistX = (posX - mapX) * deltaDistX;
+        } else {
+          stepX = 1;
+          sideDistX = (mapX + 1 - posX) * deltaDistX;
+        }
+        if (rayDirY < 0) {
+          stepY = -1;
+          sideDistY = (posY - mapY) * deltaDistY;
+        } else {
+          stepY = 1;
+          sideDistY = (mapY + 1 - posY) * deltaDistY;
+        }
+        let hit = false;
+        let side;
+        while (!hit) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX;
+            mapX += stepX;
+            side = 0;
+          } else {
+            sideDistY += deltaDistY;
+            mapY += stepY;
+            side = 1;
+          }
+          if (map[mapY][mapX] > 0) hit = true;
+        }
+        let perpWallDist;
+        if (side === 0)
+          perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX;
+        else
+          perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
+        zBuffer[x] = perpWallDist;
+        const lineHeight = Math.floor(screenHeight / perpWallDist);
+        let drawStart = Math.floor(-lineHeight / 2 + screenHeight / 2);
+        if (drawStart < 0) drawStart = 0;
+        let drawEnd = Math.floor(lineHeight / 2 + screenHeight / 2);
+        if (drawEnd >= screenHeight) drawEnd = screenHeight - 1;
+        let wallX;
+        if (side === 0)
+          wallX = posY + perpWallDist * rayDirY;
+        else
+          wallX = posX + perpWallDist * rayDirX;
+        wallX -= Math.floor(wallX);
+        let texX = Math.floor(wallX * wallTexture.width);
+        if (side === 0 && rayDirX > 0) texX = wallTexture.width - texX - 1;
+        if (side === 1 && rayDirY < 0) texX = wallTexture.width - texX - 1;
+        if (wallTexture.complete) {
+          ctx.drawImage(
+            wallTexture,
+            texX, 0, 1, wallTexture.height,
+            x, drawStart, 1, drawEnd - drawStart
+          );
+        } else {
+          ctx.fillStyle = (side === 1) ? "#888" : "#aaa";
+          ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+        }
+      }
+
+      // Renderizado de enemigos (sprites)
+      const spriteData = [];
+      for (let enemy of enemies) {
+        if (!enemy.alive) continue;
+        const spriteX = enemy.x - posX;
+        const spriteY = enemy.y - posY;
+        const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+        const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+        if (transformY <= 0) continue;
+        spriteData.push({ enemy, transformX, transformY });
+      }
+      spriteData.sort((a, b) => b.transformY - a.transformY);
+      for (let sprite of spriteData) {
+        const { transformX, transformY } = sprite;
+        const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+        const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
+        const spriteWidth  = spriteHeight;
+        const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
+        const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
+        const drawEndX = drawStartX + spriteWidth;
+        for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
+          if (stripe < 0 || stripe >= screenWidth) continue;
+          if (transformY < zBuffer[stripe]) {
+            const texX = Math.floor((stripe - drawStartX) * enemyTexture.width / spriteWidth);
+            ctx.drawImage(
+              enemyTexture,
+              texX, 0, 1, enemyTexture.height,
+              stripe, drawStartY, 1, spriteHeight
+            );
+          }
+        }
+      }
+
+      // Renderizado de proyectiles
+      for (let bullet of bullets) {
+        const spriteX = bullet.x - posX;
+        const spriteY = bullet.y - posY;
+        const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+        const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+        if (transformY > 0) {
+          const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+          const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
+          const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
+          const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
+          ctx.fillStyle = "yellow";
+          ctx.beginPath();
+          ctx.arc(drawStartX + spriteSize/2, drawStartY + spriteSize/2, spriteSize/2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+
+      // Dibuja el arma (HUD)
+      const weaponWidth = screenWidth * 0.5;
+      const weaponHeight = weaponTexture.height * (weaponWidth / weaponTexture.width);
+      const weaponX = (screenWidth - weaponWidth) / 2;
+      const weaponY = screenHeight - weaponHeight;
+      ctx.drawImage(weaponTexture, weaponX, weaponY, weaponWidth, weaponHeight);
+    }
+
+    // ─── BUCLE DEL JUEGO ───
     function gameLoop() {
       update();
-      renderer.render(scene, camera);
+      render();
       requestAnimationFrame(gameLoop);
     }
-    gameLoop();
-    
-    // Ajuste de tamaño al redimensionar la ventana
-    window.addEventListener('resize', () => {
-      const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
-      renderer.setSize(newSize, newSize);
-      camera.aspect = newSize / newSize;
-      camera.updateProjectionMatrix();
-    });
   </script>
 
   <!-- 3. Script externo para el minimapa y controles móviles -->
