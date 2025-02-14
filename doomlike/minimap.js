@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // ─── CREACIÓN DEL FOOTER Y CONTENEDORES ─────────────────────────────
+  // ─── CREAR O RECUPERAR EL FOOTER ───
   let footer = document.getElementById("gameFooter");
   if (!footer) {
     footer = document.createElement("footer");
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.appendChild(footer);
   }
 
-  // Contenedor para la cruz direccional (D-pad) – IZQUIERDA
+  // ─── CONTENEDOR PARA EL D-PAD (IZQUIERDA) ───
   const dpadContainer = document.createElement("div");
   dpadContainer.style.flex = "0 0 auto";
   dpadContainer.style.display = "flex";
@@ -33,7 +33,6 @@ document.addEventListener("DOMContentLoaded", function () {
   dpad.style.height = dpadSize + "px";
   dpad.style.gap = "2px";
   
-  // Se crean los botones de dirección
   const btnUp = document.createElement("button");
   btnUp.id = "btn-up";
   btnUp.innerHTML = "▲";
@@ -59,14 +58,13 @@ document.addEventListener("DOMContentLoaded", function () {
     btn.style.fontSize = "1rem";
     btn.style.cursor = "pointer";
   });
-  
   dpad.appendChild(btnUp);
   dpad.appendChild(btnLeft);
   dpad.appendChild(btnDown);
   dpad.appendChild(btnRight);
   dpadContainer.appendChild(dpad);
   
-  // Contenedor central para el minimapa
+  // ─── CONTENEDOR CENTRAL PARA EL MINIMAPA ───
   const minimapContainer = document.createElement("div");
   minimapContainer.style.flex = "0 0 auto";
   minimapContainer.style.display = "flex";
@@ -80,7 +78,7 @@ document.addEventListener("DOMContentLoaded", function () {
   minimapContainer.appendChild(minimapCanvas);
   const minimapCtx = minimapCanvas.getContext("2d");
   
-  // Contenedor para el botón de disparo – DERECHA
+  // ─── CONTENEDOR PARA EL BOTÓN DE DISPARO (DERECHA) ───
   const shootContainer = document.createElement("div");
   shootContainer.style.flex = "0 0 auto";
   shootContainer.style.display = "flex";
@@ -95,12 +93,11 @@ document.addEventListener("DOMContentLoaded", function () {
   shootBtn.style.cursor = "pointer";
   shootContainer.appendChild(shootBtn);
   
-  // Se agrega al footer en el orden: D-pad (izquierda), minimapa (centro), botón de disparo (derecha)
   footer.appendChild(dpadContainer);
   footer.appendChild(minimapContainer);
   footer.appendChild(shootContainer);
   
-  // ─── Funciones de eventos para controles táctiles y de mouse ───
+  // ─── ASOCIAR EVENTOS A LOS BOTONES ───
   function addButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
       e.preventDefault();
@@ -110,7 +107,6 @@ document.addEventListener("DOMContentLoaded", function () {
       e.preventDefault();
       window.keys[key] = false;
     });
-    // Soporte para mouse
     button.addEventListener("mousedown", function(e) {
       e.preventDefault();
       window.keys[key] = true;
@@ -135,33 +131,33 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   
   // ─── DIBUJO DEL MINIMAPA ───
-  // Se asume que las variables globales "map", "posX", "posY" y "enemies" están definidas en el juego.
-  const MAP_WIDTH = map[0].length;
-  const MAP_HEIGHT = map.length;
+  // Se asume que las variables globales "map", "posX", "posY" y "enemies" existen
+  const MAP_WIDTH = window.map ? window.map[0].length : 15;
+  const MAP_HEIGHT = window.map ? window.map.length : 15;
   const cellSize = minimapCanvas.width / MAP_WIDTH;
   function drawMinimap() {
     minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
     // Dibuja el mapa: paredes en gris oscuro y suelos en gris claro
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
-        minimapCtx.fillStyle = (map[y][x] === 1) ? "#555" : "#ccc";
+        minimapCtx.fillStyle = (window.map && window.map[y][x] === 1) ? "#555" : "#ccc";
         minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
       }
     }
     // Dibuja al jugador en azul
     minimapCtx.fillStyle = "blue";
     minimapCtx.beginPath();
-    minimapCtx.arc(window.posX * cellSize, window.posY * cellSize, cellSize / 3, 0, Math.PI * 2);
+    minimapCtx.arc((window.posX || 0) * cellSize, (window.posY || 0) * cellSize, cellSize / 3, 0, Math.PI * 2);
     minimapCtx.fill();
     // Dibuja a cada enemigo (si están vivos) en rojo
     minimapCtx.fillStyle = "red";
-    for (let enemy of window.enemies || []) {
+    (window.enemies || []).forEach(enemy => {
       if (enemy.alive) {
         minimapCtx.beginPath();
         minimapCtx.arc(enemy.x * cellSize, enemy.y * cellSize, cellSize / 3, 0, Math.PI * 2);
         minimapCtx.fill();
       }
-    }
+    });
     // Dibuja la vida del jugador (usa window.playerLife o 100 por defecto)
     let playerLife = window.playerLife || 100;
     minimapCtx.fillStyle = "white";

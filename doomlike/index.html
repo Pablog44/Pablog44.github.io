@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Juego tipo Doom con Three.js</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body {
       margin: 0;
@@ -17,7 +18,7 @@
       margin: 0 auto;
       background: #000;
     }
-    /* HUD del arma como elemento superpuesto */
+    /* HUD del arma como imagen superpuesta */
     #weaponHUD {
       position: fixed;
       bottom: 0;
@@ -34,52 +35,47 @@
   <!-- Imagen del arma (HUD) -->
   <img id="weaponHUD" src="weapon.png" alt="Weapon HUD">
 
-  <!-- Three.js desde CDN -->
+  <!-- Three.js desde CDN: debe cargarse antes del script principal -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
   
   <!-- Script principal del juego -->
   <script>
-    /* ─── CONFIGURACIÓN DE THREE.JS ───────────────────────────── */
+    /***** CONFIGURACIÓN Y VARIABLES GLOBALES *****/
     const canvas = document.getElementById('gameCanvas');
     const availableHeight = window.innerHeight * 0.85;
     const canvasSize = Math.min(window.innerWidth, availableHeight);
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     
-    // Se utiliza el canvas existente para el renderer
+    // Renderer que utiliza nuestro canvas existente
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvasSize, canvasSize);
     
     // Escena y cámara
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, canvasSize / canvasSize, 0.1, 1000);
-    // Altura del jugador (eje Y)
     const playerHeight = 0.5;
     
-    /* ─── VARIABLES GLOBALES Y CONFIGURACIÓN DEL JUEGO ───────────────────────────── */
-    // Posición y ángulo del jugador (en el espacio de la rejilla: x -> eje X, y -> eje Z)
-    let posX = 7.5, posY = 3.5;
-    let angle = 0;  // en radianes
-    const fov = Math.PI / 3; // valor original (no usado directamente en Three.js)
-    
-    // Velocidades
+    // Estado del jugador
+    let posX = 7.5, posY = 3.5;  // Posición en el mapa (X y Z)
+    let angle = 0;             // Ángulo en radianes
     const moveSpeed = 0.2;
     const rotSpeed  = 0.2;
     
-    // Objeto para almacenar las teclas pulsadas (se expone globalmente)
+    // Objeto de controles (teclado y botones) y se expone globalmente
     const keys = {};
     window.keys = keys;
     
-    /* ─── CARGA DE TEXTURAS CON THREE.TextureLoader ───────────────────────────── */
+    /***** CARGA DE TEXTURAS *****/
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
     const wallTexture    = loader.load('wall.png');
     const floorTexture   = loader.load('floor.png');
     const ceilingTexture = loader.load('ceiling.png');
     const enemyTexture   = loader.load('enemy.png');
-    // weapon.png se utiliza en el HUD (ya cargado en el elemento <img>)
+    // weapon.png se usa en el HUD (el elemento <img>)
     
-    /* ─── DEFINICIÓN DEL MAPA (15x15) ───────────────────────────── */
+    /***** DEFINICIÓN DEL MAPA (15x15) *****/
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
     const map = [];
     for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -101,27 +97,26 @@
         map[y][x] = 0;
       }
     }
-    // Se expone la variable globalmente (para el minimapa)
-    window.map = map;
+    window.map = map; // para que minimap.js acceda al mapa
     
-    /* ─── CREACIÓN DEL ESCENARIO 3D ───────────────────────────── */
-    // Suelo: un plano que cubre el mapa
+    /***** CREACIÓN DEL ESCENARIO 3D *****/
+    // Suelo: plano con textura del piso
     const floorGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
     floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(MAP_WIDTH/2, 0, MAP_HEIGHT/2);
+    floorMesh.position.set(MAP_WIDTH / 2, 0, MAP_HEIGHT / 2);
     scene.add(floorMesh);
     
-    // Techo: plano posicionado en altura 1
+    // Techo: plano con textura del techo, posicionado en altura 1
     const ceilingGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceilingMesh.rotation.x = Math.PI / 2;
-    ceilingMesh.position.set(MAP_WIDTH/2, 1, MAP_HEIGHT/2);
+    ceilingMesh.position.set(MAP_WIDTH / 2, 1, MAP_HEIGHT / 2);
     scene.add(ceilingMesh);
     
-    // Paredes: se crea un grupo y se recorre el mapa para ubicar un cubo en cada celda 1
+    // Paredes: se recorren las celdas del mapa y se coloca un cubo donde haya "1"
     const wallGroup = new THREE.Group();
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
     const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
@@ -129,7 +124,6 @@
       for (let x = 0; x < MAP_WIDTH; x++) {
         if (map[y][x] === 1) {
           const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-          // Se posiciona el cubo centrado en la celda (x+0.5, 0.5, y+0.5)
           wall.position.set(x + 0.5, 0.5, y + 0.5);
           wallGroup.add(wall);
         }
@@ -137,7 +131,7 @@
     }
     scene.add(wallGroup);
     
-    /* ─── ENEMIGOS (SPRITES) ───────────────────────────── */
+    /***** ENEMIGOS (SPRITES) *****/
     const enemiesData = [
       { x: 5.5,  y: 2.5,  alive: true },
       { x: 7.5,  y: 10.5, alive: true },
@@ -151,17 +145,16 @@
       scene.add(sprite);
       enemy.sprite = sprite;
     });
-    window.enemies = enemiesData; // para que el minimapa acceda a ellos
+    window.enemies = enemiesData; // para el minimapa
     
-    /* ─── SISTEMA DE DISPAROS ───────────────────────────── */
+    /***** SISTEMA DE DISPAROS *****/
     const bullets = [];
     const bulletSpeed = 0.5;
     let lastShotTime = 0;
-    const shootCooldown = 300; // en milisegundos
+    const shootCooldown = 300; // milisegundos
     function shootBullet() {
       const currentTime = Date.now();
       if (currentTime - lastShotTime > shootCooldown) {
-        // Se crea una bala como una esfera pequeña
         const geometry = new THREE.SphereGeometry(0.1, 8, 8);
         const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const bulletMesh = new THREE.Mesh(geometry, material);
@@ -173,16 +166,16 @@
     }
     window.shootBullet = shootBullet; // para controles externos
     
-    /* ─── CONTROLES DE TECLADO ───────────────────────────── */
+    /***** EVENTOS DE TECLADO *****/
     window.addEventListener('keydown', e => {
       keys[e.key] = true;
       if (e.code === "Space") shootBullet();
     });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
     
-    /* ─── ACTUALIZACIÓN DEL ESTADO DEL JUEGO ───────────────────────────── */
+    /***** ACTUALIZACIÓN DEL ESTADO DEL JUEGO *****/
     function update() {
-      // Movimiento del jugador (se valida el mapa para colisiones)
+      // Movimiento del jugador
       if (keys["ArrowUp"] || keys["w"]) {
         let newX = posX + Math.cos(angle) * moveSpeed;
         let newY = posY + Math.sin(angle) * moveSpeed;
@@ -202,18 +195,17 @@
       if (keys["ArrowLeft"] || keys["a"]) angle -= rotSpeed;
       if (keys["ArrowRight"] || keys["d"]) angle += rotSpeed;
       
-      // Actualizar la cámara para que siga al jugador.
+      // Actualizar posición de la cámara (se coloca en la posición del jugador)
       camera.position.set(posX, playerHeight, posY);
-      // Ajustamos la dirección de la cámara (rotación en Y negativa para que coincida con el ángulo)
       camera.rotation.y = -angle;
       
-      // Actualización de las balas
+      // Actualizar balas
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += Math.cos(b.angle) * bulletSpeed;
         b.y += Math.sin(b.angle) * bulletSpeed;
         b.mesh.position.set(b.x, 0.5, b.y);
-        // Si la bala impacta en una pared, se elimina
+        // Si la bala choca con una pared, se elimina
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
           scene.remove(b.mesh);
           bullets.splice(i, 1);
@@ -242,7 +234,7 @@
           let dy = posY - enemy.y;
           let dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0.5) {
-            let newX = enemy.x + (dx / dist) * 0.02;  // enemySpeed = 0.02
+            let newX = enemy.x + (dx / dist) * 0.02;
             let newY = enemy.y + (dy / dist) * 0.02;
             if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
               enemy.x = newX;
@@ -256,10 +248,10 @@
       // Se exponen globalmente para el minimapa
       window.posX = posX;
       window.posY = posY;
-      window.playerLife = 100; // Valor de vida (dummy)
+      window.playerLife = 100; // Valor fijo (dummy)
     }
     
-    /* ─── BUCLE DEL JUEGO ───────────────────────────── */
+    /***** BUCLE DEL JUEGO *****/
     function gameLoop() {
       update();
       renderer.render(scene, camera);
@@ -267,7 +259,7 @@
     }
     gameLoop();
     
-    // Ajuste del renderer y cámara al cambiar el tamaño de la ventana
+    // Adaptación al redimensionar la ventana
     window.addEventListener('resize', () => {
       const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
       renderer.setSize(newSize, newSize);
