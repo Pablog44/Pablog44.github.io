@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // ─── CREAR O RECUPERAR EL FOOTER ───
+  // ─── CREAR (o recuperar) el FOOTER ───
   let footer = document.getElementById("gameFooter");
   if (!footer) {
     footer = document.createElement("footer");
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.appendChild(footer);
   }
 
-  // ─── CONTENEDOR PARA EL D-PAD (IZQUIERDA) ───
+  // ─── CONTENEDOR PARA LA CRUZ DIRECCIONAL (D-PAD) – IZQUIERDA ───
   const dpadContainer = document.createElement("div");
   dpadContainer.style.flex = "0 0 auto";
   dpadContainer.style.display = "flex";
@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", function () {
   minimapContainer.appendChild(minimapCanvas);
   const minimapCtx = minimapCanvas.getContext("2d");
   
-  // ─── CONTENEDOR PARA EL BOTÓN DE DISPARO (DERECHA) ───
+  // ─── CONTENEDOR PARA EL BOTÓN DE DISPARO – DERECHA ───
   const shootContainer = document.createElement("div");
   shootContainer.style.flex = "0 0 auto";
   shootContainer.style.display = "flex";
@@ -99,19 +99,19 @@ document.addEventListener("DOMContentLoaded", function () {
   
   // ─── ASOCIAR EVENTOS A LOS BOTONES ───
   function addButtonEvents(button, key) {
-    button.addEventListener("touchstart", function(e) {
+    button.addEventListener("touchstart", function (e) {
       e.preventDefault();
       window.keys[key] = true;
     });
-    button.addEventListener("touchend", function(e) {
+    button.addEventListener("touchend", function (e) {
       e.preventDefault();
       window.keys[key] = false;
     });
-    button.addEventListener("mousedown", function(e) {
+    button.addEventListener("mousedown", function (e) {
       e.preventDefault();
       window.keys[key] = true;
     });
-    button.addEventListener("mouseup", function(e) {
+    button.addEventListener("mouseup", function (e) {
       e.preventDefault();
       window.keys[key] = false;
     });
@@ -121,25 +121,25 @@ document.addEventListener("DOMContentLoaded", function () {
   addButtonEvents(btnDown, "ArrowDown");
   addButtonEvents(btnRight, "ArrowRight");
   
-  shootBtn.addEventListener("touchstart", function(e) {
+  shootBtn.addEventListener("touchstart", function (e) {
     e.preventDefault();
     if (typeof shootBullet === "function") shootBullet();
   });
-  shootBtn.addEventListener("mousedown", function(e) {
+  shootBtn.addEventListener("mousedown", function (e) {
     e.preventDefault();
     if (typeof shootBullet === "function") shootBullet();
   });
   
   // ─── DIBUJO DEL MINIMAPA ───
   // Se asume que las variables globales "map", "posX", "posY" y "enemies" existen
-  const MAP_WIDTH = window.map ? window.map[0].length : 15;
-  const MAP_HEIGHT = window.map ? window.map.length : 15;
-  const cellSize = minimapCanvas.width / MAP_WIDTH;
+  const MAP_WIDTH_val = window.map ? window.map[0].length : 15;
+  const MAP_HEIGHT_val = window.map ? window.map.length : 15;
+  const cellSize = minimapCanvas.width / MAP_WIDTH_val;
   function drawMinimap() {
     minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
-    // Dibuja el mapa: paredes en gris oscuro y suelos en gris claro
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      for (let x = 0; x < MAP_WIDTH; x++) {
+    // Dibuja el mapa: paredes (1) en gris oscuro, suelos (0) en gris claro
+    for (let y = 0; y < MAP_HEIGHT_val; y++) {
+      for (let x = 0; x < MAP_WIDTH_val; x++) {
         minimapCtx.fillStyle = (window.map && window.map[y][x] === 1) ? "#555" : "#ccc";
         minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
       }
@@ -158,7 +158,7 @@ document.addEventListener("DOMContentLoaded", function () {
         minimapCtx.fill();
       }
     });
-    // Dibuja la vida del jugador (usa window.playerLife o 100 por defecto)
+    // Dibuja la vida del jugador
     let playerLife = window.playerLife || 100;
     minimapCtx.fillStyle = "white";
     minimapCtx.font = "16px sans-serif";

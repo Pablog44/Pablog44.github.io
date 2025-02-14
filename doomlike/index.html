@@ -18,24 +18,15 @@
       margin: 0 auto;
       background: #000;
     }
-    /* HUD del arma como imagen superpuesta */
-    #weaponHUD {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      pointer-events: none;
-      max-width: 50%;
-    }
   </style>
 </head>
 <body>
   <!-- Canvas para Three.js -->
   <canvas id="gameCanvas"></canvas>
-  <!-- Imagen del arma (HUD) -->
-  <img id="weaponHUD" src="weapon.png" alt="Weapon HUD">
-
-  <!-- Three.js desde CDN: debe cargarse antes del script principal -->
+  <!-- El arma (HUD) se mostrará mediante un elemento de imagen -->
+  <img id="weaponHUD" src="weapon.png" alt="Weapon HUD" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);pointer-events:none;max-width:50%;">
+  
+  <!-- Three.js se carga desde CDN (¡debe cargarse antes de nuestro código!) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
   
   <!-- Script principal del juego -->
@@ -47,24 +38,22 @@
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     
-    // Renderer que utiliza nuestro canvas existente
+    // Creamos el renderer usando el canvas existente
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvasSize, canvasSize);
+    renderer.setClearColor(0x000000);
     
-    // Escena y cámara
+    // Creamos la escena y la cámara
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, canvasSize / canvasSize, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(75, canvasSize/canvasSize, 0.1, 1000);
+    
+    // Variables del jugador
+    let posX = 7.5, posY = 3.5; // Coordenadas en el mapa (x y z)
+    let angle = 0;            // Ángulo en radianes
     const playerHeight = 0.5;
-    
-    // Estado del jugador
-    let posX = 7.5, posY = 3.5;  // Posición en el mapa (X y Z)
-    let angle = 0;             // Ángulo en radianes
-    const moveSpeed = 0.2;
-    const rotSpeed  = 0.2;
-    
-    // Objeto de controles (teclado y botones) y se expone globalmente
+    const moveSpeed = 0.2, rotSpeed = 0.2;
     const keys = {};
-    window.keys = keys;
+    window.keys = keys; // para el minimapa y controles externos
     
     /***** CARGA DE TEXTURAS *****/
     const loader = new THREE.TextureLoader();
@@ -73,7 +62,7 @@
     const floorTexture   = loader.load('floor.png');
     const ceilingTexture = loader.load('ceiling.png');
     const enemyTexture   = loader.load('enemy.png');
-    // weapon.png se usa en el HUD (el elemento <img>)
+    // weapon.png se usa en el HUD (elemento <img>)
     
     /***** DEFINICIÓN DEL MAPA (15x15) *****/
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
@@ -85,22 +74,22 @@
       }
       map.push(row);
     }
-    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
+    // Barra horizontal: filas 1 a 4, columnas 3 a 11 = 0 (camino libre)
     for (let y = 1; y <= 4; y++) {
       for (let x = 3; x <= 11; x++) {
         map[y][x] = 0;
       }
     }
-    // Barra vertical (filas 4 a 13, columnas 6 a 8)
+    // Barra vertical: filas 4 a 13, columnas 6 a 8 = 0
     for (let y = 4; y <= 13; y++) {
       for (let x = 6; x <= 8; x++) {
         map[y][x] = 0;
       }
     }
-    window.map = map; // para que minimap.js acceda al mapa
+    window.map = map; // para que el minimapa acceda al mapa
     
     /***** CREACIÓN DEL ESCENARIO 3D *****/
-    // Suelo: plano con textura del piso
+    // Suelo: plano texturizado
     const floorGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -108,7 +97,7 @@
     floorMesh.position.set(MAP_WIDTH / 2, 0, MAP_HEIGHT / 2);
     scene.add(floorMesh);
     
-    // Techo: plano con textura del techo, posicionado en altura 1
+    // Techo: plano texturizado, a altura 1
     const ceilingGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
@@ -116,7 +105,7 @@
     ceilingMesh.position.set(MAP_WIDTH / 2, 1, MAP_HEIGHT / 2);
     scene.add(ceilingMesh);
     
-    // Paredes: se recorren las celdas del mapa y se coloca un cubo donde haya "1"
+    // Paredes: se coloca un cubo en cada celda del mapa con valor 1
     const wallGroup = new THREE.Group();
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
     const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
@@ -124,6 +113,7 @@
       for (let x = 0; x < MAP_WIDTH; x++) {
         if (map[y][x] === 1) {
           const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+          // Centramos el cubo en la celda (x+0.5, 0.5, y+0.5)
           wall.position.set(x + 0.5, 0.5, y + 0.5);
           wallGroup.add(wall);
         }
@@ -145,7 +135,7 @@
       scene.add(sprite);
       enemy.sprite = sprite;
     });
-    window.enemies = enemiesData; // para el minimapa
+    window.enemies = enemiesData;
     
     /***** SISTEMA DE DISPAROS *****/
     const bullets = [];
@@ -155,6 +145,7 @@
     function shootBullet() {
       const currentTime = Date.now();
       if (currentTime - lastShotTime > shootCooldown) {
+        // Se crea una bala como una esfera pequeña amarilla
         const geometry = new THREE.SphereGeometry(0.1, 8, 8);
         const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const bulletMesh = new THREE.Mesh(geometry, material);
@@ -164,7 +155,7 @@
         lastShotTime = currentTime;
       }
     }
-    window.shootBullet = shootBullet; // para controles externos
+    window.shootBullet = shootBullet;
     
     /***** EVENTOS DE TECLADO *****/
     window.addEventListener('keydown', e => {
@@ -195,17 +186,18 @@
       if (keys["ArrowLeft"] || keys["a"]) angle -= rotSpeed;
       if (keys["ArrowRight"] || keys["d"]) angle += rotSpeed;
       
-      // Actualizar posición de la cámara (se coloca en la posición del jugador)
+      // Actualizar posición y orientación de la cámara
       camera.position.set(posX, playerHeight, posY);
-      camera.rotation.y = -angle;
+      const lookTarget = new THREE.Vector3(posX + Math.cos(angle), playerHeight, posY + Math.sin(angle));
+      camera.lookAt(lookTarget);
       
-      // Actualizar balas
+      // Actualizar las balas
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += Math.cos(b.angle) * bulletSpeed;
         b.y += Math.sin(b.angle) * bulletSpeed;
         b.mesh.position.set(b.x, 0.5, b.y);
-        // Si la bala choca con una pared, se elimina
+        // Si la bala impacta en una pared, se elimina
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
           scene.remove(b.mesh);
           bullets.splice(i, 1);
@@ -245,10 +237,10 @@
         }
       });
       
-      // Se exponen globalmente para el minimapa
+      // Exponer variables para el minimapa
       window.posX = posX;
       window.posY = posY;
-      window.playerLife = 100; // Valor fijo (dummy)
+      window.playerLife = 100; // valor fijo (dummy)
     }
     
     /***** BUCLE DEL JUEGO *****/
@@ -259,7 +251,7 @@
     }
     gameLoop();
     
-    // Adaptación al redimensionar la ventana
+    // Ajustar renderer y cámara al redimensionar la ventana
     window.addEventListener('resize', () => {
       const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
       renderer.setSize(newSize, newSize);
