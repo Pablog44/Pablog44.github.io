@@ -39,19 +39,27 @@
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvasSize, canvasSize);
     
-    // Creamos la escena y la cámara
+    // Escena y cámara
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, canvasSize / canvasSize, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      canvasSize / canvasSize,
+      0.1,
+      1000
+    );
     
-    // Variables del jugador (posX, posY en el mapa, angle para la dirección)
-    let posX = 7.5, posY = 3.5;
-    let angle = 0;
+    // Variables de posición y ángulo del jugador
+    let posX = 7.5, posY = 3.5; // en el "plano" del mapa (x,y)
+    let angle = 0;              // en radianes
+    
+    // Velocidades
     const moveSpeed = 0.2;
-    const rotSpeed = 0.2;
+    const rotSpeed  = 0.2;
     
     // Posición inicial de la cámara
+    // Angle = 0 → mirando hacia el eje -Z en Three.js
     camera.position.set(posX, 0.5, posY);
-    camera.rotation.y = -angle;
+    camera.rotation.y = angle; // si angle=0, mira -Z
     
     // Exponemos variables para minimap.js
     window.posX = posX;
@@ -63,7 +71,11 @@
     const floorTexture   = textureLoader.load('floor.png');
     const ceilingTexture = textureLoader.load('ceiling.png');
     const enemyTexture   = textureLoader.load('enemy.png');
-    // weapon.png se usa en el HUD (no se muestra en Three.js, sino en 2D overlay)
+    // weapon.png se usa sólo en 2D (HUD), no en Three.js
+    
+    // Repetición de texturas en suelo y techo (1 imagen por celda)
+    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+    ceilingTexture.wrapS = ceilingTexture.wrapT = THREE.RepeatWrapping;
     
     /***** DEFINICIÓN DEL MAPA (15x15) *****/
     const MAP_WIDTH = 15, MAP_HEIGHT = 15;
@@ -90,6 +102,11 @@
     window.map = map; // para minimap.js
     
     /***** CREACIÓN DEL ESCENARIO 3D *****/
+    // Suelo y Techo ocupan toda el área 15×15
+    // Se configuran repeticiones en base al tamaño del mapa
+    floorTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
+    ceilingTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
+    
     // Suelo
     const floorGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_HEIGHT);
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
@@ -103,10 +120,11 @@
     const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceilingMesh.rotation.x = Math.PI / 2;
+    // Lo situamos a "altura" 1 (techo de 1 metro de alto)
     ceilingMesh.position.set(MAP_WIDTH / 2, 1, MAP_HEIGHT / 2);
     scene.add(ceilingMesh);
     
-    // Paredes (cada celda del mapa con valor 1 tendrá un cubo)
+    // Paredes: para cada celda con valor 1, creamos un cubo 1×1×1
     const wallGroup = new THREE.Group();
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
     const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
@@ -127,8 +145,7 @@
       { x: 7.5,  y: 10.5, alive: true },
       { x: 10.5, y: 4.5,  alive: true }
     ];
-    window.enemies = enemies; // para minimap.js
-    
+    window.enemies = enemies;
     enemies.forEach(enemy => {
       const spriteMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
       const sprite = new THREE.Sprite(spriteMaterial);
@@ -156,54 +173,66 @@
         lastShotTime = currentTime;
       }
     }
-    window.shootBullet = shootBullet; // exponer para minimap.js si fuera necesario
+    window.shootBullet = shootBullet; // acceso desde minimap.js si hace falta
     
     /***** CONTROLES (TECLADO) *****/
     const keys = {};
-    window.keys = keys; // para minimap.js
+    window.keys = keys;
     window.addEventListener('keydown', e => {
       keys[e.key] = true;
-      // Disparo con la barra espaciadora
       if (e.code === "Space") shootBullet();
     });
     window.addEventListener('keyup', e => {
       keys[e.key] = false;
     });
     
-    /***** ACTUALIZACIÓN DEL ESTADO *****/
+    /***** ACTUALIZACIÓN DEL ESTADO: Movimiento y Lógica *****/
     function update() {
-      // Movimiento del jugador (colisión con paredes)
+      // El ángulo 0 hace que miremos -Z en Three.js, 
+      // por lo que definimos el "forward" en 2D como:
+      //   forwardX =  Math.sin(angle)
+      //   forwardY = -Math.cos(angle)
+      // Esto hace que al pulsar "arriba" se avance en la dirección de la cámara
+      
+      let forwardX = Math.sin(angle);
+      let forwardY = -Math.cos(angle);
+      
       if (keys["ArrowUp"] || keys["w"]) {
-        let newX = posX + Math.cos(angle) * moveSpeed;
-        let newY = posY + Math.sin(angle) * moveSpeed;
-        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        const newX = posX + forwardX * moveSpeed;
+        const newY = posY + forwardY * moveSpeed;
+        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
       }
       if (keys["ArrowDown"] || keys["s"]) {
-        let newX = posX - Math.cos(angle) * moveSpeed;
-        let newY = posY - Math.sin(angle) * moveSpeed;
-        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        const newX = posX - forwardX * moveSpeed;
+        const newY = posY - forwardY * moveSpeed;
+        if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
           posX = newX;
           posY = newY;
         }
       }
-      if (keys["ArrowLeft"] || keys["a"]) angle -= rotSpeed;
-      if (keys["ArrowRight"] || keys["d"]) angle += rotSpeed;
+      if (keys["ArrowLeft"] || keys["a"]) {
+        angle -= rotSpeed;
+      }
+      if (keys["ArrowRight"] || keys["d"]) {
+        angle += rotSpeed;
+      }
       
-      // Actualizar cámara
+      // Actualizar cámara (en 3D, el "y" de la rotación es el giro horizontal)
       camera.position.set(posX, 0.5, posY);
-      camera.rotation.y = -angle;
+      camera.rotation.y = angle; // si angle=0 → mira -Z
       
       // Actualizar balas
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
-        b.x += Math.cos(b.angle) * bulletSpeed;
-        b.y += Math.sin(b.angle) * bulletSpeed;
+        // Mismo vector forward
+        b.x += Math.sin(b.angle) * bulletSpeed;
+        b.y -= Math.cos(b.angle) * bulletSpeed;
         b.mesh.position.set(b.x, 0.5, b.y);
         
-        // Si la bala choca con una pared
+        // Colisión con paredes
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
           scene.remove(b.mesh);
           bullets.splice(i, 1);
@@ -225,16 +254,17 @@
         }
       }
       
-      // Movimiento de enemigos (los que estén vivos, persiguen al jugador)
+      // Movimiento de enemigos (persiguen al jugador)
       enemies.forEach(enemy => {
         if (enemy.alive) {
           let dx = posX - enemy.x;
           let dy = posY - enemy.y;
           let dist = Math.sqrt(dx*dx + dy*dy);
           if (dist > 0.5) {
-            let newX = enemy.x + (dx / dist) * 0.02;
-            let newY = enemy.y + (dy / dist) * 0.02;
-            if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+            let speed = 0.02;
+            let newX = enemy.x + (dx / dist) * speed;
+            let newY = enemy.y + (dy / dist) * speed;
+            if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
               enemy.x = newX;
               enemy.y = newY;
               enemy.sprite.position.set(newX, 0.5, newY);
@@ -243,13 +273,13 @@
         }
       });
       
-      // Exponer para minimap
+      // Exponer para el minimapa
       window.posX = posX;
       window.posY = posY;
-      window.playerLife = 100; // valor estático de ejemplo
+      window.playerLife = 100; // valor fijo de ejemplo
     }
     
-    /***** BUCLE DEL JUEGO *****/
+    /***** BUCLE DEL JUEGO (render + update) *****/
     function gameLoop() {
       update();
       renderer.render(scene, camera);
@@ -257,7 +287,7 @@
     }
     gameLoop();
     
-    // Adaptar tamaño al redimensionar
+    // Ajuste de tamaño al redimensionar
     window.addEventListener('resize', () => {
       const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
       renderer.setSize(newSize, newSize);

@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.appendChild(footer);
   }
 
-  // D-pad (izquierda)
+  // ─── D-PAD (IZQUIERDA) ───
   const dpadContainer = document.createElement("div");
   dpadContainer.style.flex = "0 0 auto";
   dpadContainer.style.display = "flex";
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
   dpad.appendChild(btnRight);
   dpadContainer.appendChild(dpad);
 
-  // Minimap (centro)
+  // ─── MINIMAPA (CENTRO) ───
   const minimapContainer = document.createElement("div");
   minimapContainer.style.flex = "0 0 auto";
   minimapContainer.style.display = "flex";
@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
   minimapContainer.appendChild(minimapCanvas);
   const minimapCtx = minimapCanvas.getContext("2d");
 
-  // Botón disparar (derecha)
+  // ─── BOTÓN DE DISPARO (DERECHA) ───
   const shootContainer = document.createElement("div");
   shootContainer.style.flex = "0 0 auto";
   shootContainer.style.display = "flex";
@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", function () {
   footer.appendChild(minimapContainer);
   footer.appendChild(shootContainer);
 
-  // Eventos de botones (D-pad y disparar)
+  // ─── EVENTOS DE LOS BOTONES ───
   function addButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
       e.preventDefault();
@@ -116,7 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof shootBullet === "function") shootBullet();
   });
 
-  // Variables mapa
+  // ─── DIBUJAR MINIMAPA ───
   const MAP_WIDTH = (window.map && window.map[0]) ? window.map[0].length : 15;
   const MAP_HEIGHT = window.map ? window.map.length : 15;
   const cellSize = minimapCanvas.width / MAP_WIDTH;
@@ -136,7 +136,13 @@ document.addEventListener("DOMContentLoaded", function () {
     // Jugador en azul
     minimapCtx.fillStyle = "blue";
     minimapCtx.beginPath();
-    minimapCtx.arc((window.posX || 0) * cellSize, (window.posY || 0) * cellSize, cellSize / 3, 0, Math.PI * 2);
+    minimapCtx.arc(
+      (window.posX || 0) * cellSize,
+      (window.posY || 0) * cellSize,
+      cellSize / 3,
+      0,
+      Math.PI * 2
+    );
     minimapCtx.fill();
 
     // Enemigos (rojo)
