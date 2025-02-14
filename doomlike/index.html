@@ -41,27 +41,22 @@
     
     // Escena y cámara
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      canvasSize / canvasSize,
-      0.1,
-      1000
-    );
+    // Nota: La relación de aspecto se define para un canvas cuadrado
+    const camera = new THREE.PerspectiveCamera(75, canvasSize / canvasSize, 0.1, 1000);
     
-    // Variables de posición y ángulo del jugador
-    let posX = 7.5, posY = 3.5; // en el "plano" del mapa (x,y)
-    let angle = 0;              // en radianes
-    
-    // Velocidades
+    // Variables del jugador: posX y posY representan la posición en el mapa (plano 2D),
+    // y "angle" es el ángulo de rotación. Con angle = 0, la cámara mira hacia -Z.
+    let posX = 7.5, posY = 3.5;
+    let angle = 0;
     const moveSpeed = 0.2;
     const rotSpeed  = 0.2;
     
-    // Posición inicial de la cámara
-    // Angle = 0 → mirando hacia el eje -Z en Three.js
+    // Posición inicial de la cámara (y = 0.5 para simular la altura del ojo)
     camera.position.set(posX, 0.5, posY);
-    camera.rotation.y = angle; // si angle=0, mira -Z
+    // Con angle = 0, queremos que la cámara mire hacia -Z (por eso usamos rotation.y = angle)
+    camera.rotation.y = angle;
     
-    // Exponemos variables para minimap.js
+    // Exponemos variables para el minimapa (minimap.js)
     window.posX = posX;
     window.posY = posY;
     
@@ -71,9 +66,9 @@
     const floorTexture   = textureLoader.load('floor.png');
     const ceilingTexture = textureLoader.load('ceiling.png');
     const enemyTexture   = textureLoader.load('enemy.png');
-    // weapon.png se usa sólo en 2D (HUD), no en Three.js
+    // Nota: weapon.png se usará en el HUD (por ejemplo, como overlay en 2D)
     
-    // Repetición de texturas en suelo y techo (1 imagen por celda)
+    // Configuramos que las texturas de suelo y techo se repitan:
     floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
     ceilingTexture.wrapS = ceilingTexture.wrapT = THREE.RepeatWrapping;
     
@@ -87,23 +82,22 @@
       }
       map.push(row);
     }
-    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
+    // Se define una barra horizontal en filas 1 a 4 y columnas 3 a 11:
     for (let y = 1; y <= 4; y++) {
       for (let x = 3; x <= 11; x++) {
         map[y][x] = 0;
       }
     }
-    // Barra vertical (filas 4 a 13, columnas 6 a 8)
+    // Se define una barra vertical en filas 4 a 13 y columnas 6 a 8:
     for (let y = 4; y <= 13; y++) {
       for (let x = 6; x <= 8; x++) {
         map[y][x] = 0;
       }
     }
-    window.map = map; // para minimap.js
+    window.map = map; // para acceso en minimap.js
     
     /***** CREACIÓN DEL ESCENARIO 3D *****/
-    // Suelo y Techo ocupan toda el área 15×15
-    // Se configuran repeticiones en base al tamaño del mapa
+    // Configuramos la repetición de la textura para que se muestre una imagen completa por celda:
     floorTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
     ceilingTexture.repeat.set(MAP_WIDTH, MAP_HEIGHT);
     
@@ -120,11 +114,11 @@
     const ceilingMaterial = new THREE.MeshBasicMaterial({ map: ceilingTexture });
     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceilingMesh.rotation.x = Math.PI / 2;
-    // Lo situamos a "altura" 1 (techo de 1 metro de alto)
+    // Colocamos el techo a altura 1 (simulando 1 metro)
     ceilingMesh.position.set(MAP_WIDTH / 2, 1, MAP_HEIGHT / 2);
     scene.add(ceilingMesh);
     
-    // Paredes: para cada celda con valor 1, creamos un cubo 1×1×1
+    // Paredes: por cada celda del mapa con valor 1 se crea un cubo 1×1×1
     const wallGroup = new THREE.Group();
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
     const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
@@ -132,6 +126,7 @@
       for (let x = 0; x < MAP_WIDTH; x++) {
         if (map[y][x] === 1) {
           const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+          // Se centra el cubo en la celda: (x+0.5, 0.5, y+0.5)
           wall.position.set(x + 0.5, 0.5, y + 0.5);
           wallGroup.add(wall);
         }
@@ -173,7 +168,7 @@
         lastShotTime = currentTime;
       }
     }
-    window.shootBullet = shootBullet; // acceso desde minimap.js si hace falta
+    window.shootBullet = shootBullet; // para accesos externos
     
     /***** CONTROLES (TECLADO) *****/
     const keys = {};
@@ -186,16 +181,14 @@
       keys[e.key] = false;
     });
     
-    /***** ACTUALIZACIÓN DEL ESTADO: Movimiento y Lógica *****/
+    /***** ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) *****/
     function update() {
-      // El ángulo 0 hace que miremos -Z en Three.js, 
-      // por lo que definimos el "forward" en 2D como:
-      //   forwardX =  Math.sin(angle)
-      //   forwardY = -Math.cos(angle)
-      // Esto hace que al pulsar "arriba" se avance en la dirección de la cámara
-      
-      let forwardX = Math.sin(angle);
-      let forwardY = -Math.cos(angle);
+      // Definimos el vector "forward" en base al ángulo actual:
+      // Con angle = 0 la cámara mira -Z, por lo que:
+      // forwardX = sin(angle)
+      // forwardY = -cos(angle)
+      const forwardX = Math.sin(angle);
+      const forwardY = -Math.cos(angle);
       
       if (keys["ArrowUp"] || keys["w"]) {
         const newX = posX + forwardX * moveSpeed;
@@ -220,19 +213,19 @@
         angle += rotSpeed;
       }
       
-      // Actualizar cámara (en 3D, el "y" de la rotación es el giro horizontal)
+      // Actualizamos la posición y orientación de la cámara
       camera.position.set(posX, 0.5, posY);
-      camera.rotation.y = angle; // si angle=0 → mira -Z
+      camera.rotation.y = angle;
       
       // Actualizar balas
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
-        // Mismo vector forward
+        // Utilizamos el mismo vector forward para la bala
         b.x += Math.sin(b.angle) * bulletSpeed;
         b.y -= Math.cos(b.angle) * bulletSpeed;
         b.mesh.position.set(b.x, 0.5, b.y);
         
-        // Colisión con paredes
+        // Si la bala choca con una pared
         if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
           scene.remove(b.mesh);
           bullets.splice(i, 1);
@@ -243,7 +236,7 @@
           if (enemy.alive) {
             let dx = enemy.x - b.x;
             let dy = enemy.y - b.y;
-            if (Math.sqrt(dx*dx + dy*dy) < 0.3) {
+            if (Math.sqrt(dx * dx + dy * dy) < 0.3) {
               enemy.alive = false;
               scene.remove(enemy.sprite);
               scene.remove(b.mesh);
@@ -254,14 +247,14 @@
         }
       }
       
-      // Movimiento de enemigos (persiguen al jugador)
+      // Movimiento de enemigos: persiguen al jugador
       enemies.forEach(enemy => {
         if (enemy.alive) {
           let dx = posX - enemy.x;
           let dy = posY - enemy.y;
-          let dist = Math.sqrt(dx*dx + dy*dy);
+          let dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0.5) {
-            let speed = 0.02;
+            const speed = 0.02;
             let newX = enemy.x + (dx / dist) * speed;
             let newY = enemy.y + (dy / dist) * speed;
             if (map[Math.floor(newY)] && map[Math.floor(newY)][Math.floor(newX)] === 0) {
@@ -273,13 +266,13 @@
         }
       });
       
-      // Exponer para el minimapa
+      // Exponemos la posición actual para el minimapa
       window.posX = posX;
       window.posY = posY;
-      window.playerLife = 100; // valor fijo de ejemplo
+      window.playerLife = 100; // Valor fijo de ejemplo
     }
     
-    /***** BUCLE DEL JUEGO (render + update) *****/
+    /***** BUCLE DEL JUEGO *****/
     function gameLoop() {
       update();
       renderer.render(scene, camera);
@@ -287,7 +280,7 @@
     }
     gameLoop();
     
-    // Ajuste de tamaño al redimensionar
+    // Ajuste de tamaño al redimensionar la ventana
     window.addEventListener('resize', () => {
       const newSize = Math.min(window.innerWidth, window.innerHeight * 0.85);
       renderer.setSize(newSize, newSize);
