@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // Creamos (o recuperamos) el footer y lo estilizamos como contenedor flex horizontal.
+  // ─── CREACIÓN DEL FOOTER Y CONTENEDORES ─────────────────────────────
   let footer = document.getElementById("gameFooter");
   if (!footer) {
     footer = document.createElement("footer");
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.appendChild(footer);
   }
 
-  // ─── CONTENEDOR PARA LA CRUZ DIRECCIONAL (D-pad) – IZQUIERDA ───
+  // Contenedor para la cruz direccional (D-pad) – IZQUIERDA
   const dpadContainer = document.createElement("div");
   dpadContainer.style.flex = "0 0 auto";
   dpadContainer.style.display = "flex";
@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
   dpad.style.width = dpadSize + "px";
   dpad.style.height = dpadSize + "px";
   dpad.style.gap = "2px";
+  
   // Se crean los botones de dirección
   const btnUp = document.createElement("button");
   btnUp.id = "btn-up";
@@ -53,17 +54,19 @@ document.addEventListener("DOMContentLoaded", function () {
   btnRight.innerHTML = "▶";
   btnRight.style.gridColumn = "3 / 4";
   btnRight.style.gridRow = "2 / 3";
+  
   [btnUp, btnLeft, btnDown, btnRight].forEach(btn => {
     btn.style.fontSize = "1rem";
     btn.style.cursor = "pointer";
   });
+  
   dpad.appendChild(btnUp);
   dpad.appendChild(btnLeft);
   dpad.appendChild(btnDown);
   dpad.appendChild(btnRight);
   dpadContainer.appendChild(dpad);
-
-  // ─── CONTENEDOR CENTRAL PARA EL MINIMAPA ───
+  
+  // Contenedor central para el minimapa
   const minimapContainer = document.createElement("div");
   minimapContainer.style.flex = "0 0 auto";
   minimapContainer.style.display = "flex";
@@ -76,8 +79,8 @@ document.addEventListener("DOMContentLoaded", function () {
   minimapCanvas.style.background = "#000";
   minimapContainer.appendChild(minimapCanvas);
   const minimapCtx = minimapCanvas.getContext("2d");
-
-  // ─── CONTENEDOR PARA EL BOTÓN DE DISPARO – DERECHA ───
+  
+  // Contenedor para el botón de disparo – DERECHA
   const shootContainer = document.createElement("div");
   shootContainer.style.flex = "0 0 auto";
   shootContainer.style.display = "flex";
@@ -91,12 +94,12 @@ document.addEventListener("DOMContentLoaded", function () {
   shootBtn.style.fontSize = "1rem";
   shootBtn.style.cursor = "pointer";
   shootContainer.appendChild(shootBtn);
-
-  // Se agrega al footer en el siguiente orden: D-pad (izquierda), minimapa (centro), botón de disparo (derecha)
+  
+  // Se agrega al footer en el orden: D-pad (izquierda), minimapa (centro), botón de disparo (derecha)
   footer.appendChild(dpadContainer);
   footer.appendChild(minimapContainer);
   footer.appendChild(shootContainer);
-
+  
   // ─── Funciones de eventos para controles táctiles y de mouse ───
   function addButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
@@ -107,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
       e.preventDefault();
       window.keys[key] = false;
     });
-    // Soporte para mouse (pruebas en escritorio)
+    // Soporte para mouse
     button.addEventListener("mousedown", function(e) {
       e.preventDefault();
       window.keys[key] = true;
@@ -121,6 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
   addButtonEvents(btnLeft, "ArrowLeft");
   addButtonEvents(btnDown, "ArrowDown");
   addButtonEvents(btnRight, "ArrowRight");
+  
   shootBtn.addEventListener("touchstart", function(e) {
     e.preventDefault();
     if (typeof shootBullet === "function") shootBullet();
@@ -129,9 +133,9 @@ document.addEventListener("DOMContentLoaded", function () {
     e.preventDefault();
     if (typeof shootBullet === "function") shootBullet();
   });
-
+  
   // ─── DIBUJO DEL MINIMAPA ───
-  // Se asume que las variables globales "map", "posX", "posY" y "enemies" ya están definidas en el juego.
+  // Se asume que las variables globales "map", "posX", "posY" y "enemies" están definidas en el juego.
   const MAP_WIDTH = map[0].length;
   const MAP_HEIGHT = map.length;
   const cellSize = minimapCanvas.width / MAP_WIDTH;
@@ -147,11 +151,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // Dibuja al jugador en azul
     minimapCtx.fillStyle = "blue";
     minimapCtx.beginPath();
-    minimapCtx.arc(posX * cellSize, posY * cellSize, cellSize / 3, 0, Math.PI * 2);
+    minimapCtx.arc(window.posX * cellSize, window.posY * cellSize, cellSize / 3, 0, Math.PI * 2);
     minimapCtx.fill();
     // Dibuja a cada enemigo (si están vivos) en rojo
     minimapCtx.fillStyle = "red";
-    for (let enemy of enemies) {
+    for (let enemy of window.enemies || []) {
       if (enemy.alive) {
         minimapCtx.beginPath();
         minimapCtx.arc(enemy.x * cellSize, enemy.y * cellSize, cellSize / 3, 0, Math.PI * 2);
