@@ -117,6 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // ─── DIBUJAR MINIMAPA ───
+  // Dibujamos cada celda con su color y además dibujamos una cuadrícula para resaltar las paredes.
   const MAP_WIDTH = (window.map && window.map[0]) ? window.map[0].length : 15;
   const MAP_HEIGHT = window.map ? window.map.length : 15;
   const cellSize = minimapCanvas.width / MAP_WIDTH;
@@ -124,16 +125,19 @@ document.addEventListener("DOMContentLoaded", function () {
   function drawMinimap() {
     minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
 
-    // Dibuja el mapa: paredes = gris oscuro, suelo = gris claro
+    // Dibujar cada celda con borde para resaltar la rejilla
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
         const isWall = (window.map && window.map[y][x] === 1);
         minimapCtx.fillStyle = isWall ? "#555" : "#ccc";
         minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        // Dibuja el borde (en negro)
+        minimapCtx.strokeStyle = "#000";
+        minimapCtx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
       }
     }
 
-    // Jugador en azul
+    // Dibujar el jugador (círculo azul)
     minimapCtx.fillStyle = "blue";
     minimapCtx.beginPath();
     minimapCtx.arc(
@@ -145,7 +149,7 @@ document.addEventListener("DOMContentLoaded", function () {
     );
     minimapCtx.fill();
 
-    // Enemigos en rojo
+    // Dibujar enemigos (círculos rojos)
     minimapCtx.fillStyle = "red";
     (window.enemies || []).forEach(enemy => {
       if (enemy.alive) {
@@ -155,7 +159,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-    // Vida del jugador
+    // Dibujar la "vida" del jugador
     const life = window.playerLife || 100;
     minimapCtx.fillStyle = "white";
     minimapCtx.font = "16px sans-serif";

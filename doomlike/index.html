@@ -59,14 +59,14 @@
     function onTextureLoaded() {
       texturesLoaded++;
       if (texturesLoaded === 5) {
-        // Extrae píxeles de la textura del piso
+        // Extraer píxeles de piso
         const floorCanvas = document.createElement('canvas');
         floorCanvas.width = floorTexture.width;
         floorCanvas.height = floorTexture.height;
         const floorCtx = floorCanvas.getContext('2d');
         floorCtx.drawImage(floorTexture, 0, 0);
         floorData = floorCtx.getImageData(0, 0, floorTexture.width, floorTexture.height).data;
-        // Extrae píxeles de la textura del techo
+        // Extraer píxeles de techo
         const ceilingCanvas = document.createElement('canvas');
         ceilingCanvas.width = ceilingTexture.width;
         ceilingCanvas.height = ceilingTexture.height;
@@ -92,13 +92,13 @@
       }
       map.push(row);
     }
-    // Barra horizontal (filas 1 a 4, columnas 3 a 11)
+    // Barra horizontal: filas 1 a 4, columnas 3 a 11
     for (let y = 1; y <= 4; y++) {
       for (let x = 3; x <= 11; x++) {
         map[y][x] = 0;
       }
     }
-    // Barra vertical (filas 4 a 13, columnas 6 a 8)
+    // Barra vertical: filas 4 a 13, columnas 6 a 8
     for (let y = 4; y <= 13; y++) {
       for (let x = 6; x <= 8; x++) {
         map[y][x] = 0;
@@ -106,8 +106,8 @@
     }
 
     // ─── VARIABLES DEL JUGADOR ───
-    let posX = 7.5, posY = 3.5;  // Posición inicial (dentro del mapa)
-    let angle = 0;             // Ángulo en radianes (0 → mirando hacia -Z en nuestro sistema)
+    let posX = 7.5, posY = 3.5;  // Posición inicial
+    let angle = 0;             // Ángulo en radianes (0 → mirando hacia -Z)
     const fov = Math.PI / 3;   // Campo de visión (60°)
 
     // Velocidades
@@ -148,10 +148,10 @@
     ];
     const enemySpeed = 0.02;
 
-    // Actualización del estado: Movimiento y lógica
+    // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
     function update() {
       // Usamos el mismo vector forward que en el código que funciona:
-      // forwardX = cos(angle), forwardY = sin(angle)
+      // forwardX = cos(angle) y forwardY = sin(angle)
       if (keys["ArrowUp"] || keys["w"]) {
         let newX = posX + Math.cos(angle) * moveSpeed;
         let newY = posY + Math.sin(angle) * moveSpeed;
@@ -179,7 +179,7 @@
       window.posX = posX;
       window.posY = posY;
 
-      // Actualizamos los proyectiles
+      // Actualizamos proyectiles
       for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         // Usamos la misma fórmula que para el movimiento del jugador
@@ -201,7 +201,7 @@
           }
         }
       }
-      // Movimiento simple de enemigos (persiguiendo al jugador)
+      // Movimiento simple de enemigos (persiguen al jugador)
       for (let enemy of enemies) {
         if (enemy.alive) {
           let dx = posX - enemy.x;
