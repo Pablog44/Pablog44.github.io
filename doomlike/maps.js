@@ -40,13 +40,13 @@ function generateFirstMap() {
       mapArray.push(row);
     }
     // Ejemplo de "vaciar" algunas zonas distintas
-    for (let y = 2; y < 10; y++) {
+    for (let y = 2; y <= 10; y++) {
       for (let x = 2; x < 13; x++) {
         mapArray[y][x] = 0;
       }
     }
 
-    for (let y = 10; y <= 14; y++) {
+    for (let y = 10; y <= 13; y++) {
         for (let x = 5; x <= 9; x++) {
           mapArray[y][x] = 0;
         }
