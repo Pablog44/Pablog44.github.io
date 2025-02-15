@@ -45,7 +45,13 @@ function generateFirstMap() {
         mapArray[y][x] = 0;
       }
     }
-    // Podrías añadir más modificaciones para el segundo mapa...
+
+    for (let y = 10; y <= 14; y++) {
+        for (let x = 5; x <= 9; x++) {
+          mapArray[y][x] = 0;
+        }
+      }
+
     return mapArray;
   }
   
