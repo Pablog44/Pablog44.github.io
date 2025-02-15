@@ -1,3 +1,5 @@
+/***** game.js *****/
+
 /***** CONFIGURACIÓN DEL CANVAS Y VARIABLES GLOBALES *****/
 const canvas = document.getElementById('gameCanvas');
 const availableHeight = window.innerHeight * 0.85;
@@ -23,7 +25,6 @@ const ceilingTexture = loadTexture('ceiling.png');
 const weaponTexture  = loadTexture('weapon.png');
 const enemyTexture   = loadTexture('enemy.png');
 
-// Variables para extraer píxeles de piso y techo (para el raycasting)
 let floorData = null, ceilingData = null;
 let texturesLoaded = 0;
 function onTextureLoaded() {
@@ -45,6 +46,8 @@ function onTextureLoaded() {
     ceilingCtx.drawImage(ceilingTexture, 0, 0);
     ceilingData = ceilingCtx.getImageData(0, 0, ceilingTexture.width, ceilingTexture.height).data;
 
+    // **Aquí inicializamos el primer mapa y luego arrancamos el bucle**
+    window.initMap(0);            // <-- Viene de maps.js
     requestAnimationFrame(gameLoop);
   }
 }
@@ -54,37 +57,12 @@ ceilingTexture.onload = onTextureLoaded;
 weaponTexture.onload  = onTextureLoaded;
 enemyTexture.onload   = onTextureLoaded;
 
-// ─── DEFINICIÓN DEL MAPA (15x15) ───
-const MAP_WIDTH = 15, MAP_HEIGHT = 15;
-const map = [];
-for (let y = 0; y < MAP_HEIGHT; y++) {
-  const row = [];
-  for (let x = 0; x < MAP_WIDTH; x++) {
-    row.push(1); // Ponemos 1 (pared) por defecto
-  }
-  map.push(row);
-}
-// "Vaciar" parte del mapa (pasillos) poniendo 0
-// Barra horizontal: filas 1 a 4, columnas 3 a 11
-for (let y = 1; y <= 4; y++) {
-  for (let x = 3; x <= 11; x++) {
-    map[y][x] = 0;
-  }
-}
-// Barra vertical: filas 4 a 13, columnas 6 a 8
-for (let y = 4; y <= 13; y++) {
-  for (let x = 6; x <= 8; x++) {
-    map[y][x] = 0;
-  }
-}
+// ─── VARIABLES DEL JUGADOR (las define maps.js cuando hacemos initMap) ───
+let posX = 0, posY = 0; // Se sobreescriben en initMap()
+let angle = 0;          // Se sobreescribe en initMap()
 
-// Exponemos el mapa en window para que lo use el minimapa
-window.map = map;
-
-// ─── VARIABLES DEL JUGADOR ───
-let posX = 7.5, posY = 3.5; // Posición inicial
-let angle = 0;              // Ángulo en radianes
-const fov = Math.PI / 3;    // Campo de visión (60°)
+// Campo de visión
+const fov = Math.PI / 3;  // 60°
 
 // Velocidades
 const moveSpeed = 0.2;
@@ -92,7 +70,6 @@ const rotSpeed  = 0.2;
 
 // ─── CONTROLES ───
 window.keys = {}; // Objeto global para almacenar pulsaciones
-
 window.addEventListener('keydown', e => {
   window.keys[e.key] = true;
   // Disparo con la barra espaciadora (opcional)
@@ -117,35 +94,26 @@ function shootBullet() {
     lastShotTime = currentTime;
   }
 }
-// Exponemos la función para que otros módulos (footer.js) la llamen
-window.shootBullet = shootBullet;
+window.shootBullet = shootBullet; // exponer para footer.js, etc.
 
-// ─── ENEMIGOS ───
-const enemies = [
-  { x: 5.5,  y: 2.5,  alive: true },
-  { x: 7.5,  y: 10.5, alive: true },
-  { x: 10.5, y: 4.5,  alive: true }
-];
-// Exponemos los enemigos en window para el minimapa
-window.enemies = enemies;
-
+// ─── MOVIMIENTO ENEMIGOS ───
 const enemySpeed = 0.02;
 
 // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
 function update() {
   // Movimiento del jugador
   if (window.keys["ArrowUp"] || window.keys["w"]) {
-    let newX = posX + Math.cos(angle) * moveSpeed;
-    let newY = posY + Math.sin(angle) * moveSpeed;
-    if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+    const newX = posX + Math.cos(angle) * moveSpeed;
+    const newY = posY + Math.sin(angle) * moveSpeed;
+    if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
       posX = newX;
       posY = newY;
     }
   }
   if (window.keys["ArrowDown"] || window.keys["s"]) {
-    let newX = posX - Math.cos(angle) * moveSpeed;
-    let newY = posY - Math.sin(angle) * moveSpeed;
-    if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+    const newX = posX - Math.cos(angle) * moveSpeed;
+    const newY = posY - Math.sin(angle) * moveSpeed;
+    if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
       posX = newX;
       posY = newY;
     }
@@ -163,20 +131,20 @@ function update() {
 
   // Actualizamos proyectiles
   for (let i = bullets.length - 1; i >= 0; i--) {
-    let b = bullets[i];
+    const b = bullets[i];
     // Avanza el proyectil
     b.x += Math.cos(b.angle) * bulletSpeed;
     b.y += Math.sin(b.angle) * bulletSpeed;
     // Si colisiona con pared o fuera de mapa, se destruye
-    if (!map[Math.floor(b.y)] || map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
+    if (!window.map[Math.floor(b.y)] || window.map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
       bullets.splice(i, 1);
       continue;
     }
     // Detección de impacto con enemigos
-    for (let enemy of enemies) {
+    for (let enemy of window.enemies) {
       if (enemy.alive) {
-        let dx = enemy.x - b.x;
-        let dy = enemy.y - b.y;
+        const dx = enemy.x - b.x;
+        const dy = enemy.y - b.y;
         if (Math.sqrt(dx * dx + dy * dy) < 0.3) {
           enemy.alive = false;
           bullets.splice(i, 1);
@@ -187,16 +155,16 @@ function update() {
   }
 
   // Movimiento simple de enemigos (persiguen al jugador)
-  for (let enemy of enemies) {
+  for (let enemy of window.enemies) {
     if (enemy.alive) {
-      let dx = posX - enemy.x;
-      let dy = posY - enemy.y;
-      let dist = Math.sqrt(dx * dx + dy * dy);
+      const dx = posX - enemy.x;
+      const dy = posY - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
       // Se mueven si están a más de 0.5 de distancia
       if (dist > 0.5) {
-        let newX = enemy.x + (dx / dist) * enemySpeed;
-        let newY = enemy.y + (dy / dist) * enemySpeed;
-        if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        const newX = enemy.x + (dx / dist) * enemySpeed;
+        const newY = enemy.y + (dy / dist) * enemySpeed;
+        if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
           enemy.x = newX;
           enemy.y = newY;
         }
@@ -204,8 +172,15 @@ function update() {
     }
   }
 
-  // Exponemos un valor de vida del jugador, para que el minimapa (u otro módulo) lo muestre
-  window.playerLife = 100; // Valor fijo de ejemplo
+  // Ejemplo: comprobar si todos los enemigos están muertos -> pasar al siguiente mapa
+  const aliveEnemies = window.enemies.filter(e => e.alive);
+  if (aliveEnemies.length === 0) {
+    // Si no quedan enemigos, pasamos al siguiente mapa
+    window.nextMap(); // Llamamos a la función definida en maps.js
+  }
+
+  // Exponemos un valor de vida del jugador, para que el minimapa lo muestre
+  window.playerLife = 100; 
 }
 
 // ─── RENDERIZADO (raycasting 2D) ───
@@ -223,14 +198,14 @@ function render() {
   const halfHeight = screenHeight / 2;
   const posZ = halfHeight;
 
-  // Floor & ceiling casting
+  // --- Floor & ceiling casting ---
   const imgData = ctx.getImageData(0, 0, screenWidth, screenHeight);
   const data = imgData.data;
 
   for (let y = 0; y < screenHeight; y++) {
     let p = y - halfHeight;
     if (p === 0) p = 1; // Evitar división entre cero
-    let rowDistance = posZ / Math.abs(p);
+    const rowDistance = posZ / Math.abs(p);
 
     const floorStepX = rowDistance * ((dirX + planeX) - (dirX - planeX)) / screenWidth;
     const floorStepY = rowDistance * ((dirY + planeY) - (dirY - planeY)) / screenWidth;
@@ -272,7 +247,7 @@ function render() {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  // Raycasting de paredes
+  // --- Raycasting de paredes ---
   for (let x = 0; x < screenWidth; x++) {
     const cameraX = 2 * x / screenWidth - 1;
     const rayDirX = dirX + planeX * cameraX;
@@ -315,7 +290,7 @@ function render() {
         mapY += stepY;
         side = 1;
       }
-      if (map[mapY][mapX] > 0) hit = true;
+      if (window.map[mapY][mapX] > 0) hit = true;
     }
 
     let perpWallDist;
@@ -347,7 +322,7 @@ function render() {
     if (side === 0 && rayDirX > 0) texX = wallTexture.width - texX - 1;
     if (side === 1 && rayDirY < 0) texX = wallTexture.width - texX - 1;
 
-    // Dibujamos la pared
+    // Dibujamos la pared (1 píxel de ancho)
     if (wallTexture.complete) {
       ctx.drawImage(
         wallTexture,
@@ -361,9 +336,9 @@ function render() {
     }
   }
 
-  // Renderizado de enemigos (sprites)
+  // --- Renderizado de enemigos (sprites) ---
   const spriteData = [];
-  for (let enemy of enemies) {
+  for (let enemy of window.enemies) {
     if (!enemy.alive) continue;
     const spriteX = enemy.x - posX;
     const spriteY = enemy.y - posY;
@@ -399,7 +374,7 @@ function render() {
     }
   }
 
-  // Renderizado de proyectiles
+  // --- Renderizado de proyectiles ---
   for (let bullet of bullets) {
     const spriteX = bullet.x - posX;
     const spriteY = bullet.y - posY;
@@ -414,12 +389,18 @@ function render() {
       // Dibujamos la bala como un pequeño círculo amarillo
       ctx.fillStyle = "yellow";
       ctx.beginPath();
-      ctx.arc(drawStartX + spriteSize/2, drawStartY + spriteSize/2, spriteSize/2, 0, 2 * Math.PI);
+      ctx.arc(
+        drawStartX + spriteSize / 2, 
+        drawStartY + spriteSize / 2,
+        spriteSize / 2, 
+        0, 
+        2 * Math.PI
+      );
       ctx.fill();
     }
   }
 
-  // Dibuja el arma (HUD) en la parte inferior
+  // --- Dibuja el arma (HUD) en la parte inferior ---
   const weaponWidth = screenWidth * 0.5;
   const weaponHeight = weaponTexture.height * (weaponWidth / weaponTexture.width);
   const weaponX = (screenWidth - weaponWidth) / 2;
