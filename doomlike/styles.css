@@ -9,8 +9,6 @@ html, body {
     display: block;
     margin: 0 auto;
     background: #000;
-    width: 100%;       /* Ajustar al 100% del ancho, si prefieres */
-    height: 85vh;      /* Ocupa el 85% de la altura de la ventana */
   }
 #gameFooter {
     position: fixed;

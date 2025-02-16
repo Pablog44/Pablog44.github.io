@@ -78,20 +78,7 @@ function generateThirdMap() {
     }
   }
 
-  // Dejamos un pasillo en la parte superior
-  for (let x = 2; x <= 12; x++) {
-    mapArray[2][x] = 0;
-  }
 
-  // Dejamos un pasillo en la parte izquierda
-  for (let y = 2; y <= 12; y++) {
-    mapArray[y][2] = 0;
-  }
-
-  // Dejamos un pasillo en la parte derecha
-  for (let y = 2; y <= 12; y++) {
-    mapArray[y][12] = 0;
-  }
 
   return mapArray;
 }
