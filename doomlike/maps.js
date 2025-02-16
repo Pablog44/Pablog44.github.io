@@ -1,65 +1,58 @@
 /***** maps.js *****/
 
-// Aquí definimos funciones para generar mapas. 
-// (Puedes ajustarlas o crear mapas directamente en arrays)
-
+// Función para generar el primer mapa
 function generateFirstMap() {
-    const MAP_WIDTH = 15, MAP_HEIGHT = 15;
-    const mapArray = [];
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      const row = [];
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        row.push(1); // Pared por defecto
-      }
-      mapArray.push(row);
+  const MAP_WIDTH = 15, MAP_HEIGHT = 15;
+  const mapArray = [];
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      row.push(1); // Pared por defecto
     }
-    // "Vaciar" parte del mapa como en tu código original
-    // Barra horizontal: filas 1 a 4, columnas 3 a 11
-    for (let y = 1; y <= 4; y++) {
-      for (let x = 3; x <= 11; x++) {
-        mapArray[y][x] = 0;
-      }
-    }
-    // Barra vertical: filas 4 a 13, columnas 6 a 8
-    for (let y = 4; y <= 13; y++) {
-      for (let x = 6; x <= 8; x++) {
-        mapArray[y][x] = 0;
-      }
-    }
-    return mapArray;
-}
-
-function generateSecondMap() {
-    const MAP_WIDTH = 15, MAP_HEIGHT = 15;
-    const mapArray = [];
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      const row = [];
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        row.push(1);
-      }
-      mapArray.push(row);
-    }
-    // Ejemplo de "vaciar" algunas zonas distintas
-    for (let y = 2; y <= 10; y++) {
-      for (let x = 2; x < 13; x++) {
-        mapArray[y][x] = 0;
-      }
-    }
-
-    // Otra zona abierta (parte inferior del mapa)
-    for (let y = 10; y <= 13; y++) {
-      for (let x = 5; x <= 9; x++) {
-        mapArray[y][x] = 0;
-      }
+    mapArray.push(row);
   }
-
+  // "Vaciar" parte del mapa: Barra horizontal (filas 1 a 4, columnas 3 a 11)
+  for (let y = 1; y <= 4; y++) {
+    for (let x = 3; x <= 11; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  // Barra vertical (filas 4 a 13, columnas 6 a 8)
+  for (let y = 4; y <= 13; y++) {
+    for (let x = 6; x <= 8; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
   return mapArray;
 }
 
-/** 
-* Tercer mapa de ejemplo.
-* Cambia o personaliza la forma en que se dibuja para crear un mapa diferente.
-*/
+// Función para generar el segundo mapa
+function generateSecondMap() {
+  const MAP_WIDTH = 15, MAP_HEIGHT = 15;
+  const mapArray = [];
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      row.push(1);
+    }
+    mapArray.push(row);
+  }
+  // Vaciar zona central
+  for (let y = 2; y <= 10; y++) {
+    for (let x = 2; x < 13; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  // Abrir zona inferior
+  for (let y = 10; y <= 13; y++) {
+    for (let x = 5; x <= 9; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  return mapArray;
+}
+
+// Función para generar el tercer mapa
 function generateThirdMap() {
   const MAP_WIDTH = 15, MAP_HEIGHT = 15;
   const mapArray = [];
@@ -70,21 +63,85 @@ function generateThirdMap() {
     }
     mapArray.push(row);
   }
-
-  // Dejamos un gran espacio abierto en el centro
-  for (let y = 3; y <= 11; y++) {
-    for (let x = 3; x <= 11; x++) {
+  // Crear un camino diagonal y una gran zona abierta en el centro
+  for (let i = 1; i < MAP_WIDTH - 1; i++) {
+    mapArray[i][i] = 0;
+    if (i + 1 < MAP_WIDTH - 1) {
+      mapArray[i][i + 1] = 0;
+    }
+  }
+  // Zona abierta en el centro
+  for (let y = 5; y < 10; y++) {
+    for (let x = 5; x < 10; x++) {
       mapArray[y][x] = 0;
     }
   }
+  return mapArray;
+}
 
+// Función para generar el cuarto mapa
+function generateFourthMap() {
+  const MAP_WIDTH = 15, MAP_HEIGHT = 15;
+  const mapArray = [];
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      row.push(1);
+    }
+    mapArray.push(row);
+  }
+  // Vaciar zona central
+  for (let y = 2; y <= 12; y++) {
+    for (let x = 2; x < 5; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  // Abrir zona inferior
+  for (let y = 6; y <= 8; y++) {
+    for (let x = 5; x <= 9; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  for (let y = 2; y <= 12; y++) {
+    for (let x = 9; x < 13; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  return mapArray;
+}
 
-
+// Función para generar el quinto mapa
+function generateFifthMap() {
+  const MAP_WIDTH = 15, MAP_HEIGHT = 15;
+  const mapArray = [];
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      row.push(1);
+    }
+    mapArray.push(row);
+  }
+  // Vaciar zona central
+  for (let y = 2; y <= 13; y++) {
+    for (let x = 2; x < 5; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  // Abrir zona inferior
+  for (let y = 11; y <= 13; y++) {
+    for (let x = 5; x <= 13; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  for (let y = 2; y < 11; y++) {
+    for (let x = 9; x < 13; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
   return mapArray;
 }
 
 // Definimos un array con la información de cada nivel/mapa
-// (puedes crear tantos objetos como niveles quieras)
 const allMaps = [
   {
     layout: generateFirstMap, 
@@ -102,8 +159,8 @@ const allMaps = [
   {
     layout: generateSecondMap,
     enemies: [
-      { x: 4.5, y: 4.5,  alive: true },
-      { x: 9.5, y: 8.5,  alive: true }
+      { x: 4.5, y: 4.5, alive: true },
+      { x: 9.5, y: 8.5, alive: true }
     ],
     playerStart: {
       x: 2.5,
@@ -114,14 +171,40 @@ const allMaps = [
   {
     layout: generateThirdMap,
     enemies: [
-      { x: 5.5,  y: 5.5,  alive: true },
-      { x: 9.5,  y: 9.5,  alive: true },
-      { x: 7.5,  y: 9.5, alive: true }
+      { x: 6.5, y: 6.5, alive: true },
+      { x: 8.5, y: 8.5, alive: true },
+      { x: 4.5, y: 4.5, alive: true }
     ],
     playerStart: {
       x: 7.5,
       y: 7.5,
-      angle: Math.PI // Apunta hacia abajo en radianes
+      angle: Math.PI / 4
+    }
+  },
+  {
+    layout: generateFourthMap,
+    enemies: [
+      { x: 3.5,  y: 3.5, alive: true },
+
+    ],
+    playerStart: {
+      x: 7.5,
+      y: 7.5,
+      angle: Math.PI
+    }
+  },
+  {
+    layout: generateFifthMap,
+    enemies: [
+      { x: 10.5,  y: 10.5, alive: true },
+      { x: 4.5,  y: 6.5, alive: true },
+      { x: 3.5, y: 7.5, alive: true },
+      { x: 3.5,  y: 3.5, alive: true }
+    ],
+    playerStart: {
+      x: 9.5,
+      y: 9.5,
+      angle: 0
     }
   }
 ];
@@ -130,52 +213,39 @@ const allMaps = [
 window.currentMapIndex = 0;
 
 /**
-* Función para inicializar (o cambiar a) un mapa en concreto.
-* Sobrescribe las variables globales: window.map, window.enemies, posX, posY, angle, etc.
-*/
+ * Función para inicializar (o cambiar a) un mapa en concreto.
+ * Sobrescribe las variables globales: window.map, window.enemies, posX, posY, angle, etc.
+ */
 window.initMap = function(index) {
-// Evitamos pasarnos de rango
-if (index < 0 || index >= allMaps.length) {
-  console.warn("Índice de mapa fuera de rango");
-  return;
-}
-window.currentMapIndex = index;
-
-// Cargamos el layout
-window.map = allMaps[index].layout(); 
-
-// Copiamos/enlazamos la lista de enemigos al global 'window.enemies'
-window.enemies = allMaps[index].enemies.map(e => ({ ...e }));
-
-// Actualizamos posición y ángulo del jugador
-posX   = allMaps[index].playerStart.x;
-posY   = allMaps[index].playerStart.y;
-angle  = allMaps[index].playerStart.angle;
+  // Evitamos pasarnos de rango
+  if (index < 0 || index >= allMaps.length) {
+    console.warn("Índice de mapa fuera de rango");
+    return;
+  }
+  window.currentMapIndex = index;
+  
+  // Cargamos el layout
+  window.map = allMaps[index].layout(); 
+  
+  // Copiamos/enlazamos la lista de enemigos al global 'window.enemies'
+  window.enemies = allMaps[index].enemies.map(e => ({ ...e }));
+  
+  // Actualizamos posición y ángulo del jugador
+  posX   = allMaps[index].playerStart.x;
+  posY   = allMaps[index].playerStart.y;
+  angle  = allMaps[index].playerStart.angle;
 };
 
 /**
-* Función para avanzar al siguiente mapa.
-* Por ejemplo, puedes llamarla cuando maten a todos los enemigos de un mapa.
-*/
+ * Función para avanzar al siguiente mapa.
+ * Por ejemplo, puedes llamarla cuando maten a todos los enemigos de un mapa.
+ */
 window.nextMap = function() {
-const nextIndex = window.currentMapIndex + 1;
-if (nextIndex < allMaps.length) {
-  window.initMap(nextIndex);
-} else {
-  console.log("¡No hay más mapas! Juego completado.");
-
-  // Creamos un elemento H1 para mostrar el mensaje final
-  const message = document.createElement("h1");
-  message.textContent = "¡Juego completado!";
-  message.style.position = "fixed";
-  message.style.top = "50%";
-  message.style.left = "50%";
-  message.style.transform = "translate(-50%, -50%)";
-  message.style.color = "#fff";
-  message.style.fontSize = "3rem";
-  message.style.textAlign = "center";
-
-  // Agregamos el mensaje al body
-  document.body.appendChild(message);
-}
+  const nextIndex = window.currentMapIndex + 1;
+  if (nextIndex < allMaps.length) {
+    window.initMap(nextIndex);
+  } else {
+    console.log("¡No hay más mapas! Juego completado.");
+    // Aquí podrías reiniciar o mostrar algún mensaje final
+  }
 };
