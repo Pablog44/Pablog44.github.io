@@ -245,7 +245,47 @@ window.nextMap = function() {
   if (nextIndex < allMaps.length) {
     window.initMap(nextIndex);
   } else {
-    console.log("¡No hay más mapas! Juego completado.");
-    // Aquí podrías reiniciar o mostrar algún mensaje final
+    // Evitar crear múltiples overlays si ya existe uno
+    if (document.getElementById('game-over-overlay')) return;
+
+    // Crear overlay para mensaje de "Juego terminado" y botón "Reiniciar"
+    const overlay = document.createElement('div');
+    overlay.id = 'game-over-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = 0;
+    overlay.style.left = 0;
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.zIndex = 9999;
+
+    // Mensaje "Juego terminado"
+    const message = document.createElement('div');
+    message.textContent = 'Juego terminado';
+    message.style.color = '#fff';
+    message.style.fontSize = '48px';
+    message.style.marginBottom = '20px';
+    overlay.appendChild(message);
+
+    // Botón "Reiniciar"
+    const restartButton = document.createElement('button');
+    restartButton.textContent = 'Reiniciar';
+    restartButton.style.padding = '10px 20px';
+    restartButton.style.fontSize = '24px';
+    restartButton.style.cursor = 'pointer';
+    restartButton.addEventListener('click', function() {
+      // Elimina el overlay y reinicia el juego desde el primer mapa
+      document.body.removeChild(overlay);
+      window.initMap(0);
+    });
+    overlay.appendChild(restartButton);
+
+    // Añadir el overlay al body
+    document.body.appendChild(overlay);
   }
 };
+
