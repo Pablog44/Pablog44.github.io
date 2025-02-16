@@ -116,7 +116,7 @@ const allMaps = [
     enemies: [
       { x: 5.5,  y: 5.5,  alive: true },
       { x: 9.5,  y: 9.5,  alive: true },
-      { x: 7.5,  y: 11.5, alive: true }
+      { x: 7.5,  y: 9.5, alive: true }
     ],
     playerStart: {
       x: 7.5,
