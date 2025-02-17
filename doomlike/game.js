@@ -68,6 +68,15 @@ const fov = Math.PI / 3;  // 60°
 const moveSpeed = 0.2;
 const rotSpeed  = 0.2;
 
+// ──────────────────────────────────────────────────────────
+// NUEVAS VARIABLES PARA ACELERAR/DESACELERAR LA ROTACIÓN
+// ──────────────────────────────────────────────────────────
+let rotateLeftTime  = 0;
+let rotateRightTime = 0;
+const minRotSpeed   = 0.05;   // Velocidad de giro al dar pequeños toques
+const accelFrames   = 10;     // Cuántos "frames" tarda en llegar a rotSpeed
+// ──────────────────────────────────────────────────────────
+
 // ─── CONTROLES ───
 window.keys = {}; // Objeto global para almacenar pulsaciones
 window.addEventListener('keydown', e => {
@@ -118,12 +127,27 @@ function update() {
       posY = newY;
     }
   }
+
+  // ─────────────────────────────────────────
+  // ROTACIÓN CON ACELERACIÓN / DESACELERACIÓN
+  // ─────────────────────────────────────────
   if (window.keys["ArrowLeft"] || window.keys["a"]) {
-    angle -= rotSpeed;
+    rotateLeftTime++;
+    // factor se acerca a 1 al mantener pulsado
+    const factor = Math.min(1, rotateLeftTime / accelFrames);
+    angle -= (minRotSpeed + factor * (rotSpeed - minRotSpeed));
+  } else {
+    rotateLeftTime = 0;
   }
+
   if (window.keys["ArrowRight"] || window.keys["d"]) {
-    angle += rotSpeed;
+    rotateRightTime++;
+    const factor = Math.min(1, rotateRightTime / accelFrames);
+    angle += (minRotSpeed + factor * (rotSpeed - minRotSpeed));
+  } else {
+    rotateRightTime = 0;
   }
+  // ─────────────────────────────────────────
 
   // Actualizamos las posiciones en window para el minimapa
   window.posX = posX;
