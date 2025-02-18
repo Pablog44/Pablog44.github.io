@@ -159,25 +159,58 @@ function generateSixthMap() {
     mapArray.push(row);
   }
 
-  // Vaciar el interior (dejar solo una pared de borde)
-  for (let y = 1; y < MAP_HEIGHT - 1; y++) {
-    for (let x = 1; x < MAP_WIDTH - 1; x++) {
+  for (let y = 1; y <= 4; y++) {
+    for (let x = 1; x < 5; x++) {
       mapArray[y][x] = 0;
     }
   }
 
-  // Crear una cruz de muros en el centro
-  // Eje vertical de la cruz
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    mapArray[y][Math.floor(MAP_WIDTH / 2)] = 1;
+  for (let y = 2; y < 3; y++) {
+    for (let x = 5; x <= 10; x++) {
+      mapArray[y][x] = 0;
+    }
   }
-  // Eje horizontal de la cruz
-  for (let x = 0; x < MAP_WIDTH; x++) {
-    mapArray[Math.floor(MAP_HEIGHT / 2)][x] = 1;
+    for (let y = 4; y <= 10; y++) {
+        for (let x = 2; x < 3; x++) {
+            mapArray[y][x] = 0;
+        }
+    }
+  for (let y = 1; y <= 4; y++) {
+    for (let x = 10; x < 14; x++) {
+      mapArray[y][x] = 0;
+    }
   }
+  for (let y = 4; y <= 10; y++) {
+    for (let x = 11; x < 12; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  for (let y = 10; y < 14; y++) {
+    for (let x = 1; x < 5; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+  for (let y = 10; y < 14; y++) {
+    for (let x = 10; x < 14; x++) {
+      mapArray[y][x] = 0;
+    }
+  }
+    for (let y = 12; y < 13; y++) {
+        for (let x = 5; x <= 7; x++) {
+            mapArray[y][x] = 0;
+        }
+    }
+    for (let y = 9; y < 12; y++) {
+        for (let x = 7; x < 8; x++) {
+            mapArray[y][x] = 0;
+        }
+    }
+    for (let y = 6; y < 9; y++) {
+        for (let x = 6; x < 9; x++) {
+            mapArray[y][x] = 0;
+        }
+    }
 
-  // Abrir el centro de la cruz
-  mapArray[Math.floor(MAP_HEIGHT / 2)][Math.floor(MAP_WIDTH / 2)] = 0;
 
   return mapArray;
 }
@@ -254,12 +287,14 @@ const allMaps = [
     enemies: [
       { x: 2.5,  y: 2.5,   alive: true },
       { x: 12.5, y: 2.5,   alive: true },
-      { x: 2.5,  y: 12.5,  alive: true },
+      { x: 2.5, y: 12.5, alive: true },
+      { x: 6.5, y: 6.5, alive: true },
+      { x: 7.5, y: 7.5, alive: true },
       { x: 12.5, y: 12.5,  alive: true }
     ],
     playerStart: {
-      x: 7.5,
-      y: 7.5,
+      x: 11.5,
+      y: 11.5,
       angle: 0
     }
   }
@@ -344,3 +379,4 @@ window.nextMap = function() {
     document.body.appendChild(overlay);
   }
 };
+
