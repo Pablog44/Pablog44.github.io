@@ -17,13 +17,13 @@ document.addEventListener("DOMContentLoaded", function () {
       footer.style.padding = "0 5px";
       document.body.appendChild(footer);
     }
-  
+
     // ─── D-PAD (IZQUIERDA) ───
     const dpadContainer = document.createElement("div");
     dpadContainer.style.flex = "0 0 auto";
     dpadContainer.style.display = "flex";
     dpadContainer.style.alignItems = "center";
-  
+
     const dpadSize = footer.clientHeight * 0.8;
     const dpad = document.createElement("div");
     dpad.style.display = "grid";
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
     dpad.style.width = dpadSize + "px";
     dpad.style.height = dpadSize + "px";
     dpad.style.gap = "2px";
-  
+
     function createBtn(label, gridCol, gridRow) {
       const btn = document.createElement("button");
       btn.innerHTML = label;
@@ -42,25 +42,25 @@ document.addEventListener("DOMContentLoaded", function () {
       btn.style.gridRow = gridRow;
       return btn;
     }
-  
+
     const btnUp    = createBtn("▲", "2 / 3", "1 / 2");
     const btnLeft  = createBtn("◀", "1 / 2", "2 / 3");
     const btnDown  = createBtn("▼", "2 / 3", "3 / 4");
     const btnRight = createBtn("▶", "3 / 4", "2 / 3");
-  
+
     dpad.appendChild(btnUp);
     dpad.appendChild(btnLeft);
     dpad.appendChild(btnDown);
     dpad.appendChild(btnRight);
     dpadContainer.appendChild(dpad);
-  
+
     // ─── MINIMAPA + VIDA (CENTRO) ───
     const middleContainer = document.createElement("div");
     middleContainer.style.flex = "0 0 auto";
     middleContainer.style.display = "flex";
     middleContainer.style.alignItems = "center";
     middleContainer.style.gap = "1rem";
-  
+
     // Minimap
     const minimapSize = footer.clientHeight * 0.8;
     const minimapCanvas = document.createElement("canvas");
@@ -68,28 +68,28 @@ document.addEventListener("DOMContentLoaded", function () {
     minimapCanvas.width = minimapSize;
     minimapCanvas.height = minimapSize;
     minimapCanvas.style.background = "#000";
-  
+
     // Contenedor de la vida (texto a la derecha del mapa)
     const lifeContainer = document.createElement("div");
     lifeContainer.id = "lifeContainer";
     lifeContainer.style.color = "white";
     lifeContainer.style.fontFamily = "sans-serif";
     lifeContainer.style.fontSize = "1rem";
-  
+
     // Aquí se actualizará el texto de la vida
     const lifeLabel = document.createElement("span");
     lifeLabel.id = "lifeLabel"; 
     lifeContainer.appendChild(lifeLabel);
-  
+
     middleContainer.appendChild(minimapCanvas);
     middleContainer.appendChild(lifeContainer);
-  
+
     // ─── BOTÓN DE DISPARO (DERECHA) ───
     const shootContainer = document.createElement("div");
     shootContainer.style.flex = "0 0 auto";
     shootContainer.style.display = "flex";
     shootContainer.style.alignItems = "center";
-  
+
     const shootBtn = document.createElement("button");
     shootBtn.innerHTML = "Disparar";
     shootBtn.style.width = "12vh";
@@ -98,12 +98,12 @@ document.addEventListener("DOMContentLoaded", function () {
     shootBtn.style.fontSize = "1rem";
     shootBtn.style.cursor = "pointer";
     shootContainer.appendChild(shootBtn);
-  
+
     // AÑADIMOS TODOS LOS CONTENEDORES AL FOOTER
     footer.appendChild(dpadContainer);
     footer.appendChild(middleContainer);
     footer.appendChild(shootContainer);
-  
+
     // ─── EVENTOS DE LOS BOTONES ───
     function addButtonEvents(button, key) {
       button.addEventListener("touchstart", function(e) {
@@ -127,7 +127,7 @@ document.addEventListener("DOMContentLoaded", function () {
     addButtonEvents(btnLeft,  "ArrowLeft");
     addButtonEvents(btnDown,  "ArrowDown");
     addButtonEvents(btnRight, "ArrowRight");
-  
+
     // Disparo al pulsar el botón
     shootBtn.addEventListener("touchstart", function(e) {
       e.preventDefault();
@@ -138,4 +138,3 @@ document.addEventListener("DOMContentLoaded", function () {
       if (typeof window.shootBullet === "function") window.shootBullet();
     });
   });
-  

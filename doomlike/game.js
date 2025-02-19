@@ -10,6 +10,12 @@ const ctx = canvas.getContext('2d');
 const screenWidth = canvas.width;
 const screenHeight = canvas.height;
 
+// VARIABLES GLOBALES DEL JUEGO
+let playerLife = 100;            // Vida del jugador
+let enemyBullets = [];           // Proyectiles de los enemigos
+const enemyBulletSpeed = 0.3;    // Velocidad de los proyectiles enemigos
+const enemyShootCooldown = 3000; // Tiempo (ms) entre disparos de cada enemigo
+
 // ─── FUNCIONES DE AYUDA ───
 function loadTexture(src) {
   const img = new Image();
@@ -46,8 +52,8 @@ function onTextureLoaded() {
     ceilingCtx.drawImage(ceilingTexture, 0, 0);
     ceilingData = ceilingCtx.getImageData(0, 0, ceilingTexture.width, ceilingTexture.height).data;
 
-    // **Aquí inicializamos el primer mapa y luego arrancamos el bucle**
-    window.initMap(0);            // <-- Viene de maps.js
+    // **Aquí inicializamos el primer mapa y arrancamos el bucle**
+    window.initMap(0); // <-- Viene de maps.js (define también window.enemies, etc.)
     requestAnimationFrame(gameLoop);
   }
 }
@@ -57,24 +63,20 @@ ceilingTexture.onload = onTextureLoaded;
 weaponTexture.onload  = onTextureLoaded;
 enemyTexture.onload   = onTextureLoaded;
 
-// ─── VARIABLES DEL JUGADOR (las define maps.js cuando hacemos initMap) ───
+// ─── VARIABLES DEL JUGADOR (se definen en initMap de maps.js) ───
 let posX = 0, posY = 0; // Se sobreescriben en initMap()
-let angle = 0;          // Se sobreescribe en initMap()
+let angle = 0;          // Se sobreescriben en initMap()
 
-// Campo de visión
+// Campo de visión y velocidades
 const fov = Math.PI / 3;  // 60°
-
-// Velocidades
 const moveSpeed = 0.2;
 const rotSpeed  = 0.2;
 
-// ──────────────────────────────────────────────────────────
-// NUEVAS VARIABLES PARA ACELERAR/DESACELERAR LA ROTACIÓN
-// ──────────────────────────────────────────────────────────
+// ─── VARIABLES PARA ACELERAR/DESACELERAR LA ROTACIÓN ───
 let rotateLeftTime  = 0;
 let rotateRightTime = 0;
-const minRotSpeed   = 0.05;   // Velocidad de giro al dar pequeños toques
-const accelFrames   = 10;     // Cuántos "frames" tarda en llegar a rotSpeed
+const minRotSpeed   = 0.03;
+const accelFrames   = 10;
 // ──────────────────────────────────────────────────────────
 
 // ─── CONTROLES ───
@@ -90,7 +92,7 @@ window.addEventListener('keyup', e => {
   window.keys[e.key] = false;
 });
 
-// ─── SISTEMA DE DISPAROS ───
+// ─── SISTEMA DE DISPAROS DEL JUGADOR ───
 const bullets = [];
 const bulletSpeed = 0.5;
 let lastShotTime = 0;
@@ -103,14 +105,22 @@ function shootBullet() {
     lastShotTime = currentTime;
   }
 }
-window.shootBullet = shootBullet; // exponer para footer.js, etc.
+window.shootBullet = shootBullet; // Exponer para otros módulos (footer.js, etc.)
 
-// ─── MOVIMIENTO ENEMIGOS ───
+// ─── MOVIMIENTO DE ENEMIGOS ───
 const enemySpeed = 0.02;
 
 // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
 function update() {
-  // Movimiento del jugador
+  // Si la vida llega a 0, se considera Game Over
+  if (playerLife <= 0) {
+    alert("¡Game Over!");
+    window.initMap(0);
+    playerLife = 100;
+    return;
+  }
+
+  // Movimiento del jugador (adelante/atrás)
   if (window.keys["ArrowUp"] || window.keys["w"]) {
     const newX = posX + Math.cos(angle) * moveSpeed;
     const newY = posY + Math.sin(angle) * moveSpeed;
@@ -128,18 +138,14 @@ function update() {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ROTACIÓN CON ACELERACIÓN / DESACELERACIÓN
-  // ─────────────────────────────────────────
+  // Rotación con aceleración/desaceleración
   if (window.keys["ArrowLeft"] || window.keys["a"]) {
     rotateLeftTime++;
-    // factor se acerca a 1 al mantener pulsado
     const factor = Math.min(1, rotateLeftTime / accelFrames);
     angle -= (minRotSpeed + factor * (rotSpeed - minRotSpeed));
   } else {
     rotateLeftTime = 0;
   }
-
   if (window.keys["ArrowRight"] || window.keys["d"]) {
     rotateRightTime++;
     const factor = Math.min(1, rotateRightTime / accelFrames);
@@ -147,19 +153,17 @@ function update() {
   } else {
     rotateRightTime = 0;
   }
-  // ─────────────────────────────────────────
 
-  // Actualizamos las posiciones en window para el minimapa
+  // Actualizamos las posiciones en window (para el minimapa)
   window.posX = posX;
   window.posY = posY;
 
-  // Actualizamos proyectiles
+  // ─── ACTUALIZACIÓN DE LOS PROYECTILES DEL JUGADOR ───
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
-    // Avanza el proyectil
     b.x += Math.cos(b.angle) * bulletSpeed;
     b.y += Math.sin(b.angle) * bulletSpeed;
-    // Si colisiona con pared o fuera de mapa, se destruye
+    // Si colisiona con pared o sale del mapa, se elimina
     if (!window.map[Math.floor(b.y)] || window.map[Math.floor(b.y)][Math.floor(b.x)] > 0) {
       bullets.splice(i, 1);
       continue;
@@ -178,33 +182,88 @@ function update() {
     }
   }
 
-  // Movimiento simple de enemigos (persiguen al jugador)
+  // ─── ACTUALIZACIÓN DE ENEMIGOS ───
+  const currentTime = Date.now();
   for (let enemy of window.enemies) {
     if (enemy.alive) {
       const dx = posX - enemy.x;
       const dy = posY - enemy.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      // Se mueven si están a más de 0.5 de distancia
+      
+      // Movimiento: se acerca al jugador y, si choca con pared, intenta deslizarse
       if (dist > 0.5) {
-        const newX = enemy.x + (dx / dist) * enemySpeed;
-        const newY = enemy.y + (dy / dist) * enemySpeed;
+        const moveX = (dx / dist) * enemySpeed;
+        const moveY = (dy / dist) * enemySpeed;
+        const newX = enemy.x + moveX;
+        const newY = enemy.y + moveY;
         if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
           enemy.x = newX;
           enemy.y = newY;
+        } else {
+          // Intentar deslizarse: mover solo en X o solo en Y si es posible
+          if (window.map[Math.floor(enemy.y)][Math.floor(newX)] === 0) {
+            enemy.x = newX;
+          }
+          if (window.map[Math.floor(newY)][Math.floor(enemy.x)] === 0) {
+            enemy.y = newY;
+          }
+        }
+      }
+      
+      // Ataque por contacto: si el enemigo toca al jugador, le quita vida (cada 1 seg)
+      if (dist < 0.5) {
+        if (!enemy.lastContactDamage || currentTime - enemy.lastContactDamage > 1000) {
+          playerLife -= 5;
+          enemy.lastContactDamage = currentTime;
+        }
+      }
+      
+      // Ataque a distancia: si el jugador está cerca, el enemigo dispara
+      if (dist < 5) {
+        if (!enemy.lastShotTime || currentTime - enemy.lastShotTime > enemyShootCooldown) {
+          enemyBullets.push({
+            x: enemy.x,
+            y: enemy.y,
+            angle: Math.atan2(posY - enemy.y, posX - enemy.x)
+          });
+          enemy.lastShotTime = currentTime;
         }
       }
     }
   }
 
-  // Ejemplo: comprobar si todos los enemigos están muertos -> pasar al siguiente mapa
-  const aliveEnemies = window.enemies.filter(e => e.alive);
-  if (aliveEnemies.length === 0) {
-    // Si no quedan enemigos, pasamos al siguiente mapa
-    window.nextMap(); // Llamamos a la función definida en maps.js
+  // ─── ACTUALIZACIÓN DE LOS PROYECTILES DE LOS ENEMIGOS ───
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const bullet = enemyBullets[i];
+    bullet.x += Math.cos(bullet.angle) * enemyBulletSpeed;
+    bullet.y += Math.sin(bullet.angle) * enemyBulletSpeed;
+    // Si colisiona con pared o sale del mapa, se elimina
+    if (!window.map[Math.floor(bullet.y)] || window.map[Math.floor(bullet.y)][Math.floor(bullet.x)] > 0) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+    // Si impacta al jugador, le quita vida
+    const dxBullet = posX - bullet.x;
+    const dyBullet = posY - bullet.y;
+    if (Math.sqrt(dxBullet * dxBullet + dyBullet * dyBullet) < 0.3) {
+      playerLife -= 5;
+      enemyBullets.splice(i, 1);
+      continue;
+    }
   }
 
-  // Exponemos un valor de vida del jugador, para que el minimapa lo muestre
-  window.playerLife = 100; 
+  // Si ya no quedan enemigos vivos, se pasa al siguiente mapa
+  const aliveEnemies = window.enemies.filter(e => e.alive);
+  if (aliveEnemies.length === 0) {
+    window.nextMap(); // Función definida en maps.js
+  }
+
+  // Actualizar la variable global de vida y, si existe, actualizar el HUD
+  window.playerLife = playerLife;
+  const lifeLabel = document.getElementById("lifeLabel");
+  if (lifeLabel) {
+    lifeLabel.innerText = "Vida: " + playerLife;
+  }
 }
 
 // ─── RENDERIZADO (raycasting 2D) ───
@@ -222,7 +281,7 @@ function render() {
   const halfHeight = screenHeight / 2;
   const posZ = halfHeight;
 
-  // --- Floor & ceiling casting ---
+  // --- Floor & Ceiling casting ---
   const imgData = ctx.getImageData(0, 0, screenWidth, screenHeight);
   const data = imgData.data;
 
@@ -342,11 +401,9 @@ function render() {
     wallX -= Math.floor(wallX);
 
     let texX = Math.floor(wallX * wallTexture.width);
-    // Ajuste para que la textura no "salte"
     if (side === 0 && rayDirX > 0) texX = wallTexture.width - texX - 1;
     if (side === 1 && rayDirY < 0) texX = wallTexture.width - texX - 1;
 
-    // Dibujamos la pared (1 píxel de ancho)
     if (wallTexture.complete) {
       ctx.drawImage(
         wallTexture,
@@ -354,7 +411,6 @@ function render() {
         x, drawStart, 1, drawEnd - drawStart
       );
     } else {
-      // Color sólido si textura no está lista
       ctx.fillStyle = (side === 1) ? "#888" : "#aaa";
       ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
     }
@@ -371,7 +427,6 @@ function render() {
     if (transformY <= 0) continue;
     spriteData.push({ enemy, transformX, transformY });
   }
-  // Ordenar sprites por distancia (los más lejanos detrás)
   spriteData.sort((a, b) => b.transformY - a.transformY);
 
   for (let sprite of spriteData) {
@@ -379,14 +434,10 @@ function render() {
     const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
     const spriteHeight = Math.abs(Math.floor(screenHeight / transformY));
     const spriteWidth  = spriteHeight;
-
     const drawStartY = Math.floor(-spriteHeight / 2 + screenHeight / 2);
     const drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
-    const drawEndX = drawStartX + spriteWidth;
-
-    for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
+    for (let stripe = drawStartX; stripe < drawStartX + spriteWidth; stripe++) {
       if (stripe < 0 || stripe >= screenWidth) continue;
-      // Z-Buffer check
       if (transformY < zBuffer[stripe]) {
         const texX = Math.floor((stripe - drawStartX) * enemyTexture.width / spriteWidth);
         ctx.drawImage(
@@ -398,7 +449,7 @@ function render() {
     }
   }
 
-  // --- Renderizado de proyectiles ---
+  // --- Renderizado de proyectiles del jugador ---
   for (let bullet of bullets) {
     const spriteX = bullet.x - posX;
     const spriteY = bullet.y - posY;
@@ -409,9 +460,31 @@ function render() {
       const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
       const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
       const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
-
-      // Dibujamos la bala como un pequeño círculo amarillo
       ctx.fillStyle = "yellow";
+      ctx.beginPath();
+      ctx.arc(
+        drawStartX + spriteSize / 2, 
+        drawStartY + spriteSize / 2,
+        spriteSize / 2, 
+        0, 
+        2 * Math.PI
+      );
+      ctx.fill();
+    }
+  }
+
+  // --- Renderizado de proyectiles de los enemigos ---
+  for (let bullet of enemyBullets) {
+    const spriteX = bullet.x - posX;
+    const spriteY = bullet.y - posY;
+    const transformX = invDet * (dirY * spriteX - dirX * spriteY);
+    const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+    if (transformY > 0) {
+      const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+      const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
+      const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
+      const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
+      ctx.fillStyle = "red";
       ctx.beginPath();
       ctx.arc(
         drawStartX + spriteSize / 2, 
