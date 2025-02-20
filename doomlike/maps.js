@@ -181,7 +181,7 @@ function generateSixthMap() {
     }
   }
   for (let y = 4; y <= 10; y++) {
-    for (let x = 11; x < 12; x++) {
+    for (let x = 12; x < 13; x++) {
       mapArray[y][x] = 0;
     }
   }
