@@ -101,10 +101,17 @@ const bulletSpeed = 0.5;
 let lastShotTime = 0;
 const shootCooldown = 300; // milisegundos
 
+// ─── SONIDO DEL DISPARO ───
+// Se carga un archivo de audio (asegúrate de tener "shoot.mp3" en la ruta correcta)
+const shootSound = new Audio('shoot.mp3');
+shootSound.volume = 0.5; // Ajusta el volumen (0 a 1)
+
 function shootBullet() {
   const currentTime = Date.now();
   if (currentTime - lastShotTime > shootCooldown) {
     bullets.push({ x: posX, y: posY, angle: angle });
+    shootSound.currentTime = 0; // Reiniciar el sonido para poder reproducirlo de inmediato
+    shootSound.play();
     lastShotTime = currentTime;
   }
 }
