@@ -1,5 +1,9 @@
 /***** maps.js *****/
 
+// SONIDO DE INICIO DE MAPA
+const mapStartSound = new Audio('mapStart.mp3');
+mapStartSound.volume = 0.5;
+
 // Función para generar el primer mapa
 function generateFirstMap() {
   const MAP_WIDTH = 15, MAP_HEIGHT = 15;
@@ -305,6 +309,7 @@ window.currentMapIndex = 0;
  * Función para inicializar (o cambiar a) un mapa en concreto.
  * Sobrescribe las variables globales: window.map, window.enemies, posX, posY, angle, etc.
  * Además, se vacían los arrays de proyectiles del jugador y de los enemigos.
+ * Al inicio de cada mapa se reproduce el sonido de inicio.
  */
 window.initMap = function(index) {
   // Evitamos pasarnos de rango
@@ -332,6 +337,10 @@ window.initMap = function(index) {
   posX   = allMaps[index].playerStart.x;
   posY   = allMaps[index].playerStart.y;
   angle  = allMaps[index].playerStart.angle;
+  
+  // Reproducir el sonido de inicio del mapa al 50% de volumen
+  mapStartSound.currentTime = 0;
+  mapStartSound.play();
 };
 
 /**
