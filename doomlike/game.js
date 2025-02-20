@@ -94,6 +94,9 @@ window.addEventListener('keyup', e => {
 
 // ─── SISTEMA DE DISPAROS DEL JUGADOR ───
 const bullets = [];
+// Hacemos que el array de balas esté accesible globalmente
+window.bullets = bullets;
+
 const bulletSpeed = 0.5;
 let lastShotTime = 0;
 const shootCooldown = 300; // milisegundos

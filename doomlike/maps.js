@@ -170,11 +170,11 @@ function generateSixthMap() {
       mapArray[y][x] = 0;
     }
   }
-    for (let y = 4; y <= 10; y++) {
-        for (let x = 2; x < 3; x++) {
-            mapArray[y][x] = 0;
-        }
+  for (let y = 4; y <= 10; y++) {
+    for (let x = 2; x < 3; x++) {
+      mapArray[y][x] = 0;
     }
+  }
   for (let y = 1; y <= 4; y++) {
     for (let x = 10; x < 14; x++) {
       mapArray[y][x] = 0;
@@ -195,22 +195,21 @@ function generateSixthMap() {
       mapArray[y][x] = 0;
     }
   }
-    for (let y = 12; y < 13; y++) {
-        for (let x = 5; x <= 7; x++) {
-            mapArray[y][x] = 0;
-        }
+  for (let y = 12; y < 13; y++) {
+    for (let x = 5; x <= 7; x++) {
+      mapArray[y][x] = 0;
     }
-    for (let y = 9; y < 12; y++) {
-        for (let x = 7; x < 8; x++) {
-            mapArray[y][x] = 0;
-        }
+  }
+  for (let y = 9; y < 12; y++) {
+    for (let x = 7; x < 8; x++) {
+      mapArray[y][x] = 0;
     }
-    for (let y = 6; y < 9; y++) {
-        for (let x = 6; x < 9; x++) {
-            mapArray[y][x] = 0;
-        }
+  }
+  for (let y = 6; y < 9; y++) {
+    for (let x = 6; x < 9; x++) {
+      mapArray[y][x] = 0;
     }
-
+  }
 
   return mapArray;
 }
@@ -258,8 +257,7 @@ const allMaps = [
   {
     layout: generateFourthMap,
     enemies: [
-      { x: 3.5,  y: 3.5, alive: true },
-
+      { x: 3.5,  y: 3.5, alive: true }
     ],
     playerStart: {
       x: 7.5,
@@ -287,9 +285,9 @@ const allMaps = [
     enemies: [
       { x: 2.5,  y: 2.5,   alive: true },
       { x: 12.5, y: 2.5,   alive: true },
-      { x: 2.5, y: 12.5, alive: true },
-      { x: 6.5, y: 6.5, alive: true },
-      { x: 7.5, y: 7.5, alive: true },
+      { x: 2.5,  y: 12.5,  alive: true },
+      { x: 6.5,  y: 6.5,   alive: true },
+      { x: 7.5,  y: 7.5,   alive: true },
       { x: 12.5, y: 12.5,  alive: true }
     ],
     playerStart: {
@@ -306,6 +304,7 @@ window.currentMapIndex = 0;
 /**
  * Función para inicializar (o cambiar a) un mapa en concreto.
  * Sobrescribe las variables globales: window.map, window.enemies, posX, posY, angle, etc.
+ * Además, se vacían los arrays de proyectiles del jugador y de los enemigos.
  */
 window.initMap = function(index) {
   // Evitamos pasarnos de rango
@@ -314,6 +313,14 @@ window.initMap = function(index) {
     return;
   }
   window.currentMapIndex = index;
+  
+  // Vaciamos los proyectiles existentes (del jugador y de los enemigos)
+  if (window.bullets) {
+    window.bullets.length = 0;
+  }
+  if (window.enemyBullets) {
+    window.enemyBullets.length = 0;
+  }
   
   // Cargamos el layout
   window.map = allMaps[index].layout(); 
@@ -369,8 +376,9 @@ window.nextMap = function() {
     restartButton.style.fontSize = '24px';
     restartButton.style.cursor = 'pointer';
     restartButton.addEventListener('click', function() {
-      // Elimina el overlay y reinicia el juego desde el primer mapa
+      // Elimina el overlay, restablece la vida y reinicia el juego desde el primer mapa
       document.body.removeChild(overlay);
+      playerLife = 100;
       window.initMap(0);
     });
     overlay.appendChild(restartButton);
@@ -379,4 +387,3 @@ window.nextMap = function() {
     document.body.appendChild(overlay);
   }
 };
-
