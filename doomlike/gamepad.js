@@ -22,12 +22,12 @@
             }
 
             // Eje 0: -1 = izquierda (ArrowLeft), 1 = derecha (ArrowRight)
-            if (gp.axes[0] < -axisThreshold) {
+            if (gp.axes[2] < -axisThreshold) {
                 window.keys["ArrowLeft"] = true;
             } else {
                 window.keys["ArrowLeft"] = false;
             }
-            if (gp.axes[0] > axisThreshold) {
+            if (gp.axes[2] > axisThreshold) {
                 window.keys["ArrowRight"] = true;
             } else {
                 window.keys["ArrowRight"] = false;
@@ -63,13 +63,13 @@
 
             // --- Movimiento lateral (strafe) ---
             // LB para strafe izquierda (índice 4) mapeado a "q"
-            if (gp.buttons[4].pressed) {
+            if (gp.axes[0] < -axisThreshold) {
                 window.keys["q"] = true;
             } else {
                 window.keys["q"] = false;
             }
             // RB para strafe derecha (índice 5) mapeado a "e"
-            if (gp.buttons[5].pressed) {
+            if (gp.axes[0] > axisThreshold) {
                 window.keys["e"] = true;
             } else {
                 window.keys["e"] = false;
