@@ -18,11 +18,16 @@ const enemyShootCooldown = 3000; // Tiempo (ms) entre disparos de cada enemigo
 
 // ─── FUNCIONES DE AYUDA ───
 function loadTexture(src) {
+  // Si se pide el GIF de la pared, usar el elemento oculto del DOM
+  if(src === 'wall.gif'){
+    return document.getElementById("wallGif");
+  }
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
   return img;
 }
+
 
 // ─── CARGA DE TEXTURAS ───
 // Cambiamos la textura de las paredes para que use un GIF (por ejemplo, "wall.gif")

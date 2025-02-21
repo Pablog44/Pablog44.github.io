@@ -15,10 +15,15 @@
   <!-- Canvas principal del juego -->
   <canvas id="gameCanvas"></canvas>
 
-  <!-- Footer para minimapa y controles (se generará por JS si no existe) -->
+  <!-- Footer para minimapa y controles -->
   <footer id="gameFooter"></footer>
 
-  <!-- Scripts del juego (módulos separados) -->
+  <!-- Contenedor oculto para mantener activos los GIFs animados -->
+  <div id="hiddenImages" style="display: none;">
+    <img id="wallGif" src="wall.gif" alt="Wall Animation">
+  </div>
+
+  <!-- Scripts del juego -->
   <script src="game.js"></script>
   <script src="footer.js"></script>
   <script src="minimap.js"></script>
