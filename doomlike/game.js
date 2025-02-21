@@ -25,7 +25,8 @@ function loadTexture(src) {
 }
 
 // ─── CARGA DE TEXTURAS ───
-const wallTexture    = loadTexture('wall.png');
+// Cambiamos la textura de las paredes para que use un GIF (por ejemplo, "wall.gif")
+const wallTexture    = loadTexture('wall.gif');  // Antes: 'wall.png'
 const floorTexture   = loadTexture('floor.png');
 const ceilingTexture = loadTexture('ceiling.png');
 const weaponTexture  = loadTexture('weapon.png');
@@ -83,6 +84,12 @@ const accelFrames   = 10;
 window.keys = {}; // Objeto global para almacenar pulsaciones
 window.addEventListener('keydown', e => {
   window.keys[e.key] = true;
+  // Activar dash con la tecla Control
+  if (e.key === "Control") {
+    if (typeof window.dash === "function") {
+      window.dash();
+    }
+  }
   // Disparo con la barra espaciadora (opcional)
   if (e.code === "Space") {
     shootBullet();
@@ -91,6 +98,21 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => {
   window.keys[e.key] = false;
 });
+
+// ─── FUNCIÓN DASH ───
+// Mueve al jugador rápidamente hacia adelante si no hay obstáculo.
+function dash() {
+  const dashDistance = 1; // Distancia del dash (ajústala según tu juego)
+  const newX = posX + Math.cos(angle) * dashDistance;
+  const newY = posY + Math.sin(angle) * dashDistance;
+  // Comprobamos que no choque con una pared
+  if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
+    posX = newX;
+    posY = newY;
+  }
+  // Opcional: reproducir sonido o animación
+}
+window.dash = dash;
 
 // ─── SISTEMA DE DISPAROS DEL JUGADOR ───
 const bullets = [];
@@ -130,7 +152,7 @@ function update() {
     return;
   }
 
-  // Movimiento del jugador (adelante/atrás)
+  // Movimiento del jugador hacia adelante y atrás (w/s o flechas arriba/abajo)
   if (window.keys["ArrowUp"] || window.keys["w"]) {
     const newX = posX + Math.cos(angle) * moveSpeed;
     const newY = posY + Math.sin(angle) * moveSpeed;
@@ -148,7 +170,27 @@ function update() {
     }
   }
 
-  // Rotación con aceleración/desaceleración
+  // Movimiento lateral (strafe) con "q" (izquierda) y "e" (derecha)
+  if (window.keys["q"]) {
+    // Movimiento perpendicular hacia la izquierda (ángulo - 90°)
+    const newX = posX + Math.cos(angle - Math.PI / 2) * moveSpeed;
+    const newY = posY + Math.sin(angle - Math.PI / 2) * moveSpeed;
+    if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
+      posX = newX;
+      posY = newY;
+    }
+  }
+  if (window.keys["e"]) {
+    // Movimiento perpendicular hacia la derecha (ángulo + 90°)
+    const newX = posX + Math.cos(angle + Math.PI / 2) * moveSpeed;
+    const newY = posY + Math.sin(angle + Math.PI / 2) * moveSpeed;
+    if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
+      posX = newX;
+      posY = newY;
+    }
+  }
+
+  // Rotación con aceleración/desaceleración (teclas flecha izquierda/derecha o a/d)
   if (window.keys["ArrowLeft"] || window.keys["a"]) {
     rotateLeftTime++;
     const factor = Math.min(1, rotateLeftTime / accelFrames);

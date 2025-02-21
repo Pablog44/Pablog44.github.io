@@ -51,6 +51,29 @@
                 }
             }
             previousButtonsState[7] = shootRT;
+
+            // --- Dash con botón Y (índice 3) ---
+            const dashButton = gp.buttons[3].pressed;
+            if (dashButton && !previousButtonsState[3]) {
+                if (typeof window.dash === "function") {
+                    window.dash();
+                }
+            }
+            previousButtonsState[3] = dashButton;
+
+            // --- Movimiento lateral (strafe) ---
+            // LB para strafe izquierda (índice 4) mapeado a "q"
+            if (gp.buttons[4].pressed) {
+                window.keys["q"] = true;
+            } else {
+                window.keys["q"] = false;
+            }
+            // RB para strafe derecha (índice 5) mapeado a "e"
+            if (gp.buttons[5].pressed) {
+                window.keys["e"] = true;
+            } else {
+                window.keys["e"] = false;
+            }
         }
 
         requestAnimationFrame(pollGamepad);
