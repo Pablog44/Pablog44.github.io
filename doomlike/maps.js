@@ -2,7 +2,7 @@
 
 // SONIDO DE INICIO DE MAPA
 const mapStartSound = new Audio('mapStart.mp3');
-mapStartSound.volume = 0.5;
+mapStartSound.volume = 0.3;
 
 // Función para generar el primer mapa
 function generateFirstMap() {
