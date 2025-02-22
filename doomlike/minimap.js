@@ -27,15 +27,44 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Jugador (círculo azul)
+    const playerX = (window.posX || 0) * cellSize;
+    const playerY = (window.posY || 0) * cellSize;
+    const playerRadius = cellSize / 3;
+
     minimapCtx.fillStyle = "blue";
     minimapCtx.beginPath();
-    minimapCtx.arc(
-      (window.posX || 0) * cellSize,
-      (window.posY || 0) * cellSize,
-      cellSize / 3,
-      0,
-      Math.PI * 2
+    minimapCtx.arc(playerX, playerY, playerRadius, 0, Math.PI * 2);
+    minimapCtx.fill();
+
+    // Flecha naranja indicando la dirección del jugador
+    const angle = window.angle || 0; // Obtener el ángulo del jugador desde game.js
+    const arrowLength = cellSize / 2; // Longitud de la flecha
+    const arrowTipX = playerX + Math.cos(angle) * (playerRadius + arrowLength);
+    const arrowTipY = playerY + Math.sin(angle) * (playerRadius + arrowLength);
+
+    minimapCtx.strokeStyle = "orange";
+    minimapCtx.fillStyle = "orange";
+    minimapCtx.lineWidth = 2;
+
+    // Dibujar la línea de la flecha
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(playerX, playerY); // Desde el centro del jugador
+    minimapCtx.lineTo(arrowTipX, arrowTipY); // Hasta la punta de la flecha
+    minimapCtx.stroke();
+
+    // Dibujar la punta de la flecha (triángulo pequeño)
+    const arrowHeadSize = cellSize / 6;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(arrowTipX, arrowTipY);
+    minimapCtx.lineTo(
+      arrowTipX - Math.cos(angle + Math.PI / 6) * arrowHeadSize,
+      arrowTipY - Math.sin(angle + Math.PI / 6) * arrowHeadSize
     );
+    minimapCtx.lineTo(
+      arrowTipX - Math.cos(angle - Math.PI / 6) * arrowHeadSize,
+      arrowTipY - Math.sin(angle - Math.PI / 6) * arrowHeadSize
+    );
+    minimapCtx.closePath();
     minimapCtx.fill();
 
     // Enemigos (círculos rojos)
