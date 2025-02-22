@@ -26,7 +26,7 @@ function loadTexture(src) {
 
 // ─── CARGA DE TEXTURAS ───
 // Cambiamos la textura de las paredes para que use un GIF (por ejemplo, "wall.gif")
-const wallTexture    = loadTexture('wall.gif');  // Antes: 'wall.png'
+const wallTexture    = loadTexture('wall.png');  
 const floorTexture   = loadTexture('floor.png');
 const ceilingTexture = loadTexture('ceiling.png');
 const weaponTexture  = loadTexture('weapon.png');
