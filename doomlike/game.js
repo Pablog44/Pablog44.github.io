@@ -16,12 +16,34 @@ let enemyBullets = [];           // Proyectiles de los enemigos
 const enemyBulletSpeed = 0.3;    // Velocidad de los proyectiles enemigos
 const enemyShootCooldown = 3000; // Tiempo (ms) entre disparos de cada enemigo
 
+// Constantes para evitar aglomeraciones y mantener margen de seguridad
+const enemySpeed = 0.02;
+const minWallDist = 0.3;   // Distancia mínima que debe mantener el enemigo con la pared
+const minEnemyDist = 0.5;  // Distancia mínima entre enemigos
+
 // ─── FUNCIONES DE AYUDA ───
 function loadTexture(src) {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
   return img;
+}
+
+// Función para determinar si el jugador es visible desde un enemigo (sin paredes en medio)
+function isPlayerVisible(enemy) {
+  const dx = posX - enemy.x;
+  const dy = posY - enemy.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const steps = Math.ceil(distance / 0.1);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const checkX = enemy.x + dx * t;
+    const checkY = enemy.y + dy * t;
+    if (window.map[Math.floor(checkY)] && window.map[Math.floor(checkY)][Math.floor(checkX)] > 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // ─── CARGA DE TEXTURAS ───
@@ -139,9 +161,6 @@ function shootBullet() {
 }
 window.shootBullet = shootBullet; // Exponer para otros módulos (footer.js, etc.)
 
-// ─── MOVIMIENTO DE ENEMIGOS ───
-const enemySpeed = 0.02;
-
 // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
 function update() {
   // Si la vida llega a 0, se considera Game Over
@@ -238,49 +257,96 @@ function update() {
   // ─── ACTUALIZACIÓN DE ENEMIGOS ───
   const currentTime = Date.now();
   for (let enemy of window.enemies) {
-    if (enemy.alive) {
-      const dx = posX - enemy.x;
-      const dy = posY - enemy.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      // Movimiento: se acerca al jugador y, si choca con pared, intenta deslizarse
-      if (dist > 0.5) {
-        const moveX = (dx / dist) * enemySpeed;
-        const moveY = (dy / dist) * enemySpeed;
-        const newX = enemy.x + moveX;
-        const newY = enemy.y + moveY;
-        if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
-          enemy.x = newX;
-          enemy.y = newY;
-        } else {
-          // Intentar deslizarse: mover solo en X o solo en Y si es posible
-          if (window.map[Math.floor(enemy.y)][Math.floor(newX)] === 0) {
-            enemy.x = newX;
-          }
-          if (window.map[Math.floor(newY)][Math.floor(enemy.x)] === 0) {
-            enemy.y = newY;
+    if (!enemy.alive) continue;
+    const dx = posX - enemy.x;
+    const dy = posY - enemy.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Determinar si el enemigo debe perseguir al jugador:
+    // Sólo se mueve hacia él si está cerca (dist < 5) o es visible (sin paredes intermedias)
+    let chasePlayer = false;
+    if (dist < 5 || isPlayerVisible(enemy)) {
+      chasePlayer = true;
+    }
+
+    let chaseVector = { x: 0, y: 0 };
+    if (chasePlayer) {
+      chaseVector.x = (dx / dist) * enemySpeed;
+      chaseVector.y = (dy / dist) * enemySpeed;
+    }
+
+    // Repulsión respecto a las paredes
+    let repulseWall = { x: 0, y: 0 };
+    const enemyCellX = Math.floor(enemy.x);
+    const enemyCellY = Math.floor(enemy.y);
+    for (let i = enemyCellY - 1; i <= enemyCellY + 1; i++) {
+      for (let j = enemyCellX - 1; j <= enemyCellX + 1; j++) {
+        if (window.map[i] && window.map[i][j] > 0) {
+          const wallCenterX = j + 0.5;
+          const wallCenterY = i + 0.5;
+          const vx = enemy.x - wallCenterX;
+          const vy = enemy.y - wallCenterY;
+          const distanceToWall = Math.sqrt(vx * vx + vy * vy);
+          if (distanceToWall < minWallDist && distanceToWall > 0) {
+            const push = (minWallDist - distanceToWall);
+            repulseWall.x += (vx / distanceToWall) * push * enemySpeed;
+            repulseWall.y += (vy / distanceToWall) * push * enemySpeed;
           }
         }
       }
-      
-      // Ataque por contacto: si el enemigo toca al jugador, le quita vida (cada 1 seg)
-      if (dist < 0.5) {
-        if (!enemy.lastContactDamage || currentTime - enemy.lastContactDamage > 1000) {
-          playerLife -= 5;
-          enemy.lastContactDamage = currentTime;
-        }
+    }
+
+    // Repulsión entre enemigos para mantener separación
+    let repulseEnemies = { x: 0, y: 0 };
+    for (let other of window.enemies) {
+      if (other === enemy || !other.alive) continue;
+      const vx = enemy.x - other.x;
+      const vy = enemy.y - other.y;
+      const d = Math.sqrt(vx * vx + vy * vy);
+      if (d < minEnemyDist && d > 0) {
+        const push = (minEnemyDist - d);
+        repulseEnemies.x += (vx / d) * push * enemySpeed;
+        repulseEnemies.y += (vy / d) * push * enemySpeed;
       }
-      
-      // Ataque a distancia: si el jugador está cerca, el enemigo dispara
-      if (dist < 5) {
-        if (!enemy.lastShotTime || currentTime - enemy.lastShotTime > enemyShootCooldown) {
-          enemyBullets.push({
-            x: enemy.x,
-            y: enemy.y,
-            angle: Math.atan2(posY - enemy.y, posX - enemy.x)
-          });
-          enemy.lastShotTime = currentTime;
-        }
+    }
+
+    // Sumar las fuerzas de persecución y repulsión
+    let moveX = chaseVector.x + repulseWall.x + repulseEnemies.x;
+    let moveY = chaseVector.y + repulseWall.y + repulseEnemies.y;
+
+    // Intentar mover al enemigo si la nueva posición es transitable
+    const newX = enemy.x + moveX;
+    const newY = enemy.y + moveY;
+    if (window.map[Math.floor(newY)] && window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
+      enemy.x = newX;
+      enemy.y = newY;
+    } else {
+      // Intentar deslizarse en cada eje si es posible
+      if (window.map[Math.floor(enemy.y)] && window.map[Math.floor(enemy.y)][Math.floor(newX)] === 0) {
+        enemy.x = newX;
+      }
+      if (window.map[Math.floor(newY)] && window.map[Math.floor(newY)][Math.floor(enemy.x)] === 0) {
+        enemy.y = newY;
+      }
+    }
+
+    // Ataque por contacto: si el enemigo toca al jugador, le quita vida (cada 1 seg)
+    if (dist < 0.5) {
+      if (!enemy.lastContactDamage || currentTime - enemy.lastContactDamage > 1000) {
+        playerLife -= 5;
+        enemy.lastContactDamage = currentTime;
+      }
+    }
+
+    // Ataque a distancia: el enemigo dispara si el jugador está cerca (dist < 5) y es visible
+    if (dist < 5 && isPlayerVisible(enemy)) {
+      if (!enemy.lastShotTime || currentTime - enemy.lastShotTime > enemyShootCooldown) {
+        enemyBullets.push({
+          x: enemy.x,
+          y: enemy.y,
+          angle: Math.atan2(posY - enemy.y, posX - enemy.x)
+        });
+        enemy.lastShotTime = currentTime;
       }
     }
   }
@@ -358,6 +424,7 @@ function render() {
         let tx = Math.floor((worldX - cellX) * floorTexture.width);
         let ty = Math.floor((worldY - cellY) * floorTexture.height);
         tx = ((tx % floorTexture.width) + floorTexture.width) % floorTexture.width;
+        // CORRECCIÓN: usar floorTexture.height en lugar de ceilingTexture.height
         ty = ((ty % floorTexture.height) + floorTexture.height) % floorTexture.height;
         const texIndex = (ty * floorTexture.width + tx) * 4;
         data[pixelIndex    ] = floorData[texIndex    ];
