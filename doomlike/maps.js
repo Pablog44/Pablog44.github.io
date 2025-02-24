@@ -360,6 +360,7 @@ window.nextMap = function() {
     if (document.getElementById('game-over-overlay')) return;
 
     // Reproducir sonido de juego terminado
+    mapStartSound.pause();
     gameOverSound.currentTime = 0;
     gameOverSound.play();
 
