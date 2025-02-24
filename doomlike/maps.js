@@ -4,6 +4,10 @@
 const mapStartSound = new Audio('mapStart.mp3');
 mapStartSound.volume = 0.3;
 
+// SONIDO DE JUEGO TERMINADO
+const gameOverSound = new Audio('gameOver.mp3');
+gameOverSound.volume = 0.3;
+
 // Función para generar el primer mapa
 function generateFirstMap() {
   const MAP_WIDTH = 15, MAP_HEIGHT = 15;
@@ -355,6 +359,10 @@ window.nextMap = function() {
     // Evitar crear múltiples overlays si ya existe uno
     if (document.getElementById('game-over-overlay')) return;
 
+    // Reproducir sonido de juego terminado
+    gameOverSound.currentTime = 0;
+    gameOverSound.play();
+
     // Crear overlay para mensaje de "Juego terminado" y botón "Reiniciar"
     const overlay = document.createElement('div');
     overlay.id = 'game-over-overlay';
@@ -385,6 +393,10 @@ window.nextMap = function() {
     restartButton.style.fontSize = '24px';
     restartButton.style.cursor = 'pointer';
     restartButton.addEventListener('click', function() {
+      // Detener el sonido de juego terminado para evitar que se solape con el de inicio
+      gameOverSound.pause();
+      gameOverSound.currentTime = 0;
+      
       // Elimina el overlay, restablece la vida y reinicia el juego desde el primer mapa
       document.body.removeChild(overlay);
       playerLife = 100;
