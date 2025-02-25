@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  // ─── CREAR O RECUPERAR EL FOOTER ───
+  // Obtener (o crear) el footer
   let footer = document.getElementById("gameFooter");
   if (!footer) {
     footer = document.createElement("footer");
@@ -43,7 +43,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return btn;
   }
 
-  // Botones de la cruzeta
   const btnUp    = createBtn("▲", "2 / 3", "1 / 2");
   const btnLeft  = createBtn("◀", "1 / 2", "2 / 3");
   const btnDown  = createBtn("▼", "2 / 3", "3 / 4");
@@ -62,6 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
   middleContainer.style.alignItems = "center";
   middleContainer.style.gap = "1rem";
 
+  // Minimap
   const minimapSize = footer.clientHeight * 0.8;
   const minimapCanvas = document.createElement("canvas");
   minimapCanvas.id = "minimapCanvas"; 
@@ -69,12 +69,14 @@ document.addEventListener("DOMContentLoaded", function () {
   minimapCanvas.height = minimapSize;
   minimapCanvas.style.background = "#000";
 
+  // Contenedor de la vida (texto a la derecha del mapa)
   const lifeContainer = document.createElement("div");
   lifeContainer.id = "lifeContainer";
   lifeContainer.style.color = "white";
   lifeContainer.style.fontFamily = "sans-serif";
   lifeContainer.style.fontSize = "1rem";
 
+  // Aquí se actualizará el texto de la vida
   const lifeLabel = document.createElement("span");
   lifeLabel.id = "lifeLabel"; 
   lifeContainer.appendChild(lifeLabel);
@@ -97,12 +99,12 @@ document.addEventListener("DOMContentLoaded", function () {
   shootBtn.style.cursor = "pointer";
   shootContainer.appendChild(shootBtn);
 
-  // ─── AÑADIR CONTENEDORES AL FOOTER ───
+  // AÑADIMOS TODOS LOS CONTENEDORES AL FOOTER
   footer.appendChild(dpadContainer);
   footer.appendChild(middleContainer);
   footer.appendChild(shootContainer);
 
-  // ─── EVENTOS DE LOS BOTONES DE LA CRUZETA ───
+  // ─── EVENTOS DE LOS BOTONES ───
   function addButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
       e.preventDefault();
@@ -121,14 +123,12 @@ document.addEventListener("DOMContentLoaded", function () {
       window.keys[key] = false;
     });
   }
-  // Los botones laterales (izquierda y derecha) se usan para desplazarse
-  addButtonEvents(btnLeft,  "ArrowLeft");
-  addButtonEvents(btnRight, "ArrowRight");
-  // Los botones de arriba y abajo se ocultarán en móvil
   addButtonEvents(btnUp,    "ArrowUp");
+  addButtonEvents(btnLeft,  "ArrowLeft");
   addButtonEvents(btnDown,  "ArrowDown");
+  addButtonEvents(btnRight, "ArrowRight");
 
-  // ─── EVENTOS DEL BOTÓN DE DISPARO ───
+  // Disparo al pulsar el botón
   shootBtn.addEventListener("touchstart", function(e) {
     e.preventDefault();
     if (typeof window.shootBullet === "function") window.shootBullet();
@@ -138,35 +138,35 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof window.shootBullet === "function") window.shootBullet();
   });
 
-  // ─── BOTONES DE ROTACIÓN (SOLO EN VISTA MÓVIL) ───
-  // Se crea un contenedor posicionado justo encima del footer.
+  // ─── BOTONES DE GIRO (SOLO EN VISTA MÓVIL) ───
+  // Se crean dos botones, uno para girar a la izquierda y otro para girar a la derecha,
+  // posicionados en cada extremo, justo encima del footer.
   const rotateContainer = document.createElement("div");
   rotateContainer.id = "rotateContainer";
   rotateContainer.style.position = "fixed";
-  rotateContainer.style.bottom = "15vh"; // justo sobre el footer
+  rotateContainer.style.bottom = "15vh"; // Encima del footer
   rotateContainer.style.left = "0";
   rotateContainer.style.width = "100%";
-  rotateContainer.style.height = "10vh"; // altura configurable
-  rotateContainer.style.display = "none"; // por defecto se oculta; se mostrará solo en móvil
-  rotateContainer.style.justifyContent = "space-around";
-  rotateContainer.style.alignItems = "center";
-  rotateContainer.style.background = "#333"; // fondo opcional
-  document.body.appendChild(rotateContainer);
+  rotateContainer.style.display = "none"; // Se mostrará solo en vista móvil mediante media query
+  rotateContainer.style.justifyContent = "space-between";
+  rotateContainer.style.padding = "0 10px";
+  rotateContainer.style.boxSizing = "border-box";
 
   const btnRotateLeft = document.createElement("button");
-  btnRotateLeft.innerHTML = "Girar Izquierda";
-  btnRotateLeft.style.fontSize = "1rem";
+  btnRotateLeft.innerHTML = "◀";
+  btnRotateLeft.style.fontSize = "1.5rem";
   btnRotateLeft.style.cursor = "pointer";
 
   const btnRotateRight = document.createElement("button");
-  btnRotateRight.innerHTML = "Girar Derecha";
-  btnRotateRight.style.fontSize = "1rem";
+  btnRotateRight.innerHTML = "▶";
+  btnRotateRight.style.fontSize = "1.5rem";
   btnRotateRight.style.cursor = "pointer";
 
   rotateContainer.appendChild(btnRotateLeft);
   rotateContainer.appendChild(btnRotateRight);
+  document.body.appendChild(rotateContainer);
 
-  function addRotationButtonEvents(button, key) {
+  function addRotateButtonEvents(button, key) {
     button.addEventListener("touchstart", function(e) {
       e.preventDefault();
       window.keys[key] = true;
@@ -184,23 +184,15 @@ document.addEventListener("DOMContentLoaded", function () {
       window.keys[key] = false;
     });
   }
-  addRotationButtonEvents(btnRotateLeft, "rotateLeft");
-  addRotationButtonEvents(btnRotateRight, "rotateRight");
+  addRotateButtonEvents(btnRotateLeft, "rotateLeft");
+  addRotateButtonEvents(btnRotateRight, "rotateRight");
 
-  // ─── MEDIA QUERIES (MOSTRAR ROTACIÓN Y OCULTAR ARRIBA/ABAJO EN MÓVIL) ───
-  // Se agregan estilos dinámicos para que el contenedor de rotación aparezca solo en vista móvil
-  // y se oculten los botones de arriba y abajo de la cruzeta.
+  // ─── MEDIA QUERY PARA VISTA MÓVIL ───
   const styleEl = document.createElement("style");
   styleEl.innerHTML = `
     @media (max-width: 768px) {
       #rotateContainer {
         display: flex !important;
-      }
-      /* Oculta los botones de arriba y abajo para que la cruzeta sirva solo para mover lateralmente */
-      button:nth-child(1),
-      button:nth-child(3) {
-        /* Asumiendo que en el grid el primer y tercer botón son "▲" y "▼" respectivamente */
-        display: none;
       }
     }
   `;
