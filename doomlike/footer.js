@@ -123,10 +123,13 @@ document.addEventListener("DOMContentLoaded", function () {
       window.keys[key] = false;
     });
   }
-  addButtonEvents(btnUp,    "ArrowUp");
-  addButtonEvents(btnLeft,  "ArrowLeft");
-  addButtonEvents(btnDown,  "ArrowDown");
-  addButtonEvents(btnRight, "ArrowRight");
+  // La cruceta imita el left stick del gamepad:
+  // Vertical: arriba = "w", abajo = "s"
+  // Horizontal: izquierda y derecha se mantienen "ArrowLeft" y "ArrowRight"
+  addButtonEvents(btnUp,    "w");
+  addButtonEvents(btnLeft,  "q");
+  addButtonEvents(btnDown,  "s");
+  addButtonEvents(btnRight, "e");
 
   // Disparo al pulsar el botón
   shootBtn.addEventListener("touchstart", function(e) {
@@ -184,8 +187,9 @@ document.addEventListener("DOMContentLoaded", function () {
       window.keys[key] = false;
     });
   }
-  addRotateButtonEvents(btnRotateLeft, "rotateLeft");
-  addRotateButtonEvents(btnRotateRight, "rotateRight");
+  // Los nuevos botones de giro ahora hacen lo mismo que los botones izquierda y derecha de la cruceta
+  addRotateButtonEvents(btnRotateLeft, "ArrowLeft");
+  addRotateButtonEvents(btnRotateRight, "ArrowRight");
 
   // ─── MEDIA QUERY PARA VISTA MÓVIL ───
   const styleEl = document.createElement("style");
