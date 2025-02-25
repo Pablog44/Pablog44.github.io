@@ -143,15 +143,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ─── BOTONES DE GIRO (SOLO EN VISTA MÓVIL) ───
   // Se crean dos botones, uno para girar a la izquierda y otro para girar a la derecha,
-  // posicionados en cada extremo, justo encima del footer.
+  // posicionados en la parte superior del footer.
   const rotateContainer = document.createElement("div");
   rotateContainer.id = "rotateContainer";
   rotateContainer.style.position = "fixed";
-  rotateContainer.style.bottom = "15vh"; // Encima del footer
+  rotateContainer.style.bottom = "calc(15vh + 20px)"; // Encima del footer y 20px más arriba
   rotateContainer.style.left = "0";
   rotateContainer.style.width = "100%";
   rotateContainer.style.display = "none"; // Se mostrará solo en vista móvil mediante media query
-  rotateContainer.style.justifyContent = "space-between";
+  rotateContainer.style.justifyContent = "flex-end"; // Alineados a la derecha
+  rotateContainer.style.gap = "30px"; // Espacio de 30px entre ellos
   rotateContainer.style.padding = "0 10px";
   rotateContainer.style.boxSizing = "border-box";
 
