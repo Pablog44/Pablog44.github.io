@@ -1,6 +1,6 @@
 /***** game.js *****/
 
-/***** CONFIGURACIÓN DEL CANVAS Y VARIABLES GLOBALES *****/
+// ─── CONFIGURACIÓN DEL CANVAS Y VARIABLES GLOBALES ───
 const canvas = document.getElementById('gameCanvas');
 const availableHeight = window.innerHeight * 0.85;
 const canvasSize = Math.min(window.innerWidth, availableHeight);
@@ -47,7 +47,7 @@ function isPlayerVisible(enemy) {
 }
 
 // ─── CARGA DE TEXTURAS ───
-// Cambiamos la textura de las paredes para que use un GIF (por ejemplo, "wall.gif")
+// Cambia las rutas de las texturas según corresponda
 const wallTexture    = loadTexture('wall.png');  
 const floorTexture   = loadTexture('floor.png');
 const ceilingTexture = loadTexture('ceiling.png');
@@ -75,8 +75,8 @@ function onTextureLoaded() {
     ceilingCtx.drawImage(ceilingTexture, 0, 0);
     ceilingData = ceilingCtx.getImageData(0, 0, ceilingTexture.width, ceilingTexture.height).data;
 
-    // **Aquí inicializamos el primer mapa y arrancamos el bucle**
-    window.initMap(0); // <-- Viene de maps.js (define también window.enemies, etc.)
+    // Inicializa el primer mapa y arranca el bucle (window.initMap viene de maps.js)
+    window.initMap(0);
     requestAnimationFrame(gameLoop);
   }
 }
@@ -95,14 +95,50 @@ const fov = Math.PI / 3;  // 60°
 const moveSpeed = 0.2;
 const rotSpeed  = 0.2;
 
-// ─── VARIABLES PARA ACELERAR/DESACELERAR LA ROTACIÓN ───
+// ─── VARIABLES PARA ACELERAR/DESACELERAR LA ROTACIÓN (TECLADO) ───
 let rotateLeftTime  = 0;
 let rotateRightTime = 0;
 const minRotSpeed   = 0.03;
 const accelFrames   = 10;
-// ──────────────────────────────────────────────────────────
 
-// ─── CONTROLES ───
+// ─── CONTROL CON RATÓN (POINTER LOCK) ───
+// Cuando se use el ratón, la rotación se actualizará directamente según el movimiento
+let useMouseRotation = false;
+canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
+document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
+
+canvas.addEventListener('click', function() {
+    canvas.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', lockChangeAlert, false);
+document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+
+function lockChangeAlert() {
+    if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas) {
+        useMouseRotation = true;
+        document.addEventListener("mousemove", updateMouseMovement, false);
+    } else {
+        useMouseRotation = false;
+        document.removeEventListener("mousemove", updateMouseMovement, false);
+    }
+}
+
+function updateMouseMovement(e) {
+    const mouseSensitivity = 0.001; // Ajusta la sensibilidad según convenga
+    // Se invierte la dirección: si mueves el ratón a la izquierda, se rota a la izquierda
+    angle += e.movementX * mouseSensitivity;
+}
+
+// ─── DISPARO CON RATÓN ───
+// Al hacer clic izquierdo se dispara
+canvas.addEventListener('mousedown', function(e) {
+    if (e.button === 0) { // Botón izquierdo
+        shootBullet();
+    }
+});
+
+// ─── CONTROLES CON TECLADO ───
 window.keys = {}; // Objeto global para almacenar pulsaciones
 window.addEventListener('keydown', e => {
   window.keys[e.key] = true;
@@ -127,39 +163,35 @@ function dash() {
   const dashDistance = 1; // Distancia del dash (ajústala según tu juego)
   const newX = posX + Math.cos(angle) * dashDistance;
   const newY = posY + Math.sin(angle) * dashDistance;
-  // Comprobamos que no choque con una pared
   if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
     posX = newX;
     posY = newY;
   }
-  // Opcional: reproducir sonido o animación
 }
 window.dash = dash;
 
 // ─── SISTEMA DE DISPAROS DEL JUGADOR ───
 const bullets = [];
-// Hacemos que el array de balas esté accesible globalmente
-window.bullets = bullets;
+window.bullets = bullets; // Hacemos el array de balas accesible globalmente
 
 const bulletSpeed = 0.5;
 let lastShotTime = 0;
 const shootCooldown = 300; // milisegundos
 
-// ─── SONIDO DEL DISPARO ───
-// Se carga un archivo de audio (asegúrate de tener "shoot.mp3" en la ruta correcta)
+// Sonido del disparo (asegúrate de tener "shoot.mp3" en la ruta correcta)
 const shootSound = new Audio('shoot.mp3');
-shootSound.volume = 0.5; // Ajusta el volumen (0 a 1)
+shootSound.volume = 0.5;
 
 function shootBullet() {
   const currentTime = Date.now();
   if (currentTime - lastShotTime > shootCooldown) {
     bullets.push({ x: posX, y: posY, angle: angle });
-    shootSound.currentTime = 0; // Reiniciar el sonido para poder reproducirlo de inmediato
+    shootSound.currentTime = 0;
     shootSound.play();
     lastShotTime = currentTime;
   }
 }
-window.shootBullet = shootBullet; // Exponer para otros módulos (footer.js, etc.)
+window.shootBullet = shootBullet;
 
 // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
 function update() {
@@ -190,8 +222,7 @@ function update() {
   }
 
   // Movimiento lateral (strafe) con "q" (izquierda) y "e" (derecha)
-  if (window.keys["q"]) {
-    // Movimiento perpendicular hacia la izquierda (ángulo - 90°)
+  if (window.keys["a"]) {
     const newX = posX + Math.cos(angle - Math.PI / 2) * moveSpeed;
     const newY = posY + Math.sin(angle - Math.PI / 2) * moveSpeed;
     if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
@@ -199,8 +230,7 @@ function update() {
       posY = newY;
     }
   }
-  if (window.keys["e"]) {
-    // Movimiento perpendicular hacia la derecha (ángulo + 90°)
+  if (window.keys["d"]) {
     const newX = posX + Math.cos(angle + Math.PI / 2) * moveSpeed;
     const newY = posY + Math.sin(angle + Math.PI / 2) * moveSpeed;
     if (window.map[Math.floor(newY)][Math.floor(newX)] === 0) {
@@ -209,23 +239,37 @@ function update() {
     }
   }
 
-  // Rotación con aceleración/desaceleración (teclas flecha izquierda/derecha o a/d)
-  if (window.keys["ArrowLeft"] || window.keys["a"]) {
-    rotateLeftTime++;
-    const factor = Math.min(1, rotateLeftTime / accelFrames);
-    angle -= (minRotSpeed + factor * (rotSpeed - minRotSpeed));
-  } else {
-    rotateLeftTime = 0;
+  // ─── ROTACIÓN ───
+  // Si no se usa la rotación con ratón (pointer lock activo), se usa la aceleración por teclado
+  if (!useMouseRotation) {
+    if (window.keys["ArrowLeft"] || window.keys["q"]) {
+      rotateLeftTime++;
+      const factor = Math.min(1, rotateLeftTime / accelFrames);
+      angle -= (minRotSpeed + factor * (rotSpeed - minRotSpeed));
+    } else {
+      rotateLeftTime = 0;
+    }
+    if (window.keys["ArrowRight"] || window.keys["e"]) {
+      rotateRightTime++;
+      const factor = Math.min(1, rotateRightTime / accelFrames);
+      angle += (minRotSpeed + factor * (rotSpeed - minRotSpeed));
+    } else {
+      rotateRightTime = 0;
+    }
   }
-  if (window.keys["ArrowRight"] || window.keys["d"]) {
-    rotateRightTime++;
-    const factor = Math.min(1, rotateRightTime / accelFrames);
-    angle += (minRotSpeed + factor * (rotSpeed - minRotSpeed));
-  } else {
-    rotateRightTime = 0;
+  // Independientemente del método, se añade la rotación analógica del gamepad (stick derecho)
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = gamepads[0];
+  if (gp) {
+    let axisRotation = gp.axes[2]; // Asumimos que el stick derecho horizontal está en el eje 2
+    const threshold = 0.1;
+    if (Math.abs(axisRotation) > threshold) {
+      const gamepadSensitivity = 0.15; // Ajusta según convenga
+      angle += axisRotation * gamepadSensitivity;
+    }
   }
 
-  // Actualizamos las posiciones en window (para el minimapa)
+  // Actualizamos las posiciones globales (útiles para el minimapa, etc.)
   window.posX = posX;
   window.posY = posY;
   window.angle = angle;
@@ -262,8 +306,7 @@ function update() {
     const dy = posY - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Determinar si el enemigo debe perseguir al jugador:
-    // Sólo se mueve hacia él si está cerca (dist < 5) o es visible (sin paredes intermedias)
+    // Determinar si el enemigo debe perseguir al jugador
     let chasePlayer = false;
     if (dist < 5 || isPlayerVisible(enemy)) {
       chasePlayer = true;
@@ -310,7 +353,7 @@ function update() {
       }
     }
 
-    // Sumar las fuerzas de persecución y repulsión
+    // Sumar fuerzas de persecución y repulsión
     let moveX = chaseVector.x + repulseWall.x + repulseEnemies.x;
     let moveY = chaseVector.y + repulseWall.y + repulseEnemies.y;
 
@@ -321,7 +364,6 @@ function update() {
       enemy.x = newX;
       enemy.y = newY;
     } else {
-      // Intentar deslizarse en cada eje si es posible
       if (window.map[Math.floor(enemy.y)] && window.map[Math.floor(enemy.y)][Math.floor(newX)] === 0) {
         enemy.x = newX;
       }
@@ -338,7 +380,7 @@ function update() {
       }
     }
 
-    // Ataque a distancia: el enemigo dispara si el jugador está cerca (dist < 5) y es visible
+    // Ataque a distancia: el enemigo dispara si el jugador está cerca y es visible
     if (dist < 5 && isPlayerVisible(enemy)) {
       if (!enemy.lastShotTime || currentTime - enemy.lastShotTime > enemyShootCooldown) {
         enemyBullets.push({
@@ -356,12 +398,10 @@ function update() {
     const bullet = enemyBullets[i];
     bullet.x += Math.cos(bullet.angle) * enemyBulletSpeed;
     bullet.y += Math.sin(bullet.angle) * enemyBulletSpeed;
-    // Si colisiona con pared o sale del mapa, se elimina
     if (!window.map[Math.floor(bullet.y)] || window.map[Math.floor(bullet.y)][Math.floor(bullet.x)] > 0) {
       enemyBullets.splice(i, 1);
       continue;
     }
-    // Si impacta al jugador, le quita vida
     const dxBullet = posX - bullet.x;
     const dyBullet = posY - bullet.y;
     if (Math.sqrt(dxBullet * dxBullet + dyBullet * dyBullet) < 0.3) {
@@ -374,7 +414,7 @@ function update() {
   // Si ya no quedan enemigos vivos, se pasa al siguiente mapa
   const aliveEnemies = window.enemies.filter(e => e.alive);
   if (aliveEnemies.length === 0) {
-    window.nextMap(); // Función definida en maps.js
+    window.nextMap();
   }
 
   // Actualizar la variable global de vida y, si existe, actualizar el HUD
@@ -424,7 +464,6 @@ function render() {
         let tx = Math.floor((worldX - cellX) * floorTexture.width);
         let ty = Math.floor((worldY - cellY) * floorTexture.height);
         tx = ((tx % floorTexture.width) + floorTexture.width) % floorTexture.width;
-        // CORRECCIÓN: usar floorTexture.height en lugar de ceilingTexture.height
         ty = ((ty % floorTexture.height) + floorTexture.height) % floorTexture.height;
         const texIndex = (ty * floorTexture.width + tx) * 4;
         data[pixelIndex    ] = floorData[texIndex    ];
@@ -511,7 +550,6 @@ function render() {
     let drawEnd = Math.floor(lineHeight / 2 + screenHeight / 2);
     if (drawEnd >= screenHeight) drawEnd = screenHeight - 1;
 
-    // Coordenada X en la textura
     let wallX;
     if (side === 0) {
       wallX = posY + perpWallDist * rayDirY;

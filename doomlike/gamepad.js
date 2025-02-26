@@ -8,8 +8,8 @@
         const gp = gamepads[0];
 
         if (gp) {
-            // --- Mapeo del stick izquierdo para movimiento y rotación ---
-            // Eje 1: -1 = hacia arriba (w), 1 = hacia abajo (s)
+            // --- Mapeo del stick izquierdo para movimiento ---
+            // Eje 1: -1 = hacia adelante (w), 1 = hacia atrás (s)
             if (gp.axes[1] < -axisThreshold) {
                 window.keys["w"] = true;
             } else {
@@ -19,18 +19,6 @@
                 window.keys["s"] = true;
             } else {
                 window.keys["s"] = false;
-            }
-
-            // Eje 0: -1 = izquierda (ArrowLeft), 1 = derecha (ArrowRight)
-            if (gp.axes[2] < -axisThreshold) {
-                window.keys["ArrowLeft"] = true;
-            } else {
-                window.keys["ArrowLeft"] = false;
-            }
-            if (gp.axes[2] > axisThreshold) {
-                window.keys["ArrowRight"] = true;
-            } else {
-                window.keys["ArrowRight"] = false;
             }
 
             // --- Botones para disparar ---
@@ -64,15 +52,15 @@
             // --- Movimiento lateral (strafe) ---
             // LB para strafe izquierda (índice 4) mapeado a "q"
             if (gp.axes[0] < -axisThreshold) {
-                window.keys["q"] = true;
+                window.keys["a"] = true;
             } else {
-                window.keys["q"] = false;
+                window.keys["a"] = false;
             }
             // RB para strafe derecha (índice 5) mapeado a "e"
             if (gp.axes[0] > axisThreshold) {
-                window.keys["e"] = true;
+                window.keys["d"] = true;
             } else {
-                window.keys["e"] = false;
+                window.keys["d"] = false;
             }
         }
 
