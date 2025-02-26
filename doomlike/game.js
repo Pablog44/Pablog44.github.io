@@ -10,6 +10,12 @@ const ctx = canvas.getContext('2d');
 const screenWidth = canvas.width;
 const screenHeight = canvas.height;
 
+const gameOveSound = new Audio('gameOve.mp3');
+gameOveSound.volume = 0.3;
+
+// Variable para evitar múltiples activaciones del reinicio por gamepad
+let restartTriggered = false;
+
 // VARIABLES GLOBALES DEL JUEGO
 let playerLife = 100;            // Vida del jugador
 let enemyBullets = [];           // Proyectiles de los enemigos
@@ -193,13 +199,104 @@ function shootBullet() {
 }
 window.shootBullet = shootBullet;
 
+// Función para reiniciar el juego (se usa en el overlay de Game Over)
+function restartGame() {
+  if (typeof gameOveSound !== 'undefined') {
+    gameOveSound.pause();
+    gameOveSound.currentTime = 0;
+  }
+  const overlay = document.getElementById('game-over-overlay');
+  if (overlay) {
+    document.body.removeChild(overlay);
+  }
+  playerLife = 100;
+  window.initMap(0);
+}
+
 // ─── ACTUALIZACIÓN DEL ESTADO (MOVIMIENTO Y LÓGICA) ───
 function update() {
   // Si la vida llega a 0, se considera Game Over
   if (playerLife <= 0) {
-    alert("¡Game Over!");
-    window.initMap(0);
-    playerLife = 100;
+    // Si ya existe el overlay, podemos comprobar si se pulsa con gamepad
+    const overlayExist = document.getElementById('game-over-overlay');
+    if (overlayExist) {
+      // Comprobar si se pulsa el botón Start del gamepad (normalmente button 9)
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp = gamepads[0];
+      if (gp && gp.buttons[9] && gp.buttons[9].pressed && !restartTriggered) {
+        restartTriggered = true;
+        restartGame();
+      } else if (gp && gp.buttons[9] && !gp.buttons[9].pressed) {
+        restartTriggered = false;
+      }
+      return;
+    }
+    
+    // Evitar crear múltiples overlays si ya existe uno
+    if (document.getElementById('game-over-overlay')) return;
+    
+    // Detener el sonido de inicio del mapa (mapStartSound debe estar definido en maps.js)
+    if (typeof mapStartSound !== 'undefined') {
+      mapStartSound.pause();
+    }
+    // Reproducir sonido de Game Over
+    if (typeof gameOveSound !== 'undefined') {
+      gameOveSound.currentTime = 0;
+      gameOveSound.play();
+    }
+    
+    // Crear overlay para "Game Over"
+    const overlay = document.createElement('div');
+    overlay.id = 'game-over-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = 0;
+    overlay.style.left = 0;
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.zIndex = 9999;
+    // Hacer que el overlay pueda recibir foco para detectar la tecla Intro
+    overlay.tabIndex = 0;
+    overlay.focus();
+
+    // Mensaje "Game Over" con letras en rojo
+    const message = document.createElement('div');
+    message.textContent = '¡Game Over!';
+    message.style.color = 'red';
+    message.style.fontSize = '48px';
+    message.style.marginBottom = '20px';
+    overlay.appendChild(message);
+
+    // Botón "Reiniciar"
+    const restartButton = document.createElement('button');
+    restartButton.textContent = 'Reiniciar';
+    restartButton.style.padding = '10px 20px';
+    restartButton.style.fontSize = '24px';
+    restartButton.style.cursor = 'pointer';
+    restartButton.addEventListener('click', function() {
+      restartGame();
+    });
+    overlay.appendChild(restartButton);
+
+    // Permitir reiniciar con click derecho (manejamos el evento contextmenu)
+    overlay.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      restartGame();
+    });
+
+    // Permitir reiniciar al pulsar la tecla Intro
+    overlay.addEventListener('keydown', function(e) {
+      if (e.key === "Enter") {
+        restartGame();
+      }
+    });
+
+    // Añadir el overlay al body y salir de update()
+    document.body.appendChild(overlay);
     return;
   }
 
@@ -221,7 +318,7 @@ function update() {
     }
   }
 
-  // Movimiento lateral (strafe) con "q" (izquierda) y "e" (derecha)
+  // Movimiento lateral (strafe) con "a" (izquierda) y "d" (derecha)
   if (window.keys["a"]) {
     const newX = posX + Math.cos(angle - Math.PI / 2) * moveSpeed;
     const newY = posY + Math.sin(angle - Math.PI / 2) * moveSpeed;
