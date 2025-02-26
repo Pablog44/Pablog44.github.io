@@ -393,8 +393,9 @@ window.nextMap = function() {
     restartButton.style.padding = '10px 20px';
     restartButton.style.fontSize = '24px';
     restartButton.style.cursor = 'pointer';
-    restartButton.addEventListener('click', function() {
-      // Detener el sonido de juego terminado para evitar que se solape con el de inicio
+
+    // Función para reiniciar el juego
+    function restartGame() {
       gameOverSound.pause();
       gameOverSound.currentTime = 0;
       
@@ -402,7 +403,42 @@ window.nextMap = function() {
       document.body.removeChild(overlay);
       playerLife = 100;
       window.initMap(0);
+    }
+
+    // Evento clic en el botón
+    restartButton.addEventListener('click', restartGame);
+
+    // Evento para la tecla Enter
+    document.addEventListener('keydown', function onKeyDown(e) {
+      if (e.code === 'Enter' && document.getElementById('game-over-overlay')) {
+        restartGame();
+      }
     });
+
+    // Evento para clic derecho
+    document.addEventListener('contextmenu', function onContextMenu(e) {
+      if (document.getElementById('game-over-overlay')) {
+        e.preventDefault();
+        restartGame();
+      }
+    });
+
+    // Soporte para gamepad
+    function checkGamepad() {
+      const gamepads = navigator.getGamepads();
+      for (const gamepad of gamepads) {
+        if (gamepad && document.getElementById('game-over-overlay')) {
+          if (gamepad.buttons[9]?.pressed) { // Start button
+            restartGame();
+          }
+        }
+      }
+      if (document.getElementById('game-over-overlay')) {
+        requestAnimationFrame(checkGamepad);
+      }
+    }
+    requestAnimationFrame(checkGamepad);
+
     overlay.appendChild(restartButton);
 
     // Añadir el overlay al body

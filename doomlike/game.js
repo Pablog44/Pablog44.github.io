@@ -199,7 +199,8 @@ function shootBullet() {
 }
 window.shootBullet = shootBullet;
 
-// Función para reiniciar el juego (se usa en el overlay de Game Over)
+// ─── FUNCIÓN REINICIAR JUEGO ───
+// Reinicia el juego eliminando el overlay y reseteando variables
 function restartGame() {
   if (typeof gameOveSound !== 'undefined') {
     gameOveSound.pause();
@@ -209,7 +210,11 @@ function restartGame() {
   if (overlay) {
     document.body.removeChild(overlay);
   }
+  // Reiniciamos variables globales según sea necesario
   playerLife = 100;
+  bullets.length = 0;
+  enemyBullets.length = 0;
+  // Se reinician el mapa, enemigos, etc. (asumimos que initMap se encarga de ello)
   window.initMap(0);
 }
 
@@ -217,9 +222,8 @@ function restartGame() {
 function update() {
   // Si la vida llega a 0, se considera Game Over
   if (playerLife <= 0) {
-    // Si ya existe el overlay, podemos comprobar si se pulsa con gamepad
-    const overlayExist = document.getElementById('game-over-overlay');
-    if (overlayExist) {
+    const overlay = document.getElementById('game-over-overlay');
+    if (overlay) {
       // Comprobar si se pulsa el botón Start del gamepad (normalmente button 9)
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const gp = gamepads[0];
@@ -232,44 +236,31 @@ function update() {
       return;
     }
     
-    // Evitar crear múltiples overlays si ya existe uno
-    if (document.getElementById('game-over-overlay')) return;
-    
-    // Detener el sonido de inicio del mapa (mapStartSound debe estar definido en maps.js)
-    if (typeof mapStartSound !== 'undefined') {
-      mapStartSound.pause();
-    }
-    // Reproducir sonido de Game Over
-    if (typeof gameOveSound !== 'undefined') {
-      gameOveSound.currentTime = 0;
-      gameOveSound.play();
-    }
-    
-    // Crear overlay para "Game Over"
-    const overlay = document.createElement('div');
-    overlay.id = 'game-over-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = 0;
-    overlay.style.left = 0;
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    overlay.style.display = 'flex';
-    overlay.style.flexDirection = 'column';
-    overlay.style.justifyContent = 'center';
-    overlay.style.alignItems = 'center';
-    overlay.style.zIndex = 9999;
+    // ─── CREAR OVERLAY DE GAME OVER ───
+    const overlayNew = document.createElement('div');
+    overlayNew.id = 'game-over-overlay';
+    overlayNew.style.position = 'fixed';
+    overlayNew.style.top = 0;
+    overlayNew.style.left = 0;
+    overlayNew.style.width = '100%';
+    overlayNew.style.height = '100%';
+    overlayNew.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    overlayNew.style.display = 'flex';
+    overlayNew.style.flexDirection = 'column';
+    overlayNew.style.justifyContent = 'center';
+    overlayNew.style.alignItems = 'center';
+    overlayNew.style.zIndex = 9999;
     // Hacer que el overlay pueda recibir foco para detectar la tecla Intro
-    overlay.tabIndex = 0;
-    overlay.focus();
+    overlayNew.tabIndex = 0;
+    overlayNew.focus();
 
-    // Mensaje "Game Over" con letras en rojo
+    // Mensaje "Game Over"
     const message = document.createElement('div');
     message.textContent = '¡Game Over!';
     message.style.color = 'red';
     message.style.fontSize = '48px';
     message.style.marginBottom = '20px';
-    overlay.appendChild(message);
+    overlayNew.appendChild(message);
 
     // Botón "Reiniciar"
     const restartButton = document.createElement('button');
@@ -280,23 +271,22 @@ function update() {
     restartButton.addEventListener('click', function() {
       restartGame();
     });
-    overlay.appendChild(restartButton);
+    overlayNew.appendChild(restartButton);
 
-    // Permitir reiniciar con click derecho (manejamos el evento contextmenu)
-    overlay.addEventListener('contextmenu', function(e) {
+    // Permitir reiniciar con click derecho
+    overlayNew.addEventListener('contextmenu', function(e) {
       e.preventDefault();
       restartGame();
     });
 
     // Permitir reiniciar al pulsar la tecla Intro
-    overlay.addEventListener('keydown', function(e) {
+    overlayNew.addEventListener('keydown', function(e) {
       if (e.key === "Enter") {
         restartGame();
       }
     });
 
-    // Añadir el overlay al body y salir de update()
-    document.body.appendChild(overlay);
+    document.body.appendChild(overlayNew);
     return;
   }
 
@@ -337,7 +327,6 @@ function update() {
   }
 
   // ─── ROTACIÓN ───
-  // Si no se usa la rotación con ratón (pointer lock activo), se usa la aceleración por teclado
   if (!useMouseRotation) {
     if (window.keys["ArrowLeft"] || window.keys["q"]) {
       rotateLeftTime++;
@@ -543,7 +532,7 @@ function render() {
 
   for (let y = 0; y < screenHeight; y++) {
     let p = y - halfHeight;
-    if (p === 0) p = 1; // Evitar división entre cero
+    if (p === 0) p = 1;
     const rowDistance = posZ / Math.abs(p);
 
     const floorStepX = rowDistance * ((dirX + planeX) - (dirX - planeX)) / screenWidth;
