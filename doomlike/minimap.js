@@ -19,10 +19,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const isWall = (window.map && window.map[y][x] === 1);
         minimapCtx.fillStyle = isWall ? "#555" : "#ccc"; // pared vs pasillo
         minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-
-        // Bordes en negro
-        minimapCtx.strokeStyle = "#000";
-        minimapCtx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
       }
     }
 
