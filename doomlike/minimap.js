@@ -38,8 +38,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const arrowTipX = playerX + Math.cos(angle) * (playerRadius + arrowLength);
     const arrowTipY = playerY + Math.sin(angle) * (playerRadius + arrowLength);
 
-    minimapCtx.strokeStyle = "orange";
-    minimapCtx.fillStyle = "orange";
+    minimapCtx.strokeStyle = "green";
+    minimapCtx.fillStyle = "green";
     minimapCtx.lineWidth = 2;
 
     // Dibujar la línea de la flecha
