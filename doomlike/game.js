@@ -701,6 +701,9 @@ function render() {
     const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
     if (transformY > 0) {
       const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+      // Comprobar si el proyectil está dentro de la pantalla y no está oculto por una pared
+      if (spriteScreenX < 0 || spriteScreenX >= screenWidth) continue;
+      if (transformY >= zBuffer[spriteScreenX]) continue;
       const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
       const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
       const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
@@ -725,6 +728,9 @@ function render() {
     const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
     if (transformY > 0) {
       const spriteScreenX = Math.floor((screenWidth / 2) * (1 + transformX / transformY));
+      // Comprobar si el proyectil está dentro de la pantalla y no está oculto por una pared
+      if (spriteScreenX < 0 || spriteScreenX >= screenWidth) continue;
+      if (transformY >= zBuffer[spriteScreenX]) continue;
       const spriteSize = Math.abs(Math.floor(screenHeight / transformY)) / 8;
       const drawStartY = Math.floor(-spriteSize / 2 + screenHeight / 2);
       const drawStartX = Math.floor(-spriteSize / 2 + spriteScreenX);
