@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Juego tipo Snoods con Phaser</title>
+  <!-- Importa Phaser desde CDN: -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #fafafa;
+      font-family: sans-serif;
+      text-align: center;
+    }
+
+    #game-container {
+      margin: 0 auto;
+      display: block;
+      width: 800px;
+      height: 600px;
+      border: 1px solid #ccc;
+      position: relative;
+    }
+
+    #btn-reiniciar {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Juego tipo Snoods (Bubble Shooter) con Phaser</h1>
+  
+  <div id="game-container"></div>
+  <button id="btn-reiniciar" onclick="reiniciarJuego()">Reiniciar</button>
+
+  <script>
+    // Configuración básica de Phaser
+    const config = {
+      type: Phaser.AUTO,
+      width: 800,
+      height: 600,
+      parent: 'game-container',
+      physics: {
+        default: 'arcade',
+        arcade: {
+          gravity: { y: 0 },
+          debug: false
+        }
+      },
+      scene: {
+        preload: preload,
+        create: create,
+        update: update
+      }
+    };
+
+    let game = new Phaser.Game(config);
+
+    // Variables globales de la escena
+    let shooter;             // Sprite para el "cañón" o lanzador
+    let currentBall;         // Bola actual que se lanzará
+    let ballsGroup;          // Grupo que contiene todas las bolas en la rejilla
+    let shotBall;            // Referencia a la bola que se ha disparado
+    let shootAngle = 0;      // Ángulo de tiro (0 = recto arriba)
+    let canShoot = true;     // Control para saber si se puede disparar
+    let cursors;
+
+    // Array de colores disponibles (6 colores)
+    const COLORS = [0xff0000, 0xff9900, 0xffff00, 0x00ff00, 0x00ffff, 0x9900ff];
+
+    function preload() {
+      // Podemos generar texturas simples en tiempo real con Graphics (Phaser 3)
+      // o usar imágenes. Para un ejemplo rápido, crearemos pequeños círculos de colores.
+    }
+
+    function create() {
+      // Creamos un grupo estático para las bolas en la parte superior
+      ballsGroup = this.physics.add.staticGroup();
+
+      // Generamos una "rejilla" simple de bolas
+      const rows = 5;
+      const cols = 8;
+      const startX = 100;
+      const startY = 50;
+      const spacing = 50;
+
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          let color = Phaser.Utils.Array.GetRandom(COLORS);
+          // Creamos una gráfica y la convertimos en textura
+          let ballTexture = this.add.graphics({ x: 0, y: 0 });
+          ballTexture.fillStyle(color, 1);
+          ballTexture.fillCircle(15, 15, 15);
+          // Generamos una clave única para no pisar texturas
+          let key = 'ball' + color + '_' + row + '_' + col;
+          ballTexture.generateTexture(key, 30, 30);
+          ballTexture.destroy(); // ya no se necesita
+
+          let ball = ballsGroup.create(startX + col * spacing, startY + row * spacing, key);
+          ball.setCircle(15);
+          ball.setOffset(0, 0);
+          ball.body.immovable = true;
+          ball.setData('color', color);
+        }
+      }
+
+      // Creamos el "cañón" (shooter) como simple indicador, en la parte de abajo
+      shooter = this.add.rectangle(400, 550, 40, 40, 0x333333);
+      shooter.setOrigin(0.5);
+
+      // Creamos la bola actual que se va a disparar
+      currentBall = createNewBall(this, 400, 500);
+
+      // Habilitamos teclado para manejar el ángulo
+      cursors = this.input.keyboard.createCursorKeys();
+      // Disparo con espacio
+      this.input.keyboard.on('keydown-SPACE', () => {
+        shootBall(this);
+      });
+
+      // También disparamos al dar click
+      this.input.on('pointerdown', () => {
+        shootBall(this);
+      });
+    }
+
+    function update() {
+      // Manejar el ángulo de disparo con flechas izq/der
+      if (cursors.left.isDown) {
+        shootAngle -= 1.5; 
+      } else if (cursors.right.isDown) {
+        shootAngle += 1.5;
+      }
+
+      // Limitar el ángulo para no salirse mucho del rango
+      if (shootAngle < -80) shootAngle = -80;
+      if (shootAngle > 80) shootAngle = 80;
+
+      // Rotamos el "cañón" (shooter)
+      shooter.setRotation(Phaser.Math.DegToRad(shootAngle));
+
+      // Actualizamos la posición de la bola que está "cargada"
+      if (currentBall && canShoot) {
+        // La bola sigue la posición y rotación del shooter
+        currentBall.x = shooter.x;
+        currentBall.y = shooter.y - 50;  // un poco por encima
+      }
+
+      // Si existe una bola disparada, revisamos colisiones con el grupo
+      if (shotBall) {
+        this.physics.overlap(shotBall, ballsGroup, (ballDisparada, ballEstatica) => {
+          // Al colisionar, fijamos la bola disparada en esa posición
+          ballDisparada.body.setVelocity(0, 0);
+          ballDisparada.body.setImmovable(true);
+
+          // Convertimos la bola disparada a estática para que no se mueva
+          ballsGroup.add(ballDisparada);
+          shotBall = null;
+          canShoot = true;
+
+          // Chequear posibles grupos de mismo color, etc.
+          // Aquí podrías implementar la lógica de eliminar grupos.
+          // Por simplicidad, este ejemplo no lo implementa en profundidad.
+
+          // Generar la siguiente bola
+          currentBall = createNewBall(this, 400, 500);
+        });
+        
+        // Si la bola disparada sale de la pantalla, reseteamos
+        if (shotBall.y < 0 || shotBall.x < 0 || shotBall.x > 800) {
+          shotBall.destroy();
+          shotBall = null;
+          canShoot = true;
+          // Generar nueva bola
+          currentBall = createNewBall(this, 400, 500);
+        }
+      }
+    }
+
+    function createNewBall(scene, x, y) {
+      let color = Phaser.Utils.Array.GetRandom(COLORS);
+      let gfx = scene.add.graphics({ x: 0, y: 0 });
+      gfx.fillStyle(color, 1);
+      gfx.fillCircle(15, 15, 15);
+      let key = 'currentBall' + color + Phaser.Math.Between(0, 100000);
+      gfx.generateTexture(key, 30, 30);
+      gfx.destroy();
+
+      let ball = scene.physics.add.image(x, y, key);
+      ball.setCircle(15);
+      ball.setOffset(0, 0);
+      ball.setCollideWorldBounds(true);
+      ball.setBounce(1);
+      ball.setData('color', color);
+      return ball;
+    }
+
+    function shootBall(scene) {
+      if (!canShoot || !currentBall) return;
+      canShoot = false;
+      shotBall = currentBall;
+      currentBall = null;
+
+      // Calculamos la velocidad basándonos en el ángulo
+      let angleRad = Phaser.Math.DegToRad(shootAngle - 90); // -90 para que 0° sea hacia arriba
+      let speed = 400;
+      shotBall.body.setVelocity(speed * Math.cos(angleRad), speed * Math.sin(angleRad));
+    }
+
+    function reiniciarJuego() {
+      // Recarga la página
+      location.reload();
+    }
+  </script>
+</body>
+</html>
