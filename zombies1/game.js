@@ -1,6 +1,7 @@
+// game.js
 let canvas = document.getElementById('gameCanvas');
-canvas.width = window.innerWidth;  // Establecer el ancho del canvas igual al ancho de la ventana
-canvas.height = window.innerHeight;  // Establecer la altura del canvas igual a la altura de la ventana
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 let ctx = canvas.getContext('2d');
 let mouse = { x: 0, y: 0 };
@@ -11,20 +12,23 @@ let player = {
     width: 10,
     height: 20,
     rotation: 0,
-    speed: 2
+    speed: 4
 };
 
 let bullets = [];
-let bulletSpeed = 5;
+let enemyBullets = [];
+let bulletSpeed = 9;
+let enemyBulletSpeed = 6;
 let score = 0;
+let lastShotTime = 0;
+const shotCooldown = 200;
 
 let enemies = [];
 let enemySpeed = 2;
 
-// Agregar arrays para las estrellas
 let stars = [[], [], []];
-let starSpeeds = [1, 2, 3];  // Las velocidades de las tres capas de estrellas
-let starColors = ['#FFFF00', '#FFFF33', '#FFFF66'];  // Los colores de las tres capas de estrellas
+let starSpeeds = [1, 2, 3];
+let starColors = ['#FFFF00', '#FFFF33', '#FFFF66'];
 
 let keys = {
     up: false,
@@ -32,56 +36,40 @@ let keys = {
     left: false,
     right: false
 };
-// Agregar estrellas iniciales
+
+let isUsingGamepad = false;
+let gameOver = false;
+
 for (let i = 0; i < 100; i++) {
     for (let j = 0; j < stars.length; j++) {
         let star = {
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
-            radius: Math.random() * 2,  // Radio de la estrella
+            radius: Math.random() * 2,
         };
         stars[j].push(star);
     }
 }
+
 canvas.addEventListener('mousemove', function(e) {
-    let rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
-    player.rotation = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-});
-window.addEventListener('keydown', function(e) {
-    switch(e.key) {
-        case 'w': keys.up = true; break;
-        case 'a': keys.left = true; break;
-        case 's': keys.down = true; break;
-        case 'd': keys.right = true; break;
+    if (!isUsingGamepad && !gameOver) {
+        let rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+        player.rotation = Math.atan2(mouse.y - player.y, mouse.x - player.x);
     }
 });
-function pollGamepad() {
-    let gamepad = navigator.getGamepads()[0]; // Considera el primer gamepad conectado
 
-    if (gamepad) {
-        // Joystick derecho para apuntar (asumiendo que axes[2] y axes[3] son los ejes del joystick derecho)
-        player.rotation = Math.atan2(gamepad.axes[3], gamepad.axes[2]);
-
-        // Joystick izquierdo para moverse (asumiendo que axes[0] y axes[1] son los ejes del joystick izquierdo)
-        player.x += gamepad.axes[0] * player.speed;
-        player.y += gamepad.axes[1] * player.speed;
-
-       // Botón 'RB' para disparar (asumiendo que buttons[5] es el botón 'RB')
-
-        if (gamepad.buttons[5].pressed) {
-            let bullet = {
-                x: player.x,
-                y: player.y,
-                vx: bulletSpeed * Math.cos(player.rotation),
-                vy: bulletSpeed * Math.sin(player.rotation)
-            };
-            bullets.push(bullet);
+window.addEventListener('keydown', function(e) {
+    if (!gameOver) {
+        switch(e.key) {
+            case 'w': keys.up = true; break;
+            case 'a': keys.left = true; break;
+            case 's': keys.down = true; break;
+            case 'd': keys.right = true; break;
         }
     }
-}
-
+});
 
 window.addEventListener('keyup', function(e) {
     switch(e.key) {
@@ -92,33 +80,81 @@ window.addEventListener('keyup', function(e) {
     }
 });
 
-canvas.addEventListener('mousemove', function(e) {
-    let rect = canvas.getBoundingClientRect();
-    let mouseX = e.clientX - rect.left;
-    let mouseY = e.clientY - rect.top;
-    player.rotation = Math.atan2(mouseY - player.y, mouseX - player.x);
-});
-
 canvas.addEventListener('click', function(e) {
-    let bullet = {
-        x: player.x,
-        y: player.y,
-        vx: bulletSpeed * Math.cos(player.rotation),
-        vy: bulletSpeed * Math.sin(player.rotation)
-    };
-    bullets.push(bullet);
+    if (!gameOver) shootBullet();
 });
 
-// Spawn enemies every 2 seconds
-setInterval(function() {
-    let enemy = {
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        width: 10,
-        height: 20
-    };
-    enemies.push(enemy);
-}, 2000);
+function shootBullet() {
+    let currentTime = Date.now();
+    if (currentTime - lastShotTime >= shotCooldown) {
+        let bullet = {
+            x: player.x,
+            y: player.y,
+            vx: bulletSpeed * Math.cos(player.rotation),
+            vy: bulletSpeed * Math.sin(player.rotation),
+            color: '#00f' // Azul para balas del jugador
+        };
+        bullets.push(bullet);
+        lastShotTime = currentTime;
+    }
+}
+
+function spawnEnemy() {
+    let attempts = 0;
+    const maxAttempts = 10;
+    let newEnemy;
+
+    do {
+        newEnemy = {
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            width: 10,
+            height: 20,
+            wanderAngle: Math.random() * Math.PI * 2,
+            lastShot: Date.now() + Math.random() * 1000 // Tiempo inicial aleatorio para disparos
+        };
+        attempts++;
+    } while (isTooCloseToOthers(newEnemy) && attempts < maxAttempts);
+
+    if (attempts < maxAttempts) {
+        enemies.push(newEnemy);
+    }
+}
+
+setInterval(spawnEnemy, 2000);
+
+function isTooCloseToOthers(enemy) {
+    const minDistance = 40;
+    for (let other of enemies) {
+        let dx = enemy.x - other.x;
+        let dy = enemy.y - other.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < minDistance) return true;
+    }
+    return false;
+}
+
+function pollGamepad() {
+    let gamepad = navigator.getGamepads()[0];
+    if (gamepad) {
+        isUsingGamepad = true;
+        if (!gameOver) {
+            player.rotation = Math.atan2(gamepad.axes[3], gamepad.axes[2]);
+            player.x += gamepad.axes[0] * player.speed;
+            player.y += gamepad.axes[1] * player.speed;
+
+            if (gamepad.buttons[5].pressed || gamepad.buttons[0].pressed) {
+                shootBullet();
+            }
+        }
+        // Botón Start (índice 9 en muchos controles) para reiniciar
+        if (gameOver && gamepad.buttons[9].pressed) {
+            resetGame();
+        }
+    } else {
+        isUsingGamepad = false;
+    }
+}
 
 function resetGame() {
     player = {
@@ -127,137 +163,209 @@ function resetGame() {
         width: 10,
         height: 20,
         rotation: 0,
-        speed: 2  // Reinicia la velocidad del jugador
+        speed: 4
     };
-
     bullets = [];
+    enemyBullets = [];
     enemies = [];
-    score = 0;  // Reinicia la puntuación
-    
-    // Reinicia el estado de las teclas WASD
+    score = 0;
     keys = {
-        w: false,  // up
-        a: false,  // left
-        s: false,  // down
-        d: false  // right
+        up: false,
+        down: false,
+        left: false,
+        right: false
     };
+    isUsingGamepad = false;
+    lastShotTime = 0;
+    gameOver = false;
 }
-
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Dibujar y mover las estrellas
-    for (let i = 0; i < stars.length; i++) {
-        ctx.fillStyle = starColors[i];
-        for (let j = 0; j < stars[i].length; j++) {
-            let star = stars[i][j];
-            ctx.beginPath();
-            ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-            ctx.fill();
-            star.x -= starSpeeds[i];
-            
-            // Si la estrella ha salido de la pantalla
-            if (star.x < 0) {
-                stars[i].splice(j, 1);
-                // Agregar una nueva estrella en el lado derecho
-                let newStar = {
-                    x: canvas.width,
-                    y: Math.random() * canvas.height,
-                    radius: Math.random() * 2,
-                };
-                stars[i].push(newStar);
+
+    if (!gameOver) {
+        // Estrellas
+        for (let i = 0; i < stars.length; i++) {
+            ctx.fillStyle = starColors[i];
+            for (let j = 0; j < stars[i].length; j++) {
+                let star = stars[i][j];
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+                star.x -= starSpeeds[i];
+                if (star.x < 0) {
+                    stars[i].splice(j, 1);
+                    stars[i].push({
+                        x: canvas.width,
+                        y: Math.random() * canvas.height,
+                        radius: Math.random() * 2,
+                    });
+                }
             }
         }
-    }
-    let dx = mouse.x - player.x;
-    let dy = mouse.y - player.y;
-    let distanceToMouse = Math.sqrt(dx * dx + dy * dy);
 
-    if (distanceToMouse > 50) {  // Si el jugador no está "cerca" del cursor del ratón
-        let angleToMouse = Math.atan2(dy, dx);
-        player.x += player.speed * Math.cos(angleToMouse);
-        player.y += player.speed * Math.sin(angleToMouse);
-    }
-
-    pollGamepad(); 
-
-    if (keys.up) player.y -= player.speed;
-    if (keys.down) player.y += player.speed;
-    if (keys.left) player.x -= player.speed;
-    if (keys.right) player.x += player.speed;
-    ctx.save();  // Guarda el contexto actual
-    ctx.translate(player.x, player.y);  // Cambia el origen del contexto al centro del jugador
-    ctx.rotate(player.rotation);  // Rota el contexto alrededor del nuevo origen
-    ctx.fillStyle = '#00f';  // Establece el color de relleno a azul
-    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);  // Dibuja el rectángulo principal del jugador
-    
-    // Añadir dos rectángulos azules al jugador
-    ctx.fillRect(-player.width / 2 - 4, -player.height / 2 , 10, 2);  // Dibuja un rectángulo en la parte superior del rectángulo principal
-    ctx.fillRect(-player.width / 2 - 4, player.height / 2 , 10, 2);  // Dibuja un rectángulo en la parte inferior del rectángulo principal
-    ctx.fillRect(player.width / 2 - 4, -player.height / 2, 10, 2);
-    ctx.fillRect(player.width / 2 - 4, player.height / 2, 10, 2);
-    ctx.beginPath();
-    ctx.arc(0, 0, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();  // Restaura el contexto a su estado original (antes del save)
-
-    bullets.forEach(function(bullet, i) {
-        bullet.x += bullet.vx;
-        bullet.y += bullet.vy;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Bullet-enemy collision
-        enemies.forEach(function(enemy, j) {
-            let dx = enemy.x - bullet.x;
-            let dy = enemy.y - bullet.y;
-            let distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < enemy.width / 2) {
-                enemies.splice(j, 1);
-                bullets.splice(i, 1);
-                score++;  // Incrementa la puntuación
+        if (!isUsingGamepad) {
+            let dx = mouse.x - player.x;
+            let dy = mouse.y - player.y;
+            let distanceToMouse = Math.sqrt(dx * dx + dy * dy);
+            if (distanceToMouse > 50) {
+                let angleToMouse = Math.atan2(dy, dx);
+                player.x += player.speed * Math.cos(angleToMouse);
+                player.y += player.speed * Math.sin(angleToMouse);
             }
-        });
-    });
+        }
 
-    enemies.forEach(function(enemy) {
-        let dx = player.x - enemy.x;
-        let dy = player.y - enemy.y;
-        let angle = Math.atan2(dy, dx);
-        enemy.x += enemySpeed * Math.cos(angle);
-        enemy.y += enemySpeed * Math.sin(angle);
+        pollGamepad();
 
+        if (keys.up) player.y -= player.speed;
+        if (keys.down) player.y += player.speed;
+        if (keys.left) player.x -= player.speed;
+        if (keys.right) player.x += player.speed;
+
+        // Dibujar jugador
         ctx.save();
-        ctx.translate(enemy.x, enemy.y);
-        ctx.rotate(angle + Math.PI);
-        ctx.fillStyle = '#f00';
-        ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
-        // Añadir dos rectángulos azules al enemigo
-        ctx.fillRect(-enemy.width / 2 - 4, -enemy.height / 2, 10, 2);
-        ctx.fillRect(enemy.width / 2 - 4, -enemy.height / 2, 10, 2);
-        ctx.fillRect(-enemy.width / 2 - 4, enemy.height / 2 , 10, 2);
-        ctx.fillRect(enemy.width / 2 - 4, enemy.height / 2, 10, 2);
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.rotation);
+        ctx.fillStyle = '#00f';
+        ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.fillRect(-player.width / 2 - 4, -player.height / 2, 10, 2);
+        ctx.fillRect(-player.width / 2 - 4, player.height / 2, 10, 2);
+        ctx.fillRect(player.width / 2 - 4, -player.height / 2, 10, 2);
+        ctx.fillRect(player.width / 2 - 4, player.height / 2, 10, 2);
         ctx.beginPath();
         ctx.arc(0, 0, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-    
- 
 
-        // Player-enemy collision
-        let pdx = player.x - enemy.x;
-        let pdy = player.y - enemy.y;
-        let pdistance = Math.sqrt(pdx * pdx + pdy * pdy);
-        if (pdistance < player.width / 2) {
-            alert('Game Over');
-            resetGame();
-        }
-    });
-    // Muestra la puntuación
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#0095DD";
-    ctx.fillText("Score: " + score, 8, 20);
+        // Balas del jugador
+        bullets.forEach(function(bullet, i) {
+            bullet.x += bullet.vx;
+            bullet.y += bullet.vy;
+            ctx.fillStyle = bullet.color;
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            enemies.forEach(function(enemy, j) {
+                let dx = enemy.x - bullet.x;
+                let dy = enemy.y - bullet.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < enemy.width / 2) {
+                    enemies.splice(j, 1);
+                    bullets.splice(i, 1);
+                    score++;
+                }
+            });
+        });
+
+        // Balas de enemigos
+        enemyBullets.forEach(function(bullet, i) {
+            bullet.x += bullet.vx;
+            bullet.y += bullet.vy;
+            ctx.fillStyle = bullet.color;
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            let dx = player.x - bullet.x;
+            let dy = player.y - bullet.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < player.width / 2) {
+                gameOver = true;
+            }
+        });
+
+        // Enemigos con IA mejorada
+        enemies.forEach(function(enemy) {
+            let dx = player.x - enemy.x;
+            let dy = player.y - enemy.y;
+            let distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+            let pursuitAngle = Math.atan2(dy, dx);
+
+            // Persecución más directa con menos aleatoriedad
+            let finalAngle = pursuitAngle * 0.9 + enemy.wanderAngle * 0.1;
+            enemy.wanderAngle += (Math.random() - 0.5) * 0.1;
+
+            // Separación mejorada
+            let separationX = 0;
+            let separationY = 0;
+            enemies.forEach(function(other) {
+                if (enemy !== other) {
+                    let sepDx = enemy.x - other.x;
+                    let sepDy = enemy.y - other.y;
+                    let sepDist = Math.sqrt(sepDx * sepDx + sepDy * sepDy);
+                    if (sepDist < 40 && sepDist > 0) {
+                        let force = (40 - sepDist) / 40;
+                        separationX += (sepDx / sepDist) * force * 2;
+                        separationY += (sepDy / sepDist) * force * 2;
+                    }
+                }
+            });
+
+            enemy.x += Math.cos(finalAngle) * enemySpeed + separationX;
+            enemy.y += Math.sin(finalAngle) * enemySpeed + separationY;
+
+            // Disparo de enemigos
+            let currentTime = Date.now();
+            if (currentTime - enemy.lastShot >= 1000) {
+                let bullet = {
+                    x: enemy.x,
+                    y: enemy.y,
+                    vx: enemyBulletSpeed * Math.cos(pursuitAngle),
+                    vy: enemyBulletSpeed * Math.sin(pursuitAngle),
+                    color: '#f00' // Rojo para balas de enemigos
+                };
+                enemyBullets.push(bullet);
+                enemy.lastShot = currentTime;
+            }
+
+            // Dibujar enemigo
+            ctx.save();
+            ctx.translate(enemy.x, enemy.y);
+            ctx.rotate(pursuitAngle + Math.PI);
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+            ctx.fillRect(-enemy.width / 2 - 4, -enemy.height / 2, 10, 2);
+            ctx.fillRect(enemy.width / 2 - 4, -enemy.height / 2, 10, 2);
+            ctx.fillRect(-enemy.width / 2 - 4, enemy.height / 2, 10, 2);
+            ctx.fillRect(enemy.width / 2 - 4, enemy.height / 2, 10, 2);
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Colisión con jugador
+            let pdx = player.x - enemy.x;
+            let pdy = player.y - enemy.y;
+            let pdistance = Math.sqrt(pdx * pdx + pdy * pdy);
+            if (pdistance < player.width / 2) {
+                gameOver = true;
+            }
+        });
+
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#0095DD";
+        ctx.fillText("Score: " + score, 8, 20);
+    } else {
+        // Pantalla de Game Over
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = "60px Arial";
+        ctx.fillStyle = "#ff0000";
+        ctx.textAlign = "center";
+        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 40);
+        
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("Score: " + score, canvas.width / 2, canvas.height / 2 + 20);
+        
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "#00ff00";
+        ctx.fillText("Press START to Restart", canvas.width / 2, canvas.height / 2 + 60);
+        
+        pollGamepad(); // Seguir verificando el botón Start
+    }
     
     requestAnimationFrame(gameLoop);
 }
