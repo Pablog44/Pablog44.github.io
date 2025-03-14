@@ -1,11 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-   
+  <meta charset="UTF-8">
+  <title>Mi Juego</title>
+  <link rel="stylesheet" type="text/css" href="styles.css">
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <script src="game.js"></script> 
-    <link rel="stylesheet" type="text/css" href="styles.css">
+  <!-- Landing page -->
+  <div id="landing">
+    <h1>Bienvenido a Mi Juego</h1>
+    <button id="onePlayerBtn">1 Jugador</button>
+    <button id="twoPlayersBtn">2 Jugadores</button>
+    <button id="recordsBtn">Records</button>
+  </div>
+
+  <!-- Pantalla para elegir control (visible según el modo seleccionado) -->
+  <div id="controlSelection" style="display:none;">
+    <h2>Seleccione el control</h2>
+    <!-- Para modo 1 jugador -->
+    <div id="onePlayerControl" style="display:none;">
+      <p>Jugador 1: Elija su control:</p>
+      <button id="controlKeyboardBtn">Teclado y Ratón</button>
+      <button id="controlGamepadBtn">Mando</button>
+    </div>
+    <!-- Para modo 2 jugadores (se asigna automáticamente) -->
+    <div id="twoPlayersControl" style="display:none;">
+      <p>Asignación de controles para 2 Jugadores:</p>
+      <p>Jugador 1: Teclado y Ratón</p>
+      <p>Jugador 2: Mando</p>
+      <button id="startTwoPlayersBtn">Comenzar Juego</button>
+    </div>
+  </div>
+
+  <!-- Pantalla de records -->
+  <div id="recordsPage" style="display:none;">
+    <h2>Records</h2>
+    <ul id="recordsList"></ul>
+    <button id="backToLandingBtn">Volver</button>
+  </div>
+
+  <!-- Canvas del juego -->
+  <canvas id="gameCanvas" style="display:none;"></canvas>
+  
+  <script src="game.js"></script>
 </body>
 </html>

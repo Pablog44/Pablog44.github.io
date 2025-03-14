@@ -4,9 +4,30 @@ body {
     overflow: hidden;
     height: 100vh;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-}
-#gameCanvas {
+    color: #fff;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+  
+  #landing, #controlSelection, #recordsPage {
+    z-index: 10;
+  }
+  
+  button {
+    padding: 10px 20px;
+    margin: 10px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  #gameCanvas {
     border: 1px solid #fff;
-}
+    background-color: #000;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  
