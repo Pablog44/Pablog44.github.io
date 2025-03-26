@@ -140,7 +140,7 @@ const textureKeys = {
 const game = new Phaser.Game(config);
 
 function preload() {
-  // Carga de imágenes. Ajusta si tus archivos tienen nombres distintos.
+  // Carga de imágenes. Asegúrate de que los nombres coincidan con tus archivos.
   this.load.image("wall0",    "img/wall0.jpg");
   this.load.image("wall1",    "img/wall1.jpg");
   this.load.image("wall2",    "img/wall2.jpg");
@@ -261,10 +261,10 @@ function renderRaycasting() {
     const floorY = playerY + Math.sin(playerAngle) * camDist;
 
     for (let xScreen = 0; xScreen < width; xScreen++) {
-      // offset horizontal
+      // Offset horizontal
       const angleOffset = (xScreen - width / 2) / width * 1.5;
 
-      // rx, ry = celda real en el mundo para el floor
+      // rx, ry = celda real en el mundo para el suelo y techo
       const rx = floorX + Math.cos(playerAngle + Math.PI / 2) * angleOffset * camDist;
       const ry = floorY + Math.sin(playerAngle + Math.PI / 2) * angleOffset * camDist;
 
@@ -280,16 +280,19 @@ function renderRaycasting() {
         const floorIndex = floorMap[cellY][cellX];
         if (floorIndex >= 0 && floorIndex < textureKeys.floor.length) {
           const texKey = textureKeys.floor[floorIndex];
-          // Mapeamos subpixel
-          drawTexturePixel(texKey, rx - cellX, ry - cellY, xScreen, yScreen + halfH);
+          const u = rx - cellX;
+          const v = ry - cellY;
+          drawTexturePixel(texKey, u, v, xScreen, yScreen + halfH);
         }
 
         // --- Techo ---
         const ceilingIndex = ceilingMap[cellY][cellX];
         if (ceilingIndex >= 0 && ceilingIndex < textureKeys.ceiling.length) {
           const texCeil = textureKeys.ceiling[ceilingIndex];
-          const invY = (halfH - 1) - yScreen; 
-          drawTexturePixel(texCeil, rx - cellX, ry - cellY, xScreen, invY);
+          const invY = (halfH - 1) - yScreen;
+          const uCeil = rx - cellX;
+          const vCeil = 1 - (ry - cellY); // Invertimos v para el techo
+          drawTexturePixel(texCeil, uCeil, vCeil, xScreen, invY);
         }
       }
     }
@@ -360,10 +363,10 @@ function renderRaycasting() {
     if (drawStart < 0) drawStart = 0;
     if (drawEnd >= height) drawEnd = height - 1;
 
-    // Texture index
-    const wallIndex = wallMap[mapY][mapX];
+    // Texture index (ajustado para que 1->wall0, 2->wall1, etc.)
+    const wallIndex = wallMap[mapY][mapX] - 1;
+    if (wallIndex < 0 || wallIndex >= textureKeys.wall.length) continue;
     const wallTexKey = textureKeys.wall[wallIndex];
-    if (!wallTexKey) continue;
 
     // Coord "horizontal" en la pared
     let wallX;
