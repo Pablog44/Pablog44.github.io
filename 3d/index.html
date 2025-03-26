@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Raycaster con Phaser 3</title>
+
+  <style>
+    /* Estilos básicos */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #gameContainer {
+      width: 100vw;
+      height: 100vh;
+    }
+    /* Texto de ayuda en pantalla */
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      padding: 10px;
+      font-size: 14px;
+    }
+  </style>
+
+  <!-- Phaser 3 desde CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
+</head>
+
+<body>
+<div id="gameContainer"></div>
+<div id="info">
+  <p><strong>Controles:</strong></p>
+  <ul>
+    <li>W / S : Avanzar / Retroceder</li>
+    <li>A / D : Strafe (moverse lateralmente)</li>
+    <li>← / → : Girar izquierda / derecha</li>
+  </ul>
+  <p>Raycaster simple con Phaser 3.</p>
+</div>
+
+<script>
+////////////////////////////////////////////////////////////////////////
+// MAPAS DE PAREDES, SUELO Y TECHO
+////////////////////////////////////////////////////////////////////////
+/*
+   - wallMap: 0 significa "no hay pared".
+     Si es 1, 2, 3..., se corresponde con las texturas de pared (textures.wall[]).
+   - floorMap / ceilingMap: cada número apunta a un índice de textures.floor[] o textures.ceiling[].
+*/
+const wallMap = [
+  [1, 2, 1, 2, 1, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 2, 2, 2, 2, 0, 1],
+  [1, 1, 1, 2, 1, 1, 1, 1],
+];
+
+const floorMap = [
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 1, 0, 0, 1, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+const ceilingMap = [
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0, 0],
+  [0, 0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+////////////////////////////////////////////////////////////////////////
+// CONFIGURACIÓN DE PHASER
+////////////////////////////////////////////////////////////////////////
+const config = {
+  type: Phaser.AUTO,
+  parent: 'gameContainer',
+  width: window.innerWidth,
+  height: window.innerHeight,
+  scene: {
+    preload: preload,
+    create: create,
+    update: update,
+  }
+};
+
+////////////////////////////////////////////////////////////////////////
+// VARIABLES GLOBALES
+////////////////////////////////////////////////////////////////////////
+let canvasTexture; // Canvas interno de Phaser para dibujar
+let ctx;           // Contexto 2D de ese canvas
+let canvasWidth;  
+let canvasHeight;  
+
+// Jugador
+let playerX = 3.5;    // Celda X
+let playerY = 3.5;    // Celda Y
+let playerAngle = 0;  // Ángulo en radianes (0 = eje X positivo)
+
+// Velocidades
+const moveSpeed = 0.05;
+const rotSpeed = 0.03;
+
+// Teclado
+let cursors;
+let keyW, keyS, keyA, keyD;
+
+// Claves de texturas en Phaser
+const textureKeys = {
+  wall:    ["wall0", "wall1", "wall2"], // 0->wall0, 1->wall1, 2->wall2
+  floor:   ["floor0", "floor1"],        // 0->floor0, 1->floor1
+  ceiling: ["ceiling0", "ceiling1"]     // 0->ceiling0, 1->ceiling1
+};
+
+////////////////////////////////////////////////////////////////////////
+// INICIO DEL JUEGO
+////////////////////////////////////////////////////////////////////////
+const game = new Phaser.Game(config);
+
+function preload() {
+  // Carga de imágenes. Ajusta si tus archivos tienen nombres distintos.
+  this.load.image("wall0",    "img/wall0.jpg");
+  this.load.image("wall1",    "img/wall1.jpg");
+  this.load.image("wall2",    "img/wall2.jpg");
+  this.load.image("floor0",   "img/floor0.jpg");
+  this.load.image("floor1",   "img/floor1.jpg");
+  this.load.image("ceiling0", "img/ceiling0.jpg");
+  this.load.image("ceiling1", "img/ceiling1.jpg");
+}
+
+function create() {
+  canvasWidth = this.sys.game.config.width;
+  canvasHeight = this.sys.game.config.height;
+
+  // Creamos un canvas "manual"
+  canvasTexture = this.textures.createCanvas("rayCanvas", canvasWidth, canvasHeight);
+  ctx = canvasTexture.context;
+
+  // Añadimos la imagen resultante de 'rayCanvas'
+  const image = this.add.image(0, 0, "rayCanvas");
+  image.setOrigin(0, 0);
+
+  // Teclas
+  cursors = this.input.keyboard.createCursorKeys();
+  keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+  keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+  keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+  keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+
+  // Evento de resize, por si ajustas la ventana
+  this.scale.on('resize', resize, this);
+}
+
+function resize(gameSize) {
+  const width = gameSize.width;
+  const height = gameSize.height;
+  if (!canvasTexture) return;
+
+  canvasWidth = width;
+  canvasHeight = height;
+  canvasTexture.setSize(width, height);
+  ctx = canvasTexture.context;
+}
+
+function update(time, delta) {
+  // Mover jugador
+  handlePlayerMovement();
+  // Render con raycasting
+  renderRaycasting();
+  // Refrescar la textura para que se vean los cambios
+  canvasTexture.refresh();
+}
+
+////////////////////////////////////////////////////////////////////////
+// MOVIMIENTO DEL JUGADOR
+////////////////////////////////////////////////////////////////////////
+function handlePlayerMovement() {
+  // Girar con flechas
+  if (cursors.left.isDown) {
+    playerAngle -= rotSpeed;
+  }
+  if (cursors.right.isDown) {
+    playerAngle += rotSpeed;
+  }
+
+  const dx = Math.cos(playerAngle);
+  const dy = Math.sin(playerAngle);
+
+  let newX = playerX;
+  let newY = playerY;
+
+  // W / S para avanzar o retroceder
+  if (keyW.isDown) {
+    newX += dx * moveSpeed;
+    newY += dy * moveSpeed;
+  } else if (keyS.isDown) {
+    newX -= dx * moveSpeed;
+    newY -= dy * moveSpeed;
+  }
+
+  // A / D para strafe
+  if (keyA.isDown) {
+    newX += Math.cos(playerAngle - Math.PI / 2) * moveSpeed;
+    newY += Math.sin(playerAngle - Math.PI / 2) * moveSpeed;
+  } else if (keyD.isDown) {
+    newX += Math.cos(playerAngle + Math.PI / 2) * moveSpeed;
+    newY += Math.sin(playerAngle + Math.PI / 2) * moveSpeed;
+  }
+
+  // Colisión con paredes (mapa)
+  if (wallMap[Math.floor(newY)][Math.floor(newX)] === 0) {
+    playerX = newX;
+    playerY = newY;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+// RENDER PRINCIPAL (RAYCASTING)
+////////////////////////////////////////////////////////////////////////
+function renderRaycasting() {
+  // Limpiar canvas
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  const width = canvasWidth;
+  const height = canvasHeight;
+  const halfH = Math.floor(height / 2);
+
+  // ================================
+  // 1) Suelo y techo (versión simple con “aproximación”)
+  // ================================
+  for (let yScreen = 0; yScreen < halfH; yScreen++) {
+    // yScreen = fila desde arriba hacia la mitad (para el techo)
+    // yScreen + halfH = fila para el suelo (desde mitad hacia abajo)
+
+    // Aproximación de distancia
+    const camDist = halfH / (halfH - yScreen);
+
+    // Coordenadas iniciales (para la parte frontal)
+    const floorX = playerX + Math.cos(playerAngle) * camDist;
+    const floorY = playerY + Math.sin(playerAngle) * camDist;
+
+    for (let xScreen = 0; xScreen < width; xScreen++) {
+      // offset horizontal
+      const angleOffset = (xScreen - width / 2) / width * 1.5;
+
+      // rx, ry = celda real en el mundo para el floor
+      const rx = floorX + Math.cos(playerAngle + Math.PI / 2) * angleOffset * camDist;
+      const ry = floorY + Math.sin(playerAngle + Math.PI / 2) * angleOffset * camDist;
+
+      const cellX = Math.floor(rx);
+      const cellY = Math.floor(ry);
+
+      // Comprobamos si está dentro del mapa
+      if (
+        cellX >= 0 && cellX < wallMap[0].length &&
+        cellY >= 0 && cellY < wallMap.length
+      ) {
+        // --- Piso ---
+        const floorIndex = floorMap[cellY][cellX];
+        if (floorIndex >= 0 && floorIndex < textureKeys.floor.length) {
+          const texKey = textureKeys.floor[floorIndex];
+          // Mapeamos subpixel
+          drawTexturePixel(texKey, rx - cellX, ry - cellY, xScreen, yScreen + halfH);
+        }
+
+        // --- Techo ---
+        const ceilingIndex = ceilingMap[cellY][cellX];
+        if (ceilingIndex >= 0 && ceilingIndex < textureKeys.ceiling.length) {
+          const texCeil = textureKeys.ceiling[ceilingIndex];
+          const invY = (halfH - 1) - yScreen; 
+          drawTexturePixel(texCeil, rx - cellX, ry - cellY, xScreen, invY);
+        }
+      }
+    }
+  }
+
+  // ================================
+  // 2) Paredes (raycasting vertical)
+  // ================================
+  for (let x = 0; x < width; x++) {
+    const cameraX = 2 * x / width - 1; // de -1 a 1
+    // Dirección del rayo
+    const rayDirX = Math.cos(playerAngle) + Math.cos(playerAngle + Math.PI / 2) * cameraX;
+    const rayDirY = Math.sin(playerAngle) + Math.sin(playerAngle + Math.PI / 2) * cameraX;
+
+    let mapX = Math.floor(playerX);
+    let mapY = Math.floor(playerY);
+
+    const deltaDistX = Math.abs(1 / rayDirX);
+    const deltaDistY = Math.abs(1 / rayDirY);
+    let sideDistX, sideDistY;
+    let stepX, stepY;
+
+    if (rayDirX < 0) {
+      stepX = -1;
+      sideDistX = (playerX - mapX) * deltaDistX;
+    } else {
+      stepX = 1;
+      sideDistX = (mapX + 1.0 - playerX) * deltaDistX;
+    }
+    if (rayDirY < 0) {
+      stepY = -1;
+      sideDistY = (playerY - mapY) * deltaDistY;
+    } else {
+      stepY = 1;
+      sideDistY = (mapY + 1.0 - playerY) * deltaDistY;
+    }
+
+    // DDA
+    let hit = false;
+    let side = 0; // 0=Eje X, 1=Eje Y
+    while (!hit) {
+      if (sideDistX < sideDistY) {
+        sideDistX += deltaDistX;
+        mapX += stepX;
+        side = 0;
+      } else {
+        sideDistY += deltaDistY;
+        mapY += stepY;
+        side = 1;
+      }
+      if (wallMap[mapY][mapX] !== 0) {
+        hit = true;
+      }
+    }
+
+    // Distancia perpendicular
+    let perpWallDist;
+    if (side === 0) {
+      perpWallDist = sideDistX - deltaDistX;
+    } else {
+      perpWallDist = sideDistY - deltaDistY;
+    }
+
+    // Altura de la columna
+    const lineHeight = Math.floor(height / perpWallDist);
+    let drawStart = -lineHeight / 2 + (height / 2);
+    let drawEnd = lineHeight / 2 + (height / 2);
+    if (drawStart < 0) drawStart = 0;
+    if (drawEnd >= height) drawEnd = height - 1;
+
+    // Texture index
+    const wallIndex = wallMap[mapY][mapX];
+    const wallTexKey = textureKeys.wall[wallIndex];
+    if (!wallTexKey) continue;
+
+    // Coord "horizontal" en la pared
+    let wallX;
+    if (side === 0) {
+      wallX = playerY + perpWallDist * rayDirY;
+    } else {
+      wallX = playerX + perpWallDist * rayDirX;
+    }
+    wallX -= Math.floor(wallX);
+
+    // Calc texX
+    const texImg = game.textures.get(wallTexKey).source[0].image;
+    const texW = texImg.width;
+    const texH = texImg.height;
+
+    let texX = Math.floor(wallX * texW);
+    // Ajuste si está en lado "opuesto"
+    if (side === 0 && rayDirX > 0) texX = texW - texX - 1;
+    if (side === 1 && rayDirY < 0) texX = texW - texX - 1;
+
+    // Pintar esa columna
+    for (let y = drawStart; y < drawEnd; y++) {
+      const d = (y - (height / 2) + lineHeight / 2);
+      const texY = Math.floor(d * texH / lineHeight);
+      drawTexturePixelCol(wallTexKey, texX, texY, x, y);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+// FUNCIONES AUXILIARES PARA DIBUJAR PIXEL A PIXEL
+////////////////////////////////////////////////////////////////////////
+
+/**
+ * Dibuja 1 píxel usando coordenadas normalizadas (u, v) en [0..1].
+ * @param {string} textureKey 
+ * @param {number} u  [0..1]
+ * @param {number} v  [0..1]
+ * @param {number} screenX 
+ * @param {number} screenY 
+ */
+function drawTexturePixel(textureKey, u, v, screenX, screenY) {
+  const tex = game.textures.get(textureKey);
+  if (!tex) return;
+  const img = tex.source[0].image;
+  if (!img) return;
+
+  const texW = img.width;
+  const texH = img.height;
+  const tx = Math.floor(u * texW);
+  const ty = Math.floor(v * texH);
+
+  if (tx >= 0 && tx < texW && ty >= 0 && ty < texH) {
+    ctx.drawImage(img, tx, ty, 1, 1, screenX, screenY, 1, 1);
+  }
+}
+
+/**
+ * Dibuja 1 píxel usando coordenadas (texX, texY) en píxeles dentro de la textura
+ * @param {string} textureKey 
+ * @param {number} texX
+ * @param {number} texY
+ * @param {number} screenX
+ * @param {number} screenY
+ */
+function drawTexturePixelCol(textureKey, texX, texY, screenX, screenY) {
+  const tex = game.textures.get(textureKey);
+  if (!tex) return;
+  const img = tex.source[0].image;
+  if (!img) return;
+
+  const texW = img.width;
+  const texH = img.height;
+
+  if (texX >= 0 && texX < texW && texY >= 0 && texY < texH) {
+    ctx.drawImage(img, texX, texY, 1, 1, screenX, screenY, 1, 1);
+  }
+}
+</script>
+</body>
+</html>
