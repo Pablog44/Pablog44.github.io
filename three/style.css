@@ -1,0 +1,132 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Oculta barras de scroll si el canvas es más grande */
+    font-family: sans-serif;
+    background-color: #222;
+    color: #eee;
+    display: flex; /* Usa flexbox para layout */
+}
+
+#container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameCanvas {
+    display: block;
+    flex-grow: 1; /* El canvas ocupa el espacio restante */
+    height: 100vh;
+}
+
+#editorControls {
+    width: 450px; /* Ancho fijo para el panel */
+    height: 100vh; /* Altura completa */
+    overflow-y: auto; /* Scroll si el contenido es mucho */
+    background-color: #333;
+    padding: 15px;
+    box-sizing: border-box; /* Padding incluido en el ancho */
+    display: flex;
+    flex-direction: column;
+}
+
+h2, h3, h4 {
+    margin-top: 0;
+    border-bottom: 1px solid #555;
+    padding-bottom: 5px;
+}
+
+.control-group {
+    margin-bottom: 20px;
+    background-color: #444;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+label {
+    margin-right: 5px;
+}
+
+input[type="number"], input[type="text"] {
+    margin-right: 10px;
+    padding: 5px;
+    background-color: #555;
+    border: 1px solid #777;
+    color: #eee;
+    max-width: 100px; /* Ajusta según sea necesario */
+}
+input[type="text"] {
+     max-width: 180px;
+}
+
+
+button {
+    padding: 8px 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 2px;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+#mapEditorGrid {
+    display: grid; /* Usamos CSS Grid para la rejilla */
+    grid-template-columns: repeat(var(--map-cols, 10), 25px); /* Columnas dinámicas */
+    grid-template-rows: repeat(var(--map-rows, 10), 25px);    /* Filas dinámicas */
+    gap: 1px;
+    background-color: #555;
+    margin-top: 10px;
+    border: 1px solid #666;
+    cursor: crosshair;
+    align-self: start; /* Para que no se estire verticalmente */
+}
+
+.grid-cell {
+    background-color: #777; /* Color por defecto (suelo) */
+    border: 1px solid #666;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px; /* Para mostrar índices de textura */
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.grid-cell.wall {
+    background-color: #aaa; /* Color para paredes */
+}
+
+.grid-cell:hover {
+    background-color: lightblue;
+    opacity: 0.8;
+}
+
+.texture-section {
+    margin-bottom: 15px;
+}
+
+.texture-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 5px;
+    max-height: 100px; /* Limita altura */
+    overflow-y: auto; /* Scroll si hay muchas texturas */
+}
+
+.texture-palette img {
+    width: 40px;
+    height: 40px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    object-fit: cover; /* Para que la imagen cubra el espacio */
+}
+
+.texture-palette img.selected {
+    border-color: #007bff;
+}
