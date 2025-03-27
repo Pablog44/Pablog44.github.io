@@ -3,64 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editor de Mapas Estilo Doom</title>
+    <title>Motor Estilo Doom</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="container">
-        <!-- Visor 3D -->
-        <canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
-        <!-- Panel de Control del Editor -->
-        <div id="editorControls">
-            <h2>Editor de Mapas</h2>
-
-            <div class="control-group">
-                <h3>Mapa</h3>
-                <label for="mapSizeX">Ancho:</label>
-                <input type="number" id="mapSizeX" value="10" min="3">
-                <label for="mapSizeY">Alto:</label>
-                <input type="number" id="mapSizeY" value="10" min="3">
-                <button id="btnNewMap">Crear Nuevo Mapa</button>
-                </div>
-
-            <div class="control-group">
-                <h3>Herramienta Actual: <span id="currentTool">Colocar Pared</span></h3>
-                <button id="toolWall">Pared</button>
-                <button id="toolFloor">Suelo/Techo</button>
-                </div>
-
-            <div class="control-group">
-                <h3>Texturas</h3>
-                <div class="texture-section">
-                    <h4>Paredes (<span id="selectedWallTextureDisplay">Actual: 0</span>)</h4>
-                    <div id="wallTexturePalette" class="texture-palette"></div>
-                    <input type="text" id="newWallTextureUrl" placeholder="URL/ruta nueva textura pared">
-                    <button id="btnAddWallTexture">Añadir</button>
-                </div>
-                <div class="texture-section">
-                    <h4>Suelos (<span id="selectedFloorTextureDisplay">Actual: 0</span>)</h4>
-                    <div id="floorTexturePalette" class="texture-palette"></div>
-                    <input type="text" id="newFloorTextureUrl" placeholder="URL/ruta nueva textura suelo">
-                    <button id="btnAddFloorTexture">Añadir</button>
-                </div>
-                <div class="texture-section">
-                    <h4>Techos (<span id="selectedCeilingTextureDisplay">Actual: 0</span>)</h4>
-                    <div id="ceilingTexturePalette" class="texture-palette"></div>
-                    <input type="text" id="newCeilingTextureUrl" placeholder="URL/ruta nueva textura techo">
-                    <button id="btnAddCeilingTexture">Añadir</button>
-                </div>
-            </div>
-
-            <!-- Rejilla del Editor 2D -->
-            <h3>Editor 2D</h3>
-            <div id="mapEditorGrid">
-                <!-- La rejilla se generará aquí con JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Incluir Three.js (desde CDN o localmente) -->
+    <!-- Incluir Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Incluir tu script -->
     <script src="script.js"></script>

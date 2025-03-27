@@ -1,362 +1,393 @@
-// --- Variables Globales ---
-let scene, camera, renderer;
-let player, controls;
-let mapData = []; // Matriz 2D para el mapa
-let mapWidth = 10;
-let mapHeight = 10;
-const TILE_SIZE = 5; // Tamaño de cada cuadrado en el mundo 3D
-const WALL_HEIGHT = 5; // Altura de las paredes
+// --- Configuración Inicial ---
+const TILE_SIZE = 5;      // Tamaño de cada cuadrado en el mundo 3D
+const WALL_HEIGHT = 5;    // Altura de las paredes
+const moveSpeed = 8.0;    // Velocidad de movimiento del jugador (teclado)
+const lookSpeed = 0.003;  // Sensibilidad del ratón
+const gamepadLookSpeed = 1.5; // Sensibilidad de la vista con gamepad (ajusta según sea necesario)
+const gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad
 
-// Texturas
-const textureLoader = new THREE.TextureLoader();
+// --- Datos del Mapa (¡Aquí defines tus mapas!) ---
+// 0 = Espacio vacío
+// wallMap: 1+ = Índice de textura en wallTextures (1=wallTextures[1], 2=wallTextures[2], ...)
+// floor/ceilingMap: 0+ = Índice de textura en floor/ceilingTextures (0=placeholder, 1=floor/ceilingTextures[1], ...)
+const wallMap = [
+  [1, 2, 1, 2, 1, 1, 1, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 1, 1, 0, 0, 2, 0, 0, 1],
+  [2, 0, 1, 1, 0, 0, 2, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 1, 1, 1, 0, 1],
+  [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 1, 1, 1, 1, 2, 1, 1, 1, 1],
+];
+const floorMap = [
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 0 usará placeholder (floorTextures[0])
+  [0, 1, 1, 1, 1, 1, 1, 1, 1, 0], // 1 usará floorTextures[1]
+  [0, 1, 0, 0, 1, 1, 0, 1, 1, 0],
+  [0, 1, 0, 0, 1, 1, 0, 1, 1, 0],
+  [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+  [0, 1, 1, 1, 1, 0, 0, 0, 1, 0],
+  [0, 1, 0, 1, 1, 1, 1, 1, 1, 0],
+  [0, 1, 0, 1, 1, 1, 1, 1, 1, 0],
+  [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+const ceilingMap = [
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 1 usará ceilingTextures[1]
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 0 usará placeholder (ceilingTextures[0])
+  [1, 0, 1, 1, 0, 0, 1, 0, 0, 1],
+  [1, 0, 1, 1, 0, 0, 1, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 1, 1, 1, 0, 1],
+  [1, 0, 1, 0, 0, 0, 1, 1, 0, 1],
+  [1, 0, 1, 2, 2, 0, 1, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+// --- Texturas (URLs o rutas locales) ---
+const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png']; // Corresponden a 1 y 2 en wallMap
+const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png']; // Corresponden a 1 y 2 en floorMap
+const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png']; // Corresponden a 1 y 2 en ceilingMap
+const placeholderTextureUrl = 'textures/placeholder.png'; // Textura de fallback (índice 0)
+
+// --- Variables Globales de Three.js y Juego ---
+let scene, camera, renderer;
+let clock = new THREE.Clock();
+let textureLoader = new THREE.TextureLoader();
 let wallTextures = [];
 let floorTextures = [];
 let ceilingTextures = [];
-let wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png']; // Rutas iniciales
-let floorTextureUrls = ['textures/floor1.png'];
-let ceilingTextureUrls = ['textures/ceiling1.png'];
+let placeholderTexture = null;
+let mapMeshesGroup = new THREE.Group();
+let mapWidth = wallMap[0].length;
+let mapHeight = wallMap.length;
 
-// Estado del Editor
-let currentTool = 'wall'; // 'wall' o 'floor'
-let selectedWallTextureIndex = 0;
-let selectedFloorTextureIndex = 0;
-let selectedCeilingTextureIndex = 0;
-
-// Movimiento
-const moveState = { forward: 0, back: 0, left: 0, right: 0, up: 0, down: 0 };
-const moveSpeed = 10.0;
-const lookSpeed = 0.003;
-let clock = new THREE.Clock();
+// Movimiento y Control
+const moveState = { forward: 0, back: 0, left: 0, right: 0 }; // Combinará teclado y gamepad
 let isPointerLocked = false;
-
-// Objetos 3D del mapa
-let mapMeshesGroup = new THREE.Group(); // Grupo para contener todos los meshes del mapa
+let activeGamepadIndex = null; // Índice del gamepad activo
 
 // --- Inicialización ---
 function init() {
     // Escena
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB); // Color cielo
-    scene.fog = new THREE.Fog(0x87CEEB, 0, TILE_SIZE * mapWidth * 0.8); // Niebla ligera
+    scene.background = new THREE.Color(0x333333);
+    scene.fog = new THREE.Fog(scene.background, TILE_SIZE * 2, TILE_SIZE * mapWidth * 0.7);
 
     // Cámara
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.y = WALL_HEIGHT / 2; // Altura inicial del jugador
+    camera.position.y = WALL_HEIGHT / 2;
+    // Orden de rotación importante para FPS: YXZ
+    // El eje Y (Yaw) se aplica primero globalmente, luego X (Pitch) localmente. Z (Roll) se mantiene en 0.
+    camera.rotation.order = 'YXZ';
+
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
-    renderer.setSize(window.innerWidth - 450, window.innerHeight); // Ajusta al tamaño del contenedor
-    renderer.shadowMap.enabled = true; // Sombras (opcional, puede afectar rendimiento)
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
 
     // Luces
-    const ambientLight = new THREE.AmbientLight(0xaaaaaa); // Luz ambiental suave
+    const ambientLight = new THREE.AmbientLight(0x909090);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-    directionalLight.position.set(10, 30, 20);
-    directionalLight.castShadow = true; // La luz proyecta sombras
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(15, 30, 20);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
     scene.add(directionalLight);
+    const playerLight = new THREE.PointLight(0xffccaa, 0.4, TILE_SIZE * 5);
+    camera.add(playerLight);
+    scene.add(camera);
 
-    // Controles de Cámara (Pointer Lock para movimiento FPS)
+    // Controles
     setupPointerLock();
+    window.addEventListener('gamepadconnected', (event) => {
+        console.log('Gamepad conectado:', event.gamepad.id);
+        if (activeGamepadIndex === null) activeGamepadIndex = event.gamepad.index;
+    });
+    window.addEventListener('gamepaddisconnected', (event) => {
+        console.log('Gamepad desconectado:', event.gamepad.id);
+        if (activeGamepadIndex === event.gamepad.index) {
+            activeGamepadIndex = null;
+            findActiveGamepad();
+        }
+    });
+    findActiveGamepad();
 
-    // Cargar texturas iniciales y construir el mapa
+    // Cargar Recursos y Construir Mundo
     preloadTextures().then(() => {
-        createMapData(); // Crear datos del mapa inicial
-        buildMapGeometry(); // Construir geometría 3D
-        setupEditor(); // Configurar la interfaz del editor
-        animate(); // Iniciar el bucle de renderizado
+        findStartPosition();
+        buildMapGeometry();
+        scene.add(mapMeshesGroup);
+        animate();
     }).catch(error => {
-        console.error("Error al cargar texturas iniciales:", error);
-        // Opcional: Mostrar un mensaje al usuario
+        console.error("Error crítico al cargar texturas:", error);
+        document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">Error al cargar texturas. Revisa la consola (F12). Asegúrate de que las imágenes existan en la carpeta 'textures' y que uses un servidor local.</div>`;
     });
 
-
-    // Event Listener para redimensionar ventana
     window.addEventListener('resize', onWindowResize, false);
 }
 
+function findActiveGamepad() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    activeGamepadIndex = null;
+    for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i]) {
+            activeGamepadIndex = i;
+            console.log(`Gamepad activo encontrado en índice: ${i}`);
+            break;
+        }
+    }
+}
+
 // --- Carga de Texturas ---
-async function loadTexture(url) {
+async function loadTexture(url, isPlaceholder = false) {
     return new Promise((resolve, reject) => {
         textureLoader.load(
             url,
             (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.magFilter = THREE.NearestFilter; // Estilo Pixelado (Doom)
-                texture.minFilter = THREE.LinearMipmapLinearFilter; // Mejor calidad a distancia
+                texture.magFilter = THREE.NearestFilter;
+                texture.minFilter = THREE.NearestMipmapLinearFilter;
+                if (!isPlaceholder) console.log(`Textura cargada: ${url}`);
                 resolve(texture);
             },
-            undefined, // onProgress (no necesario aquí)
+            undefined, // onProgress
             (error) => {
-                console.error(`Error cargando textura: ${url}`, error);
-                // Intentar cargar una textura por defecto o placeholder
-                textureLoader.load('textures/placeholder.png', // Asegúrate de tener esta imagen
-                    (placeholderTexture) => {
-                         placeholderTexture.wrapS = THREE.RepeatWrapping;
-                         placeholderTexture.wrapT = THREE.RepeatWrapping;
-                         placeholderTexture.magFilter = THREE.NearestFilter;
-                         placeholderTexture.minFilter = THREE.LinearMipmapLinearFilter;
-                         resolve(placeholderTexture); // Resuelve con el placeholder
-                    },
-                    undefined,
-                    (placeholderError) => {
-                         console.error("Error cargando textura placeholder", placeholderError);
-                         reject(`No se pudo cargar ${url} ni el placeholder.`); // Rechaza si ni el placeholder carga
+                if (!isPlaceholder) {
+                    console.error(`Error cargando textura: ${url}`, error);
+                    if (placeholderTexture) {
+                        console.warn(`Usando placeholder para ${url}`);
+                        resolve(placeholderTexture);
+                    } else {
+                        reject(`No se pudo cargar ${url} y el placeholder no está disponible.`);
                     }
-                 );
+                } else {
+                    console.error(`¡¡ERROR CRÍTICO: No se pudo cargar la textura placeholder ${url}!!`, error);
+                    reject(`No se pudo cargar la textura placeholder ${url}`);
+                }
             }
         );
     });
 }
 
-
 async function preloadTextures() {
-    const wallPromises = wallTextureUrls.map(url => loadTexture(url));
-    const floorPromises = floorTextureUrls.map(url => loadTexture(url));
-    const ceilingPromises = ceilingTextureUrls.map(url => loadTexture(url));
+    try {
+        placeholderTexture = await loadTexture(placeholderTextureUrl, true);
+        console.log("Textura placeholder cargada.");
 
-    wallTextures = await Promise.all(wallPromises);
-    floorTextures = await Promise.all(floorPromises);
-    ceilingTextures = await Promise.all(ceilingPromises);
-    console.log("Texturas cargadas:", { wallTextures, floorTextures, ceilingTextures });
-    updateTexturePalettes(); // Actualizar UI después de cargar
-}
+        const loadTextureArray = async (urls) => {
+            const promises = urls.map(url => loadTexture(url));
+            return Promise.all(promises);
+        };
 
-// --- Creación y Gestión del Mapa ---
-function createMapData(newWidth = mapWidth, newHeight = mapHeight) {
-    mapWidth = newWidth;
-    mapHeight = newHeight;
-    mapData = [];
-    for (let y = 0; y < mapHeight; y++) {
-        mapData[y] = [];
-        for (let x = 0; x < mapWidth; x++) {
-            // Borde exterior como pared por defecto
-            const isWall = x === 0 || x === mapWidth - 1 || y === 0 || y === mapHeight - 1;
-            mapData[y][x] = {
-                isWall: isWall,
-                wallTexture: 0, // Índice de textura de pared
-                floorTexture: 0, // Índice de textura de suelo
-                ceilingTexture: 0 // Índice de textura de techo
-            };
-        }
+        [wallTextures, floorTextures, ceilingTextures] = await Promise.all([
+            loadTextureArray(wallTextureUrls),
+            loadTextureArray(floorTextureUrls),
+            loadTextureArray(ceilingTextureUrls)
+        ]);
+        console.log("Texturas de mapa procesadas.");
+
+        // Añadir placeholder al inicio (índice 0)
+        wallTextures.unshift(placeholderTexture);
+        floorTextures.unshift(placeholderTexture);
+        ceilingTextures.unshift(placeholderTexture);
+        console.log(`Total texturas pared (incl. placeholder): ${wallTextures.length}`);
+        console.log(`Total texturas suelo (incl. placeholder): ${floorTextures.length}`);
+        console.log(`Total texturas techo (incl. placeholder): ${ceilingTextures.length}`);
+
+    } catch (error) {
+        console.error("Fallo catastrófico durante la carga de texturas:", error);
+        throw error;
     }
-    // Colocar al jugador en un espacio vacío inicial
-    findStartPosition();
 }
 
-function findStartPosition() {
-    for (let y = 1; y < mapHeight - 1; y++) {
-        for (let x = 1; x < mapWidth - 1; x++) {
-            if (!mapData[y][x].isWall) {
-                camera.position.x = x * TILE_SIZE + TILE_SIZE / 2;
-                camera.position.z = y * TILE_SIZE + TILE_SIZE / 2;
-                camera.position.y = WALL_HEIGHT / 2; // Asegurar altura correcta
-                console.log(`Posición inicial jugador: x=${x}, z=${y}`);
-                return; // Salir en cuanto se encuentra un espacio
-            }
-        }
-    }
-    // Si no hay espacio (mapa solo paredes), colocar en el centro
-    console.warn("No se encontró espacio vacío para el jugador, colocando en el centro.");
-    camera.position.x = (mapWidth / 2) * TILE_SIZE;
-    camera.position.z = (mapHeight / 2) * TILE_SIZE;
-    camera.position.y = WALL_HEIGHT / 2;
-}
-
-
+// --- Construcción de la Geometría del Mapa ---
 function buildMapGeometry() {
     // Limpiar geometría anterior
     while (mapMeshesGroup.children.length > 0) {
         const mesh = mapMeshesGroup.children[0];
         mapMeshesGroup.remove(mesh);
         if (mesh.geometry) mesh.geometry.dispose();
-        // Importante: Desechar materiales si son únicos por mesh
-         if (mesh.material) {
-             if (Array.isArray(mesh.material)) {
-                 mesh.material.forEach(material => {
-                     if (material.map) material.map.dispose();
-                     material.dispose();
-                 });
-             } else {
-                  if (mesh.material.map) mesh.material.map.dispose();
-                  mesh.material.dispose();
-             }
-         }
+        if (mesh.material) {
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            materials.forEach(mat => {
+                if (mat.map) mat.map.dispose();
+                mat.dispose();
+            });
+        }
     }
 
-
-    // Geometrías base (reutilizables)
     const wallGeometry = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
     const floorCeilingGeometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE);
-    floorCeilingGeometry.rotateX(-Math.PI / 2); // Rotar para que esté horizontal
+    floorCeilingGeometry.rotateX(-Math.PI / 2); // Suelo
     const ceilingGeometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE);
-    ceilingGeometry.rotateX(Math.PI / 2); // Rotar para el techo
+    ceilingGeometry.rotateX(Math.PI / 2); // Techo
 
+    const materialsCache = {};
+    const getMaterial = (texture) => {
+        if (!texture || !texture.uuid) return new THREE.MeshStandardMaterial({ color: 0xff00ff }); // Error color
+        const cacheKey = texture.uuid;
+        if (!materialsCache[cacheKey]) {
+            materialsCache[cacheKey] = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.85, // Ajusta para apariencia deseada
+                metalness: 0.1,
+                side: THREE.FrontSide // Renderizar solo cara frontal por defecto
+            });
+        }
+        return materialsCache[cacheKey];
+    };
 
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
-            const cell = mapData[y][x];
             const worldX = x * TILE_SIZE;
             const worldZ = y * TILE_SIZE;
 
-            if (cell.isWall) {
-                // --- Pared ---
-                const wallTextureIndex = cell.wallTexture < wallTextures.length ? cell.wallTexture : 0;
-                 if (!wallTextures[wallTextureIndex]) {
-                     console.warn(`Textura de pared índice ${wallTextureIndex} no encontrada para celda (${x},${y}). Usando índice 0.`);
-                     wallTextureIndex = 0; // Fallback a la primera textura
-                 }
+            const wallType = wallMap[y]?.[x]; // Usar optional chaining por si acaso
 
-                if (wallTextures.length > 0 && wallTextures[wallTextureIndex]) {
-                    // Crear un material específico para esta pared si las texturas pueden variar
-                    const wallMaterial = new THREE.MeshStandardMaterial({
-                        map: wallTextures[wallTextureIndex],
-                        side: THREE.DoubleSide // Renderizar ambas caras (puede no ser necesario si el mapa siempre es cerrado)
-                    });
+            if (wallType !== undefined && wallType > 0) {
+                // --- Pared ---
+                const texture = wallTextures[wallType] || wallTextures[0]; // Usa índice directo, fallback a 0 (placeholder)
+                if (texture) {
+                    const wallMaterial = getMaterial(texture);
                     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
                     wallMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT / 2, worldZ + TILE_SIZE / 2);
                     wallMesh.castShadow = true;
                     wallMesh.receiveShadow = true;
                     mapMeshesGroup.add(wallMesh);
                 } else {
-                    console.warn(`No hay texturas de pared válidas disponibles para la celda (${x},${y})`);
-                    // Opcional: Crear una pared con color básico si no hay textura
-                     const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
-                     const wallMesh = new THREE.Mesh(wallGeometry, fallbackMaterial);
-                     wallMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT / 2, worldZ + TILE_SIZE / 2);
-                     mapMeshesGroup.add(wallMesh);
+                     console.error(`Fallo crítico: No hay textura de pared (${x},${y})`);
+                }
+            } else if (wallType === 0) { // Solo crear suelo/techo si NO es pared
+                // --- Suelo y Techo ---
+                const floorTextureIndex = floorMap[y]?.[x] ?? 0;
+                const ceilingTextureIndex = ceilingMap[y]?.[x] ?? 0;
+
+                const floorTexture = floorTextures[floorTextureIndex] || floorTextures[0];
+                const ceilingTexture = ceilingTextures[ceilingTextureIndex] || ceilingTextures[0];
+
+                // Crear Suelo
+                if (floorTexture) {
+                    const floorMaterial = getMaterial(floorTexture);
+                    const floorMesh = new THREE.Mesh(floorCeilingGeometry, floorMaterial);
+                    floorMesh.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
+                    floorMesh.receiveShadow = true;
+                    mapMeshesGroup.add(floorMesh);
+                } else {
+                    console.error(`Fallo crítico: No hay textura de suelo (${x},${y})`);
                 }
 
-            } else {
-                // --- Suelo ---
-                let floorTextureIndex = cell.floorTexture < floorTextures.length ? cell.floorTexture : 0;
-                 if (!floorTextures[floorTextureIndex]) {
-                     console.warn(`Textura de suelo índice ${floorTextureIndex} no encontrada para celda (${x},${y}). Usando índice 0.`);
-                     floorTextureIndex = 0; // Fallback
-                 }
-
-                 if (floorTextures.length > 0 && floorTextures[floorTextureIndex]) {
-                     const floorMaterial = new THREE.MeshStandardMaterial({
-                         map: floorTextures[floorTextureIndex],
-                         side: THREE.DoubleSide
-                     });
-                     // Clonar la textura y aplicarla si necesitas repetición específica por tile
-                     // floorMaterial.map = floorTextures[floorTextureIndex].clone();
-                     // floorMaterial.map.needsUpdate = true; // Si clonas
-                     // floorMaterial.map.repeat.set(1, 1); // Repetir 1 vez en el plano
-
-                     const floorMesh = new THREE.Mesh(floorCeilingGeometry, floorMaterial);
-                     floorMesh.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
-                     floorMesh.receiveShadow = true; // El suelo recibe sombras
-                     mapMeshesGroup.add(floorMesh);
-                 } else {
-                      console.warn(`No hay texturas de suelo válidas disponibles para la celda (${x},${y})`);
-                      // Fallback color
-                      const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, side: THREE.DoubleSide });
-                      const floorMesh = new THREE.Mesh(floorCeilingGeometry, fallbackMaterial);
-                      floorMesh.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
-                      mapMeshesGroup.add(floorMesh);
-                 }
-
-
-                // --- Techo ---
-                let ceilingTextureIndex = cell.ceilingTexture < ceilingTextures.length ? cell.ceilingTexture : 0;
-                if (!ceilingTextures[ceilingTextureIndex]) {
-                    console.warn(`Textura de techo índice ${ceilingTextureIndex} no encontrada para celda (${x},${y}). Usando índice 0.`);
-                    ceilingTextureIndex = 0; // Fallback
-                }
-
-                if (ceilingTextures.length > 0 && ceilingTextures[ceilingTextureIndex]) {
-                    const ceilingMaterial = new THREE.MeshStandardMaterial({
-                        map: ceilingTextures[ceilingTextureIndex],
-                        side: THREE.DoubleSide
-                    });
-                    // ceilingMaterial.map = ceilingTextures[ceilingTextureIndex].clone();
-                    // ceilingMaterial.map.needsUpdate = true;
-                    // ceilingMaterial.map.repeat.set(1, 1);
-
+                // Crear Techo
+                 if (ceilingTexture) {
+                    const ceilingMaterial = getMaterial(ceilingTexture);
                     const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
                     ceilingMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT, worldZ + TILE_SIZE / 2);
-                    // ceilingMesh.receiveShadow = true; // Opcional si hay luces desde abajo
                     mapMeshesGroup.add(ceilingMesh);
                  } else {
-                      console.warn(`No hay texturas de techo válidas disponibles para la celda (${x},${y})`);
-                      // Fallback color
-                      const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x666666, side: THREE.DoubleSide });
-                      const ceilingMesh = new THREE.Mesh(ceilingGeometry, fallbackMaterial);
-                      ceilingMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT, worldZ + TILE_SIZE / 2);
-                      mapMeshesGroup.add(ceilingMesh);
+                    console.error(`Fallo crítico: No hay textura de techo (${x},${y})`);
                  }
+            }
+            // Si wallType es undefined (mapa irregular), no se crea nada para esa celda.
+        }
+    }
+    console.log("Geometría del mapa construida.");
+}
+
+// --- Posición Inicial del Jugador ---
+function findStartPosition() {
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            if (wallMap[y]?.[x] === 0) {
+                camera.position.x = x * TILE_SIZE + TILE_SIZE / 2;
+                camera.position.z = y * TILE_SIZE + TILE_SIZE / 2;
+                camera.position.y = WALL_HEIGHT / 2;
+                console.log(`Posición inicial jugador: x=${x}, z=${y}`);
+                return;
             }
         }
     }
-    scene.add(mapMeshesGroup); // Añadir el grupo completo a la escena
-    console.log("Geometría del mapa reconstruida.");
+    console.warn("No se encontró espacio vacío, colocando en el centro.");
+    camera.position.x = (mapWidth / 2) * TILE_SIZE;
+    camera.position.z = (mapHeight / 2) * TILE_SIZE;
+    camera.position.y = WALL_HEIGHT / 2;
 }
-
 
 // --- Controles de Movimiento y Cámara ---
 function setupPointerLock() {
     const canvas = renderer.domElement;
     canvas.addEventListener('click', () => {
-        canvas.requestPointerLock();
+        if (!isPointerLocked) {
+             canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
+             if (canvas.requestPointerLock) canvas.requestPointerLock();
+        }
     });
 
-    document.addEventListener('pointerlockchange', () => {
-        isPointerLocked = document.pointerLockElement === canvas;
-        if(isPointerLocked) {
-            console.log("Pointer Locked");
-            // Opcional: Ocultar cursor o mostrar retícula
-        } else {
-            console.log("Pointer Unlocked");
-            // Mostrar cursor, detener movimiento si es necesario
-            Object.keys(moveState).forEach(key => moveState[key] = 0); // Detener movimiento al salir
-        }
-    }, false);
+    const pointerLockChange = () => {
+        isPointerLocked = !!(document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas);
+        console.log("Pointer Locked:", isPointerLocked);
+    };
+
+    document.addEventListener('pointerlockchange', pointerLockChange, false);
+    document.addEventListener('mozpointerlockchange', pointerLockChange, false);
+    document.addEventListener('webkitpointerlockchange', pointerLockChange, false);
 
     document.addEventListener('mousemove', onMouseMove, false);
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
 }
 
+// =============================================================
+// ===== ROTACIÓN DE CÁMARA CORREGIDA =====
+// =============================================================
+function rotateCamera(deltaX, deltaY) {
+    // --- Rotación Horizontal (Yaw) ---
+    // Gira la CÁMARA alrededor del eje Y del MUNDO (Vector3(0, 1, 0)).
+    // Esto es crucial para que la cámara gire sobre sí misma horizontalmente
+    // sin inclinarse respecto a la gravedad global.
+    camera.rotation.y -= deltaX; // Aplicar rotación Y directamente (orden YXZ)
+
+    // --- Rotación Vertical (Pitch) ---
+    // Gira la CÁMARA alrededor de su propio eje X LOCAL.
+    // Necesitamos limitar esta rotación para no dar la vuelta.
+    const maxPitch = Math.PI / 2 - 0.05; // Límite superior (casi 90 grados)
+    const minPitch = -Math.PI / 2 + 0.05; // Límite inferior (casi -90 grados)
+
+    // Aplicar el cambio de pitch y luego clampear (limitar)
+    camera.rotation.x -= deltaY;
+    camera.rotation.x = Math.max(minPitch, Math.min(maxPitch, camera.rotation.x));
+
+    // Asegurarse de que no haya rotación en Z (Roll)
+    // Como usamos orden 'YXZ', la rotación Z debería permanecer 0,
+    // pero lo forzamos por seguridad.
+    camera.rotation.z = 0;
+}
+// =============================================================
+
 function onMouseMove(event) {
     if (!isPointerLocked) return;
-
-    const movementX = event.movementX || 0;
-    const movementY = event.movementY || 0;
-
-    // Rotación horizontal (Yaw) - alrededor del eje Y global
-    camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -movementX * lookSpeed);
-
-    // Rotación vertical (Pitch) - alrededor del eje X local de la cámara
-    // Limitamos el pitch para evitar que la cámara se invierta
-    const currentPitch = camera.rotation.x;
-    const deltaPitch = -movementY * lookSpeed;
-    const maxPitch = Math.PI / 2 - 0.1; // Casi vertical hacia arriba
-    const minPitch = -Math.PI / 2 + 0.1; // Casi vertical hacia abajo
-
-    if (currentPitch + deltaPitch < maxPitch && currentPitch + deltaPitch > minPitch) {
-        camera.rotateX(deltaPitch);
-    }
+    const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+    const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+    rotateCamera(movementX * lookSpeed, movementY * lookSpeed);
 }
 
-
 function onKeyDown(event) {
-    if (!isPointerLocked && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) { // Permitir escribir en inputs
-         // Si no está bloqueado y no estamos en un input, bloquearlo al presionar WASD
-         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
-              renderer.domElement.requestPointerLock();
-         }
+    if (event.repeat) return;
+    if (!isPointerLocked && ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
+         renderer.domElement.click();
     }
-
     switch (event.key.toLowerCase()) {
         case 'w': case 'arrowup':    moveState.forward = 1; break;
         case 's': case 'arrowdown':  moveState.back = 1; break;
-        case 'a': case 'arrowleft':  moveState.left = 1; break;
-        case 'd': case 'arrowright': moveState.right = 1; break;
-        // case 'r': moveState.up = 1; break;    // Subir (opcional)
-        // case 'f': moveState.down = 1; break;  // Bajar (opcional)
+        case 'd': case 'arrowleft':  moveState.left = 1; break;
+        case 'a': case 'arrowright': moveState.right = 1; break;
     }
 }
 
@@ -364,320 +395,168 @@ function onKeyUp(event) {
     switch (event.key.toLowerCase()) {
         case 'w': case 'arrowup':    moveState.forward = 0; break;
         case 's': case 'arrowdown':  moveState.back = 0; break;
-        case 'a': case 'arrowleft':  moveState.left = 0; break;
-        case 'd': case 'arrowright': moveState.right = 0; break;
-        // case 'r': moveState.up = 0; break;
-        // case 'f': moveState.down = 0; break;
+        case 'd': case 'arrowleft':  moveState.left = 0; break;
+        case 'a': case 'arrowright': moveState.right = 0; break;
+    }
+}
+
+function handleGamepadInput(delta) {
+    if (activeGamepadIndex === null) return;
+
+    const gamepads = navigator.getGamepads();
+    const gp = gamepads[activeGamepadIndex];
+    if (!gp) {
+        activeGamepadIndex = null;
+        findActiveGamepad();
+        return;
+    }
+
+    const leftStickX = gp.axes[1] || 0;
+    const leftStickY = gp.axes[0] || 0;
+    const rightStickX = gp.axes[2] || 0;
+    const rightStickY = gp.axes[3] || 0;
+
+    // --- Movimiento (Stick Izquierdo) ---
+    // Reseteamos el estado del gamepad cada frame y lo recalculamos
+    let gpForward = 0, gpBack = 0, gpLeft = 0, gpRight = 0;
+    if (leftStickY < -gamepadDeadZone) gpForward = 1;
+    else if (leftStickY > gamepadDeadZone) gpBack = 1;
+    if (leftStickX < -gamepadDeadZone) gpLeft = 1;
+    else if (leftStickX > gamepadDeadZone) gpRight = 1;
+
+    // Actualizar moveState: Teclado tiene prioridad si está activo (1), si no (0), usa gamepad.
+    moveState.forward = Math.max(moveState.forward, gpForward);
+    moveState.back = Math.max(moveState.back, gpBack);
+    moveState.left = Math.max(moveState.left, gpLeft);
+    moveState.right = Math.max(moveState.right, gpRight);
+     // Si se suelta la tecla, onKeyUp pone a 0, y en el siguiente frame
+     // el gamepad tomará el control si el stick sigue presionado.
+
+    // --- Vista (Stick Derecho) ---
+    let lookX = 0, lookY = 0;
+    if (Math.abs(rightStickX) > gamepadDeadZone) lookX = rightStickX;
+    if (Math.abs(rightStickY) > gamepadDeadZone) lookY = rightStickY;
+
+    if (lookX !== 0 || lookY !== 0) {
+        const deltaLookX = lookX * gamepadLookSpeed * delta;
+        const deltaLookY = lookY * gamepadLookSpeed * delta;
+        rotateCamera(deltaLookX, deltaLookY);
     }
 }
 
 function updateMovement(delta) {
-    if (!isPointerLocked && (moveState.forward || moveState.back || moveState.left || moveState.right)) {
-        // Si se desbloqueó mientras se movía, detener
-         Object.keys(moveState).forEach(key => moveState[key] = 0);
-         return;
-    }
-     if (!isPointerLocked) return; // No mover si no está bloqueado
-
+    // Copiamos el estado del teclado para que handleGamepadInput no lo sobrescriba permanentemente
+    const keyboardState = { ...moveState };
+    // Procesar gamepad (puede modificar moveState temporalmente)
+    handleGamepadInput(delta);
+    // Ahora moveState refleja la combinación (priorizando teclado si = 1)
 
     const moveDistance = moveSpeed * delta;
     const velocity = new THREE.Vector3();
+    const worldDirection = new THREE.Vector3();
 
-    // Obtener la dirección de la cámara en el plano XZ
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0; // Ignorar componente Y para movimiento horizontal
-    forward.normalize();
+    // Obtener dirección a la que mira la cámara en el plano XZ
+    camera.getWorldDirection(worldDirection);
+    worldDirection.y = 0;
+    worldDirection.normalize();
 
-    const right = new THREE.Vector3();
-    right.crossVectors(camera.up, forward).normalize(); // Vector derecho perpendicular
+    // Calcular dirección derecha relativa
+    const rightDirection = new THREE.Vector3().crossVectors(camera.up, worldDirection).normalize();
 
-    if (moveState.forward) velocity.add(forward);
-    if (moveState.back) velocity.sub(forward);
-    if (moveState.left) velocity.sub(right); // Moverse hacia la izquierda relativa
-    if (moveState.right) velocity.add(right); // Moverse hacia la derecha relativa
+    // Calcular movimiento neto en ejes relativos
+    let moveZ = (moveState.forward ? 1 : 0) - (moveState.back ? 1 : 0);
+    let moveX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0);
 
-    // Movimiento vertical (opcional)
-    // if (moveState.up) camera.position.y += moveDistance;
-    // if (moveState.down) camera.position.y -= moveDistance;
+    // Aplicar movimiento
+    velocity.add(worldDirection.multiplyScalar(moveZ));
+    velocity.add(rightDirection.multiplyScalar(moveX));
 
-    velocity.normalize().multiplyScalar(moveDistance);
+    // Resetear moveState al estado del teclado para el próximo frame
+    // Esto evita que el estado del gamepad "se quede pegado" si se suelta el stick
+    // mientras se mantiene presionada una tecla.
+     moveState.forward = keyboardState.forward;
+     moveState.back = keyboardState.back;
+     moveState.left = keyboardState.left;
+     moveState.right = keyboardState.right;
+
+
+    if (velocity.lengthSq() > 0) {
+        velocity.normalize().multiplyScalar(moveDistance);
+    } else {
+        return; // No hay movimiento
+    }
 
     // --- Colisión Simple ---
-    const currentPos = camera.position.clone();
-    const targetPos = currentPos.clone().add(velocity);
+    const currentPos = camera.position;
+    let finalVelocity = velocity.clone();
 
-    const targetGridX = Math.floor(targetPos.x / TILE_SIZE);
-    const targetGridZ = Math.floor(targetPos.z / TILE_SIZE); // Usar Z para el eje Y del mapa
+    const checkCollision = (axisVelocity, targetCoordFunc, wallCheckCoordFunc) => {
+        if (axisVelocity === 0) return 0; // No hay movimiento en este eje
 
-    const currentGridX = Math.floor(currentPos.x / TILE_SIZE);
-    const currentGridZ = Math.floor(currentPos.z / TILE_SIZE);
+        const targetCoord = targetCoordFunc(axisVelocity);
+        const wallCheckCoords = wallCheckCoordFunc();
 
-    // Comprobar colisión en el eje X
-    const targetPosX = currentPos.clone().add(new THREE.Vector3(velocity.x, 0, 0));
-    const targetGridX_X = Math.floor(targetPosX.x / TILE_SIZE);
-    if (isWallAt(targetGridX_X, currentGridZ)) {
-        velocity.x = 0; // Detener movimiento X si choca
-    }
+        if (isWallAt(wallCheckCoords.x, wallCheckCoords.z)) {
+            return 0; // Choca, detener movimiento en este eje
+        }
+        return axisVelocity; // No choca, mantener velocidad
+    };
 
-    // Comprobar colisión en el eje Z
-    const targetPosZ = currentPos.clone().add(new THREE.Vector3(0, 0, velocity.z));
-    const targetGridZ_Z = Math.floor(targetPosZ.z / TILE_SIZE);
-     if (isWallAt(currentGridX, targetGridZ_Z)) {
-        velocity.z = 0; // Detener movimiento Z si choca
-    }
+    // Comprobar X
+    finalVelocity.x = checkCollision(
+        velocity.x,
+        (vx) => currentPos.x + vx,
+        () => ({ x: Math.floor((currentPos.x + velocity.x) / TILE_SIZE), z: Math.floor(currentPos.z / TILE_SIZE) })
+    );
 
-    // Comprobar colisiones diagonales sutiles (esquinas) - Simplificado
-    // Una mejor colisión consideraría el radio del jugador
-    if (isWallAt(targetGridX_X, targetGridZ_Z) && isWallAt(currentGridX, targetGridZ_Z) && isWallAt(targetGridX_X, currentGridZ)) {
-         // Si el destino diagonal es pared Y las paredes adyacentes también lo son, detener ambos
-         // Esto ayuda a evitar quedarse atascado en esquinas internas
-         velocity.x = 0;
-         velocity.z = 0;
-    }
+    // Comprobar Z
+    finalVelocity.z = checkCollision(
+        velocity.z,
+        (vz) => currentPos.z + vz,
+        () => ({ x: Math.floor(currentPos.x / TILE_SIZE), z: Math.floor((currentPos.z + velocity.z) / TILE_SIZE) })
+    );
+
+     // Comprobación adicional para esquinas internas (si ambos ejes fueron bloqueados)
+     if (velocity.x !== 0 && velocity.z !== 0 && finalVelocity.x === 0 && finalVelocity.z === 0) {
+         const diagGridX = Math.floor((currentPos.x + velocity.x) / TILE_SIZE);
+         const diagGridZ = Math.floor((currentPos.z + velocity.z) / TILE_SIZE);
+         if (isWallAt(diagGridX, diagGridZ)) {
+             // La esquina diagonal es pared, mantener ambos bloqueados (ya están en 0)
+         } else {
+              // La esquina diagonal está libre. ¿Cuál eje desbloquear?
+              // Podríamos intentar permitir solo X o solo Z, pero mantenerlos bloqueados
+              // suele ser un comportamiento aceptable y más simple para evitar "atravesar" esquinas.
+              // Para un deslizamiento más avanzado se necesitaría calcular colisión con los planos de las paredes.
+         }
+     }
 
 
-    camera.position.add(velocity);
-
-    // Mantener al jugador dentro de los límites (opcional, las paredes deberían bastar)
-    // camera.position.x = Math.max(TILE_SIZE / 2, Math.min(mapWidth * TILE_SIZE - TILE_SIZE / 2, camera.position.x));
-    // camera.position.z = Math.max(TILE_SIZE / 2, Math.min(mapHeight * TILE_SIZE - TILE_SIZE / 2, camera.position.z));
-
-     // Forzar altura constante (si no hay movimiento arriba/abajo)
-     camera.position.y = WALL_HEIGHT / 2;
+    camera.position.add(finalVelocity);
+    camera.position.y = WALL_HEIGHT / 2; // Mantener altura constante
 }
 
 function isWallAt(gridX, gridZ) {
     if (gridX < 0 || gridX >= mapWidth || gridZ < 0 || gridZ >= mapHeight) {
-        return true; // Considerar fuera de límites como pared
+        return true; // Fuera de límites es pared
     }
-    return mapData[gridZ] && mapData[gridZ][gridX] && mapData[gridZ][gridX].isWall;
+    return wallMap[gridZ]?.[gridX] > 0; // Devuelve true si es mayor que 0, false si es 0 o undefined
 }
 
-
-// --- Lógica del Editor ---
-function setupEditor() {
-    const mapEditorGrid = document.getElementById('mapEditorGrid');
-    const mapSizeXInput = document.getElementById('mapSizeX');
-    const mapSizeYInput = document.getElementById('mapSizeY');
-    const btnNewMap = document.getElementById('btnNewMap');
-    const currentToolDisplay = document.getElementById('currentTool');
-
-    // Botones de herramientas
-    document.getElementById('toolWall').addEventListener('click', () => {
-        currentTool = 'wall';
-        currentToolDisplay.textContent = 'Colocar Pared';
-    });
-    document.getElementById('toolFloor').addEventListener('click', () => {
-        currentTool = 'floor';
-        currentToolDisplay.textContent = 'Suelo/Techo';
-    });
-
-    // Botón Nuevo Mapa
-    btnNewMap.addEventListener('click', () => {
-        const newWidth = parseInt(mapSizeXInput.value, 10);
-        const newHeight = parseInt(mapSizeYInput.value, 10);
-        if (newWidth >= 3 && newHeight >= 3) {
-            createMapData(newWidth, newHeight);
-            buildMapGeometry();
-            drawEditorGrid(); // Redibujar la rejilla 2D
-            updateTexturePalettes(); // Asegurar paletas actualizadas
-        } else {
-            alert("El tamaño del mapa debe ser al menos 3x3.");
-        }
-    });
-
-     // Añadir Texturas
-     setupTextureAdding('Wall', wallTextureUrls, wallTextures, updateTexturePalettes);
-     setupTextureAdding('Floor', floorTextureUrls, floorTextures, updateTexturePalettes);
-     setupTextureAdding('Ceiling', ceilingTextureUrls, ceilingTextures, updateTexturePalettes);
-
-    drawEditorGrid();
-    updateTexturePalettes();
-    updateSelectedTextureDisplays();
-}
-
-function setupTextureAdding(type, urlsArray, texturesArray, updateCallback) {
-     const input = document.getElementById(`new${type}TextureUrl`);
-     const button = document.getElementById(`btnAdd${type}Texture`);
-
-     button.addEventListener('click', async () => {
-         const url = input.value.trim();
-         if (url && !urlsArray.includes(url)) {
-             try {
-                 const newTexture = await loadTexture(url);
-                 urlsArray.push(url);
-                 texturesArray.push(newTexture);
-                 input.value = ''; // Limpiar input
-                 updateCallback(); // Actualizar la UI de la paleta
-                 console.log(`Textura de ${type} añadida: ${url}`);
-             } catch (error) {
-                 alert(`Error al cargar la textura de ${type}: ${error}`);
-             }
-         } else if (urlsArray.includes(url)) {
-              alert(`La textura ${url} ya existe.`);
-         } else {
-              alert(`Introduce una URL o ruta válida para la textura de ${type}.`);
-         }
-     });
- }
-
-function drawEditorGrid() {
-    const mapEditorGrid = document.getElementById('mapEditorGrid');
-    mapEditorGrid.innerHTML = ''; // Limpiar rejilla anterior
-
-    // Actualizar variables CSS para el tamaño de la rejilla
-    mapEditorGrid.style.setProperty('--map-cols', mapWidth);
-    mapEditorGrid.style.setProperty('--map-rows', mapHeight);
-
-    for (let y = 0; y < mapHeight; y++) {
-        for (let x = 0; x < mapWidth; x++) {
-            const cell = document.createElement('div');
-            cell.classList.add('grid-cell');
-            cell.dataset.x = x; // Guardar coordenadas en el elemento
-            cell.dataset.y = y;
-
-            updateCellVisual(cell, mapData[y][x]); // Aplicar estilo inicial
-
-            cell.addEventListener('click', handleGridClick);
-            mapEditorGrid.appendChild(cell);
-        }
-    }
-}
-
-function handleGridClick(event) {
-    const cellElement = event.target;
-    const x = parseInt(cellElement.dataset.x, 10);
-    const y = parseInt(cellElement.dataset.y, 10);
-
-    if (isNaN(x) || isNaN(y)) return; // Salir si no se pudo obtener coords
-
-    const cellData = mapData[y][x];
-
-    if (currentTool === 'wall') {
-        cellData.isWall = !cellData.isWall; // Alternar pared/suelo
-        if (cellData.isWall) {
-             // Al poner pared, asignar textura seleccionada
-             cellData.wallTexture = selectedWallTextureIndex;
-        } else {
-             // Al quitar pared, asignar texturas de suelo/techo seleccionadas
-             cellData.floorTexture = selectedFloorTextureIndex;
-             cellData.ceilingTexture = selectedCeilingTextureIndex;
-        }
-
-    } else if (currentTool === 'floor') {
-        if (!cellData.isWall) { // Solo se aplica a celdas de suelo/techo
-            cellData.floorTexture = selectedFloorTextureIndex;
-            cellData.ceilingTexture = selectedCeilingTextureIndex;
-        } else {
-             // Opcional: Permitir cambiar textura de pared con esta herramienta?
-             cellData.wallTexture = selectedWallTextureIndex;
-        }
-    }
-
-    updateCellVisual(cellElement, cellData); // Actualizar visualización 2D
-    buildMapGeometry(); // Reconstruir la geometría 3D
-}
-
-function updateCellVisual(cellElement, cellData) {
-     // Actualiza la clase y el contenido de texto de la celda 2D
-     if (cellData.isWall) {
-         cellElement.classList.add('wall');
-         cellElement.textContent = `W${cellData.wallTexture}`; // Muestra W y índice textura pared
-         cellElement.style.backgroundImage = ''; // Limpiar imagen de fondo
-     } else {
-         cellElement.classList.remove('wall');
-          // Mostrar índices de suelo/techo
-         cellElement.textContent = `F${cellData.floorTexture} C${cellData.ceilingTexture}`;
-
-         // Opcional: Mostrar miniatura de textura de suelo en la celda 2D
-         const floorTexUrl = floorTextureUrls[cellData.floorTexture];
-          if (floorTexUrl && floorTextures[cellData.floorTexture]) { // Asegurarse que la textura está cargada
-              cellElement.style.backgroundImage = `url('${floorTexUrl}')`;
-              cellElement.style.backgroundSize = 'cover';
-          } else {
-              cellElement.style.backgroundImage = '';
-          }
-     }
- }
-
- function updateTexturePalettes() {
-    updatePalette('Wall', wallTextureUrls, selectedWallTextureIndex, (index) => {
-        selectedWallTextureIndex = index;
-        updateSelectedTextureDisplays();
-    });
-    updatePalette('Floor', floorTextureUrls, selectedFloorTextureIndex, (index) => {
-        selectedFloorTextureIndex = index;
-        updateSelectedTextureDisplays();
-    });
-    updatePalette('Ceiling', ceilingTextureUrls, selectedCeilingTextureIndex, (index) => {
-        selectedCeilingTextureIndex = index;
-        updateSelectedTextureDisplays();
-    });
-}
-
-
-function updatePalette(type, urlsArray, selectedIndex, selectCallback) {
-    const paletteDiv = document.getElementById(`${type.toLowerCase()}TexturePalette`);
-    paletteDiv.innerHTML = ''; // Limpiar paleta
-
-    urlsArray.forEach((url, index) => {
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = `${type} Texture ${index}`;
-        img.title = `${url} (Index: ${index})`; // Tooltip
-        img.dataset.index = index;
-        if (index === selectedIndex) {
-            img.classList.add('selected');
-        }
-
-        // Manejar error de carga de imagen en la paleta
-        img.onerror = function() {
-             img.src = 'textures/placeholder.png'; // Usar placeholder si falla
-             img.alt = `Error loading ${url}`;
-             img.title = `Error loading ${url} (Index: ${index})`;
-        };
-
-
-        img.addEventListener('click', () => {
-            selectCallback(index);
-            // Actualizar visualmente la selección en la paleta
-            const siblings = paletteDiv.querySelectorAll('img');
-            siblings.forEach(sibling => sibling.classList.remove('selected'));
-            img.classList.add('selected');
-        });
-        paletteDiv.appendChild(img);
-    });
-}
-
-
-function updateSelectedTextureDisplays() {
-    document.getElementById('selectedWallTextureDisplay').textContent = `Actual: ${selectedWallTextureIndex}`;
-    document.getElementById('selectedFloorTextureDisplay').textContent = `Actual: ${selectedFloorTextureIndex}`;
-    document.getElementById('selectedCeilingTextureDisplay').textContent = `Actual: ${selectedCeilingTextureIndex}`;
-}
-
-
-// --- Bucle de Animación y Renderizado ---
+// --- Bucle de Animación ---
 function animate() {
     requestAnimationFrame(animate);
+    const delta = clock.getDelta();
 
-    const delta = clock.getDelta(); // Tiempo desde el último frame
-
-    updateMovement(delta); // Actualizar posición del jugador/cámara
-
+    updateMovement(delta); // Actualizar gamepad, teclado, movimiento y colisión
     renderer.render(scene, camera);
 }
 
-// --- Gestión de Ventana ---
+// --- Ajuste de Ventana ---
 function onWindowResize() {
-    const newWidth = window.innerWidth - document.getElementById('editorControls').offsetWidth;
-    const newHeight = window.innerHeight;
-
-    camera.aspect = newWidth / newHeight;
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(newWidth, newHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// --- Iniciar Todo ---
+// --- ¡Empezar! ---
 init();
