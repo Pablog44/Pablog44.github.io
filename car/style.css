@@ -1,12 +1,13 @@
 body, html {
     margin: 0;
     padding: 0;
+    width: 100%;
     height: 100%;
-    overflow: hidden; /* Evita barras de scroll */
+    overflow: hidden;
     font-family: sans-serif;
     background-color: #333;
     color: #fff;
-    display: flex;
+    display: flex; /* Usado para centrar la pantalla de inicio */
     justify-content: center;
     align-items: center;
 }
@@ -17,12 +18,11 @@ body, html {
     padding: 30px;
     border-radius: 10px;
     box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    z-index: 10; /* Asegura que esté sobre el canvas del juego */
+    position: relative; /* Necesario para z-index */
 }
 
-#start-screen h1 {
-    margin-bottom: 20px;
-}
-
+/* ... (Estilos de botones e instrucciones como antes) ... */
 #start-screen button {
     padding: 10px 20px;
     font-size: 1.2em;
@@ -43,7 +43,6 @@ body, html {
     background-color: #777;
     cursor: not-allowed;
 }
-
 
 #gamepad-status {
     margin-top: 20px;
@@ -67,53 +66,78 @@ body, html {
     border-radius: 5px;
 }
 
-#game-screen {
-    display: flex;
+
+#game-container {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background-color: #222; /* Fondo del área de juego */
+    background-color: #000; /* Fondo negro por defecto */
 }
 
-.viewport {
-    position: relative; /* Para posicionar el HUD */
-    height: 100%;
-    border: 1px solid #555; /* Borde para separar vistas */
-    box-sizing: border-box; /* Incluye borde en el tamaño */
-    overflow: hidden; /* Asegura que nada se salga del viewport */
-}
-
-.single-player .viewport {
-    width: 100%;
-}
-
-.two-players #player1-viewport {
-    width: 50%;
-}
-.two-players #player2-viewport {
-    width: 50%;
-    display: block !important; /* Asegura que se muestre */
-}
-
-
-canvas {
-    display: block; /* Evita espacios extra debajo del canvas */
-    background-color: #606060; /* Color del asfalto */
+#game-canvas {
+    display: block;
     width: 100%;
     height: 100%;
 }
+
+#minimap-canvas {
+    position: absolute;
+    bottom: 10px;
+    left: 10px; /* Cambiado a la izquierda */
+    width: 150px; /* Tamaño del minimapa */
+    height: 100px;
+    background-color: rgba(50, 50, 50, 0.7); /* Fondo semitransparente */
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    z-index: 5; /* Sobre el canvas 3D */
+}
+
+#stats-output {
+    position: absolute;
+    bottom: 10px;
+    right: 10px; /* Abajo a la derecha */
+    z-index: 5;
+    /* Stats.js aplicará su propio estilo */
+}
+#stats-output > div { /* Ajustar posición si es necesario */
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+}
+
 
 .hud {
     position: absolute;
     top: 10px;
-    left: 10px;
+    left: 10px; /* HUD P1 a la izquierda */
     color: white;
     font-size: 1.5em;
     text-shadow: 1px 1px 2px black;
     background-color: rgba(0, 0, 0, 0.5);
     padding: 5px 10px;
     border-radius: 5px;
+    z-index: 5;
 }
+/* Ocultar HUD P2 por defecto */
+#hud2 {
+    display: none;
+}
+/* Mostrar y posicionar HUD P2 en modo 2 jugadores */
+.two-players #hud2 {
+    display: block;
+    left: 51%; /* Ligeramente a la derecha del centro */
+}
+
 
 .hidden {
     display: none;
+    visibility: hidden; /* Mejor para elementos posicionados */
+    opacity: 0;
+}
+#game-container:not(.hidden) {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.5s ease-in; /* Transición suave */
 }
