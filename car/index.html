@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrera Ovalada Gamepad</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="start-screen">
+        <h1>Carrera Ovalada</h1>
+        <p>Selecciona el modo de juego:</p>
+        <button id="one-player-btn">1 Jugador</button>
+        <button id="two-players-btn">2 Jugadores</button>
+        <div id="gamepad-status">
+            <p>Detectando gamepads...</p>
+            <ul id="gamepad-list"></ul>
+        </div>
+         <p class="instructions">
+            <strong>Controles (Gamepad):</strong><br>
+            Joystick Izquierdo / D-Pad: Girar<br>
+            Gatillo Derecho / Botón A (o similar): Acelerar<br>
+            Gatillo Izquierdo / Botón B (o similar): Frenar / Reversa
+        </p>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div id="player1-viewport" class="viewport">
+            <canvas id="canvas1"></canvas>
+            <div class="hud" id="hud1">Vueltas P1: 0</div>
+        </div>
+        <div id="player2-viewport" class="viewport hidden">
+             <canvas id="canvas2"></canvas>
+             <div class="hud" id="hud2">Vueltas P2: 0</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
