@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrera 3D Oval</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="info">
+        Vueltas: <span id="lap-count">0</span> / 3
+        <br>
+        <span id="message">Pulsa 'W' para acelerar, 'S' para frenar/reversa, 'A'/'D' para girar</span>
+    </div>
+    <div id="game-container">
+        <!-- El canvas donde se renderizará el juego 3D -->
+        <!-- Three.js lo creará automáticamente o podemos añadir <canvas id="gameCanvas"></canvas> -->
+    </div>
+
+    <!-- Incluir Three.js (CDN) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Incluir tu script del juego -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>

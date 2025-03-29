@@ -1,0 +1,49 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Evita barras de scroll */
+    font-family: Arial, sans-serif;
+    background-color: #333;
+    color: white;
+}
+
+#game-container {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+canvas {
+    display: block; /* Asegura que el canvas ocupe el contenedor */
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    z-index: 100; /* Asegura que esté sobre el canvas */
+}
+
+#message {
+    display: block;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+#game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3em;
+    color: yellow;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 101;
+    display: none; /* Oculto por defecto */
+}
