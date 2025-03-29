@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bomber3D SplitScreen</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Three.js creará el canvas aquí -->
+    </div>
+
+    <div id="ui-container">
+        <div id="player1-info" class="player-info left">
+            <h3>Jugador 1</h3>
+            <div>Bombas: <span id="p1-bombs">1</span>/<span id="p1-bomb-capacity">1</span></div>
+            <div>Rango: <span id="p1-range">1</span></div>
+            <div>Velocidad: <span id="p1-speed">1</span>x</div>
+        </div>
+        <div id="player2-info" class="player-info right">
+             <h3>Jugador 2</h3>
+             <div>Bombas: <span id="p2-bombs">1</span>/<span id="p2-bomb-capacity">1</span></div>
+             <div>Rango: <span id="p2-range">1</span></div>
+             <div>Velocidad: <span id="p2-speed">1</span>x</div>
+        </div>
+         <div id="message-overlay">
+            <h1 id="message-text">Bomber3D</h1>
+            <button id="start-button">Iniciar Juego</button>
+             <p>(P1: WASD + Espacio | P2: Flechas + Enter)</p>
+        </div>
+    </div>
+
+    <!-- Incluir Three.js (Usando Import Map para Módulos) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Incluir tu script del juego como módulo -->
+    <script type="module" src="game.js"></script>
+</body>
+</html>
