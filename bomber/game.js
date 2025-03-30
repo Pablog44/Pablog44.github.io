@@ -40,7 +40,7 @@ let players = []; // [player1, player2]
 let grid = []; // El tablero lógico 2D
 let blocks = {}; // Almacena meshes de bloques por coordenada "row_col"
 let bombs = []; // Bombas activas { mesh, gridPos, timer, range, owner }
-let explosions = []; // Explosiones activas { cells, timer }
+let explosions = []; // Explosiones activas { cells, timer, visuals }
 let powerups = {}; // Powerups activos por coordenada "row_col" { mesh, type }
 let clock = new THREE.Clock();
 let gameRunning = false;
@@ -86,7 +86,8 @@ function init() {
     // Cámaras (Una para cada jugador)
     for (let i = 0; i < 2; i++) {
         const camera = new THREE.PerspectiveCamera(60, (window.innerWidth / 2) / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, GRID_SIZE * CELL_SIZE * 0.8, GRID_SIZE * CELL_SIZE * 0.6); // Vista elevada
+        // Posición inicial un poco más genérica, se ajustará en updateCameraPositions
+        camera.position.set(0, GRID_SIZE * CELL_SIZE * 0.8, GRID_SIZE * CELL_SIZE * 0.6);
         camera.lookAt(0, 0, 0);
         cameras.push(camera);
     }
@@ -101,11 +102,11 @@ function init() {
     directionalLight.shadow.mapSize.width = 1024;
     directionalLight.shadow.mapSize.height = 1024;
     directionalLight.shadow.camera.near = 1;
-    directionalLight.shadow.camera.far = GRID_SIZE * CELL_SIZE * 2;
-    directionalLight.shadow.camera.left = -GRID_SIZE * CELL_SIZE;
-    directionalLight.shadow.camera.right = GRID_SIZE * CELL_SIZE;
-    directionalLight.shadow.camera.top = GRID_SIZE * CELL_SIZE;
-    directionalLight.shadow.camera.bottom = -GRID_SIZE * CELL_SIZE;
+    directionalLight.shadow.camera.far = GRID_SIZE * CELL_SIZE * 2.5; // Aumentar far plane de sombra
+    directionalLight.shadow.camera.left = -GRID_SIZE * CELL_SIZE * 0.8;
+    directionalLight.shadow.camera.right = GRID_SIZE * CELL_SIZE * 0.8;
+    directionalLight.shadow.camera.top = GRID_SIZE * CELL_SIZE * 0.8;
+    directionalLight.shadow.camera.bottom = -GRID_SIZE * CELL_SIZE * 0.8;
     scene.add(directionalLight);
     // const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera); // Helper visual de sombra
     // scene.add(shadowHelper);
@@ -113,14 +114,17 @@ function init() {
 
     // Cargar Texturas y Crear Materiales
     loadMaterials(() => {
-        // Una vez cargadas las texturas, construir el nivel
+        // Una vez cargadas las texturas, construir el nivel inicial
         createLevel();
         setupPlayers();
         updateUI(); // Actualiza UI inicial
         // Mostrar pantalla de inicio
+        ui.messageText.textContent = "Bomber3D";
+        ui.startButton.textContent = "Iniciar Juego";
         ui.messageOverlay.style.display = 'flex';
-        ui.startButton.onclick = startGame;
-        // Iniciar loop (pero el juego no correrá hasta pulsar Start)
+        // El botón de inicio inicial llama a startGame
+        ui.startButton.onclick = () => startGame(); // Llama a startGame para la primera vez
+        // Iniciar loop de animación (pero el juego no correrá hasta pulsar Start)
         animate();
     });
 
@@ -132,6 +136,8 @@ function init() {
 
 function loadMaterials(callback) {
     let texturesToLoad = Object.keys(TEXTURES).length;
+    let loadedCount = 0; // Use a counter instead of decrementing
+
     if (texturesToLoad === 0) {
         console.warn("No texture paths defined in TEXTURES constant.");
         if (callback) callback();
@@ -139,35 +145,42 @@ function loadMaterials(callback) {
     }
 
     function textureLoaded() {
-        texturesToLoad--;
-        if (texturesToLoad === 0 && callback) {
+        loadedCount++;
+        // console.log(`Texture loaded (${loadedCount}/${Object.keys(TEXTURES).length})`);
+        if (loadedCount === Object.keys(TEXTURES).length && callback) {
             console.log("All textures loaded.");
             callback();
         }
     }
 
+     function textureError(url) {
+        console.error(`Failed to load texture: ${url}`);
+        console.warn(`Using fallback color for ${url}`);
+        textureLoaded(); // Still count it as "attempted" to proceed
+    }
+
+
     function createMaterial(texturePath, fallbackColor = 0xffffff) {
-         if (!texturePath) return new THREE.MeshStandardMaterial({ color: fallbackColor });
-        try {
+         if (!texturePath) {
+             console.warn("Missing texture path, using fallback color.");
+             textureLoaded(); // Count as loaded even if path missing
+             return new THREE.MeshStandardMaterial({ color: fallbackColor });
+         }
+         try {
             const texture = textureLoader.load(
                 texturePath,
                 textureLoaded, // Success
                 undefined,     // Progress (optional)
-                (err) => {     // Error
-                    console.error(`Failed to load texture: ${texturePath}`, err);
-                     console.warn(`Using fallback color for ${texturePath}`);
-                    textureLoaded(); // Still count it as "loaded" to proceed
-                }
+                () => textureError(texturePath) // Error simplified
             );
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
-             // Ajusta el repeat si la textura no está diseñada para un cubo unidad
-             // texture.repeat.set(1 / CELL_SIZE, 1 / CELL_SIZE);
+            // Ajusta el repeat si la textura no está diseñada para un cubo unidad
+            // texture.repeat.set(1, 1); // Default for now
             return new THREE.MeshStandardMaterial({ map: texture, metalness: 0.1, roughness: 0.8 });
         } catch (e) {
             console.error(`Error creating material for ${texturePath}: `, e);
-             console.warn(`Using fallback color for ${texturePath}`);
-             textureLoaded();
+            textureError(texturePath); // Call error handler
             return new THREE.MeshStandardMaterial({ color: fallbackColor });
         }
     }
@@ -184,9 +197,16 @@ function loadMaterials(callback) {
     materials.powerup_range = createMaterial(TEXTURES.powerup_range, 0x00ff00);
     materials.powerup_speed = createMaterial(TEXTURES.powerup_speed, 0x00ffff);
     materials.explosion = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 }); // Naranja para explosión
+
+     // Fallback if texture count calculation was off (shouldn't happen with counter)
+     if (loadedCount === Object.keys(TEXTURES).length && texturesToLoad > 0 && callback) {
+         console.warn("Callback potentially called early, but proceeding.");
+         callback();
+     }
 }
 
 function createLevel() {
+    console.log("Creating Level...");
     // Crear Suelo y Techo
     const planeGeometry = new THREE.PlaneGeometry(GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE);
 
@@ -206,26 +226,30 @@ function createLevel() {
 
 
     // Crear Tablero Lógico y Bloques 3D
-    grid = [];
+    grid = []; // Asegurarse de resetear el grid lógico
+    blocks = {}; // Asegurarse de resetear los bloques físicos
     for (let r = 0; r < GRID_SIZE; r++) {
         grid[r] = [];
         for (let c = 0; c < GRID_SIZE; c++) {
             let cellType = CELL_EMPTY;
+            // Define starting areas - need to be empty
+            const isP1StartArea = (r >= 1 && r <= 2 && c >= 1 && c <= 2);
+            const isP2StartArea = (r >= GRID_SIZE - 3 && r <= GRID_SIZE - 2 && c >= GRID_SIZE - 3 && c <= GRID_SIZE - 2);
+
             if (r === 0 || c === 0 || r === GRID_SIZE - 1 || c === GRID_SIZE - 1 || (r % 2 === 0 && c % 2 === 0)) {
                 cellType = CELL_INDESTRUCTIBLE; // Bordes y pilares
-            } else {
-                // Evitar bloques cerca de las esquinas de inicio
-                 const isNearP1Start = (r <= 2 && c <= 2);
-                 const isNearP2Start = (r >= GRID_SIZE - 3 && c >= GRID_SIZE - 3);
-                 const isNearP3Start = (r <= 2 && c >= GRID_SIZE - 3); // Esquina superior derecha
-                 const isNearP4Start = (r >= GRID_SIZE - 3 && c <= 2); // Esquina inferior izquierda (si hubiera 4 jug.)
-
-                if (!isNearP1Start && !isNearP2Start && !isNearP3Start && !isNearP4Start && Math.random() < DESTRUCTIBLE_CHANCE) {
+            } else if (isP1StartArea || isP2StartArea) {
+                 cellType = CELL_EMPTY; // Ensure start areas are clear
+            }
+            else {
+                // Place destructible blocks randomly elsewhere
+                if (Math.random() < DESTRUCTIBLE_CHANCE) {
                      cellType = CELL_DESTRUCTIBLE;
                 } else {
                     cellType = CELL_EMPTY;
                 }
             }
+
             grid[r][c] = cellType;
 
             if (cellType === CELL_INDESTRUCTIBLE || cellType === CELL_DESTRUCTIBLE) {
@@ -233,12 +257,16 @@ function createLevel() {
             }
         }
     }
-    console.log("Grid created:", grid);
+    console.log("Grid created:", grid.length > 0 ? "OK" : "Failed");
 }
 
 function createBlock(r, c, type) {
     const blockGeometry = new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE, CELL_SIZE);
     const material = (type === CELL_INDESTRUCTIBLE) ? materials.indestructible : materials.destructible;
+    if (!material) {
+        console.error(`Material not found for block type ${type} at ${r},${c}. Using fallback.`);
+        material = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // Magenta fallback
+    }
     const block = new THREE.Mesh(blockGeometry, material);
     block.position.copy(gridToWorld(r, c));
     block.castShadow = true;
@@ -249,23 +277,30 @@ function createBlock(r, c, type) {
 }
 
 function setupPlayers() {
+    console.log("Setting up Players...");
     players = []; // Limpiar jugadores si se reinicia
 
-    // Jugador 1 (Esquina Superior Izquierda)
+    // Jugador 1 (Esquina Superior Izquierda) - Posición inicial (1,1)
     players.push(createPlayer(1, 1, materials.player1, 0));
 
-    // Jugador 2 (Esquina Inferior Derecha)
+    // Jugador 2 (Esquina Inferior Derecha) - Posición inicial (GRID_SIZE-2, GRID_SIZE-2)
     players.push(createPlayer(GRID_SIZE - 2, GRID_SIZE - 2, materials.player2, 1));
 
      // Ajustar cámaras iniciales para mirar a sus jugadores
-    updateCameraPositions();
+    updateCameraPositions(); // Llama esto para centrar cámaras inicialmente
 }
 
 function createPlayer(r, c, material, playerIndex) {
     const playerGeometry = new THREE.CapsuleGeometry(CELL_SIZE * 0.35, CELL_SIZE * 0.3, 16, 8); // Un poco más pequeño que la celda
+     if (!material) {
+        console.error(`Material not found for player ${playerIndex + 1}. Using fallback.`);
+        material = new THREE.MeshStandardMaterial({ color: playerIndex === 0 ? 0x0000ff : 0xff0000 });
+    }
     const playerMesh = new THREE.Mesh(playerGeometry, material);
-    playerMesh.position.copy(gridToWorld(r, c));
-     playerMesh.position.y = -CELL_SIZE / 2 + (CELL_SIZE * 0.3 + CELL_SIZE*0.35); // Ajustar altura cápsula
+    const worldPos = gridToWorld(r, c);
+    playerMesh.position.copy(worldPos);
+    // Ajustar altura cápsula (centro de la cápsula = worldY + mitad_altura_cilindro)
+    playerMesh.position.y = worldPos.y -CELL_SIZE / 2 + (CELL_SIZE * 0.3); // Levantar base cápsula al suelo
     playerMesh.castShadow = true;
     playerMesh.receiveShadow = true;
     scene.add(playerMesh);
@@ -284,47 +319,55 @@ function createPlayer(r, c, material, playerIndex) {
     };
 }
 
+// Llamada por el botón 'Iniciar Juego' / 'Jugar de Nuevo (via resetGame)'
 function startGame() {
-    // Resetear estado si es necesario (opcional, mejor recargar la página por simplicidad ahora)
-    // resetGame(); // Implementar si se quiere jugar varias rondas sin recargar
-
-    // Ocultar mensaje y empezar el juego
-    ui.messageOverlay.style.display = 'none';
-    gameRunning = true;
-    clock.start(); // Asegurarse que el reloj corra
-    console.log("Game Started!");
+    // No necesita resetear aquí, resetGame lo hace si es necesario.
+    console.log("Attempting to start game...");
+    ui.messageOverlay.style.display = 'none'; // Ocultar mensaje/botón
+    gameRunning = true; // Activar lógica del juego en animate()
+    if (!clock.running) { // Iniciar reloj si no está corriendo
+        clock.start();
+    }
+    // Reset delta time in case of restart while clock was running
+    clock.getDelta();
+    console.log("Game Running Flag set to TRUE.");
 }
 
+// Llamada SOLO por el botón 'Jugar de Nuevo'
 function resetGame() {
-     // Detener juego
-    gameRunning = false;
-    clock.stop();
+     console.log("Resetting Game...");
+     // 1. Detener el estado de juego activo
+     gameRunning = false;
+     // No detenemos el clock, el requestAnimationFrame sigue corriendo
 
-    // Limpiar objetos de la escena que no sean persistentes
-    bombs.forEach(b => scene.remove(b.mesh));
-    bombs = [];
-    explosions.forEach(exp => {
-         if(exp.visuals) exp.visuals.forEach(v => scene.remove(v));
-    });
-    explosions = [];
-    Object.values(powerups).forEach(p => scene.remove(p.mesh));
-    powerups = {};
-     Object.values(blocks).forEach(b => scene.remove(b)); // Quitar bloques viejos
+     // 2. Limpiar objetos de la partida anterior
+     console.log("Cleaning up old game objects...");
+     bombs.forEach(b => { if (b.mesh) scene.remove(b.mesh); });
+     bombs = [];
+     explosions.forEach(exp => {
+         if(exp.visuals) exp.visuals.forEach(v => { if(v) scene.remove(v); });
+     });
+     explosions = [];
+     Object.values(powerups).forEach(p => { if (p.mesh) scene.remove(p.mesh); });
+     powerups = {};
+     Object.values(blocks).forEach(b => { if (b) scene.remove(b); }); // Quitar bloques viejos
      blocks = {};
-     players.forEach(p => scene.remove(p.mesh)); // Quitar jugadores viejos
+     players.forEach(p => { if (p.mesh) scene.remove(p.mesh); }); // Quitar jugadores viejos
      players = [];
+     grid = []; // Muy importante resetear el grid lógico
 
+     // 3. Limpiar estado de input
+     keysPressed = {};
 
-    // Recrear nivel y jugadores
-    createLevel();
-    setupPlayers();
-    updateUI();
+     // 4. Recrear el nivel y los jugadores para la nueva partida
+     console.log("Recreating level and players...");
+     createLevel();
+     setupPlayers(); // Asegúrate que esto posiciona bien las cámaras también
+     updateUI(); // Actualizar la UI con los stats iniciales
 
-    // Mostrar pantalla de inicio de nuevo
-    ui.messageText.textContent = "Bomber3D";
-    ui.startButton.textContent = "Iniciar Juego";
-    ui.messageOverlay.style.display = 'flex';
-    keysPressed = {}; // Limpiar teclas presionadas
+     // 5. Iniciar la nueva partida llamando a startGame
+     console.log("Game Reset Complete. Calling startGame...");
+     startGame(); // Esto ocultará el overlay y pondrá gameRunning = true
 }
 
 
@@ -334,31 +377,37 @@ function animate() {
     requestAnimationFrame(animate);
     const deltaTime = clock.getDelta();
 
+    // Solo actualiza la lógica del juego si gameRunning es true
     if (gameRunning) {
         handleInput(deltaTime);
         updatePlayers(deltaTime);
         updateBombs(deltaTime);
         updateExplosions(deltaTime);
-        checkCollisions();
-        checkWinCondition();
+        checkCollisions(); // Comprobar colisiones JUGADOR vs EXPLOSION
+        checkWinCondition(); // Comprobar si alguien ha ganado/empatado
     }
 
-    updateCameraPositions(); // Actualizar siempre para seguir jugadores
+    // Actualizar cámaras siempre para seguir a los jugadores (o la posición donde murieron)
+    updateCameraPositions();
 
     // Renderizado Split Screen
     renderer.clear(); // Limpia todo el buffer
 
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const halfWidth = width / 2;
+
     // --- Render Jugador 1 (Izquierda) ---
-    renderer.setViewport(0, 0, window.innerWidth / 2, window.innerHeight);
-    renderer.setScissor(0, 0, window.innerWidth / 2, window.innerHeight);
+    renderer.setViewport(0, 0, halfWidth, height);
+    renderer.setScissor(0, 0, halfWidth, height);
     renderer.setScissorTest(true);
-    renderer.render(scene, cameras[0]);
+    if (cameras[0]) renderer.render(scene, cameras[0]);
 
     // --- Render Jugador 2 (Derecha) ---
-    renderer.setViewport(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
-    renderer.setScissor(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight);
+    renderer.setViewport(halfWidth, 0, halfWidth, height);
+    renderer.setScissor(halfWidth, 0, halfWidth, height);
     renderer.setScissorTest(true); // Ya estaba true, pero por claridad
-    renderer.render(scene, cameras[1]);
+    if (cameras[1]) renderer.render(scene, cameras[1]);
 }
 
 function handleInput(deltaTime) {
@@ -369,34 +418,41 @@ function handleInput(deltaTime) {
         if (keysPressed['s']) moveDir.r += 1;
         if (keysPressed['a']) moveDir.c -= 1;
         if (keysPressed['d']) moveDir.c += 1;
-        movePlayer(players[0], moveDir);
+        // Solo intentar mover si hay input
+        if (moveDir.r !== 0 || moveDir.c !== 0) {
+             movePlayer(players[0], moveDir);
+        }
 
         if (keysPressed[' ']) { // Barra espaciadora
             placeBomb(players[0]);
-            keysPressed[' '] = false; // Evitar poner múltiples bombas con una pulsación
+            keysPressed[' '] = false; // Consumir la pulsación para evitar bombas múltiples
         }
     }
 
-    // Jugador 2 (Flechas + Enter)
+    // Jugador 2 (Flechas + Enter/Numpad0)
     if (players[1]?.alive) {
         let moveDir = { r: 0, c: 0 };
         if (keysPressed['arrowup']) moveDir.r -= 1;
         if (keysPressed['arrowdown']) moveDir.r += 1;
         if (keysPressed['arrowleft']) moveDir.c -= 1;
         if (keysPressed['arrowright']) moveDir.c += 1;
-        movePlayer(players[1], moveDir);
+         // Solo intentar mover si hay input
+        if (moveDir.r !== 0 || moveDir.c !== 0) {
+            movePlayer(players[1], moveDir);
+        }
 
-        if (keysPressed['enter'] || keysPressed['numpad0']) { // Enter o Numpad 0
+        if (keysPressed['enter'] || keysPressed['numpad0']) {
             placeBomb(players[1]);
-            keysPressed['enter'] = false;
-            keysPressed['numpad0'] = false;
+            keysPressed['enter'] = false; // Consumir pulsación
+            keysPressed['numpad0'] = false; // Consumir pulsación
         }
     }
 }
 
 function movePlayer(player, direction) {
+    // No iniciar nuevo movimiento si ya se está moviendo o está muerto
     if (!player.alive || player.isMoving || (direction.r === 0 && direction.c === 0)) {
-        return; // No mover si está muerto, ya se mueve, o no hay input
+        return;
     }
 
     const currentR = player.gridPos.r;
@@ -404,35 +460,44 @@ function movePlayer(player, direction) {
     let targetR = currentR + direction.r;
     let targetC = currentC + direction.c;
 
-    // Normalizar dirección si es diagonal (opcional, podría prohibirse)
+    // Lógica para "deslizar" en diagonales contra paredes
     if (direction.r !== 0 && direction.c !== 0) {
-         // Intentar mover horizontalmente primero si es posible
-        if (isCellPassable(currentR, targetC, player)) {
-            targetR = currentR;
+        let canMoveHorizontally = isCellPassable(currentR, targetC, player);
+        let canMoveVertically = isCellPassable(targetR, currentC, player);
+
+        if (canMoveHorizontally && canMoveVertically) {
+            // Si ambas direcciones parciales son válidas, comprobar la diagonal final
+            if (!isCellPassable(targetR, targetC, player)) {
+                // Si la diagonal está bloqueada, intentar moverse solo H o V
+                if (isCellPassable(currentR, targetC, player)) { // Priorizar H?
+                    targetR = currentR; // Mover solo horizontal
+                } else if (isCellPassable(targetR, currentC, player)){
+                    targetC = currentC; // Mover solo vertical
+                } else {
+                    return; // No puede moverse ni H ni V desde aquí en esa dirección
+                }
+            }
+            // Si la diagonal es pasable, targetR y targetC ya son correctos
+        } else if (canMoveHorizontally) {
+            targetR = currentR; // Mover solo horizontalmente
+        } else if (canMoveVertically) {
+            targetC = currentC; // Mover solo verticalmente
+        } else {
+            return; // Ambas direcciones bloqueadas, no moverse
         }
-        // Si no, intentar verticalmente
-        else if (isCellPassable(targetR, currentC, player)) {
-             targetC = currentC;
-        }
-        // Si ninguna es posible, no moverse en diagonal
-        else {
-             return;
-        }
-    } else {
-         targetR = currentR + direction.r;
-         targetC = currentC + direction.c;
     }
+    // Si no es diagonal, targetR y targetC se calcularon arriba
 
-
+    // Chequeo final para la celda destino (sea original o ajustada por deslizamiento)
     if (isCellPassable(targetR, targetC, player)) {
         player.gridPos.r = targetR;
         player.gridPos.c = targetC;
-        player.targetPos = gridToWorld(targetR, targetC);
-        player.targetPos.y = player.mesh.position.y; // Mantener altura Y
+        const targetWorldPos = gridToWorld(targetR, targetC);
+        player.targetPos.set(targetWorldPos.x, player.mesh.position.y, targetWorldPos.z); // Mantener altura Y
         player.isMoving = true;
 
-        // Comprobar si pisa un power-up al *llegar* a la celda
-         checkPowerupPickup(player);
+        // Comprobar si pisa un power-up al *entrar* en la celda (lógico)
+        checkPowerupPickup(player); // Se recogerá al llegar visualmente? O al entrar lógicamente? Pongámoslo aquí.
     }
 }
 
@@ -445,11 +510,11 @@ function updatePlayers(deltaTime) {
             const moveSpeed = PLAYER_SPEED_BASE * player.speedMultiplier * deltaTime;
             const distanceToTarget = player.mesh.position.distanceTo(player.targetPos);
 
-            if (distanceToTarget <= moveSpeed) {
-                // Llegó al destino
+            if (distanceToTarget <= moveSpeed * 1.1) { // Umbral un poco mayor para evitar quedarse corto
+                // Llegó al destino (o muy cerca)
                 player.mesh.position.copy(player.targetPos);
                 player.isMoving = false;
-                 // checkPowerupPickup(player); // Recoger powerup al *terminar* el movimiento en la celda
+                // checkPowerupPickup(player); // Opcional: Recoger al *terminar* el movimiento
             } else {
                 // Moverse hacia el destino
                 const moveDirection = new THREE.Vector3().subVectors(player.targetPos, player.mesh.position).normalize();
@@ -461,16 +526,22 @@ function updatePlayers(deltaTime) {
 
 function placeBomb(player) {
     if (!player.alive || player.bombsActive >= player.bombCapacity) {
-        return; // Ya ha puesto el máximo
+        return; // Muerto o sin capacidad
     }
 
+    // Usa la posición LÓGICA actual del jugador para colocar la bomba
     const r = player.gridPos.r;
     const c = player.gridPos.c;
 
-    // Verificar si ya hay una bomba en esa celda
-    if (grid[r][c] === CELL_BOMB || bombs.some(b => b.gridPos.r === r && b.gridPos.c === c)) {
-        // console.log("Ya hay una bomba aquí!"); // Evitar poner una encima de otra
+    // Verificar si la celda lógica ya está marcada como bomba
+    if (grid[r][c] === CELL_BOMB) {
+        // console.log(`Intento de poner bomba en (${r},${c}) fallido (Ya hay CELL_BOMB)`);
         return;
+    }
+    // Adicional: Verificar si ya existe una bomba en el array bombs en esa celda (doble check)
+    if (bombs.some(b => b.gridPos.r === r && b.gridPos.c === c)) {
+         // console.log(`Intento de poner bomba en (${r},${c}) fallido (Ya existe en array bombs)`);
+         return;
     }
 
 
@@ -478,8 +549,9 @@ function placeBomb(player) {
 
     const bombGeometry = new THREE.SphereGeometry(CELL_SIZE * 0.4, 16, 16);
     const bombMesh = new THREE.Mesh(bombGeometry, materials.bomb);
-    bombMesh.position.copy(gridToWorld(r, c));
-     bombMesh.position.y = -CELL_SIZE / 2 + CELL_SIZE * 0.4; // Elevarla un poco
+    const worldPos = gridToWorld(r, c);
+    bombMesh.position.copy(worldPos);
+    bombMesh.position.y = worldPos.y -CELL_SIZE / 2 + CELL_SIZE * 0.4; // Elevarla un poco del suelo
     bombMesh.castShadow = true;
     scene.add(bombMesh);
 
@@ -492,7 +564,7 @@ function placeBomb(player) {
     };
 
     bombs.push(newBomb);
-    grid[r][c] = CELL_BOMB; // Marcar la celda como ocupada por bomba
+    grid[r][c] = CELL_BOMB; // Marcar la celda lógica como ocupada por bomba AHORA
     player.bombsActive++;
     updateUI();
 }
@@ -502,87 +574,100 @@ function updateBombs(deltaTime) {
         const bomb = bombs[i];
         bomb.timer -= deltaTime;
 
-        // Parpadeo rápido antes de explotar (opcional)
+        // Parpadeo rápido antes de explotar
         const blinkRate = 0.1;
-         if (bomb.timer < blinkRate * 4) {
+         if (bomb.timer < blinkRate * 5 && bomb.mesh) { // 5 parpadeos
             bomb.mesh.visible = Math.floor(bomb.timer / blinkRate) % 2 === 0;
+         } else if (bomb.mesh) {
+            bomb.mesh.visible = true; // Asegurarse que es visible normalmente
          }
 
-
         if (bomb.timer <= 0) {
-            // ¡Boom!
-            explodeBomb(bomb);
-            bombs.splice(i, 1); // Quitar bomba de la lista activa
+            // Marcarla para explotar en el siguiente paso para evitar problemas de índice
+             const bombToExplode = bombs.splice(i, 1)[0]; // Quitar bomba de la lista activa
+             explodeBomb(bombToExplode); // Explotar inmediatamente
         }
     }
 }
 
 function explodeBomb(bomb) {
+    if (!bomb) return; // Seguridad
     console.log(`Bomba explota en ${bomb.gridPos.r}, ${bomb.gridPos.c}`);
 
-    scene.remove(bomb.mesh); // Quitar el mesh de la bomba
-    bomb.owner.bombsActive--; // Liberar cupo para el jugador
-    grid[bomb.gridPos.r][bomb.gridPos.c] = CELL_EMPTY; // La celda de la bomba ahora está vacía (antes de la explosión)
+    if (bomb.mesh) scene.remove(bomb.mesh);
+    if (bomb.owner) bomb.owner.bombsActive--;
+
+    // IMPORTANTE: La celda donde estaba la bomba ahora forma parte de la explosión,
+    // pero lógicamente debe considerarse 'vacía' para que la explosión se propague a través de ella.
+    // Sin embargo, debemos marcarla como CELL_EXPLOSION al final.
+    // -> Primero la marcamos vacía para la propagación.
+    grid[bomb.gridPos.r][bomb.gridPos.c] = CELL_EMPTY;
 
 
-    const explosionCells = []; // Celdas afectadas por esta explosión
+    const explosionCells = []; // Celdas afectadas lógicamente {r, c}
     const explosionVisuals = []; // Meshes para el efecto visual
+    const affectedCellsSet = new Set(); // Para evitar duplicados visuales/lógicos
 
     // Función para procesar una celda durante la expansión de la explosión
     const processCell = (r, c) => {
          if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return 'stop'; // Fuera del tablero
 
         const cellKey = `${r}_${c}`;
+        // Si ya procesamos esta celda en ESTA explosión, no hacer nada más
+        if (affectedCellsSet.has(cellKey)) return 'continue'; // O 'stop'? Continue seems better for visuals
+
         const cellType = grid[r][c];
 
-        // Añadir celda a la lista de afectadas
-        if (!explosionCells.find(cell => cell.r === r && cell.c === c)) {
-             explosionCells.push({r, c});
+        // Añadir celda a la lista de afectadas y al set
+        explosionCells.push({r, c});
+        affectedCellsSet.add(cellKey);
 
-             // Crear visualización de explosión (cubo simple)
-             const explosionGeo = new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE*0.5, CELL_SIZE); // Más plano
-             const expMesh = new THREE.Mesh(explosionGeo, materials.explosion);
-             expMesh.position.copy(gridToWorld(r, c));
-             expMesh.position.y = -CELL_SIZE / 2 + CELL_SIZE*0.25; // Centrar visualmente
-             scene.add(expMesh);
-             explosionVisuals.push(expMesh);
-        }
+        // Crear visualización de explosión (cubo plano)
+        const explosionGeo = new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE*0.2, CELL_SIZE); // Más plano
+        const expMesh = new THREE.Mesh(explosionGeo, materials.explosion.clone()); // CLONE material for opacity changes
+        expMesh.position.copy(gridToWorld(r, c));
+        expMesh.position.y = -CELL_SIZE / 2 + CELL_SIZE*0.1; // Centrar visualmente
+        scene.add(expMesh);
+        explosionVisuals.push(expMesh);
 
-
+        // Lógica de propagación
         if (cellType === CELL_INDESTRUCTIBLE) {
             return 'stop'; // La explosión se detiene aquí
         }
 
         if (cellType === CELL_DESTRUCTIBLE) {
-            destroyBlock(r, c);
-            return 'stop'; // La explosión destruye el bloque y se detiene
+            destroyBlock(r, c); // Destruye el bloque
+            return 'stop'; // La explosión destruye el bloque y se detiene en esa dirección
         }
 
         if (cellType === CELL_BOMB) {
-            // Chain reaction! Find the bomb in this cell and explode it immediately
+            // Reacción en cadena! Encontrar la bomba en esta celda y explotarla inmediatamente
+             // Busca en el array 'bombs' que aún no han sido procesadas en este frame
             const chainedBombIndex = bombs.findIndex(b => b.gridPos.r === r && b.gridPos.c === c);
             if (chainedBombIndex !== -1) {
-                const chainedBomb = bombs[chainedBombIndex];
-                bombs.splice(chainedBombIndex, 1); // Remove from list to prevent re-triggering
-                // No poner timer a 0, explotarla directamente para evitar loops infinitos si 2 explotan a la vez
+                const chainedBomb = bombs.splice(chainedBombIndex, 1)[0]; // Quitarla para evitar doble explosión
+                // Poner timer a 0 o un valor muy pequeño para asegurar que explote en el *siguiente* ciclo de updateBombs si es necesario,
+                // o explotarla directamente si no causa problemas de recursión/índice.
+                // Explotarla directamente es más simple si se maneja bien:
                 explodeBomb(chainedBomb);
+                // Nota: La explosión original CONTINÚA a través de la celda de la bomba encadenada.
             }
-            // La explosión continúa a través de donde estaba la bomba encadenada (o debería detenerse?)
-            // -> Por simplicidad, la explosión original continúa
+            // Si no se encontró (ya explotó en este frame), la explosión pasa.
         }
 
         // Si es un powerup, la explosión lo destruye
-        if (powerups[cellKey]) {
-             removePowerup(r,c);
+        if (cellType >= CELL_POWERUP_BOMB && cellType <= CELL_POWERUP_SPEED) {
+             if (powerups[cellKey]) {
+                removePowerup(r,c);
+             }
         }
 
+        // Colisión con jugador se maneja en checkCollisions leyendo el grid
 
-        // Check for players in this cell (collision check handled later)
-
-        return 'continue'; // La explosión continúa
+        return 'continue'; // La explosión continúa propagándose
     };
 
-    // Procesar celda central
+    // Procesar celda central (la de la bomba original)
     processCell(bomb.gridPos.r, bomb.gridPos.c);
 
     // Expandir en 4 direcciones
@@ -598,15 +683,19 @@ function explodeBomb(bomb) {
         }
     }
 
-     // Marcar las celdas como peligrosas temporalmente y registrar la explosión
+     // Registrar la explosión activa (con sus visuales y celdas lógicas)
      const explosionData = { cells: explosionCells, timer: EXPLOSION_DURATION, visuals: explosionVisuals };
      explosions.push(explosionData);
+
+     // Marcar TODAS las celdas afectadas como peligrosas (CELL_EXPLOSION) en el grid lógico AHORA
      explosionCells.forEach(cell => {
-         grid[cell.r][cell.c] = CELL_EXPLOSION; // Marcar como peligrosa
+          // Solo marcar si la celda no es indestructible (que no debería estar en la lista, pero por si acaso)
+          if (grid[cell.r][cell.c] !== CELL_INDESTRUCTIBLE) {
+            grid[cell.r][cell.c] = CELL_EXPLOSION;
+          }
      });
 
-
-    updateUI();
+    updateUI(); // Actualizar UI por si cambió el contador de bombas del owner
 }
 
 function updateExplosions(deltaTime) {
@@ -616,19 +705,23 @@ function updateExplosions(deltaTime) {
 
         if (exp.timer <= 0) {
             // Limpiar visualización y estado lógico de la explosión
-             exp.visuals.forEach(v => scene.remove(v));
+             exp.visuals.forEach(v => { if(v) scene.remove(v); });
              exp.cells.forEach(cell => {
-                 // Solo limpiar si sigue siendo una celda de explosión (podría haber una bomba nueva)
-                 if (grid[cell.r][cell.c] === CELL_EXPLOSION) {
+                 // Solo limpiar si *sigue* siendo una celda de explosión
+                 // (podría haber una bomba nueva, otro powerup, etc.)
+                 if (grid[cell.r]?.[cell.c] === CELL_EXPLOSION) { // Check if row exists
                      grid[cell.r][cell.c] = CELL_EMPTY;
                  }
              });
-            explosions.splice(i, 1);
+            explosions.splice(i, 1); // Quitar de la lista de explosiones activas
         } else {
-            // Hacer que la opacidad disminuya (opcional)
+            // Hacer que la opacidad disminuya (fade out)
             const opacity = Math.max(0, exp.timer / EXPLOSION_DURATION);
              exp.visuals.forEach(v => {
-                 if (v.material.opacity !== undefined) v.material.opacity = opacity * 0.8; // *0.8 para no ser totalmente opaco al inicio
+                  // Asegurarse que el material es único o clonado para esta explosión
+                 if (v?.material.opacity !== undefined) {
+                    v.material.opacity = opacity * 0.8; // *0.8 para no ser totalmente opaco al inicio
+                 }
              });
         }
     }
@@ -641,20 +734,33 @@ function destroyBlock(r, c) {
     if (blocks[cellKey]) {
         scene.remove(blocks[cellKey]);
         delete blocks[cellKey];
-        grid[r][c] = CELL_EMPTY; // Ahora es una celda vacía
+        // IMPORTANTE: No cambiar grid[r][c] aquí. La explosión lo marcará como CELL_EXPLOSION.
+        // Cuando la explosión termine, se limpiará a CELL_EMPTY.
+        // grid[r][c] = CELL_EMPTY; // <-- NO HACER ESTO AQUÍ
 
-        // Posibilidad de dejar un power-up
+        // Posibilidad de dejar un power-up (se creará 'debajo' de la explosión temporalmente)
         if (Math.random() < POWERUP_CHANCE) {
+            // Spawn powerup ANTES de que la celda se marque como CELL_EXPLOSION
             spawnPowerup(r, c);
         }
+    } else {
+         console.warn(`Intento de destruir bloque en ${r},${c}, pero no se encontró en 'blocks'. Grid state: ${grid[r]?.[c]}`);
+         // Aún así, permitir que la explosión marque la celda como CELL_EXPLOSION
     }
 }
 
 function spawnPowerup(r, c) {
+    // Comprobar si la celda está lógicamente vacía ANTES de spawnear
+    // (Aunque destroyBlock fue llamado, la explosión aún no marcó la celda)
+    if (grid[r][c] !== CELL_EMPTY && grid[r][c] !== CELL_DESTRUCTIBLE) {
+        // console.log(`No se puede spawnear powerup en ${r},${c}, la celda no está vacía/destructible (estado: ${grid[r][c]})`);
+        return; // Evitar spawn sobre bombas, otras explosiones, etc.
+    }
+
     const powerupTypeRoll = Math.random();
     let type;
     let material;
-    let geometry = new THREE.BoxGeometry(CELL_SIZE * 0.6, CELL_SIZE * 0.6, CELL_SIZE * 0.6); // Más pequeño
+    let geometry = new THREE.BoxGeometry(CELL_SIZE * 0.6, CELL_SIZE * 0.2, CELL_SIZE * 0.6); // Más plano
 
     if (powerupTypeRoll < 0.4) { // 40% Rango
         type = CELL_POWERUP_RANGE;
@@ -667,72 +773,94 @@ function spawnPowerup(r, c) {
         material = materials.powerup_speed;
     }
 
-     // Evitar spawn si ya hay algo (otra bomba, explosión, jugador?)
-    if (grid[r][c] !== CELL_EMPTY) return;
-
+    if (!material) {
+         console.error(`Material para powerup tipo ${type} no encontrado. No se spawneará.`);
+         return;
+    }
 
     console.log(`Spawn powerup tipo ${type} en ${r}, ${c}`);
 
     const powerupMesh = new THREE.Mesh(geometry, material);
-    powerupMesh.position.copy(gridToWorld(r, c));
-    powerupMesh.position.y = -CELL_SIZE / 2 + CELL_SIZE * 0.3; // A nivel del suelo
+    const worldPos = gridToWorld(r, c);
+    powerupMesh.position.copy(worldPos);
+    powerupMesh.position.y = worldPos.y -CELL_SIZE / 2 + CELL_SIZE * 0.1; // A nivel del suelo plano
     powerupMesh.castShadow = true; // Los powerups también arrojan sombra
     scene.add(powerupMesh);
 
     const cellKey = `${r}_${c}`;
     powerups[cellKey] = { mesh: powerupMesh, type: type };
-    grid[r][c] = type; // Marcar la celda con el tipo de powerup
+    // Marcar la celda lógica con el tipo de powerup.
+    // Esto sobreescribirá CELL_EMPTY o CELL_DESTRUCTIBLE.
+    // Será sobreescrito temporalmente por CELL_EXPLOSION si está en una explosión.
+    grid[r][c] = type;
 }
 
 function checkPowerupPickup(player) {
+    // Comprobar la celda lógica a la que el jugador ACABA DE ENTRAR (lógicamente)
     const r = player.gridPos.r;
     const c = player.gridPos.c;
     const cellKey = `${r}_${c}`;
+    const cellType = grid[r][c];
 
-    if (powerups[cellKey]) {
-        const powerup = powerups[cellKey];
-        console.log(`Jugador ${player.index + 1} recoge powerup tipo ${powerup.type}`);
+    if (cellType >= CELL_POWERUP_BOMB && cellType <= CELL_POWERUP_SPEED) {
+        if (powerups[cellKey]) {
+            const powerup = powerups[cellKey];
+            console.log(`Jugador ${player.index + 1} recoge powerup tipo ${powerup.type} en ${r},${c}`);
 
-        // Aplicar efecto
-        switch (powerup.type) {
-            case CELL_POWERUP_BOMB:
-                player.bombCapacity++;
-                break;
-            case CELL_POWERUP_RANGE:
-                player.bombRange++;
-                break;
-            case CELL_POWERUP_SPEED:
-                player.speedMultiplier += 0.25; // Aumentar velocidad
-                break;
+            // Aplicar efecto
+            switch (powerup.type) {
+                case CELL_POWERUP_BOMB:
+                    player.bombCapacity++;
+                    break;
+                case CELL_POWERUP_RANGE:
+                    player.bombRange++;
+                    break;
+                case CELL_POWERUP_SPEED:
+                    player.speedMultiplier = Math.min(3.0, player.speedMultiplier + 0.25); // Aumentar velocidad con límite
+                    break;
+            }
+
+            removePowerup(r, c); // Quitar el powerup del juego (visual y lógico)
+            updateUI();
+        } else {
+             // Esto podría pasar si la explosión destruyó el powerup justo antes
+             // console.log(`Jugador ${player.index + 1} entró en celda ${r},${c} con tipo powerup ${cellType}, pero no hay objeto powerup.`);
+             // Asegurarse que la celda quede vacía si el objeto no está
+              if (grid[r][c] === cellType) { // Solo si no ha cambiado mientras tanto
+                 grid[r][c] = CELL_EMPTY;
+             }
         }
-
-        removePowerup(r, c); // Quitar el powerup del juego
-        updateUI();
     }
 }
 
 function removePowerup(r, c) {
      const cellKey = `${r}_${c}`;
      if (powerups[cellKey]) {
-        scene.remove(powerups[cellKey].mesh);
+        if (powerups[cellKey].mesh) scene.remove(powerups[cellKey].mesh);
         delete powerups[cellKey];
-        if(grid[r][c] >= CELL_POWERUP_BOMB && grid[r][c] <= CELL_POWERUP_SPEED) {
-            grid[r][c] = CELL_EMPTY; // Marcar celda como vacía de nuevo
+        // Solo marcar celda como vacía si actualmente contiene este powerup
+        // (Podría haber sido sobreescrita por una bomba o explosión)
+        const currentCellType = grid[r]?.[c];
+        if(currentCellType >= CELL_POWERUP_BOMB && currentCellType <= CELL_POWERUP_SPEED) {
+            grid[r][c] = CELL_EMPTY;
         }
+        // console.log(`Powerup removido de ${r},${c}. Celda ahora es ${grid[r][c]}`);
      }
 }
 
 
 function checkCollisions() {
+    // Comprobar colisión JUGADOR vs EXPLOSION
     players.forEach(player => {
         if (!player.alive) return;
 
+        // Usar la posición LÓGICA actual del jugador
         const r = player.gridPos.r;
         const c = player.gridPos.c;
 
-        // Colisión con Explosión
-        if (grid[r][c] === CELL_EXPLOSION) {
-            console.log(`Jugador ${player.index + 1} alcanzado por explosión!`);
+        // Si la celda lógica está marcada como explosión, el jugador muere
+        if (grid[r]?.[c] === CELL_EXPLOSION) { // Check row exists
+            console.log(`Jugador ${player.index + 1} en (${r}, ${c}) alcanzado por explosión!`);
             killPlayer(player);
         }
     });
@@ -741,30 +869,39 @@ function checkCollisions() {
 function killPlayer(player) {
     if (!player.alive) return; // Ya está muerto
     player.alive = false;
-    scene.remove(player.mesh); // O hacer una animación de muerte
+    if (player.mesh) {
+        scene.remove(player.mesh); // Quitar mesh del jugador
+        player.mesh = null; // Evitar intentar acceder a él después
+    }
     console.log(`Jugador ${player.index + 1} ha muerto.`);
-    // Podríamos añadir un pequeño retraso antes de comprobar la victoria
+    // La UI se actualizará implícitamente o en checkWinCondition
+    // checkWinCondition será llamado en el mismo frame o el siguiente y detectará la muerte
 }
 
 function checkWinCondition() {
+    // Solo comprobar si el juego estaba corriendo
+    if (!gameRunning) return;
+
     const alivePlayers = players.filter(p => p.alive);
 
-    if (alivePlayers.length <= 1 && gameRunning) { // <= 1 para cubrir el caso de empate (0 vivos)
-        gameRunning = false;
-        clock.stop();
+    // Si queda 1 o 0 jugadores vivos, el juego termina
+    if (alivePlayers.length <= 1) {
+        gameRunning = false; // ¡IMPORTANTE: Detener la lógica del juego AQUI!
+        // No detener el clock, animate debe seguir corriendo para mostrar el mensaje
+
         let message = "";
         if (alivePlayers.length === 1) {
             message = `¡Jugador ${alivePlayers[0].index + 1} Gana!`;
         } else {
-            message = "¡Empate!";
+            message = "¡Empate!"; // Ambos murieron en el mismo frame
         }
+
         console.log("Game Over:", message);
         ui.messageText.textContent = message;
-        ui.startButton.textContent = "Jugar de Nuevo"; // Cambiar texto botón
-        ui.messageOverlay.style.display = 'flex';
-        // Al hacer clic en "Jugar de Nuevo", ahora llamará a startGame, que idealmente llamaría a resetGame()
-         ui.startButton.onclick = resetGame; // ¡¡IMPORTANTE: Que el botón reinicie!!
-
+        ui.startButton.textContent = "Jugar de Nuevo";
+        // Asignar resetGame al botón para la próxima vez
+        ui.startButton.onclick = resetGame; // <--- ESTO ES CLAVE PARA REINICIAR
+        ui.messageOverlay.style.display = 'flex'; // Mostrar el mensaje y el botón
     }
 }
 
@@ -774,7 +911,7 @@ function gridToWorld(r, c) {
     // Centra el tablero en el origen (0,0,0)
     const worldX = (c - (GRID_SIZE - 1) / 2) * CELL_SIZE;
     const worldZ = (r - (GRID_SIZE - 1) / 2) * CELL_SIZE;
-    const worldY = 0; // Altura base de los objetos en el centro de la celda
+    const worldY = 0; // Centro Y de la celda lógica
     return new THREE.Vector3(worldX, worldY, worldZ);
 }
 
@@ -791,46 +928,105 @@ function worldToGrid(worldPos) {
 function isCellPassable(r, c, player) {
     // Comprobar límites del tablero
     if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) {
+        // console.log(`(${r},${c}) es fuera de límites`);
         return false;
     }
-    // Comprobar tipo de celda
-    const cellType = grid[r][c];
+
+    // Comprobar tipo de celda lógica
+    const cellType = grid[r]?.[c]; // Safely access grid cell
+
+     if (cellType === undefined) {
+         console.warn(`Grid cell (${r},${c}) is undefined!`);
+         return false; // Consider undefined as impassable
+     }
+
+    // Bloques fijos y destructibles bloquean el paso
     if (cellType === CELL_INDESTRUCTIBLE || cellType === CELL_DESTRUCTIBLE) {
+         // console.log(`(${r},${c}) es bloque (tipo ${cellType})`);
         return false;
     }
-    // Comprobar si hay una bomba (los jugadores NO pueden atravesar bombas)
+
+    // Bombas bloquean el paso, EXCEPTO si es la bomba que el jugador ACABA de poner y está intentando salir de esa celda
     if (cellType === CELL_BOMB) {
-         // Permitir salir de la celda donde acabas de poner la bomba
-         const bombInCell = bombs.find(b => b.gridPos.r === r && b.gridPos.c === c);
-         if (bombInCell && bombInCell.owner === player && bombInCell.gridPos.r === player.gridPos.r && bombInCell.gridPos.c === player.gridPos.c) {
-             return true; // Puedes salir de tu propia bomba recién puesta
+         // Excepción: ¿Está el jugador *actualmente* en la celda (r,c)?
+         // (Esta función se llama para la celda *destino*, no la actual)
+         // Necesitamos saber si la celda (r,c) contiene una bomba y si el jugador *no* está intentando salir de ella.
+         const isPlayerCurrentlyInTargetCell = (player.gridPos.r === r && player.gridPos.c === c);
+
+         if (!isPlayerCurrentlyInTargetCell) {
+             // console.log(`(${r},${c}) es bomba y jugador no está saliendo de ella`);
+             return false; // Bloquea si intenta entrar en una celda con bomba
          }
-        return false;
+         // Si el jugador está intentando moverse *dentro* de la celda donde está (r=player.gridPos.r, c=player.gridPos.c)
+         // y hay una bomba, SÍ puede salir. ¡Esta condición raramente se dará aquí!
+         // La comprobación principal es simplemente: ¿Hay una bomba en la celda *destino*? Si sí, no pases.
+         // La lógica original de permitir salir de la bomba recién puesta estaba implícita porque
+         // el check se hace antes de moverse, y la celda destino no tenía bomba aún.
+         // --> Mantenemos: Si la celda DESTINO tiene bomba, no es pasable.
+         // console.log(`(${r},${c}) es bomba`);
+         // return false; // Simplificado: Las bombas siempre bloquean la entrada.
+
+         // Revisión Lógica "Salir de tu bomba":
+         // Cuando pones una bomba, estás en la celda (r,c). grid[r][c] se vuelve CELL_BOMB.
+         // Si intentas moverte a (r+1, c), isCellPassable(r+1, c) se evalúa. Eso está bien.
+         // Si intentas moverte *otra vez* a (r,c) (donde está la bomba), isCellPassable(r,c) -> CELL_BOMB -> return false. Correcto.
+         // El problema sería si te quedas quieto y luego intentas salir.
+         // Necesitamos permitir salir si player.gridPos === la celda con bomba que es tuya? No, eso es muy complejo.
+         // Regla simple: No puedes entrar a una celda que TENGA una bomba. Punto.
+         return false;
+
     }
 
-    // Comprobar colisión con otros jugadores (simple)
-    // for (const otherPlayer of players) {
-    //     if (otherPlayer !== player && otherPlayer.alive && otherPlayer.gridPos.r === r && otherPlayer.gridPos.c === c) {
-    //         return false; // No puede entrar si otro jugador está ahí
-    //     }
-    // }
+    // Comprobar colisión con otros jugadores (opcional, puede ser molesto)
+    /*
+    for (const otherPlayer of players) {
+        if (otherPlayer !== player && otherPlayer.alive) {
+            // Comprobar si el otro jugador está LÓGICAMENTE en la celda destino
+            if (otherPlayer.gridPos.r === r && otherPlayer.gridPos.c === c) {
+                 // console.log(`(${r},${c}) ocupada por otro jugador`);
+                 return false;
+            }
+            // Podría necesitarse una comprobación más compleja si los jugadores se mueven a la misma celda a la vez
+        }
+    }
+    */
 
-
-    return true; // Celda vacía, powerup o explosión (se puede pasar, pero morirás si es explosión)
+    // La celda es pasable si es EMPTY, EXPLOSION (morirás), o POWERUP
+    // console.log(`(${r},${c}) es pasable (tipo ${cellType})`);
+    return true;
 }
 
 function updateUI() {
+    // Actualizar UI para Jugador 1
     if (players[0]) {
-        ui.p1Bombs.textContent = players[0].bombCapacity - players[0].bombsActive;
-        ui.p1BombCapacity.textContent = players[0].bombCapacity;
-        ui.p1Range.textContent = players[0].bombRange;
-        ui.p1Speed.textContent = players[0].speedMultiplier.toFixed(1); // Mostrar 1 decimal
+        const p1 = players[0];
+        ui.p1Bombs.textContent = p1.alive ? p1.bombCapacity - p1.bombsActive : 'X';
+        ui.p1BombCapacity.textContent = p1.alive ? p1.bombCapacity : '-';
+        ui.p1Range.textContent = p1.alive ? p1.bombRange : '-';
+        ui.p1Speed.textContent = p1.alive ? p1.speedMultiplier.toFixed(1) : '-';
+        ui.p1Info.classList.toggle('dead', !p1.alive);
+    } else { // Estado inicial o si P1 no existe
+        ui.p1Bombs.textContent = '-';
+        ui.p1BombCapacity.textContent = '-';
+        ui.p1Range.textContent = '-';
+        ui.p1Speed.textContent = '-';
+         ui.p1Info.classList.remove('dead');
     }
+
+     // Actualizar UI para Jugador 2
      if (players[1]) {
-        ui.p2Bombs.textContent = players[1].bombCapacity - players[1].bombsActive;
-        ui.p2BombCapacity.textContent = players[1].bombCapacity;
-        ui.p2Range.textContent = players[1].bombRange;
-        ui.p2Speed.textContent = players[1].speedMultiplier.toFixed(1);
+        const p2 = players[1];
+        ui.p2Bombs.textContent = p2.alive ? p2.bombCapacity - p2.bombsActive : 'X';
+        ui.p2BombCapacity.textContent = p2.alive ? p2.bombCapacity : '-';
+        ui.p2Range.textContent = p2.alive ? p2.bombRange : '-';
+        ui.p2Speed.textContent = p2.alive ? p2.speedMultiplier.toFixed(1) : '-';
+        ui.p2Info.classList.toggle('dead', !p2.alive);
+    } else { // Estado inicial o si P2 no existe
+        ui.p2Bombs.textContent = '-';
+        ui.p2BombCapacity.textContent = '-';
+        ui.p2Range.textContent = '-';
+        ui.p2Speed.textContent = '-';
+        ui.p2Info.classList.remove('dead');
     }
 }
 
@@ -840,18 +1036,25 @@ function onWindowResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
+    renderer.setSize(width, height); // Actualizar tamaño total del renderer
+
+    // Actualizar cámaras para split screen
     cameras.forEach(cam => {
-        cam.aspect = (width / 2) / height; // Aspect ratio para media pantalla
-        cam.updateProjectionMatrix();
+        if (cam) {
+            cam.aspect = (width / 2) / height; // Aspect ratio para media pantalla
+            cam.updateProjectionMatrix();
+        }
     });
 
-    renderer.setSize(width, height);
+    // Los viewports/scissors se actualizan en cada frame en animate()
 }
 
 function onKeyDown(event) {
-    keysPressed[event.key.toLowerCase()] = true;
-     // Prevenir scroll con flechas/espacio si el juego está activo
-     if (gameRunning && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(event.key.toLowerCase())) {
+    const key = event.key.toLowerCase();
+    keysPressed[key] = true;
+
+    // Prevenir scroll con flechas/espacio/enter SOLO si el juego está activo
+     if (gameRunning && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'enter', 'numpad0'].includes(key)) {
          event.preventDefault();
      }
 }
@@ -861,20 +1064,51 @@ function onKeyUp(event) {
 }
 
 function updateCameraPositions() {
-     const cameraOffset = new THREE.Vector3(0, CELL_SIZE * 5, CELL_SIZE * 3); // Offset detrás y arriba
-     const lookAtOffset = new THREE.Vector3(0, -CELL_SIZE * 2, -CELL_SIZE * 4); // Mirar un poco hacia abajo y adelante
+     // Offset relativo a la posición del JUGADOR
+     const cameraOffset = new THREE.Vector3(0, CELL_SIZE * 6, CELL_SIZE * 4); // Un poco más arriba y atrás
+     const lookAtOffset = new THREE.Vector3(0, -CELL_SIZE * 1, -CELL_SIZE * 3); // Mirar un poco hacia abajo y adelante del jugador
 
-    for (let i = 0; i < players.length; i++) {
-        if (players[i]?.mesh) {
-            const playerPos = players[i].mesh.position;
+    for (let i = 0; i < cameras.length; i++) {
+        const player = players[i];
+        const camera = cameras[i];
+
+        if (camera && player?.mesh) { // Solo actualizar si la cámara y el mesh del jugador existen
+            const playerPos = player.mesh.position;
+
+            // Calcular posición deseada de la cámara
             const desiredCamPos = playerPos.clone().add(cameraOffset);
+
+            // Calcular punto deseado para mirar (relativo al jugador)
             const desiredLookAt = playerPos.clone().add(lookAtOffset);
 
-            // Suavizar movimiento de cámara (LERP)
-            cameras[i].position.lerp(desiredCamPos, 0.1); // Ajusta 0.1 para más/menos suavizado
-            cameras[i].lookAt(cameras[i].position.clone().lerp(desiredLookAt, 0.1)); // Suavizar también el punto de mira
-             // cameras[i].lookAt(playerPos); // Opción sin suavizado de lookAt
+            // Suavizar movimiento de cámara (LERP - Linear Interpolation)
+            // Un valor más bajo de alpha (ej: 0.05) da más suavizado (más lento el seguimiento)
+            // Un valor más alto (ej: 0.2) da menos suavizado (más rápido el seguimiento)
+            const lerpAlpha = 0.08;
+            camera.position.lerp(desiredCamPos, lerpAlpha);
+
+            // Suavizar el punto de mira también puede ser bueno
+            // Necesitamos un objeto temporal para lerpear el punto de mira, ya que lookAt necesita un Vector3
+            // O podemos lerpear un vector director si quisiéramos... pero lerpear el target es más fácil.
+            // Usaremos una propiedad temporal en la cámara o un objeto externo si es necesario.
+            if (!camera.currentLookAt) camera.currentLookAt = desiredLookAt.clone(); // Inicializar si no existe
+            camera.currentLookAt.lerp(desiredLookAt, lerpAlpha);
+            camera.lookAt(camera.currentLookAt);
+
+             // Opción sin suavizado de lookAt:
+             // camera.lookAt(playerPos); // Mirar directamente al jugador
+        } else if (camera && !player?.alive && player?.gridPos) {
+             // Si el jugador está muerto pero tenemos su última posición lógica, mirar ahí
+             const lastWorldPos = gridToWorld(player.gridPos.r, player.gridPos.c);
+             const desiredCamPos = lastWorldPos.clone().add(cameraOffset); // Cámara sobre la última pos
+             const desiredLookAt = lastWorldPos.clone().add(lookAtOffset);
+             const lerpAlpha = 0.08;
+             camera.position.lerp(desiredCamPos, lerpAlpha);
+             if (!camera.currentLookAt) camera.currentLookAt = desiredLookAt.clone();
+             camera.currentLookAt.lerp(desiredLookAt, lerpAlpha);
+             camera.lookAt(camera.currentLookAt);
         }
+        // Si no hay jugador o cámara, no hacer nada
     }
 }
 
