@@ -1,35 +1,76 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Motor Estilo Doom (VR Enabled)</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Maze</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
+        body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
         #vr-button {
             position: absolute;
             bottom: 20px;
             right: 20px;
-            z-index: 10;
+            border: 1px solid #fff;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            padding: 12px 24px;
+            font: 16px sans-serif;
+            cursor: pointer;
+            z-index: 1;
+            /* Default state: Button visible */
         }
+         #vr-button:disabled { /* Style for when VR not available */
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+         /* Hide button when presenting in VR */
+        body[data-vr-presenting="true"] #vr-button {
+            display: none;
+        }
+
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Include Three.js (keep using CDN or download locally too) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Three.js -->
+    <!-- Option 1: Use a CDN -->
+    <!-- <script src="https://unpkg.com/three@latest/build/three.module.js" type="module"></script> -->
+    <!-- <script src="https://unpkg.com/three@latest/examples/jsm/webxr/VRButton.js" type="module"></script> -->
 
-    <!-- Include VRButton helper FROM LOCAL FILE -->
-    <script src="VRButton.js"></script> <!-- <<< CHANGED THIS LINE -->
+     <!-- Option 2: Use local files (download build/three.module.js and examples/jsm/webxr/VRButton.js) -->
+     <script src="js/three.module.js" type="module"></script>
+     <!-- Note: VRButton must be imported *within* your script if using modules -->
 
-    <!-- Include your script -->
-    <script src="script.js"></script>
+
+    <!-- Your Game Script -->
+    <!-- Needs type="module" if you import VRButton internally -->
+    <!-- Remove type="module" if VRButton is loaded globally (older examples) -->
+     <script type="module">
+        // Import THREE and VRButton if using modules
+        import * as THREE from './js/three.module.js';
+        import { VRButton } from './js/webxr/VRButton.js'; // Adjust path
+
+        // Make THREE and VRButton global for your script.js if it expects them globally
+        window.THREE = THREE;
+        window.VRButton = VRButton;
+
+        // Now load your main script which uses the global THREE and VRButton
+         const gameScript = document.createElement('script');
+         gameScript.src = 'script.js'; // Your main game code
+         // gameScript.type = 'module'; // Uncomment if script.js also uses imports/exports
+         document.body.appendChild(gameScript);
+
+    </script>
+
+     <!-- Or, if VRButton.js is NOT a module and expects THREE globally: -->
+     <!--
+     <script src="js/three.min.js"></script> <!- Non-module version ->
+     <script src="js/webxr/VRButton.js"></script> <!- Non-module version ->
+     <script src="script.js"></script> <!- Your script, non-module ->
+     -->
+
 </body>
 </html>

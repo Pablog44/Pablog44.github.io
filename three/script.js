@@ -1,11 +1,11 @@
 // --- Configuración Inicial ---
 const TILE_SIZE = 5;      // Tamaño de cada cuadrado en el mundo 3D
 const WALL_HEIGHT = 5;    // Altura de las paredes
-const moveSpeed = 5.0;    // Velocidad de movimiento (ajustada para VR/screen)
+const moveSpeed = 5.0;    // Velocidad base
 const lookSpeed = 0.003;  // Sensibilidad del ratón (solo pantalla)
 const gamepadLookSpeed = 1.5; // Sensibilidad de la vista con gamepad (solo pantalla)
-const gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad
-const vrMoveSpeedFactor = 0.8; // Multiplicador de velocidad en VR (más lento suele ser mejor)
+const gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad (pantalla)
+const vrMoveSpeedFactor = 0.7; // Multiplicador de velocidad en VR (más lento suele ser mejor para confort)
 const vrDeadZone = 0.15;   // Zona muerta para sticks/touchpads de VR
 
 // --- Datos del Mapa (¡Aquí defines tus mapas!) ---
@@ -50,10 +50,10 @@ const ceilingMap = [
 ];
 
 // --- Texturas (URLs o rutas locales) ---
-const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png']; // Corresponden a 1 y 2 en wallMap
-const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png']; // Corresponden a 1 y 2 en floorMap
-const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png']; // Corresponden a 1 y 2 en ceilingMap
-const placeholderTextureUrl = 'textures/placeholder.png'; // Textura de fallback (índice 0)
+const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png'];
+const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png'];
+const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
+const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Variables Globales de Three.js y Juego ---
 let scene, camera, renderer;
@@ -63,10 +63,10 @@ let wallTextures = [];
 let floorTextures = [];
 let ceilingTextures = [];
 let placeholderTexture = null;
-let mapMeshesGroup = new THREE.Group();
+let mapMeshesGroup = new THREE.Group(); // Grupo para todos los elementos estáticos del mapa
 let mapWidth = wallMap[0].length;
 let mapHeight = wallMap.length;
-let playerRig; // <<<--- Grupo para mover al jugador (contiene la cámara)
+let playerRig; // <<<--- Grupo para mover al jugador (contiene la cámara y controla la posición/orientación base)
 
 // Movimiento y Control
 const moveState = { forward: 0, back: 0, left: 0, right: 0 }; // Teclado/Gamepad (pantalla)
@@ -76,127 +76,142 @@ let activeGamepadIndex = null; // Índice del gamepad activo (pantalla)
 
 // --- Inicialización ---
 function init() {
+    // **IMPORTANT**: Check for WebXR support early
+    if (!navigator.xr) {
+        console.error("WebXR API not found. Ensure you're using a compatible browser (Chrome, Edge, Oculus Browser, Firefox Nightly) and running this page via HTTPS or localhost.");
+        document.body.innerHTML = `<div style="padding: 20px; color: red; font-size: 18px;">
+            Error: WebXR not supported or enabled.<br>
+            Please use a WebXR-compatible browser (like Chrome, Edge, Oculus Browser).<br>
+            Also, ensure you are running this page from a secure context (<b>https://</b> or <b>http://localhost</b>), not directly from the file system (file:///).
+            </div>`;
+        return; // Stop initialization if WebXR is not available
+    }
+
     // Escena
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x333333); // Se puede ajustar o hacer negro para VR
-    scene.fog = new THREE.Fog(scene.background, TILE_SIZE * 2, TILE_SIZE * mapWidth * 0.7);
+    scene.background = new THREE.Color(0x1a1a1a); // Darker background often better for VR
+    scene.fog = new THREE.Fog(scene.background, TILE_SIZE * 2, TILE_SIZE * mapWidth * 0.8);
 
     // Cámara
+    // Field of View (FOV) might be overridden by VR headset, but good default
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // NO establecemos la posición Y aquí, se hará en el Rig
-    camera.rotation.order = 'YXZ'; // Importante para FPS
+    // Set rotation order for intuitive FPS controls (Yaw, Pitch, Roll)
+    camera.rotation.order = 'YXZ';
 
-    // Player Rig (Contenedor para la cámara)
+    // Player Rig (Crucial for VR)
+    // This group represents the player's base position and yaw (left/right turn) on the floor.
+    // The camera is placed inside this rig. In VR, the headset controls the camera's
+    // position *relative* to this rig's position and its rotation (pitch/roll/head-yaw).
     playerRig = new THREE.Group();
-    playerRig.position.y = WALL_HEIGHT / 2; // Altura base del jugador
-    playerRig.add(camera); // Añadir cámara al rig
-    scene.add(playerRig); // Añadir el rig a la escena
+    playerRig.position.y = WALL_HEIGHT / 2; // Set base eye-height (VR headset adds offset)
+    playerRig.add(camera); // Attach camera to the rig
+    scene.add(playerRig); // Add the rig to the scene
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+    const canvas = document.getElementById('gameCanvas');
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio); // Sharper rendering
     renderer.shadowMap.enabled = true;
-    renderer.xr.enabled = true; // <<<--- Habilitar WebXR
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
 
-    // Botón VR
+    // Enable WebXR
+    renderer.xr.enabled = true;
+    // Set the frame of reference. 'local-floor' assumes the user's physical floor
+    // corresponds to y=0 in the playerRig's space. Height is added by tracking.
+    renderer.xr.setReferenceSpaceType('local-floor');
+
+    // VR Button (Checks for compatibility before showing)
     const vrButton = VRButton.createButton(renderer);
-    vrButton.id = 'vr-button'; // Asignar ID para posible CSS
+    vrButton.id = 'vr-button';
     document.body.appendChild(vrButton);
+    vrButton.addEventListener('click', () => {
+         // Explicitly release pointer lock if entering VR while locked
+        if (isPointerLocked) {
+            document.exitPointerLock();
+        }
+    });
+
 
     // Luces
-    const ambientLight = new THREE.AmbientLight(0x909090);
+    const ambientLight = new THREE.AmbientLight(0x808080); // Slightly brighter ambient
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Slightly stronger directional
     directionalLight.position.set(15, 30, 20);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 1024;
     directionalLight.shadow.mapSize.height = 1024;
-    // Ajustar shadow camera para evitar clipping cercano en VR
+    // Adjust shadow camera bounds to fit the map
+    const mapExtentX = mapWidth * TILE_SIZE;
+    const mapExtentZ = mapHeight * TILE_SIZE;
     directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -TILE_SIZE * mapWidth / 2;
-    directionalLight.shadow.camera.right = TILE_SIZE * mapWidth / 2;
-    directionalLight.shadow.camera.top = TILE_SIZE * mapHeight / 2;
-    directionalLight.shadow.camera.bottom = -TILE_SIZE * mapHeight / 2;
-
+    directionalLight.shadow.camera.far = 100; // Adjust far plane based on scene size + light distance
+    directionalLight.shadow.camera.left = -mapExtentX / 2 - TILE_SIZE;
+    directionalLight.shadow.camera.right = mapExtentX / 2 + TILE_SIZE;
+    directionalLight.shadow.camera.top = mapExtentZ / 2 + TILE_SIZE;
+    directionalLight.shadow.camera.bottom = -mapExtentZ / 2 - TILE_SIZE;
     scene.add(directionalLight);
-    const playerLight = new THREE.PointLight(0xffccaa, 0.4, TILE_SIZE * 5);
-    camera.add(playerLight); // Luz sigue la cámara/cabeza
+    // scene.add(new THREE.CameraHelper(directionalLight.shadow.camera)); // Uncomment to debug shadow camera
 
-    // Controles (Pantalla)
-    setupPointerLock(); // Configura listeners, pero se desactivarán en VR
-    window.addEventListener('gamepadconnected', (event) => {
-        if (renderer.xr.isPresenting) return; // Ignorar si está en VR
-        console.log('Gamepad conectado:', event.gamepad.id);
-        if (activeGamepadIndex === null) activeGamepadIndex = event.gamepad.index;
-    });
-    window.addEventListener('gamepaddisconnected', (event) => {
-        console.log('Gamepad desconectado:', event.gamepad.id);
-        if (activeGamepadIndex === event.gamepad.index) {
-            activeGamepadIndex = null;
-            findActiveGamepad(); // Buscar otro si es necesario
-        }
-    });
-    findActiveGamepad(); // Intentar encontrar uno al inicio
+    // Optional: Small light attached to the player/camera for nearby illumination
+    const playerLight = new THREE.PointLight(0xffccaa, 0.3, TILE_SIZE * 4);
+    // Attach to camera so it follows head movement in VR and screen mode
+    camera.add(playerLight);
+
+    // Controles (Pantalla) - Setup listeners, they will be ignored if in VR mode
+    setupScreenControls();
+    setupGamepadSupport();
 
     // Cargar Recursos y Construir Mundo
     preloadTextures().then(() => {
-        findStartPosition(); // Posiciona el playerRig
+        findStartPosition(); // Position the playerRig
         buildMapGeometry();
         scene.add(mapMeshesGroup);
-        // Iniciar el bucle de renderizado
-        renderer.setAnimationLoop(renderLoop); // <<<--- Usar setAnimationLoop
+        // Start the render loop using WebXR's recommended method
+        renderer.setAnimationLoop(renderLoop);
     }).catch(error => {
-        console.error("Error crítico al cargar texturas:", error);
-        document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">Error al cargar texturas. Revisa la consola (F12). Asegúrate de que las imágenes existan en la carpeta 'textures' y que uses un servidor local.</div>`;
-        // Detener todo si fallan las texturas
+        console.error("CRITICAL ERROR loading textures:", error);
+        // Display a user-friendly error message
+        document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">
+            Error loading game textures. Check the console (F12) for details.<br>
+            Ensure the 'textures' folder exists and contains the required images.<br>
+            Make sure you are running this from a local server (http://localhost).
+            </div>`;
+        // No need to call setAnimationLoop if loading failed
     });
 
     window.addEventListener('resize', onWindowResize, false);
 }
 
-function findActiveGamepad() {
-     if (renderer.xr.isPresenting) { // No buscar gamepads de pantalla en VR
-        activeGamepadIndex = null;
-        return;
-    }
-    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    activeGamepadIndex = null;
-    for (let i = 0; i < gamepads.length; i++) {
-        if (gamepads[i]) {
-            activeGamepadIndex = i;
-            console.log(`Gamepad (pantalla) activo encontrado en índice: ${i}`);
-            break;
-        }
-    }
-}
-
-// --- Carga de Texturas (sin cambios) ---
+// --- Texture Loading (Improved Error Handling) ---
 async function loadTexture(url, isPlaceholder = false) {
     return new Promise((resolve, reject) => {
+        console.log(`Attempting to load texture: ${url}`);
         textureLoader.load(
             url,
-            (texture) => {
+            (texture) => { // onLoad
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.magFilter = THREE.NearestFilter;
-                texture.minFilter = THREE.NearestMipmapLinearFilter;
-                if (!isPlaceholder) console.log(`Textura cargada: ${url}`);
+                texture.magFilter = THREE.NearestFilter; // Pixelated look
+                texture.minFilter = THREE.LinearMipmapLinearFilter; // Good balance for distance
+                // texture.anisotropy = renderer.capabilities.getMaxAnisotropy(); // Optional: Sharper textures at angles
+                console.log(`Successfully loaded: ${url}`);
                 resolve(texture);
             },
-            undefined, // onProgress
-            (error) => {
+            undefined, // onProgress - currently unused
+            (errorEvent) => { // onError
                 if (!isPlaceholder) {
-                    console.error(`Error cargando textura: ${url}`, error);
+                    console.error(`Failed to load texture: ${url}. Error:`, errorEvent.message);
                     if (placeholderTexture) {
-                        console.warn(`Usando placeholder para ${url}`);
-                        resolve(placeholderTexture); // Resuelve con placeholder si falla una normal
+                        console.warn(`Using placeholder texture for ${url}.`);
+                        resolve(placeholderTexture); // Fallback to placeholder
                     } else {
-                        reject(`No se pudo cargar ${url} y el placeholder no está disponible.`);
+                        reject(`Failed to load texture ${url} and placeholder is not available.`);
                     }
                 } else {
-                    console.error(`¡¡ERROR CRÍTICO: No se pudo cargar la textura placeholder ${url}!!`, error);
-                    reject(`No se pudo cargar la textura placeholder ${url}`);
+                    // Critical if the placeholder itself fails
+                    console.error(`CRITICAL FAILURE: Could not load placeholder texture ${url}! Error:`, errorEvent.message);
+                    reject(`Failed to load placeholder texture ${url}. Cannot continue.`);
                 }
             }
         );
@@ -205,42 +220,43 @@ async function loadTexture(url, isPlaceholder = false) {
 
 async function preloadTextures() {
     try {
+        // Load placeholder first, it's critical
         placeholderTexture = await loadTexture(placeholderTextureUrl, true);
-        console.log("Textura placeholder cargada.");
+        console.log("Placeholder texture loaded successfully.");
 
+        // Function to load an array of URLs, falling back to placeholder on failure
         const loadTextureArray = async (urls) => {
-            const promises = urls.map(url => loadTexture(url));
-            // Usamos Promise.allSettled para intentar cargar todas, incluso si alguna falla
-            const results = await Promise.allSettled(promises);
-            // Devolvemos las texturas que sí se cargaron (o el placeholder si fallaron)
-            return results.map(result => result.status === 'fulfilled' ? result.value : placeholderTexture);
+            const promises = urls.map(url => loadTexture(url).catch(err => {
+                console.warn(`Caught error for ${url}, using placeholder.`, err); // Log specific error
+                return placeholderTexture; // Ensure fallback happens even if loadTexture promise rejects
+            }));
+            return Promise.all(promises); // Wait for all (including fallbacks) to resolve
         };
 
+        // Load all texture types concurrently
         [wallTextures, floorTextures, ceilingTextures] = await Promise.all([
             loadTextureArray(wallTextureUrls),
             loadTextureArray(floorTextureUrls),
             loadTextureArray(ceilingTextureUrls)
         ]);
-        console.log("Texturas de mapa procesadas.");
 
-        // Añadir placeholder al inicio (índice 0) si no está ya
-        if (wallTextures[0] !== placeholderTexture) wallTextures.unshift(placeholderTexture);
-        if (floorTextures[0] !== placeholderTexture) floorTextures.unshift(placeholderTexture);
-        if (ceilingTextures[0] !== placeholderTexture) ceilingTextures.unshift(placeholderTexture);
+        // Prepend placeholder to each array for index 0 access
+        wallTextures.unshift(placeholderTexture);
+        floorTextures.unshift(placeholderTexture);
+        ceilingTextures.unshift(placeholderTexture);
 
-        console.log(`Total texturas pared (incl. placeholder): ${wallTextures.length}`);
-        console.log(`Total texturas suelo (incl. placeholder): ${floorTextures.length}`);
-        console.log(`Total texturas techo (incl. placeholder): ${ceilingTextures.length}`);
+        console.log(`Textures loaded: Walls=${wallTextures.length}, Floors=${floorTextures.length}, Ceilings=${ceilingTextures.length} (incl. placeholder at index 0)`);
 
     } catch (error) {
-        console.error("Fallo catastrófico durante la carga de texturas:", error);
-        throw error; // Re-lanzar para detener la inicialización
+        // This catch block handles the failure of the placeholder texture loading
+        console.error("Catastrophic texture loading failure (likely placeholder):", error);
+        throw error; // Re-throw to stop initialization in init()
     }
 }
 
-
-// --- Construcción de la Geometría del Mapa (sin cambios) ---
+// --- Map Geometry Building (Minor optimizations) ---
 function buildMapGeometry() {
+    // Clear previous map geometry if rebuilding
     while (mapMeshesGroup.children.length > 0) {
         const mesh = mapMeshesGroup.children[0];
         mapMeshesGroup.remove(mesh);
@@ -248,161 +264,213 @@ function buildMapGeometry() {
         if (mesh.material) {
             const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
             materials.forEach(mat => {
-                if (mat.map) mat.map.dispose();
-                mat.dispose();
+                if (mat.map) mat.map.dispose(); // Dispose texture reference
+                mat.dispose(); // Dispose material
             });
         }
     }
 
+    // Use InstancedMesh or MergedGeometry for large maps for performance.
+    // For this size, individual meshes are acceptable.
+
+    // Create base geometries once
     const wallGeometry = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
     const floorCeilingGeometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE);
+    // Rotate plane to be horizontal (floor)
     floorCeilingGeometry.rotateX(-Math.PI / 2);
-    const ceilingGeometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE);
-    ceilingGeometry.rotateX(Math.PI / 2);
 
+    // Material cache to reuse materials for the same texture
     const materialsCache = {};
     const getMaterial = (texture) => {
-        if (!texture || !texture.uuid) return new THREE.MeshStandardMaterial({ color: 0xff00ff, side: THREE.DoubleSide }); // Error color, DoubleSide por si acaso
+        if (!texture || !texture.uuid) { // Check if texture is valid
+             console.warn("Invalid texture passed to getMaterial, using fallback color.");
+             return new THREE.MeshStandardMaterial({ color: 0xff00ff, roughness: 0.8, metalness: 0.1 });
+        }
         const cacheKey = texture.uuid;
         if (!materialsCache[cacheKey]) {
-             // Asegurarse que la textura esté lista (puede que aún no esté cargada del todo al inicio)
-            texture.needsUpdate = true;
             materialsCache[cacheKey] = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.85, // Adjust for desired surface look
+                metalness: 0.1,
+                side: THREE.FrontSide // Render only the front face (optimization)
+            });
+        }
+        return materialsCache[cacheKey];
+    };
+     const getCeilingMaterial = (texture) => {
+        if (!texture || !texture.uuid) {
+             console.warn("Invalid texture passed to getCeilingMaterial, using fallback color.");
+             return new THREE.MeshStandardMaterial({ color: 0xff00ff, roughness: 0.8, metalness: 0.1 });
+        }
+        const cacheKey = texture.uuid + '_ceil'; // Separate cache key if different settings needed
+        if (!materialsCache[cacheKey]) {
+             materialsCache[cacheKey] = new THREE.MeshStandardMaterial({
                 map: texture,
                 roughness: 0.85,
                 metalness: 0.1,
-                side: THREE.FrontSide
+                // Render back side for ceilings as we look up at them
+                // Could also use DoubleSide, but BackSide is slightly more efficient if camera never goes above ceiling
+                side: THREE.BackSide
             });
         }
         return materialsCache[cacheKey];
     };
 
+
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             const worldX = x * TILE_SIZE;
             const worldZ = y * TILE_SIZE;
-            const wallType = wallMap[y]?.[x];
+            const wallType = wallMap[y]?.[x]; // Use optional chaining for safety
 
+            // Calculate center positions once
+            const centerX = worldX + TILE_SIZE / 2;
+            const centerZ = worldZ + TILE_SIZE / 2;
+
+            // --- Create Walls ---
             if (wallType !== undefined && wallType > 0) {
-                const texture = wallTextures[wallType] || wallTextures[0];
+                const wallTextureIndex = Math.min(wallType, wallTextures.length - 1); // Clamp index
+                const texture = wallTextures[wallTextureIndex] || wallTextures[0]; // Fallback
                 const wallMaterial = getMaterial(texture);
+
                 const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-                wallMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT / 2, worldZ + TILE_SIZE / 2);
+                wallMesh.position.set(centerX, WALL_HEIGHT / 2, centerZ);
                 wallMesh.castShadow = true;
                 wallMesh.receiveShadow = true;
                 mapMeshesGroup.add(wallMesh);
-            } else if (wallType === 0) {
-                const floorTextureIndex = floorMap[y]?.[x] ?? 0;
-                const ceilingTextureIndex = ceilingMap[y]?.[x] ?? 0;
+            }
+            // --- Create Floor and Ceiling for empty spaces ---
+            else if (wallType === 0) {
+                // Floor
+                const floorTextureIndex = Math.min(floorMap[y]?.[x] ?? 0, floorTextures.length - 1);
                 const floorTexture = floorTextures[floorTextureIndex] || floorTextures[0];
-                const ceilingTexture = ceilingTextures[ceilingTextureIndex] || ceilingTextures[0];
-
                 const floorMaterial = getMaterial(floorTexture);
-                const floorMesh = new THREE.Mesh(floorCeilingGeometry, floorMaterial);
-                floorMesh.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
-                floorMesh.receiveShadow = true;
+                const floorMesh = new THREE.Mesh(floorCeilingGeometry, floorMaterial); // Reuse geometry
+                floorMesh.position.set(centerX, 0, centerZ); // Position at Y=0
+                floorMesh.receiveShadow = true; // Floors receive shadows
                 mapMeshesGroup.add(floorMesh);
 
-                const ceilingMaterial = getMaterial(ceilingTexture);
-                // Para techos, usar DoubleSide puede ser útil si el jugador puede mirar hacia arriba
-                // ceilingMaterial.side = THREE.DoubleSide;
-                const ceilingMesh = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-                ceilingMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT, worldZ + TILE_SIZE / 2);
-                 // Los techos normalmente no proyectan sombras, pero pueden recibirlas
+                // Ceiling
+                const ceilingTextureIndex = Math.min(ceilingMap[y]?.[x] ?? 0, ceilingTextures.length - 1);
+                const ceilingTexture = ceilingTextures[ceilingTextureIndex] || ceilingTextures[0];
+                // Use ceiling material (BackSide)
+                const ceilingMaterial = getCeilingMaterial(ceilingTexture);
+                // Create a distinct mesh for the ceiling, positioned at WALL_HEIGHT
+                // We reuse the floor/ceiling *geometry* but need a separate *mesh* object.
+                // Reusing floorCeilingGeometry is fine, just need to position it correctly.
+                const ceilingMesh = new THREE.Mesh(floorCeilingGeometry, ceilingMaterial);
+                ceilingMesh.position.set(centerX, WALL_HEIGHT, centerZ); // Position at Y=WALL_HEIGHT
+                // Ceilings might cast shadows downwards if lights are above them,
+                // but usually, they mainly receive shadows from walls/objects below lights.
                 // ceilingMesh.castShadow = false;
-                // ceilingMesh.receiveShadow = true; // Depende de si hay luces arriba
+                ceilingMesh.receiveShadow = true; // Can receive shadows from lights above
                 mapMeshesGroup.add(ceilingMesh);
             }
         }
     }
-    console.log("Geometría del mapa construida.");
+    console.log("Map geometry built.");
 }
 
-// --- Posición Inicial del Jugador ---
+// --- Player Start Position ---
 function findStartPosition() {
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             if (wallMap[y]?.[x] === 0) {
-                // Posicionar el RIG, no la cámara directamente
+                // Position the RIG, not the camera directly
                 playerRig.position.x = x * TILE_SIZE + TILE_SIZE / 2;
                 playerRig.position.z = y * TILE_SIZE + TILE_SIZE / 2;
-                // La altura Y ya se estableció en init
-                console.log(`Posición inicial jugador (Rig): x=${playerRig.position.x}, z=${playerRig.position.z}`);
+                // Y position (base height) is already set in init
+                console.log(`Player start position (Rig): x=${playerRig.position.x.toFixed(2)}, z=${playerRig.position.z.toFixed(2)}`);
                 return;
             }
         }
     }
-    console.warn("No se encontró espacio vacío, colocando en el centro.");
+    // Fallback if no empty space found
+    console.warn("No empty tile (0) found in wallMap. Placing player at map center.");
     playerRig.position.x = (mapWidth / 2) * TILE_SIZE;
     playerRig.position.z = (mapHeight / 2) * TILE_SIZE;
 }
 
-// --- Controles de Pantalla (Teclado/Ratón/Gamepad) ---
-function setupPointerLock() {
+// --- Screen Controls (Keyboard/Mouse) ---
+function setupScreenControls() {
     const canvas = renderer.domElement;
     canvas.addEventListener('click', () => {
-        // Solo pedir bloqueo si NO estamos en VR y NO está bloqueado ya
+        // Request pointer lock only if not in VR and not already locked
         if (!renderer.xr.isPresenting && !isPointerLocked) {
-             canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
-             if (canvas.requestPointerLock) canvas.requestPointerLock();
+            canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
+            if (canvas.requestPointerLock) {
+                canvas.requestPointerLock();
+            } else {
+                console.warn("Pointer Lock API not available.");
+            }
         }
     });
 
-    const pointerLockChange = () => {
-        isPointerLocked = !!(document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas);
-        if (renderer.xr.isPresenting) isPointerLocked = false; // Asegurar que no esté bloqueado en VR
+    const onPointerLockChange = () => {
+        const lockElement = document.pointerLockElement || document.mozPointerLockElement || document.webkitPointerLockElement;
+        isPointerLocked = !!(lockElement === canvas);
+         // Ensure pointer lock is released if we enter VR
+        if (renderer.xr.isPresenting) {
+            isPointerLocked = false;
+        }
         console.log("Pointer Locked:", isPointerLocked);
+        // Maybe show/hide a crosshair based on isPointerLocked state
     };
 
-    document.addEventListener('pointerlockchange', pointerLockChange, false);
-    document.addEventListener('mozpointerlockchange', pointerLockChange, false);
-    document.addEventListener('webkitpointerlockchange', pointerLockChange, false);
+    const onPointerLockError = (event) => {
+        console.error("Pointer Lock Error:", event);
+    };
 
-    document.addEventListener('mousemove', onMouseMove, false);
-    document.addEventListener('keydown', onKeyDown, false);
-    document.addEventListener('keyup', onKeyUp, false);
+    document.addEventListener('pointerlockchange', onPointerLockChange, false);
+    document.addEventListener('mozpointerlockchange', onPointerLockChange, false);
+    document.addEventListener('webkitpointerlockchange', onPointerLockChange, false);
+    document.addEventListener('pointerlockerror', onPointerLockError, false);
+    document.addEventListener('mozpointerlockerror', onPointerLockError, false);
+    document.addEventListener('webkitpointerlockerror', onPointerLockError, false);
+
+    document.addEventListener('mousemove', onMouseMoveScreen, false);
+    document.addEventListener('keydown', onKeyDownScreen, false);
+    document.addEventListener('keyup', onKeyUpScreen, false);
 }
 
-// Rotación para modo pantalla
-function rotatePlayer(deltaX, deltaY) {
-    if (!isPointerLocked || renderer.xr.isPresenting) return; // Solo si está bloqueado y no en VR
+// Separate handler names to avoid confusion if VR controllers also emit mouse-like events
+function onMouseMoveScreen(event) {
+    // Only rotate if pointer is locked and we are NOT in VR
+    if (!isPointerLocked || renderer.xr.isPresenting) return;
 
-    // --- Rotación Horizontal (Yaw) ---
-    // Gira el RIG completo sobre el eje Y del MUNDO.
-    playerRig.rotation.y -= deltaX;
-
-    // --- Rotación Vertical (Pitch) ---
-    // Gira solo la CÁMARA alrededor de su eje X LOCAL dentro del RIG.
-    const maxPitch = Math.PI / 2 - 0.05;
-    const minPitch = -Math.PI / 2 + 0.05;
-    camera.rotation.x -= deltaY;
-    camera.rotation.x = Math.max(minPitch, Math.min(maxPitch, camera.rotation.x));
-    // Z (Roll) se mantiene en 0 por el orden 'YXZ'
-}
-
-function onMouseMove(event) {
-    if (!isPointerLocked || renderer.xr.isPresenting) return; // <<< Guard VR
     const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
     const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
-    rotatePlayer(movementX * lookSpeed, movementY * lookSpeed);
+
+    // Horizontal rotation (Yaw): Rotate the entire playerRig around the World's Y axis.
+    playerRig.rotation.y -= movementX * lookSpeed;
+
+    // Vertical rotation (Pitch): Rotate *only the camera* around its local X axis.
+    // This prevents the whole rig from tilting, allowing looking up/down independently.
+    const maxPitch = Math.PI / 2 - 0.1; // Prevent looking straight up/down
+    const minPitch = -maxPitch;
+    camera.rotation.x -= movementY * lookSpeed;
+    camera.rotation.x = Math.max(minPitch, Math.min(maxPitch, camera.rotation.x));
 }
 
-function onKeyDown(event) {
-    if (event.repeat || renderer.xr.isPresenting) return; // <<< Guard VR
-    // Pedir bloqueo si se pulsa tecla de movimiento y no estamos bloqueados/en VR
-    if (!isPointerLocked && ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
-         renderer.domElement.click();
+function onKeyDownScreen(event) {
+    // Ignore if in VR or key is held down
+    if (event.repeat || renderer.xr.isPresenting) return;
+
+    // Request pointer lock on movement key press if not locked/in VR
+     if (!isPointerLocked && ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
+         renderer.domElement.click(); // Simulate click to request lock
     }
+
     switch (event.key.toLowerCase()) {
         case 'w': case 'arrowup':    moveState.forward = 1; break;
         case 's': case 'arrowdown':  moveState.back = 1; break;
-        case 'a': case 'arrowleft':  moveState.left = 1; break; // Strafe Izquierda
-        case 'd': case 'arrowright': moveState.right = 1; break;// Strafe Derecha
+        case 'a': case 'arrowleft':  moveState.left = 1; break; // Strafe Left
+        case 'd': case 'arrowright': moveState.right = 1; break;// Strafe Right
     }
 }
 
-function onKeyUp(event) {
-     if (renderer.xr.isPresenting) return; // <<< Guard VR
+function onKeyUpScreen(event) {
+    if (renderer.xr.isPresenting) return; // Ignore if in VR
     switch (event.key.toLowerCase()) {
         case 'w': case 'arrowup':    moveState.forward = 0; break;
         case 's': case 'arrowdown':  moveState.back = 0; break;
@@ -411,233 +479,316 @@ function onKeyUp(event) {
     }
 }
 
-function handleGamepadInputScreen(delta) { // Renombrado para claridad
-    if (activeGamepadIndex === null || renderer.xr.isPresenting) return; // <<< Guard VR
+// --- Screen Controls (Gamepad) ---
+function setupGamepadSupport() {
+    window.addEventListener('gamepadconnected', (event) => {
+        // Ignore if we're in a VR session (VR controllers handled separately)
+        if (renderer.xr.isPresenting) return;
+        console.log(`Gamepad connected (Screen): Index ${event.gamepad.index}, ID: ${event.gamepad.id}`);
+        if (activeGamepadIndex === null) {
+            activeGamepadIndex = event.gamepad.index;
+            console.log(`Gamepad ${activeGamepadIndex} activated for screen control.`);
+        }
+    });
+
+    window.addEventListener('gamepaddisconnected', (event) => {
+        console.log(`Gamepad disconnected (Screen): Index ${event.gamepad.index}, ID: ${event.gamepad.id}`);
+        if (activeGamepadIndex === event.gamepad.index) {
+            console.log(`Active screen gamepad ${activeGamepadIndex} disconnected. Searching for another...`);
+            activeGamepadIndex = null;
+            findActiveGamepadScreen(); // Try to find another connected gamepad
+        }
+    });
+
+    // Initial check for already connected gamepads
+    findActiveGamepadScreen();
+}
+
+function findActiveGamepadScreen() {
+    if (renderer.xr.isPresenting) { // Don't activate screen gamepads if in VR
+        activeGamepadIndex = null;
+        return;
+    }
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    activeGamepadIndex = null; // Reset first
+    for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i]) {
+            activeGamepadIndex = i;
+            console.log(`Found active gamepad for screen control at index: ${i}`);
+            return; // Use the first one found
+        }
+    }
+     console.log("No active gamepad found for screen control.");
+}
+
+function handleGamepadInputScreen(delta) {
+    // Only run if NOT in VR and an active gamepad exists
+    if (renderer.xr.isPresenting || activeGamepadIndex === null) return;
 
     const gamepads = navigator.getGamepads();
     const gp = gamepads[activeGamepadIndex];
-    if (!gp) {
-        findActiveGamepad(); // Intentar encontrar otro si se desconecta
+
+    if (!gp) { // Gamepad might have disconnected unexpectedly
+        findActiveGamepadScreen(); // Try to find another
         return;
     }
 
-    // Mapeo común: Asumiendo stick izquierdo para mover, derecho para mirar
+    // --- Movement (Left Stick - Axes 0, 1) ---
+    // Standard mapping: Axis 0 = X (Left/Right), Axis 1 = Y (Up/Down)
     const leftStickX = gp.axes[0] || 0;
-    const leftStickY = gp.axes[1] || 0; // Negativo es arriba
-    const rightStickX = gp.axes[2] || 0;
-    const rightStickY = gp.axes[3] || 0; // Negativo es arriba
+    const leftStickY = gp.axes[1] || 0; // Note: Often negative Y is UP/FORWARD
 
-    // --- Movimiento (Stick Izquierdo) ---
     let gpForward = 0, gpBack = 0, gpLeft = 0, gpRight = 0;
-    if (leftStickY < -gamepadDeadZone) gpForward = 1; // Arriba -> Adelante
-    else if (leftStickY > gamepadDeadZone) gpBack = 1; // Abajo -> Atrás
-    if (leftStickX < -gamepadDeadZone) gpLeft = 1; // Izquierda -> Strafe Izquierda
-    else if (leftStickX > gamepadDeadZone) gpRight = 1; // Derecha -> Strafe Derecha
+    if (leftStickY < -gamepadDeadZone) gpForward = Math.abs(leftStickY); // Use magnitude for potential analog speed
+    else if (leftStickY > gamepadDeadZone) gpBack = Math.abs(leftStickY);
 
-    // Actualizar moveState: Prioridad Teclado > Gamepad
+    if (leftStickX < -gamepadDeadZone) gpLeft = Math.abs(leftStickX);
+    else if (leftStickX > gamepadDeadZone) gpRight = Math.abs(leftStickX);
+
+    // Update moveState (Gamepad values can overwrite 0s from keyboard release)
+    // Use Math.max to combine keyboard (0 or 1) and gamepad (0 to 1)
+    // If keyboard is pressed (1), it overrides gamepad analog value.
     moveState.forward = Math.max(moveState.forward, gpForward);
     moveState.back = Math.max(moveState.back, gpBack);
     moveState.left = Math.max(moveState.left, gpLeft);
     moveState.right = Math.max(moveState.right, gpRight);
 
-    // --- Vista (Stick Derecho) ---
+
+    // --- Look (Right Stick - Axes 2, 3) ---
+    // Standard mapping: Axis 2 = X (Left/Right), Axis 3 = Y (Up/Down)
+    const rightStickX = gp.axes[2] || 0;
+    const rightStickY = gp.axes[3] || 0; // Note: Often negative Y is UP
+
     let lookX = 0, lookY = 0;
     if (Math.abs(rightStickX) > gamepadDeadZone) lookX = rightStickX;
     if (Math.abs(rightStickY) > gamepadDeadZone) lookY = rightStickY;
 
     if (lookX !== 0 || lookY !== 0) {
-        // No necesitamos isPointerLocked aquí, el gamepad siempre puede mirar
-        const deltaLookX = lookX * gamepadLookSpeed * delta;
-        const deltaLookY = lookY * gamepadLookSpeed * delta;
-        rotatePlayer(deltaLookX, deltaLookY); // Rotar jugador/cámara
+        // Rotate using the same logic as the mouse
+        // Horizontal rotation (Yaw) - Rotate playerRig
+        playerRig.rotation.y -= lookX * gamepadLookSpeed * delta;
+
+        // Vertical rotation (Pitch) - Rotate camera only
+        const maxPitch = Math.PI / 2 - 0.1;
+        const minPitch = -maxPitch;
+        camera.rotation.x -= lookY * gamepadLookSpeed * delta;
+        camera.rotation.x = Math.max(minPitch, Math.min(maxPitch, camera.rotation.x));
     }
 }
 
-// --- Movimiento y Colisión (Común para Pantalla y VR, adaptado) ---
-const worldDirection = new THREE.Vector3();
-const rightDirection = new THREE.Vector3();
-const velocity = new THREE.Vector3();
 
-function updateMovement(delta, useVRInput = false) {
-    const currentMoveState = useVRInput ? vrMoveState : moveState;
-    const speed = useVRInput ? moveSpeed * vrMoveSpeedFactor : moveSpeed;
-    const moveDistance = speed * delta;
-
-    velocity.set(0, 0, 0); // Reset velocity
-
-    // Obtener dirección de referencia:
-    // - Pantalla: Dirección del Rig (controlado por ratón/gamepad Y)
-    // - VR: Dirección de la Cámara/Cabeza (controlado por headset)
-    const referenceObject = useVRInput ? camera : playerRig;
-    referenceObject.getWorldDirection(worldDirection);
-    worldDirection.y = 0; // Proyectar en el plano XZ
-    worldDirection.normalize();
-
-    // Calcular dirección derecha relativa a la referencia
-    // Usar camera.up global (0,1,0) ya que worldDirection está en XZ
-    rightDirection.crossVectors(new THREE.Vector3(0, 1, 0), worldDirection).normalize();
-    // Invertir si es necesario (depende de la convención, three.js suele ser Y-up, X-right, Z-out)
-    // Si strafe está invertido, quitar el .negate() o ajustar crossVectors
-     rightDirection.negate(); // Para que 'D' (right) mueva hacia +X relativo
-
-
-    // Calcular movimiento neto basado en el estado actual (VR o Pantalla)
-    let moveZ = (currentMoveState.forward ? 1 : 0) - (currentMoveState.back ? 1 : 0);
-    let moveX = (currentMoveState.right ? 1 : 0) - (currentMoveState.left ? 1 : 0); // Strafe
-
-    // Aplicar movimiento relativo a la dirección de referencia
-    velocity.add(worldDirection.multiplyScalar(moveZ));
-    velocity.add(rightDirection.multiplyScalar(moveX));
-
-    if (velocity.lengthSq() > 0) {
-        velocity.normalize().multiplyScalar(moveDistance);
-    } else {
-        return; // No hay movimiento
-    }
-
-    // --- Colisión Simple (con el Rig) ---
-    const currentPos = playerRig.position;
-    let finalVelocity = velocity.clone();
-
-    // Check X
-    if (velocity.x !== 0) {
-        const nextGridX = Math.floor((currentPos.x + velocity.x) / TILE_SIZE);
-        const currentGridZ = Math.floor(currentPos.z / TILE_SIZE);
-        if (isWallAt(nextGridX, currentGridZ)) {
-            finalVelocity.x = 0; // Choca en X
-        }
-    }
-
-    // Check Z
-    if (velocity.z !== 0) {
-        const currentGridX = Math.floor(currentPos.x / TILE_SIZE);
-        const nextGridZ = Math.floor((currentPos.z + velocity.z) / TILE_SIZE);
-        if (isWallAt(currentGridX, nextGridZ)) {
-            finalVelocity.z = 0; // Choca en Z
-        }
-    }
-
-    // Check Esquina Diagonal (si ambos X y Z intentaron moverse y fueron bloqueados)
-    if (velocity.x !== 0 && velocity.z !== 0 && finalVelocity.x === 0 && finalVelocity.z === 0) {
-        const nextGridX = Math.floor((currentPos.x + velocity.x) / TILE_SIZE);
-        const nextGridZ = Math.floor((currentPos.z + velocity.z) / TILE_SIZE);
-        if (isWallAt(nextGridX, nextGridZ)) {
-            // La esquina es pared, mantener ambos bloqueados (ya están en 0)
-        } else {
-            // Esquina libre: Permitir "deslizar" intentando solo X o solo Z
-            // Prueba permitir solo X
-            if (!isWallAt(nextGridX, Math.floor(currentPos.z / TILE_SIZE))) {
-                 finalVelocity.x = velocity.x; // Desbloquear X
-            }
-            // Prueba permitir solo Z
-            else if (!isWallAt(Math.floor(currentPos.x / TILE_SIZE), nextGridZ)) {
-                 finalVelocity.z = velocity.z; // Desbloquear Z
-            }
-            // Si ambos individuales también chocan (esquina interna rara), se queda bloqueado.
-        }
-    }
-
-    // Aplicar la velocidad final al RIG
-    playerRig.position.add(finalVelocity);
-    // Mantener altura Y constante (la cámara dentro del rig se ajustará por VR)
-    playerRig.position.y = WALL_HEIGHT / 2;
-}
-
-function isWallAt(gridX, gridZ) {
-    if (gridX < 0 || gridX >= mapWidth || gridZ < 0 || gridZ >= mapHeight) {
-        return true; // Fuera de límites es pared
-    }
-    return wallMap[gridZ]?.[gridX] > 0;
-}
-
-
-// --- Input y Movimiento VR ---
+// --- VR Input Handling ---
 function handleVRInput() {
-    // Resetear estado de movimiento VR
+    // Reset VR move state each frame
     vrMoveState.forward = 0;
     vrMoveState.back = 0;
     vrMoveState.left = 0;
     vrMoveState.right = 0;
 
-    // Intentar obtener el controlador izquierdo (índice 0)
-    const controller = renderer.xr.getController(0); // 0 suele ser izquierdo
+    // WebXR Input: Get controllers
+    // Controller 0 is typically left, Controller 1 is typically right
+    const session = renderer.xr.getSession();
+    if (!session) return; // No active XR session
 
-    if (controller && controller.gamepad) {
-        const axes = controller.gamepad.axes;
-        // Asumir que los ejes 2 y 3 son el joystick/touchpad principal
-        // (Puede variar por controlador: Oculus Touch usa 2,3; Vive usa 0,1)
-        // ¡¡¡ AJUSTAR ÍNDICES DE EJES SEGÚN TU HARDWARE !!!
-        // Ejemplo para Oculus Touch (stick izquierdo):
-         const stickX = axes[2] || 0;
-         const stickY = axes[3] || 0; // Negativo es arriba
+    // Process each input source (controller)
+    session.inputSources.forEach(source => {
+        if (source.gamepad && source.handedness) { // Check if it has gamepad data and handedness
+            const gp = source.gamepad;
+            const axes = gp.axes;
 
-        // Comentar/Descomentar según el controlador:
-        // Ejemplo para Vive Wand (touchpad izquierdo):
-        // const stickX = axes[0] || 0;
-        // const stickY = axes[1] || 0; // Negativo es arriba
+            // --- Movement (Typically Left Hand Controller) ---
+            if (source.handedness === 'left') {
+                // Common Mappings (CHECK YOUR CONTROLLER!):
+                // - Oculus Touch: axes[2] = X, axes[3] = Y (Neg Y is Forward)
+                // - Vive Wand: axes[0] = X (Touchpad), axes[1] = Y (Touchpad) (Neg Y is Forward)
+                // - Index Knuckles: axes[2] = X, axes[3] = Y (Neg Y is Forward)
+                const moveX = axes[2] || 0; // Use appropriate index for X
+                const moveY = axes[3] || 0; // Use appropriate index for Y
 
-        // Aplicar deadzone y actualizar estado VR
-        if (stickY < -vrDeadZone) vrMoveState.forward = 1;
-        else if (stickY > vrDeadZone) vrMoveState.back = 1;
+                if (moveY < -vrDeadZone) vrMoveState.forward = Math.abs(moveY);
+                else if (moveY > vrDeadZone) vrMoveState.back = Math.abs(moveY);
 
-        if (stickX < -vrDeadZone) vrMoveState.left = 1; // Strafe izquierda
-        else if (stickX > vrDeadZone) vrMoveState.right = 1; // Strafe derecha
+                if (moveX < -vrDeadZone) vrMoveState.left = Math.abs(moveX);
+                else if (moveX > vrDeadZone) vrMoveState.right = Math.abs(moveX);
+            }
 
-        // Aquí podrías añadir lógica para botones (saltar, interactuar, etc.)
-        // const buttons = controller.gamepad.buttons;
-        // if (buttons[0] && buttons[0].pressed) { /* Trigger presionado */ }
-        // if (buttons[1] && buttons[1].pressed) { /* Grip presionado */ }
-    }
-     // Podrías añadir manejo para el controlador derecho (índice 1) si quieres
-     // p.ej., para snap turning o acciones
+            // --- Turning (Typically Right Hand Controller) ---
+            if (source.handedness === 'right') {
+                // Example: Snap turning with right stick X-axis
+                // axes[2] for Oculus/Index, axes[0] for Vive
+                const turnX = axes[2] || 0;
+
+                // TODO: Implement Snap/Smooth Turning Logic
+                // Example (Needs state tracking to turn only once per flick):
+                // if (Math.abs(turnX) > 0.5) { // Threshold for flick
+                //    const angle = Math.PI / 4; // 45 degrees
+                //    playerRig.rotation.y -= Math.sign(turnX) * angle;
+                //    // Add debounce/cooldown logic here
+                // }
+
+                // --- Other Actions (Buttons) ---
+                // Example: Check trigger button (button index 0 is usually trigger)
+                // if (gp.buttons[0] && gp.buttons[0].pressed) {
+                //     console.log(`${source.handedness} Trigger pressed`);
+                // }
+                // Example: Check grip button (button index 1 is usually grip)
+                // if (gp.buttons[1] && gp.buttons[1].pressed) {
+                //     console.log(`${source.handedness} Grip pressed`);
+                // }
+            }
+        }
+    });
 }
 
 
-// --- Bucle Principal de Renderizado ---
-function renderLoop(timestamp, frame) { // frame es proporcionado por WebXR
+// --- Movement & Collision (Unified Logic) ---
+const tempWorldDirection = new THREE.Vector3();
+const tempRightDirection = new THREE.Vector3();
+const finalVelocity = new THREE.Vector3();
+const collisionCheckOffset = 0.2; // Small offset to check slightly ahead/into the wall
+
+function updateMovement(delta) {
+    const inVR = renderer.xr.isPresenting;
+    const currentMoveState = inVR ? vrMoveState : moveState;
+    const speed = inVR ? moveSpeed * vrMoveSpeedFactor : moveSpeed;
+    const moveDistance = speed * delta;
+
+    // --- Determine Movement Direction ---
+    // In VR: Movement is relative to where the *head* (camera) is looking.
+    // On Screen: Movement is relative to where the *player rig* (body) is facing (controlled by mouse/gamepad yaw).
+    const referenceObject = inVR ? camera : playerRig;
+
+    // Get the forward direction in the XZ plane
+    referenceObject.getWorldDirection(tempWorldDirection);
+    tempWorldDirection.y = 0; // Project onto the horizontal plane
+    tempWorldDirection.normalize();
+
+    // Get the right direction (perpendicular to forward, on XZ plane)
+    // Cross forward vector with world UP vector (0, 1, 0)
+    tempRightDirection.crossVectors(referenceObject.up, tempWorldDirection).normalize();
+    // Note: THREE.Object3D.up is usually (0,1,0) unless modified.
+
+    // --- Calculate Velocity based on Input ---
+    finalVelocity.set(0, 0, 0); // Reset velocity vector
+
+    // Combine forward/backward movement
+    const moveZ = (currentMoveState.forward ? currentMoveState.forward : 0) - (currentMoveState.back ? currentMoveState.back : 0);
+    // Combine left/right strafing movement
+    const moveX = (currentMoveState.right ? currentMoveState.right : 0) - (currentMoveState.left ? currentMoveState.left : 0);
+
+    // Add velocity components relative to the reference direction
+    finalVelocity.addScaledVector(tempWorldDirection, moveZ);
+    finalVelocity.addScaledVector(tempRightDirection, moveX); // Use right direction for X input
+
+    // Normalize if diagonal movement, then scale by distance
+    if (finalVelocity.lengthSq() > 0) {
+        finalVelocity.normalize().multiplyScalar(moveDistance);
+    } else {
+        return; // No input, no movement
+    }
+
+    // --- Simple Collision Detection ---
+    const currentPos = playerRig.position;
+    let intendedPos = currentPos.clone().add(finalVelocity); // Where we want to go
+
+    // Check collision on X axis
+    const checkPosX = currentPos.x + finalVelocity.x;
+    const gridZ = Math.floor(currentPos.z / TILE_SIZE);
+    const gridX_CheckX = Math.floor((checkPosX + Math.sign(finalVelocity.x) * collisionCheckOffset) / TILE_SIZE); // Check slightly ahead
+    if (finalVelocity.x !== 0 && isWallAt(gridX_CheckX, gridZ)) {
+         // Collision on X: Adjust intended position to stop at wall boundary
+        intendedPos.x = (gridX_CheckX - Math.sign(finalVelocity.x) * 0.5 + 0.5 * Math.sign(finalVelocity.x)) * TILE_SIZE - Math.sign(finalVelocity.x) * collisionCheckOffset;
+        finalVelocity.x = 0; // Stop movement in X
+    }
+
+    // Check collision on Z axis (using potentially modified intendedPos.x)
+    const checkPosZ = currentPos.z + finalVelocity.z;
+    const gridX = Math.floor(intendedPos.x / TILE_SIZE); // Use potentially adjusted X for Z check
+    const gridZ_CheckZ = Math.floor((checkPosZ + Math.sign(finalVelocity.z) * collisionCheckOffset) / TILE_SIZE); // Check slightly ahead
+    if (finalVelocity.z !== 0 && isWallAt(gridX, gridZ_CheckZ)) {
+        // Collision on Z: Adjust intended position
+        intendedPos.z = (gridZ_CheckZ - Math.sign(finalVelocity.z) * 0.5 + 0.5 * Math.sign(finalVelocity.z)) * TILE_SIZE - Math.sign(finalVelocity.z) * collisionCheckOffset;
+        finalVelocity.z = 0; // Stop movement in Z
+    }
+
+     // Diagonal corner case check (if both X and Z were non-zero initially but now are zero)
+     // A better approach involves checking the diagonal cell directly if both axes had input,
+     // but this simple wall boundary adjustment often suffices.
+
+    // --- Apply Final Position ---
+    // Apply the calculated final velocity (potentially zeroed by collisions)
+    playerRig.position.add(finalVelocity);
+
+    // Clamp Y position just in case (shouldn't change with current logic)
+    playerRig.position.y = WALL_HEIGHT / 2;
+}
+
+function isWallAt(gridX, gridZ) {
+    // Check boundaries first
+    if (gridX < 0 || gridX >= mapWidth || gridZ < 0 || gridZ >= mapHeight) {
+        return true; // Treat out-of-bounds as a wall
+    }
+    // Check the wall map data
+    return wallMap[gridZ]?.[gridX] > 0; // Check if the tile index is > 0 (meaning a wall)
+}
+
+
+// --- Main Render Loop ---
+function renderLoop(timestamp, frame) { // 'frame' is provided by WebXR session
     const delta = clock.getDelta();
 
+    // --- Input Handling ---
     if (renderer.xr.isPresenting) {
-        // --- Modo VR ---
-        handleVRInput(); // Leer mandos VR
-        updateMovement(delta, true); // Mover usando vrMoveState y dirección de cabeza
-        // ¡NO rotar jugador con ratón/gamepad! La cabeza controla la vista.
-        // La rotación del RIG (Yaw) se mantiene constante a menos que implementemos snap/smooth turning.
+        // VR Mode: Handle controller input
+        handleVRInput();
+        // NOTE: No explicit turning here yet, relies on physical turning or
+        // needs snap/smooth turn implementation in handleVRInput.
     } else {
-        // --- Modo Pantalla ---
-        // Restablecer estado del teclado/gamepad (onKeyUp los pone a 0)
+        // Screen Mode: Handle keyboard (already done via events) and gamepad
+        // Reset moveState axes potentially set by gamepad last frame,
+        // Keyboard events will set them back if keys are held.
         const keyF = moveState.forward; const keyB = moveState.back;
         const keyL = moveState.left;   const keyR = moveState.right;
         moveState.forward = 0; moveState.back = 0; moveState.left = 0; moveState.right = 0;
 
-        // Leer gamepad de pantalla (puede actualizar moveState)
-        handleGamepadInputScreen(delta);
+        handleGamepadInputScreen(delta); // Read gamepad, potentially updates moveState
 
-        // Restaurar teclado si estaba presionado (prioridad)
+        // Ensure keyboard state overrides gamepad if key is pressed
         moveState.forward = Math.max(moveState.forward, keyF);
         moveState.back = Math.max(moveState.back, keyB);
         moveState.left = Math.max(moveState.left, keyL);
         moveState.right = Math.max(moveState.right, keyR);
 
-
-        updateMovement(delta, false); // Mover usando moveState y dirección del rig
-        // La rotación por ratón/gamepad ya se aplica en sus respectivos handlers
+        // Mouse look is handled by event listeners directly updating rig/camera rotation
     }
 
-    // Renderizar la escena
-    // setAnimationLoop se encarga de llamar a esto para ambos ojos en VR
+    // --- Update Movement & Collision ---
+    // This function now uses the appropriate state (vrMoveState or moveState)
+    // and reference object (camera or playerRig) based on renderer.xr.isPresenting
+    updateMovement(delta);
+
+    // --- Render Scene ---
+    // renderer.render() is automatically called for both eyes by setAnimationLoop when in VR
     renderer.render(scene, camera);
 }
 
-// --- Ajuste de Ventana ---
+// --- Window Resizing ---
 function onWindowResize() {
-    // Solo ajustar si no estamos en VR (la sesión XR maneja su propia resolución)
+    // Only resize if NOT in VR, as the headset dictates resolution/aspect ratio
     if (!renderer.xr.isPresenting) {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // Note: setPixelRatio is usually only needed once at init,
+        // but resetting it here doesn't hurt.
+        // renderer.setPixelRatio(window.devicePixelRatio);
     }
 }
 
-// --- ¡Empezar! ---
-init();
+// --- Start Everything ---
+// Ensure the DOM is ready before initializing Three.js and accessing the canvas
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init(); // DOMContentLoaded has already fired
+}
