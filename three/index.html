@@ -6,29 +6,28 @@
     <title>Motor Estilo Doom (VR Enabled)</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Ensure canvas is visible and VR button isn't obscured */
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #000; /* Black background typical for VR */
+            background-color: #000;
         }
         canvas { display: block; }
-        /* Basic styling for VR button positioning if needed */
         #vr-button {
             position: absolute;
             bottom: 20px;
             right: 20px;
-            z-index: 10; /* Ensure it's on top */
+            z-index: 10;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Include Three.js -->
+    <!-- Include Three.js (keep using CDN or download locally too) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Include VRButton helper -->
-    <script src="https://unpkg.com/three@0.128.0/examples/js/webxr/VRButton.js"></script> <!-- Use local copy if preferred -->
+
+    <!-- Include VRButton helper FROM LOCAL FILE -->
+    <script src="VRButton.js"></script> <!-- <<< CHANGED THIS LINE -->
 
     <!-- Include your script -->
     <script src="script.js"></script>
