@@ -560,3 +560,4 @@ function onWindowResize() {
 }
 
 // --- ¡Empezar! ---
+init();
