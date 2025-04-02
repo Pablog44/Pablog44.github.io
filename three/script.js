@@ -442,7 +442,7 @@ function handleGamepadInput(delta) {
     if (Math.abs(rightStickY) > gamepadDeadZone) lookY = rightStickY;
 
     if (lookX !== 0 || lookY !== 0) {
-        const deltaLookX = -lookX * gamepadLookSpeed * delta;
+        const deltaLookX = lookX * gamepadLookSpeed * delta;
         const deltaLookY = lookY * gamepadLookSpeed * delta;
         rotateCamera(deltaLookX, deltaLookY);
     }
