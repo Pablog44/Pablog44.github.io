@@ -50,7 +50,7 @@ const ceilingMap = [
 
 // --- Texturas (URLs o rutas locales) ---
 const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png']; // Corresponden a 1 y 2 en wallMap
-const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png']; // Corresponden a 1 y 2 en floorMap
+const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png', 'textures/floor3.png' ]; // Corresponden a 1 y 2 en floorMap
 const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png']; // Corresponden a 1 y 2 en ceilingMap
 const placeholderTextureUrl = 'textures/placeholder.png'; // Textura de fallback (índice 0)
 
@@ -425,8 +425,8 @@ function handleGamepadInput(delta) {
     let gpForward = 0, gpBack = 0, gpLeft = 0, gpRight = 0;
     if (leftStickY < -gamepadDeadZone) gpForward = 1;
     else if (leftStickY > gamepadDeadZone) gpBack = 1;
-    if (leftStickX < -gamepadDeadZone) gpLeft = 1;
-    else if (leftStickX > gamepadDeadZone) gpRight = 1;
+    if (leftStickX > gamepadDeadZone) gpLeft = 1;
+    else if (leftStickX < -gamepadDeadZone) gpRight = 1;  
 
     // Actualizar moveState: Teclado tiene prioridad si está activo (1), si no (0), usa gamepad.
     moveState.forward = Math.max(moveState.forward, gpForward);
