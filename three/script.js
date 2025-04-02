@@ -70,13 +70,16 @@ let mapHeight = wallMap.length;
 const moveState = { forward: 0, back: 0, left: 0, right: 0 }; // Combinará teclado y gamepad
 let isPointerLocked = false;
 let activeGamepadIndex = null; // Índice del gamepad activo
+let stats;
 
 // --- Inicialización ---
 function init() {
     // Escena
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x333333);
-    scene.fog = new THREE.Fog(scene.background, TILE_SIZE * 2, TILE_SIZE * mapWidth * 0.7);
+    stats = new Stats();
+    stats.showPanel(0); // 0 = FPS
+    document.body.appendChild(stats.dom);
 
     // Cámara
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -412,8 +415,8 @@ function handleGamepadInput(delta) {
         return;
     }
 
-    const leftStickX = gp.axes[1] || 0;
-    const leftStickY = gp.axes[0] || 0;
+    const leftStickX = gp.axes[0] || 0; // Izquierda/Derecha
+    const leftStickY = gp.axes[1] || 0; // Adelante/Atrás
     const rightStickX = gp.axes[2] || 0;
     const rightStickY = gp.axes[3] || 0;
 
@@ -550,6 +553,7 @@ function animate() {
 
     updateMovement(delta); // Actualizar gamepad, teclado, movimiento y colisión
     renderer.render(scene, camera);
+    stats.update();
 }
 
 // --- Ajuste de Ventana ---
