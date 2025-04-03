@@ -13,18 +13,19 @@ const RACE_LAPS = 3;
 const TRACK_RADIUS_X = 40; // Radio mayor del óvalo
 const TRACK_RADIUS_Z = 25; // Radio menor del óvalo
 const TRACK_WIDTH = 8;
-const TRACK_THICKNESS = 0.2; // How thick the road mesh is
+const TRACK_THICKNESS = 0.5; // Grosor de la malla de la carretera // *** AJUSTE *** Aumentado ligeramente para visibilidad
 const CAR_LENGTH = 3;
 const CAR_WIDTH = 1.5;
-const CAR_HEIGHT_OFFSET = 0.5 + TRACK_THICKNESS; // Base car height + track thickness
+// *** CAMBIO *** Altura del centro del coche sobre la superficie de la pista (Y=0)
+const CAR_HEIGHT_OFFSET = 0.5;
 
 // Estado del jugador
 let playerState = {
     speed: 0,
     angle: 0, // Ángulo en el óvalo (0 a 2*PI)
-    // Start slightly above the track surface
+    // *** CAMBIO *** Posición Y inicial ajustada a la nueva altura sobre la pista Y=0
     position: new THREE.Vector3(TRACK_RADIUS_X, CAR_HEIGHT_OFFSET, 0),
-    rotationY: -Math.PI / 2, // Rotación del coche
+    rotationY: -Math.PI / 2, // Rotación del coche (orientación inicial)
     lap: 0,
     progress: 0, // Para detectar cruce de meta (0 a 1)
     offTrack: false,
@@ -47,51 +48,50 @@ function init() {
     // Escena
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb); // Color cielo
-    scene.fog = new THREE.Fog(0x87ceeb, 100, 350); // Adjusted fog distance
+    scene.fog = new THREE.Fog(0x87ceeb, 100, 350);
 
     // Cámara
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Posición inicial de la cámara (detrás y arriba del coche) - will be set by updateCameraPosition
-    // camera.position.set(TRACK_RADIUS_X + 10, 10, 0); // Temp position before first update
-    // camera.lookAt(playerState.position);
+    // La posición inicial se establecerá en updateCameraPosition después de crear el coche
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true; // Habilitar sombras
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('game-container').appendChild(renderer.domElement);
 
     // Luces
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Slightly brighter ambient
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Slightly stronger directional
-    directionalLight.position.set(70, 100, 50); // Adjust light position
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(70, 100, 50);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048; // Higher res shadows
+    directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 10;
-    directionalLight.shadow.camera.far = 300; // Adjusted shadow camera frustum
-    directionalLight.shadow.camera.left = -120; // Wider shadow area
+    directionalLight.shadow.camera.far = 300;
+    directionalLight.shadow.camera.left = -120;
     directionalLight.shadow.camera.right = 120;
     directionalLight.shadow.camera.top = 120;
     directionalLight.shadow.camera.bottom = -120;
     scene.add(directionalLight);
-    // const shadowHelper = new THREE.CameraHelper( directionalLight.shadow.camera ); // Debug shadows
+    // const shadowHelper = new THREE.CameraHelper( directionalLight.shadow.camera );
     // scene.add( shadowHelper );
 
-
     // Suelo
-    const groundGeometry = new THREE.PlaneGeometry(600, 600); // Larger ground
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x55aa55 }); // Verde hierba
+    const groundGeometry = new THREE.PlaneGeometry(600, 600);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    // *** AJUSTE *** Bajar ligeramente el suelo para que no coincida exactamente con la base de la pista
+    ground.position.y = -TRACK_THICKNESS - 0.1;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Pista Plana 3D
-    createFlatTrack();
+    // Pista Plana 3D - Usando el método corregido
+    createFlatTrackCorrected(); // *** CAMBIO *** Llamando a la función corregida
 
     // Coche del Jugador
     playerCar = createCar(0x0000ff); // Coche azul
@@ -102,9 +102,9 @@ function init() {
     // Coches IA
     for (let i = 0; i < AI_COUNT; i++) {
         const aiCar = createCar(getRandomColor());
-        const angleOffset = (i + 1) * (Math.PI / (AI_COUNT + 2)); // Adjusted spacing
+        const angleOffset = (i + 1) * (Math.PI / (AI_COUNT + 2));
         const startAngle = angleOffset;
-        const startPos = getOvalPosition(startAngle);
+        const startPos = getOvalPosition(startAngle); // Obtiene posición en la línea central (Y=0)
 
         aiStates[i] = {
             car: aiCar,
@@ -112,11 +112,12 @@ function init() {
             lap: 0,
             progress: startAngle / (2 * Math.PI),
             finished: false,
-            speed: AI_SPEED + Math.random() * 3 - 1.5 // Pequeña variación de velocidad
+            speed: AI_SPEED + Math.random() * 3 - 1.5
         };
-        // Set AI car position slightly above track
+        // *** CAMBIO *** Posicionar coche IA en Y = CAR_HEIGHT_OFFSET
         aiCar.position.set(startPos.x, CAR_HEIGHT_OFFSET, startPos.z);
-        aiCar.rotation.y = getOvalTangentAngle(startAngle) + Math.PI/2; // Orientar coche
+        // *** AJUSTE *** Orientar coche IA inicial (debe coincidir con updateAI)
+        aiCar.rotation.y = getOvalTangentAngle(startAngle) - Math.PI / 2;
         scene.add(aiCar);
         aiCars.push(aiCar);
     }
@@ -142,16 +143,21 @@ function init() {
 
 // --- Funciones de Creación ---
 function createCar(color) {
-    const carBodyGeometry = new THREE.BoxGeometry(CAR_LENGTH, 0.8, CAR_WIDTH); // Slightly flatter body
+    const carBodyGeometry = new THREE.BoxGeometry(CAR_LENGTH, 0.8, CAR_WIDTH);
+    // *** CAMBIO *** Rotar la geometría para que la longitud (X original) apunte a -Z
+    // Esto alinea la forma del coche con la lógica de movimiento (rotación Y controla dirección Z)
+    carBodyGeometry.rotateY(-Math.PI / 2);
+
     const carMaterial = new THREE.MeshLambertMaterial({ color: color });
     const carMesh = new THREE.Mesh(carBodyGeometry, carMaterial);
     carMesh.castShadow = true;
     carMesh.receiveShadow = true;
 
     // Offset the body slightly up so the wheels are closer to the car's origin (y=0)
+    // Esto se aplica después de la rotación de la geometría
     carBodyGeometry.translate(0, 0.4, 0);
 
-     // Añadir "ruedas" simples como referencia visual
+    // Añadir "ruedas" simples como referencia visual
     const wheelRadius = 0.35;
     const wheelThickness = 0.3;
     const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThickness, 16);
@@ -160,166 +166,164 @@ function createCar(color) {
 
     const wheelYOffset = -0.1; // How low the wheels sit relative to car origin
 
+    // *** CAMBIO *** Ajustar posiciones de las ruedas según la nueva orientación de la geometría
+    // El ancho original (Z) ahora está en el eje X local.
+    // La longitud original (X) ahora está en el eje -Z local.
+    const wheelPosX = CAR_WIDTH / 2;      // Distancia lateral desde el centro
+    const wheelPosZ = CAR_LENGTH * 0.4;   // Distancia adelante/atrás desde el centro
+
     const flWheel = new THREE.Mesh(wheelGeo, wheelMat);
-    flWheel.position.set(CAR_LENGTH * 0.4, wheelYOffset, CAR_WIDTH / 2);
+    // Eje X positivo local = Derecha del coche
+    // Eje Z negativo local = Adelante del coche
+    flWheel.position.set(wheelPosX, wheelYOffset, -wheelPosZ); // Rueda delantera derecha
     carMesh.add(flWheel);
 
     const frWheel = new THREE.Mesh(wheelGeo, wheelMat);
-    frWheel.position.set(CAR_LENGTH * 0.4, wheelYOffset, -CAR_WIDTH / 2);
+    frWheel.position.set(-wheelPosX, wheelYOffset, -wheelPosZ); // Rueda delantera izquierda
     carMesh.add(frWheel);
 
     const rlWheel = new THREE.Mesh(wheelGeo, wheelMat);
-    rlWheel.position.set(-CAR_LENGTH * 0.4, wheelYOffset, CAR_WIDTH / 2);
+    rlWheel.position.set(wheelPosX, wheelYOffset, wheelPosZ); // Rueda trasera derecha
     carMesh.add(rlWheel);
 
     const rrWheel = new THREE.Mesh(wheelGeo, wheelMat);
-    rrWheel.position.set(-CAR_LENGTH * 0.4, wheelYOffset, -CAR_WIDTH / 2);
+    rrWheel.position.set(-wheelPosX, wheelYOffset, wheelPosZ); // Rueda trasera izquierda
     carMesh.add(rrWheel);
 
+    // No es necesario rotar el carMesh aquí porque rotamos la geometría
     return carMesh;
 }
 
-function createFlatTrack() {
-    const segments = 150; // More segments for smoother curve extrusion
-    const curvePoints = [];
+// *** NUEVA FUNCIÓN *** - Crea la pista horizontalmente
+function createFlatTrackCorrected() {
+    const segments = 100;
+    const halfWidth = TRACK_WIDTH / 2;
+
+    // 1. Crear Shape 2D en el plano XY (que luego rotaremos a XZ)
+    const trackShape2D = new THREE.Shape();
+
+    // Puntos del óvalo exterior
+    const outerPoints = [];
     for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * Math.PI * 2;
-        const x = TRACK_RADIUS_X * Math.cos(angle);
-        const z = TRACK_RADIUS_Z * Math.sin(angle);
-        curvePoints.push(new THREE.Vector3(x, 0, z)); // Path is at Y=0
+        const x = (TRACK_RADIUS_X + halfWidth) * Math.cos(angle);
+        const z = (TRACK_RADIUS_Z + halfWidth) * Math.sin(angle);
+        outerPoints.push(new THREE.Vector2(x, z)); // Usamos x, z como si fueran x, y para la Shape
     }
-    const curve = new THREE.CatmullRomCurve3(curvePoints, true); // Curva cerrada
+    trackShape2D.setFromPoints(outerPoints);
 
-    // Define the shape of the track cross-section (a flat rectangle)
-    const trackShape = new THREE.Shape();
-    const halfWidth = TRACK_WIDTH / 2;
-    trackShape.moveTo(-halfWidth, 0); // Start bottom-left (relative)
-    trackShape.lineTo(halfWidth, 0);  // Bottom-right
-    trackShape.lineTo(halfWidth, TRACK_THICKNESS); // Top-right
-    trackShape.lineTo(-halfWidth, TRACK_THICKNESS); // Top-left
-    trackShape.closePath(); // Close the shape
+    // Puntos del óvalo interior (¡en orden inverso para el agujero!)
+    const innerPoints = [];
+    for (let i = segments; i >= 0; i--) {
+        const angle = (i / segments) * Math.PI * 2;
+        const x = (TRACK_RADIUS_X - halfWidth) * Math.cos(angle);
+        const z = (TRACK_RADIUS_Z - halfWidth) * Math.sin(angle);
+        innerPoints.push(new THREE.Vector2(x, z));
+    }
+    const innerHolePath = new THREE.Path(innerPoints);
+    trackShape2D.holes.push(innerHolePath);
 
-    // Extrude this shape along the oval curve
+    // 2. Extruir la Shape 2D para darle grosor (profundidad)
     const extrudeSettings = {
-        steps: segments * 2, // Need enough steps for smooth extrusion
-        bevelEnabled: false,
-        extrudePath: curve
+        depth: TRACK_THICKNESS, // Grosor de la carretera
+        bevelEnabled: false
     };
 
-    const trackGeometry = new THREE.ExtrudeGeometry(trackShape, extrudeSettings);
-    const trackMaterial = new THREE.MeshStandardMaterial({ // Use StandardMaterial for better lighting/shadows
-        color: 0x444444, // Color asfalto
+    const trackGeometry = new THREE.ExtrudeGeometry(trackShape2D, extrudeSettings);
+    const trackMaterial = new THREE.MeshStandardMaterial({
+        color: 0x444444,
         metalness: 0.1,
         roughness: 0.8
     });
     const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+
+    // 3. Rotar la malla para que quede plana en el plano XZ del mundo
+    trackMesh.rotation.x = -Math.PI / 2;
+    // Posicionar para que la superficie superior esté en Y=0
+    trackMesh.position.y = 0; // La base estará en -TRACK_THICKNESS
+
     trackMesh.receiveShadow = true;
-    // trackMesh.castShadow = true; // Optional: track can cast shadow onto itself/ground
     scene.add(trackMesh);
 
-    // Línea de meta (ajustar Y)
+    // Línea de meta (ajustar Y y rotación Z)
     const lineGeo = new THREE.PlaneGeometry(TRACK_WIDTH, 1);
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
     const finishLine = new THREE.Mesh(lineGeo, lineMat);
-    // Position slightly above the track surface
-    finishLine.position.set(TRACK_RADIUS_X, TRACK_THICKNESS + 0.01, 0);
-    finishLine.rotation.x = -Math.PI / 2;
-    // finishLine.rotation.z = -Math.PI / 2; // Should rotate around Y to align with track tangent
-    finishLine.rotation.y = -Math.PI / 2; // Align with the track direction at the finish line
+    // *** CAMBIO *** Posicionar ligeramente por encima de la nueva superficie (Y=0)
+    finishLine.position.set(TRACK_RADIUS_X, 0.01, 0);
+    finishLine.rotation.x = -Math.PI / 2; // Hacerla plana
+    // *** CAMBIO *** Rotar en Z para que cruce la pista correctamente
+    finishLine.rotation.z = -Math.PI / 2;
     scene.add(finishLine);
 }
 
+
+// --- Función createFlatTrack original (ya no se usa pero se deja por referencia si fuera necesario) ---
+/*
+function createFlatTrack() {
+    // ... (código original que creaba la pista vertical) ...
+}
+*/
+
 function createScenery() {
-    // Montañas Distantes
-    const mountainMaterial = new THREE.MeshLambertMaterial({ color: 0x7d7464 }); // Brownish grey
-    const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xeeeeee }); // White snow caps
-
-    for (let i = 0; i < 15; i++) { // Add several mountains
-        const height = Math.random() * 80 + 50; // Random height 50-130
-        const radius = Math.random() * 40 + 20; // Random radius 20-60
-        const mountainGeometry = new THREE.ConeGeometry(radius, height, 8); // Low poly cone
+    // Montañas Distantes (sin cambios)
+    const mountainMaterial = new THREE.MeshLambertMaterial({ color: 0x7d7464 });
+    const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+    for (let i = 0; i < 15; i++) {
+        const height = Math.random() * 80 + 50;
+        const radius = Math.random() * 40 + 20;
+        const mountainGeometry = new THREE.ConeGeometry(radius, height, 8);
         const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-
-        // Position randomly far away
         const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 200 + 150; // Distance 150-350
+        const distance = Math.random() * 200 + 150;
         mountain.position.set(
             Math.cos(angle) * distance,
-            height / 2 - 2, // Base slightly below ground level
+            height / 2 - 2,
             Math.sin(angle) * distance
         );
-        mountain.castShadow = false; // Optimization
-        mountain.receiveShadow = true; // Can receive shadows from clouds/sun if added
+        mountain.castShadow = false;
+        mountain.receiveShadow = true;
         scene.add(mountain);
-
-        // Add snow cap (optional)
         if (height > 80 && Math.random() > 0.3) {
              const snowHeight = height * 0.3;
-             const snowRadius = radius * (snowHeight / height) * 0.8; // Tapered snow
+             const snowRadius = radius * (snowHeight / height) * 0.8;
              const snowGeometry = new THREE.ConeGeometry(snowRadius, snowHeight, 8);
              const snow = new THREE.Mesh(snowGeometry, snowMaterial);
-             snow.position.y = height * 0.5 - snowHeight * 0.4; // Position snow cap on top
-             mountain.add(snow); // Add as child of the mountain
+             snow.position.y = height * 0.5 - snowHeight * 0.4;
+             mountain.add(snow);
         }
     }
 
-    // Casas Simples (más cerca)
-    const houseBaseMaterial = new THREE.MeshLambertMaterial({ color: 0xaa8866 }); // Beige wall
-    const houseRoofMaterial = new THREE.MeshLambertMaterial({ color: 0xcc4444 }); // Red roof
-
-     for (let i = 0; i < 10; i++) { // Add several houses
-        const baseWidth = Math.random() * 5 + 4; // 4-9
-        const baseDepth = Math.random() * 4 + 3; // 3-7
-        const baseHeight = Math.random() * 3 + 3; // 3-6
-
-        const house = new THREE.Group(); // Group base and roof
-
-        // Base
+    // Casas Simples (sin cambios)
+    const houseBaseMaterial = new THREE.MeshLambertMaterial({ color: 0xaa8866 });
+    const houseRoofMaterial = new THREE.MeshLambertMaterial({ color: 0xcc4444 });
+     for (let i = 0; i < 10; i++) {
+        const baseWidth = Math.random() * 5 + 4;
+        const baseDepth = Math.random() * 4 + 3;
+        const baseHeight = Math.random() * 3 + 3;
+        const house = new THREE.Group();
         const baseGeometry = new THREE.BoxGeometry(baseWidth, baseHeight, baseDepth);
         const baseMesh = new THREE.Mesh(baseGeometry, houseBaseMaterial);
         baseMesh.castShadow = true;
         baseMesh.receiveShadow = true;
-        baseMesh.position.y = baseHeight / 2; // Sit base on ground
+        baseMesh.position.y = baseHeight / 2;
         house.add(baseMesh);
-
-        // Roof (simple prism shape)
         const roofGeometry = new THREE.BufferGeometry();
-        const hW = baseWidth / 2;
-        const hD = baseDepth / 2;
-        const rH = baseHeight * 0.6; // Roof height
-        const vertices = new Float32Array( [
-             -hW, baseHeight, -hD,  // 0: bottom-left-back
-              hW, baseHeight, -hD,  // 1: bottom-right-back
-              hW, baseHeight,  hD,  // 2: bottom-right-front
-             -hW, baseHeight,  hD,  // 3: bottom-left-front
-               0, baseHeight + rH, -hD, // 4: top-ridge-back
-               0, baseHeight + rH,  hD  // 5: top-ridge-front
-        ] );
-        const indices = [
-            0, 1, 4, // Back gable
-            3, 5, 2, // Front gable
-            0, 3, 5, 0, 5, 4, // Left roof side
-            1, 2, 5, 1, 5, 4  // Right roof side
-        ];
+        const hW = baseWidth / 2; const hD = baseDepth / 2; const rH = baseHeight * 0.6;
+        const vertices = new Float32Array( [ -hW, baseHeight, -hD, hW, baseHeight, -hD, hW, baseHeight, hD, -hW, baseHeight, hD, 0, baseHeight + rH, -hD, 0, baseHeight + rH, hD ] );
+        const indices = [ 0, 1, 4, 3, 5, 2, 0, 3, 5, 0, 5, 4, 1, 2, 5, 1, 5, 4 ];
         roofGeometry.setIndex( indices );
         roofGeometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
-        roofGeometry.computeVertexNormals(); // Important for lighting
+        roofGeometry.computeVertexNormals();
         const roofMesh = new THREE.Mesh(roofGeometry, houseRoofMaterial);
         roofMesh.castShadow = true;
         roofMesh.receiveShadow = true;
-        roofMesh.position.y = 0; // Position relative to group origin
+        roofMesh.position.y = 0;
         house.add(roofMesh);
-
-
-        // Position house randomly around the outside of the track
         const angle = Math.random() * Math.PI * 2;
-        const distance = Math.max(TRACK_RADIUS_X, TRACK_RADIUS_Z) + TRACK_WIDTH + 10 + Math.random() * 30; // Just outside track + buffer
-         house.position.set(
-            Math.cos(angle) * distance,
-            0, // Group origin at ground level
-            Math.sin(angle) * distance
-        );
-        house.rotation.y = Math.random() * Math.PI * 2; // Random orientation
+        const distance = Math.max(TRACK_RADIUS_X, TRACK_RADIUS_Z) + TRACK_WIDTH + 10 + Math.random() * 30;
+         house.position.set( Math.cos(angle) * distance, 0, Math.sin(angle) * distance );
+        house.rotation.y = Math.random() * Math.PI * 2;
         scene.add(house);
      }
 }
@@ -329,18 +333,13 @@ function createScenery() {
 function getOvalPosition(angle) {
     const x = TRACK_RADIUS_X * Math.cos(angle);
     const z = TRACK_RADIUS_Z * Math.sin(angle);
-    // Return position ON the track surface (Y=TRACK_THICKNESS)
-    // but path itself is defined at Y=0. Function name is slightly ambiguous now.
-    // Let's keep it returning the path position at Y=0 for calculations.
+    // *** CAMBIO *** Devuelve la posición en la línea central de la pista, en Y=0
     return new THREE.Vector3(x, 0, z);
 }
 
-// Calcula el ángulo de la tangente en un punto del óvalo (para orientar el coche)
 function getOvalTangentAngle(angle) {
-    // Derivada de la posición paramétrica: (-Rx*sin(t), Rz*cos(t))
     const dx = -TRACK_RADIUS_X * Math.sin(angle);
     const dz = TRACK_RADIUS_Z * Math.cos(angle);
-    // atan2 nos da el ángulo correcto en el cuadrante adecuado
     return Math.atan2(dz, dx);
 }
 
@@ -353,16 +352,16 @@ function getRandomColor() {
   return color;
 }
 
-// --- Control de Eventos ---
+// --- Control de Eventos --- (sin cambios)
 function onKeyDown(event) {
     switch (event.key.toLowerCase()) {
         case 'w': keys.w = true; break;
         case 's': keys.s = true; break;
         case 'a': keys.a = true; break;
         case 'd': keys.d = true; break;
-        case 'r': // Simple Reset on 'R' if game over
+        case 'r':
             if (!gameRunning) {
-                window.location.reload(); // Easiest way to restart fully
+                window.location.reload();
             }
             break;
     }
@@ -385,22 +384,18 @@ function onWindowResize() {
 
 // --- Lógica de Actualización ---
 function updatePlayer(deltaTime) {
-    if (playerState.finished) return; // Don't update if finished, but allow offTrack reset
+    if (playerState.finished) return;
 
     const maxSpeed = 30.0;
     const acceleration = 25.0;
     const deceleration = 35.0;
     const friction = 10.0;
-    const turnSpeed = 2.0; // Radianes por segundo
+    const turnSpeed = 2.0;
 
-    // If offTrack, only allow reset (or maybe slow return)
     if (playerState.offTrack) {
-         // Simple stop for now. Could implement slow speed or force reset later.
          playerState.speed = 0;
-         // The 'R' keydown handler handles the reset/reload
          return;
     }
-
 
     // Aceleración / Deceleración
     if (keys.w) {
@@ -408,24 +403,21 @@ function updatePlayer(deltaTime) {
     } else if (keys.s) {
         playerState.speed -= deceleration * deltaTime;
     } else {
-        // Aplicar fricción si no se acelera ni frena
         if (playerState.speed > 0) {
             playerState.speed -= friction * deltaTime;
-            playerState.speed = Math.max(0, playerState.speed); // No ir por debajo de 0
+            playerState.speed = Math.max(0, playerState.speed);
         } else if (playerState.speed < 0) {
             playerState.speed += friction * deltaTime;
-            playerState.speed = Math.min(0, playerState.speed); // No ir por encima de 0 (en reversa)
+            playerState.speed = Math.min(0, playerState.speed);
         }
     }
 
-    // Limitar velocidad máxima
-    playerState.speed = Math.max(-maxSpeed / 2, Math.min(maxSpeed, playerState.speed)); // Mitad de velocidad en reversa
+    playerState.speed = Math.max(-maxSpeed / 2, Math.min(maxSpeed, playerState.speed));
 
-    // Giro (solo si hay movimiento)
+    // Giro
     if (Math.abs(playerState.speed) > 0.1) {
-         const turnDirection = playerState.speed > 0 ? 1 : -1; // Invertir giro en reversa
-         // Adjust turn rate based on speed (less turn at high speed) - optional realism
-         const speedFactor = 1.0 - Math.min(1.0, Math.abs(playerState.speed) / (maxSpeed * 1.5)); // Full turn at low speed, less at high
+         const turnDirection = playerState.speed > 0 ? 1 : -1;
+         const speedFactor = 1.0 - Math.min(1.0, Math.abs(playerState.speed) / (maxSpeed * 1.5));
         if (keys.a) {
             playerState.rotationY += turnSpeed * deltaTime * turnDirection * (0.5 + speedFactor * 0.5);
         }
@@ -434,25 +426,25 @@ function updatePlayer(deltaTime) {
         }
     }
 
-
-    // Calcular movimiento (forward/backward based on car's rotation)
+    // Calcular movimiento (adelante/atrás según rotación Y del coche)
+    // Con la geometría rotada, sin(rotY) afecta X y cos(rotY) afecta Z, dirigiendo -Z para rotY=0
     const moveX = Math.sin(playerState.rotationY) * playerState.speed * deltaTime;
     const moveZ = Math.cos(playerState.rotationY) * playerState.speed * deltaTime;
 
-    playerState.position.x -= moveX; // Adjust based on car model orientation if needed
-    playerState.position.z -= moveZ; // Adjust based on car model orientation if needed
+    playerState.position.x -= moveX; // -sin(rotY) para mover en X positivo si rotY es -PI/2 (girado a la derecha)
+    playerState.position.z -= moveZ; // -cos(rotY) para mover en Z negativo si rotY es 0 (recto)
 
-    // Keep car snapped to track height (can be improved with raycasting later)
+    // *** CAMBIO AQUÍ: Mantener el coche en la altura correcta sobre la pista Y=0 ***
     playerState.position.y = CAR_HEIGHT_OFFSET;
 
     // Actualizar posición y rotación del mesh
     playerCar.position.copy(playerState.position);
     playerCar.rotation.y = playerState.rotationY;
 
-    // Detección de salida de pista (simplificado)
+    // Detección de salida de pista
     checkOffTrack(playerState, playerCar);
 
-    // Detección de vuelta (only if not off track)
+    // Detección de vuelta
     if (!playerState.offTrack) {
         checkLapCompletion(playerState, playerCar);
     }
@@ -462,82 +454,71 @@ function updateAI(deltaTime) {
     aiStates.forEach(state => {
         if (state.finished) return;
 
-        // Mover la IA a lo largo del óvalo a velocidad constante
         const distanceToMove = state.speed * deltaTime;
-        // More accurate circumference approximation for ellipse
-        // Ramanujan's approximation: pi * [ 3(a+b) - sqrt((3a+b)(a+3b)) ]
         const a = TRACK_RADIUS_X;
         const b = TRACK_RADIUS_Z;
         const circumferenceApproximation = Math.PI * ( 3*(a+b) - Math.sqrt((3*a+b)*(a+3*b)) );
-        const angleChange = distanceToMove / (circumferenceApproximation / (2 * Math.PI)); // angle = dist / radius_equivalent
+        const angleChange = distanceToMove / (circumferenceApproximation / (2 * Math.PI));
 
         state.angle += angleChange;
-        state.angle %= (2 * Math.PI); // Mantener ángulo entre 0 y 2*PI
+        state.angle %= (2 * Math.PI);
 
-        const newPos = getOvalPosition(state.angle); // Get position on path (Y=0)
-        // Set car position above the track surface
+        const newPos = getOvalPosition(state.angle); // Obtiene posición en la línea central (Y=0)
+        // *** CAMBIO AQUÍ: Posicionar coche IA en Y = CAR_HEIGHT_OFFSET ***
         state.car.position.set(newPos.x, CAR_HEIGHT_OFFSET, newPos.z);
 
         // Orientar el coche IA según la tangente del óvalo
         const tangentAngle = getOvalTangentAngle(state.angle);
-         // Adjust rotation based on default model orientation
-         // If car model faces +Z by default, tangent gives direction vector, atan2(dz, dx) is angle from +X axis.
-         // Rotation Y is angle from +Z axis (clockwise negative).
-         // So rotationY should be tangentAngle - PI/2 or +PI/2 depending on model and coordinate system. Test and adjust.
-         // My car model faces -Z when rotation.y = 0. Tangent angle is direction of movement.
-        state.car.rotation.y = tangentAngle - Math.PI/2; // Adjusted based on testing
-
+        // *** AJUSTE *** Esta rotación debería funcionar ahora con la geometría corregida
+        // Si el coche IA aún mira hacia los lados, cambiar a: tangentAngle + Math.PI / 2
+        state.car.rotation.y = tangentAngle - Math.PI / 2;
 
         checkLapCompletion(state, state.car);
     });
 }
 
+// La lógica de checkOffTrack debería funcionar sin cambios, ya que compara posiciones XZ
 function checkOffTrack(state, car) {
-    if (state !== playerState || state.offTrack) return; // Only check player, and only if not already off track
+    if (state !== playerState || state.offTrack) return;
 
-    // Calculate the theoretical center point of the track at the car's current angle
-    const currentAngle = Math.atan2(car.position.z / TRACK_RADIUS_Z, car.position.x / TRACK_RADIUS_X);
-    const centerPointOnPath = getOvalPosition(currentAngle); // Y=0
+    // Usamos atan2 directamente sobre la posición XZ del coche para obtener su ángulo actual
+    // respecto al centro del óvalo.
+    // Dividir por los radios ayuda a normalizar para la forma elíptica.
+    // Se añade un pequeño valor para evitar división por cero si Z o X son 0.
+    const currentAngle = Math.atan2(car.position.z / (TRACK_RADIUS_Z || 1), car.position.x / (TRACK_RADIUS_X || 1));
+    const centerPointOnPath = getOvalPosition(currentAngle); // Punto en Y=0 en la línea central
 
-    // Calculate the horizontal distance from the car to this center point
+    // Calcular la distancia horizontal (XZ) del coche al punto central teórico
     const dx = car.position.x - centerPointOnPath.x;
     const dz = car.position.z - centerPointOnPath.z;
     const distanceToCenterLine = Math.sqrt(dx*dx + dz*dz);
 
-    const trackLimit = TRACK_WIDTH / 2 + CAR_WIDTH * 0.5; // Allow half car width overhang
+    const trackLimit = TRACK_WIDTH / 2 + CAR_WIDTH * 0.4; // Límite ajustado ligeramente
 
     if (distanceToCenterLine > trackLimit) {
         console.log("Fuera de pista!");
         state.offTrack = true;
-        state.speed = 0; // Stop car
+        state.speed = 0;
         showGameOverMessage("¡Te has salido! Pulsa R para reiniciar", true);
-        gameRunning = false; // Stop game loop updates
+        gameRunning = false;
     }
 }
 
-
+// La lógica de checkLapCompletion debería funcionar sin cambios
 function checkLapCompletion(state, car) {
     if (state.finished) return;
 
-    // Store previous progress before calculating new angle
     const oldProgress = state.progress;
 
-    // Calculate current angle based on the car's actual X/Z position
-    // Ensure division by zero is handled if radii are different and car is at origin (unlikely)
+    // Calcular ángulo actual basado en la posición XZ real del coche
     let currentAngle = Math.atan2(car.position.z / (TRACK_RADIUS_Z || 1), car.position.x / (TRACK_RADIUS_X || 1));
     if (currentAngle < 0) {
-        currentAngle += 2 * Math.PI; // Ensure angle is 0 to 2PI
+        currentAngle += 2 * Math.PI;
     }
-
-    // Calculate progress (0 to 1) based on angle
     const currentProgress = currentAngle / (2 * Math.PI);
 
-    // Detect crossing the finish line (angle passes 0, progress goes from high to low)
-    // Thresholds adjusted slightly to be more robust near 0/2PI
     if (oldProgress > 0.9 && currentProgress < 0.1) {
         state.lap++;
-        // console.log(`Coche ${state === playerState ? 'Jugador' : 'IA ' + aiStates.indexOf(state)} completó vuelta ${state.lap}`);
-
         if (state === playerState) {
             lapCountElement.textContent = state.lap;
             if (state.lap >= RACE_LAPS) {
@@ -547,68 +528,56 @@ function checkLapCompletion(state, car) {
             }
         } else {
              if (state.lap >= RACE_LAPS && !playerState.finished) {
-                 // Check if any AI finished *before* the player
                  let playerFinished = playerState.finished;
-                 let aiWon = aiStates.some(s => s.finished);
+                 let aiWon = aiStates.some(s => s.lap >= RACE_LAPS); // Comprobar si alguna IA completó las vueltas
                  if (aiWon && !playerFinished) {
-                    // An AI finished, and player hasn't yet. Player loses.
                     showGameOverMessage("¡Has Perdido! La IA ganó.", true);
-                    playerState.finished = true; // Mark player as finished (lost)
+                    playerState.finished = true; // Marcar jugador como perdido
                     gameRunning = false;
                  }
-                 state.finished = true; // Mark this specific AI as finished
+                 state.finished = true; // Marcar esta IA como finalizada
              }
         }
     }
-    // Detect crossing backwards (optional, prevents cheating)
     else if (oldProgress < 0.1 && currentProgress > 0.9) {
-        // state.lap--; // Penalize or ignore
-        // console.log("Vuelta anulada - Meta cruzada en reversa");
+        // Cruzó hacia atrás
     }
-
-    // Update progress for the next frame
     state.progress = currentProgress;
 }
 
 
-function updateCameraPosition() {
+function updateCameraPosition() { // (Sin cambios lógicos, pero ahora sigue al coche corregido)
      if (!playerCar) return;
 
-     // Desired camera position relative to car (behind and up)
-    const camDist = 12; // Distance behind the car
-    const camHeight = 5; // Height above the car's position
+    const camDist = 12;
+    const camHeight = 5;
 
-    // Calculate offset based on car's rotation
     const dx = Math.sin(playerCar.rotation.y) * camDist;
     const dz = Math.cos(playerCar.rotation.y) * camDist;
 
-    // Target camera position
     const targetCamPos = new THREE.Vector3(
-        playerCar.position.x + dx, // Add offset to car position
+        playerCar.position.x + dx,
         playerCar.position.y + camHeight,
         playerCar.position.z + dz
     );
 
-    // Smoothly move camera towards the target position using LERP
-    camera.position.lerp(targetCamPos, 0.1); // Adjust LERP factor (0.05=slower, 0.2=faster)
+    camera.position.lerp(targetCamPos, 0.1);
 
-    // Make the camera look slightly ahead of the car
-    const lookAheadDist = 7; // How many units in front of the car to look at
+    const lookAheadDist = 7;
     const lookAtPos = new THREE.Vector3().copy(playerCar.position);
-    lookAtPos.x -= Math.sin(playerCar.rotation.y) * lookAheadDist; // Adjust based on car model orientation
-    lookAtPos.z -= Math.cos(playerCar.rotation.y) * lookAheadDist; // Adjust based on car model orientation
-    // lookAtPos.y = playerCar.position.y + 1.0; // Optional: Look slightly above car center
+    lookAtPos.x -= Math.sin(playerCar.rotation.y) * lookAheadDist;
+    lookAtPos.z -= Math.cos(playerCar.rotation.y) * lookAheadDist;
+    // lookAtPos.y = playerCar.position.y + 1.0; // Opcional
 
     camera.lookAt(lookAtPos);
 }
 
 
-function showGameOverMessage(msg, isLoss) {
+function showGameOverMessage(msg, isLoss) { // (Sin cambios)
     let gameOverDiv = document.getElementById('game-over');
     if (!gameOverDiv) {
         gameOverDiv = document.createElement('div');
         gameOverDiv.id = 'game-over';
-        // Apply basic styles if CSS doesn't load
         gameOverDiv.style.position = 'absolute';
         gameOverDiv.style.top = '50%';
         gameOverDiv.style.left = '50%';
@@ -624,26 +593,19 @@ function showGameOverMessage(msg, isLoss) {
     gameOverDiv.textContent = msg;
     gameOverDiv.style.color = isLoss ? 'red' : 'lime';
     gameOverDiv.style.display = 'block';
-
-    // Reset message is now part of the game over message itself
-    messageElement.style.display = 'none'; // Hide the controls message
-
+    messageElement.style.display = 'none';
 }
 
-// --- Loop Principal ---
+// --- Loop Principal --- (sin cambios)
 function animate() {
-    // Keep requesting frames even if game logic stops, to allow reset/reload
     requestAnimationFrame(animate);
-
     const deltaTime = clock.getDelta();
 
-    // Only update game logic if running
     if (gameRunning) {
         updatePlayer(deltaTime);
         updateAI(deltaTime);
     }
 
-    // Always update camera and render
     updateCameraPosition();
     renderer.render(scene, camera);
 }

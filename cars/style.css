@@ -39,11 +39,11 @@ canvas {
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 3em;
-    color: yellow;
+    /* color: yellow; */ /* Color se establece en JS */
     background-color: rgba(0, 0, 0, 0.7);
     padding: 20px;
     border-radius: 10px;
     text-align: center;
     z-index: 101;
-    display: none; /* Oculto por defecto */
+    /* display: none;  /* Oculto por defecto (ya está en el HTML) */
 }
