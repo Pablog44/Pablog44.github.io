@@ -13,7 +13,7 @@ const RACE_LAPS = 3;
 const TRACK_RADIUS_X = 40; // Radio mayor del óvalo
 const TRACK_RADIUS_Z = 25; // Radio menor del óvalo
 const TRACK_WIDTH = 8;
-const TRACK_THICKNESS = 0.5; // Grosor de la malla de la carretera // *** AJUSTE *** Aumentado ligeramente para visibilidad
+const TRACK_THICKNESS = 0.1; // Grosor de la malla de la carretera // *** AJUSTE *** Aumentado ligeramente para visibilidad
 const CAR_LENGTH = 3;
 const CAR_WIDTH = 1.5;
 // *** CAMBIO *** Altura del centro del coche sobre la superficie de la pista (Y=0)
@@ -25,7 +25,7 @@ let playerState = {
     angle: 0, // Ángulo en el óvalo (0 a 2*PI)
     // *** CAMBIO *** Posición Y inicial ajustada a la nueva altura sobre la pista Y=0
     position: new THREE.Vector3(TRACK_RADIUS_X, CAR_HEIGHT_OFFSET, 0),
-    rotationY: -Math.PI / 2, // Rotación del coche (orientación inicial)
+    rotationY: -Math.PI / 1, // Rotación del coche (orientación inicial)
     lap: 0,
     progress: 0, // Para detectar cruce de meta (0 a 1)
     offTrack: false,
@@ -162,6 +162,8 @@ function createCar(color) {
     const wheelThickness = 0.3;
     const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThickness, 16);
     wheelGeo.rotateX(Math.PI / 2); // Rotate wheels to stand upright
+    wheelGeo.rotateY(Math.PI / 2); // Gira las ruedas para que apunten hacia -Z como el coche
+
     const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 }); // Darker wheels
 
     const wheelYOffset = -0.1; // How low the wheels sit relative to car origin
