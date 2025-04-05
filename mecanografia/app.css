@@ -1,6 +1,6 @@
 body {
     font-family: Arial, sans-serif;
-    background: linear-gradient(to right, #008B00 0%, #E9FE4E 100%);
+    background: linear-gradient(to bottom, #008B00 0%, #E9FE4E 100%);
 }
 .container {
     background-color: #ffffff;
@@ -22,28 +22,29 @@ body {
     text-align: center;
 }
 h1 {
-    font-size: 2.5rem;
+    font-size: 3rem;
     color: #00008B;
 }
 p {
     text-align: center;
 }
 #displayArea {
-    font-size: 1.3rem;
+    font-size: 2rem;
     font-weight: bold;
-    width: 200px;
+    width: 300px;
+    height: 70px;
     overflow-wrap: break-word;
     margin: 10px
 }
 
 #scoreArea {
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: bold;
     color: #0b0a24;
 }
 
 input {
-    font-size: 1rem;
+    font-size: 1.5rem;
     padding: 10px;
     border: 2px solid #00008B;
     border-radius: 5px;
@@ -71,33 +72,27 @@ button:hover {
     font-weight: bold;
 }
 .footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: calc(100% - 40px);
-    color: #212529;
-    text-align: center;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(74, 69, 69, 0.831),0 0 10px white;
-    text-align: center;
-    margin: 10px;
     background-color: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 3px 5px rgba(74, 69, 69, 0.831),0 0 8px white;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 60px
 
 }
 .footer1 {
-    position: relative;
-    left: 0;
-    bottom: 0;
-    width: calc(100% - 40px);
-    color: #212529;
-    text-align: center;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(74, 69, 69, 0.831),0 0 10px white;
-    text-align: center;
-    margin: 10px;
     background-color: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 3px 5px rgba(74, 69, 69, 0.831),0 0 8px white;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 60px
 }
 .footer1 button {
     margin: 0 20px;
@@ -115,18 +110,20 @@ textarea {
 }
 #displayArea2 {
 
-    height: 40px; /* O la altura que prefieras */
+    height: 60px; /* O la altura que prefieras */
     border: 1px solid #ccc; /* Un borde para parecerse a un área de texto */
     padding: 1px; /* Algo de padding */
     overflow-y: auto; /* Para que sea scrollable si el contenido es muy largo */
     background-color: white; /* Fondo blanco como un área de texto */
     color: black; /* Texto negro */
-    font-size: 1.3rem;
+    font-size: 2rem;
     font-weight: bold;
-    width: 200px;
+    width: 300px;
     text-align: left; 
-  
-    margin: 10px
+    scrollbar-arrow-color: white;
+    scrollbar-base-color: white;
+    scrollbar-color: transparent;
+    
     
 }
 
@@ -213,17 +210,17 @@ textarea {
 }
 
 .dark-mode .footer {
-    background-color: #777;
+    background-color: #171717;
 }
 .dark-mode .footer1 {
-    background-color: #777;
+    background-color: #171717;
 }
 .dark-mode .container{
-    background-color: #333;
+    background-color: #171717;
 }
 .dark-mode h1 {
 
-    color: #A0A7AC;
+    color:  #020d19;
 }
 .dark-mode button {
 
@@ -240,8 +237,12 @@ textarea {
 }
 .dark-mode #displayArea  {
     background-color: #555;
-    color: white;
+    color: #020d19 ;
+}
+.dark-mode #displayArea2  {
+    background-color: white;
+    color: #020d19 ;
 }
 .dark-mode #scoreArea  {
-    color: white;
+    color: #020d19 ;
 }
