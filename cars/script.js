@@ -9,11 +9,11 @@ let keys = { w: false, s: false, a: false, d: false };
 let clock = new THREE.Clock();
 
 // Configuración del juego
-const RACE_LAPS = 3;
+const RACE_LAPS = 4;
 const TRACK_RADIUS_X = 40; // Radio mayor del óvalo
 const TRACK_RADIUS_Z = 25; // Radio menor del óvalo
-const TRACK_WIDTH = 8;
-const TRACK_THICKNESS = 0.1; // Grosor de la malla de la carretera // *** AJUSTE *** Aumentado ligeramente para visibilidad
+const TRACK_WIDTH = 9;
+const TRACK_THICKNESS = 0.05; // Grosor de la malla de la carretera // *** AJUSTE *** Aumentado ligeramente para visibilidad
 const CAR_LENGTH = 3;
 const CAR_WIDTH = 1.5;
 // *** CAMBIO *** Altura del centro del coche sobre la superficie de la pista (Y=0)
@@ -456,28 +456,44 @@ function updateAI(deltaTime) {
     aiStates.forEach(state => {
         if (state.finished) return;
 
-        const distanceToMove = state.speed * deltaTime;
-        const a = TRACK_RADIUS_X;
-        const b = TRACK_RADIUS_Z;
-        const circumferenceApproximation = Math.PI * ( 3*(a+b) - Math.sqrt((3*a+b)*(a+3*b)) );
-        const angleChange = distanceToMove / (circumferenceApproximation / (2 * Math.PI));
+        // 1. Calcular nueva posición en el óvalo
+        const distance = state.speed * deltaTime;
+        const circumference = Math.PI * (3 * (TRACK_RADIUS_X + TRACK_RADIUS_Z) - Math.sqrt((3 * TRACK_RADIUS_X + TRACK_RADIUS_Z) * (TRACK_RADIUS_X + 3 * TRACK_RADIUS_Z)));
+        const deltaAngle = (distance / circumference) * 2 * Math.PI;
+        state.angle = (state.angle + deltaAngle) % (2 * Math.PI);
 
-        state.angle += angleChange;
-        state.angle %= (2 * Math.PI);
+        // 2. Posición objetivo (punto futuro en la pista)
+        const lookAhead = 1.5; // cuanto más adelante mira el coche
+        const futureAngle = (state.angle + deltaAngle * lookAhead) % (2 * Math.PI);
+        const target = getOvalPosition(futureAngle);
+        target.y = CAR_HEIGHT_OFFSET;
 
-        const newPos = getOvalPosition(state.angle); // Obtiene posición en la línea central (Y=0)
-        // *** CAMBIO AQUÍ: Posicionar coche IA en Y = CAR_HEIGHT_OFFSET ***
-        state.car.position.set(newPos.x, CAR_HEIGHT_OFFSET, newPos.z);
+        // 3. Dirección actual
+        const forward = new THREE.Vector3(0, 0, -1).applyEuler(state.car.rotation);
+        forward.normalize();
 
-        // Orientar el coche IA según la tangente del óvalo
-        const tangentAngle = getOvalTangentAngle(state.angle);
-        // *** AJUSTE *** Esta rotación debería funcionar ahora con la geometría corregida
-        // Si el coche IA aún mira hacia los lados, cambiar a: tangentAngle + Math.PI / 2
-        state.car.rotation.y = tangentAngle - Math.PI / 2;
+        // 4. Dirección deseada
+        const toTarget = new THREE.Vector3().subVectors(target, state.car.position).normalize();
 
+        // 5. Interpolación de dirección (giro suave)
+        const smoothedDir = forward.lerp(toTarget, deltaTime * 2.5).normalize();
+
+        // 6. Calcular nueva rotación Y
+        const newRotationY = Math.atan2(-smoothedDir.x, -smoothedDir.z);
+        state.car.rotation.y = newRotationY;
+
+        // 7. Mover el coche hacia adelante suavemente
+        const move = smoothedDir.clone().multiplyScalar(state.speed * deltaTime);
+        state.car.position.add(move);
+        state.car.position.y = CAR_HEIGHT_OFFSET;
+
+        // 8. Verificar vueltas
         checkLapCompletion(state, state.car);
     });
 }
+
+
+
 
 // La lógica de checkOffTrack debería funcionar sin cambios, ya que compara posiciones XZ
 function checkOffTrack(state, car) {
