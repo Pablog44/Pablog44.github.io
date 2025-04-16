@@ -1,0 +1,24 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Evita barras de scroll */
+    font-family: Arial, sans-serif;
+    background-color: #add8e6; /* Color cielo simple */
+}
+
+#container {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    z-index: 10; /* Asegura que esté por encima del canvas */
+}

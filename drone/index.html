@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Dron Mejorado</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="info">
+        Conecta un Gamepad y usa:<br/>
+        Stick Izquierdo: Mover Adelante/Atrás/Lateral (Aceleración)<br/>
+        Stick Derecho: Rotar (Yaw) / Voltereta (Pitch)<br/>
+        Botones L1/R1 (o 4/5): Bajar / Subir
+    </div>
+    <div id="container"></div>
+
+    <!-- Import Three.js (desde CDN) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <!-- Tu script principal -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
