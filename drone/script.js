@@ -8,18 +8,18 @@ const MAP_HEIGHT_LIMIT = 150;
 
 const FORWARD_ACCELERATION = 0.8;   // pitch → avance/retroceso
 const LATERAL_ACCELERATION = 0.7;   // roll  → lateral (der/izq)
-const LIFT_ACCELERATION    = 2.5;   // throttle (↑)  ← ¡Más potente!
-const YAW_ACCELERATION     = 2.0;   // giro cabecera
-const PITCH_ACCELERATION   = 1.8;   // loops (eje X)
-const ROLL_ACCELERATION    = 1.8;   // roll (eje Z)
+const LIFT_ACCELERATION    = 25.5;   // throttle (↑)  ← ¡Más potente!
+const YAW_ACCELERATION     = 5.0;   // giro cabecera
+const PITCH_ACCELERATION   = 2.8;   // loops (eje X)
+const ROLL_ACCELERATION    = 2.8;   // roll (eje Z)
 
-const GRAVITY       = 1.14;         // ← gravedad más acusada
+const GRAVITY       = 9.84;         // ← gravedad más acusada
 const DRAG          = 0.97;
 const ROTATION_DRAG = 0.94;
 
-const MAX_HORIZONTAL_SPEED = 10.0;
-const MAX_VERTICAL_SPEED   = 20.5;
-const MAX_ROTATION_SPEED   = 4.0;   // rad/s aprox.
+const MAX_HORIZONTAL_SPEED = 30.0;
+const MAX_VERTICAL_SPEED   = 30.5;
+const MAX_ROTATION_SPEED   = 15.0;   // rad/s aprox.
 
 const DEADZONE = 0.12;
 
