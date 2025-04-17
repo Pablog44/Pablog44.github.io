@@ -13,13 +13,13 @@ const YAW_ACCELERATION     = 2.0;   // giro cabecera
 const PITCH_ACCELERATION   = 1.8;   // loops (eje X)
 const ROLL_ACCELERATION    = 1.8;   // roll (eje Z)
 
-const GRAVITY       = 0.04;         // ← gravedad más acusada
+const GRAVITY       = 1.14;         // ← gravedad más acusada
 const DRAG          = 0.97;
 const ROTATION_DRAG = 0.94;
 
-const MAX_HORIZONTAL_SPEED = 3.0;
-const MAX_VERTICAL_SPEED   = 2.5;
-const MAX_ROTATION_SPEED   = 2.0;   // rad/s aprox.
+const MAX_HORIZONTAL_SPEED = 10.0;
+const MAX_VERTICAL_SPEED   = 20.5;
+const MAX_ROTATION_SPEED   = 4.0;   // rad/s aprox.
 
 const DEADZONE = 0.12;
 
@@ -209,7 +209,7 @@ function handleGamepadInput(dt) {
   const upVec      = new THREE.Vector3(0, 1, 0).applyQuaternion(drone.quaternion); // ↑ local
 
   acc.addScaledVector(forwardVec, pitchInput * FORWARD_ACCELERATION);
-  acc.addScaledVector(sideVec,    rollInput  * LATERAL_ACCELERATION);
+  //acc.addScaledVector(sideVec,    rollInput  * LATERAL_ACCELERATION);
   acc.addScaledVector(upVec,      liftInput  * LIFT_ACCELERATION);
 
   droneVelocity.addScaledVector(acc, dt);
