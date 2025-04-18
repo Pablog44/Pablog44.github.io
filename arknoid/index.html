@@ -1,16 +1,269 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Arkanoid Game</title>
-    <meta charset="utf-8" />
-    <style>
-      #gameCanvas {
-        border: 1px solid black;
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Arkanoid – mapas por matriz</title>
+<style>
+/*------------ CENTRAR EL LIENZO EN PANTALLA ------------*/
+html,body{
+  height:100%; margin:0;
+  display:flex; justify-content:center; align-items:center;
+  background:#000;
+}
+/*------------ CANVAS Y BOTÓN REINICIO ------------*/
+#gameCanvas{
+  border:3px solid #00FF00;
+  background:#000;
+  box-shadow:0 0 15px #00FF00;
+}
+#restartBtn{
+  position:absolute; top:20px; left:50%; transform:translateX(-50%);
+  padding:8px 18px; font-size:18px; font-family:sans-serif;
+  border:2px solid #00FF00; background:#000; color:#00FF00;
+  cursor:pointer; display:none;
+}
+</style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="1000" height="600"></canvas>
+  <button id="restartBtn">Reiniciar</button>
+
+<script>
+/*==================== CONSTANTES GLOBALES ====================*/
+const canvas = document.getElementById("gameCanvas");
+const ctx    = canvas.getContext("2d");
+const restartBtn = document.getElementById("restartBtn");
+
+/* Paleta */
+const paddleW = 100, paddleH = 10, paddleY = canvas.height - 20;
+let paddleX = canvas.width/2 - paddleW/2;
+
+/* Bola */
+const BASE_VX = 4, BASE_VY = -4, ballR = 10;
+let ballX, ballY, ballVX, ballVY;
+
+/* Vidas y estado */
+const MAX_LIVES = 3;
+let lives, gameStarted, gameOver, gameFinished;
+
+/* Colores (puedes añadir más y usar 5,6,7… en los mapas) */
+const blockColors = [
+  "#00FF00", // 1
+  "#FFA500", // 2
+  "#FFFF00", // 3
+  "#FF1493", // 4
+  "#1E90FF", // 5
+  "#FF69B4"  // 6
+];
+
+/*==================== MAPAS ====================
+   Cada nivel es un array de filas, y cada fila es un array de columnas.
+   Cualquier tamaño vale, el motor lo ajusta.                    */
+const levelData = [
+  [ // --------- MAPA 1 ---------
+    [1,2,3,1,2,3,4,4,4],
+    [1,1,1,1,2,2,2,2,2],
+    [1,2,3,0,2,0,4,4,4],
+    [2,2,0,0,2,0,0,2,2]
+  ],
+  [ // --------- MAPA 2 ---------
+    [4,3,2,1,0,1,2,3,4],
+    [0,4,3,2,1,1,2,3,4],
+    [0,0,4,3,2,2,3,4,0],
+    [0,0,0,4,3,3,4,0,0]
+  ],
+  [ // --------- MAPA 3 ---------
+    [1,0,2,0,3,0,4,0,1],
+    [0,1,0,2,0,3,0,4,0],
+    [1,0,2,0,3,0,4,0,1],
+    [0,1,0,2,0,3,0,4,0]
+  ]
+];
+
+/*------------ Variables dependientes del nivel ------------*/
+let blocks = [];        // matriz de objetos {visible, type}
+let rows   = 0, cols = 0;
+let offsetLeft = 0;     // para centrar horizontalmente
+const blockW = 70, blockH = 20, pad = 10, offsetTop = 40;
+
+/*==================== INICIALIZACIÓN ====================*/
+function initGame(){
+  lives = MAX_LIVES;
+  gameStarted = false; gameOver = false; gameFinished = false;
+  restartBtn.style.display = "none";
+  currentLevel = 0;
+  buildLevel();
+  resetBallAndPaddle();
+  gameLoop();
+}
+
+/* Construye blocks[] a partir de levelData[currentLevel] */
+let currentLevel = 0;
+function buildLevel(){
+  const layout = levelData[currentLevel];
+  rows = layout.length;
+  cols = layout[0].length;
+  /* centrar horizontalmente */
+  const innerW = cols*(blockW+pad) - pad;
+  offsetLeft = (canvas.width - innerW)/2;
+
+  blocks = [];
+  for(let r=0;r<rows;r++){
+    blocks[r] = [];
+    for(let c=0;c<cols;c++){
+      const type = layout[r][c];
+      blocks[r][c] = { visible: type !== 0, type };
+    }
+  }
+}
+
+function resetBallAndPaddle(){
+  paddleX = canvas.width/2 - paddleW/2;
+  ballX   = canvas.width/2;
+  ballY   = canvas.height/2;
+  ballVX  = ballVY = 0;          // parada hasta clic
+}
+
+/*==================== CONTROL DE ENTRADA ====================*/
+canvas.addEventListener("mousemove", e=>{
+  if(gameOver||gameFinished) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  paddleX = Math.max(0, Math.min(canvas.width - paddleW, mouseX - paddleW/2));
+});
+canvas.addEventListener("click", startBall);
+restartBtn.addEventListener("click", initGame);
+document.addEventListener("keydown", e=>{
+  if(e.key==="r" && (gameOver||gameFinished)) initGame();
+});
+
+function startBall(){
+  if(gameStarted) return;
+  gameStarted = true;
+  ballVX = (Math.random()<0.5?-1:1)*BASE_VX;
+  ballVY = BASE_VY;
+}
+
+/*==================== DIBUJO ====================*/
+function drawPaddle(){
+  ctx.beginPath();
+  ctx.rect(paddleX, paddleY, paddleW, paddleH);
+  ctx.fillStyle="#00FF00";
+  ctx.fill(); ctx.closePath();
+}
+function drawBall(){
+  ctx.beginPath();
+  ctx.arc(ballX, ballY, ballR, 0, Math.PI*2);
+  ctx.fillStyle="#00FFFF";
+  ctx.fill(); ctx.closePath();
+}
+function drawBlocks(){
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const b = blocks[r][c];
+      if(!b.visible) continue;
+      const x = offsetLeft + c*(blockW+pad);
+      const y = offsetTop  + r*(blockH+pad);
+      ctx.beginPath();
+      ctx.rect(x,y,blockW,blockH);
+      ctx.fillStyle = blockColors[(b.type-1) % blockColors.length];
+      ctx.fill(); ctx.closePath();
+    }
+  }
+}
+function drawLives(){
+  ctx.font="20px Arial"; ctx.fillStyle="#00FF00";
+  for(let i=0;i<lives;i++){
+    ctx.fillText("❤️", canvas.width-30*(i+1), 25);
+  }
+}
+function drawEnd(text){
+  ctx.font="48px sans-serif"; ctx.fillStyle="#00FF00";
+  ctx.textAlign="center";
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+  ctx.lineWidth=2; ctx.strokeStyle="#00FF00";
+  ctx.strokeText(text, canvas.width/2, canvas.height/2);
+}
+
+/*==================== COLISIONES ====================*/
+function paddleCollision(){
+  if(ballY+ballR >= paddleY && ballY+ballR <= paddleY+paddleH &&
+     ballX >= paddleX && ballX <= paddleX+paddleW){
+    const center = paddleX+paddleW/2;
+    const diff = ballX-center;
+    ballVY = -ballVY;
+    ballVX = diff*0.1;  // cambia ángulo según impacto
+  }
+}
+function wallCollision(){
+  if(ballX-ballR<=0 || ballX+ballR>=canvas.width) ballVX=-ballVX;
+  if(ballY-ballR<=0) ballVY=-ballVY;
+  if(ballY+ballR>=canvas.height) loseLife();
+}
+function blockCollision(){
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const b = blocks[r][c];
+      if(!b.visible) continue;
+      const x = offsetLeft + c*(blockW+pad);
+      const y = offsetTop  + r*(blockH+pad);
+      if(ballX>x && ballX<x+blockW && ballY>y && ballY<y+blockH){
+        b.visible=false;
+        ballVY=-ballVY;
+        if(levelCleared()) nextLevel();
+        return;
       }
-    </style>
-  </head>
-  <body>
-    <canvas id="gameCanvas" width="1000" height="600"></canvas>
-    <script src="game.js"></script>
-  </body>
+    }
+  }
+}
+function levelCleared(){
+  return blocks.every(row=>row.every(b=>!b.visible));
+}
+function nextLevel(){
+  currentLevel++;
+  if(currentLevel < levelData.length){
+    buildLevel();
+    resetBallAndPaddle();
+    gameStarted=false;
+  }else{
+    gameFinished=true;
+    restartBtn.style.display="block";
+  }
+}
+function loseLife(){
+  lives--;
+  if(lives===0){
+    gameOver=true;
+    restartBtn.style.display="block";
+  }
+  resetBallAndPaddle();
+  gameStarted=false;
+}
+
+/*==================== BUCLE PRINCIPAL ====================*/
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.shadowColor="#00FF00"; ctx.shadowBlur=10; ctx.shadowOffsetX=ctx.shadowOffsetY=0;
+
+  drawPaddle(); drawBall(); drawBlocks(); drawLives();
+
+  if(!gameOver && !gameFinished){
+    if(gameStarted){
+      ballX+=ballVX; ballY+=ballVY;
+      paddleCollision(); wallCollision(); blockCollision();
+    }
+    requestAnimationFrame(gameLoop);
+  }else{
+    drawEnd(gameFinished ? "¡Juego terminado!" : "Game Over");
+  }
+}
+
+/*==================== ¡ARRANQUE! ====================*/
+initGame();
+
+/*===== CÓMO AÑADIR MÁS MAPAS =========================
+   - Crea otra matriz (misma sintaxis) y añádela a levelData.
+   - Aumenta blockColors si necesitas más colores.          */
+</script>
+</body>
 </html>
