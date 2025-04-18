@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<title>Arkanoid – mapas por matriz</title>
+<title>Arkanoid – mapas por matriz con Mejoras</title>
 <style>
 /*------------ CENTRAR EL LIENZO EN PANTALLA ------------*/
 html,body{
@@ -35,48 +35,71 @@ const ctx    = canvas.getContext("2d");
 const restartBtn = document.getElementById("restartBtn");
 
 /* Paleta */
-const paddleW = 100, paddleH = 10, paddleY = canvas.height - 20;
+const BASE_PADDLE_W = 100, paddleH = 10, paddleY = canvas.height - 20;
+let paddleW = BASE_PADDLE_W;
 let paddleX = canvas.width/2 - paddleW/2;
+let paddleSticky = false; // Para la mejora STICKY
 
-/* Bola */
+/* Bola(s) */
 const BASE_VX = 4, BASE_VY = -4, ballR = 10;
-let ballX, ballY, ballVX, ballVY;
+let balls = []; // Ahora es un array para soportar multiball
 
 /* Vidas y estado */
 const MAX_LIVES = 3;
 let lives, gameStarted, gameOver, gameFinished;
 
-/* Colores (puedes añadir más y usar 5,6,7… en los mapas) */
+/* Colores */
 const blockColors = [
-  "#00FF00", // 1
-  "#FFA500", // 2
-  "#FFFF00", // 3
-  "#FF1493", // 4
-  "#1E90FF", // 5
-  "#FF69B4"  // 6
+  "#00FF00", // 1 - Verde
+  "#FFA500", // 2 - Naranja
+  "#FFFF00", // 3 - Amarillo
+  "#FF1493", // 4 - Rosa Fuerte
+  "#1E90FF", // 5 - Azul Dodger
+  "#FF69B4"  // 6 - Rosa Caliente
 ];
 
-/*==================== MAPAS ====================
-   Cada nivel es un array de filas, y cada fila es un array de columnas.
-   Cualquier tamaño vale, el motor lo ajusta.                    */
+/*==================== MEJORAS (Power-ups) ====================*/
+const powerUpTypes = ['MULTIBALL', 'SPEED', 'STICKY', 'LARGE', 'SMALL'];
+const powerUpColors = { // Colores para las mejoras
+    'MULTIBALL': '#FFFFFF', // Blanco
+    'SPEED':     '#FF0000', // Rojo
+    'STICKY':    '#00FFFF', // Cyan
+    'LARGE':     '#FFFF00', // Amarillo
+    'SMALL':     '#800080'  // Púrpura
+};
+const powerUpSize = { w: 40, h: 15 };
+const powerUpSpeed = 2;
+let activePowerUps = []; // Array para las mejoras activas en pantalla {x, y, type}
+
+// Probabilidades de soltar mejora por tipo de bloque (color) - Max 35%
+const powerUpDropChance = {
+  1: 0.10, // Verde: 10%
+  2: 0.15, // Naranja: 15%
+  3: 0.20, // Amarillo: 20%
+  4: 0.25, // Rosa Fuerte: 25%
+  5: 0.30, // Azul Dodger: 30%
+  6: 0.35  // Rosa Caliente: 35%
+};
+
+/*==================== MAPAS ====================*/
 const levelData = [
-  [ // --------- MAPA 1 ---------
+  [ // --------- MAPA 1 ---------
     [1,2,3,1,2,3,4,4,4],
     [1,1,1,1,2,2,2,2,2],
-    [1,2,3,0,2,0,4,4,4],
-    [2,2,0,0,2,0,0,2,2]
+    [1,2,3,0,5,0,4,4,4], // Añadido tipo 5
+    [2,2,0,0,6,0,0,2,2]  // Añadido tipo 6
   ],
-  [ // --------- MAPA 2 ---------
+  [ // --------- MAPA 2 ---------
     [4,3,2,1,0,1,2,3,4],
-    [0,4,3,2,1,1,2,3,4],
-    [0,0,4,3,2,2,3,4,0],
+    [0,4,3,2,5,5,2,3,4], // Añadido tipo 5
+    [0,0,4,3,6,6,3,4,0], // Añadido tipo 6
     [0,0,0,4,3,3,4,0,0]
   ],
-  [ // --------- MAPA 3 ---------
+  [ // --------- MAPA 3 ---------
     [1,0,2,0,3,0,4,0,1],
-    [0,1,0,2,0,3,0,4,0],
+    [0,5,0,6,0,5,0,6,0], // Añadido tipos 5 y 6
     [1,0,2,0,3,0,4,0,1],
-    [0,1,0,2,0,3,0,4,0]
+    [0,5,0,6,0,5,0,6,0]
   ]
 ];
 
@@ -87,18 +110,19 @@ let offsetLeft = 0;     // para centrar horizontalmente
 const blockW = 70, blockH = 20, pad = 10, offsetTop = 40;
 
 /*==================== INICIALIZACIÓN ====================*/
+let currentLevel = 0;
 function initGame(){
   lives = MAX_LIVES;
   gameStarted = false; gameOver = false; gameFinished = false;
   restartBtn.style.display = "none";
   currentLevel = 0;
+  activePowerUps = []; // Limpiar mejoras al reiniciar
   buildLevel();
-  resetBallAndPaddle();
+  resetBallAndPaddle(); // Esto ahora inicializa el array de bolas
   gameLoop();
 }
 
 /* Construye blocks[] a partir de levelData[currentLevel] */
-let currentLevel = 0;
 function buildLevel(){
   const layout = levelData[currentLevel];
   rows = layout.length;
@@ -118,10 +142,19 @@ function buildLevel(){
 }
 
 function resetBallAndPaddle(){
-  paddleX = canvas.width/2 - paddleW/2;
-  ballX   = canvas.width/2;
-  ballY   = canvas.height/2;
-  ballVX  = ballVY = 0;          // parada hasta clic
+  paddleX = canvas.width/2 - BASE_PADDLE_W/2; // Resetear a tamaño base
+  paddleW = BASE_PADDLE_W;
+  paddleSticky = false; // Quitar sticky
+
+  // Inicializar con una sola bola en el centro, sin moverse
+  balls = [{
+      x: canvas.width/2,
+      y: canvas.height/2,
+      vx: 0,
+      vy: 0,
+      stuck: false // Para la mejora STICKY
+  }];
+  activePowerUps = []; // Limpiar mejoras al perder vida/pasar nivel
 }
 
 /*==================== CONTROL DE ENTRADA ====================*/
@@ -130,7 +163,17 @@ canvas.addEventListener("mousemove", e=>{
   const rect = canvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   paddleX = Math.max(0, Math.min(canvas.width - paddleW, mouseX - paddleW/2));
+
+  // Si la paleta es pegajosa, mover las bolas pegadas con ella
+  if(paddleSticky){
+      balls.forEach(ball => {
+          if(ball.stuck){
+              ball.x = paddleX + paddleW / 2; // Mantener centrada (o ajustar lógica si se prefiere mantener posición relativa)
+          }
+      });
+  }
 });
+
 canvas.addEventListener("click", startBall);
 restartBtn.addEventListener("click", initGame);
 document.addEventListener("keydown", e=>{
@@ -138,25 +181,61 @@ document.addEventListener("keydown", e=>{
 });
 
 function startBall(){
-  if(gameStarted) return;
-  gameStarted = true;
-  ballVX = (Math.random()<0.5?-1:1)*BASE_VX;
-  ballVY = BASE_VY;
+    // Si la paleta es pegajosa, liberar las bolas pegadas
+    if (paddleSticky) {
+        let released = false;
+        balls.forEach(ball => {
+            if (ball.stuck) {
+                ball.stuck = false;
+                ball.vy = BASE_VY; // Lanzar hacia arriba
+                // Calcular vx basado en dónde estaba en la paleta
+                const center = paddleX + paddleW / 2;
+                const diff = ball.x - center;
+                ball.vx = diff * 0.1;
+                // Asegurar una velocidad mínima horizontal para evitar que se quede vertical
+                if (Math.abs(ball.vx) < 0.5) {
+                    ball.vx = (Math.random() < 0.5 ? -1 : 1) * BASE_VX * 0.5;
+                }
+                released = true;
+            }
+        });
+        if (released) {
+            gameStarted = true; // Asegurar que el juego corra si había bolas pegadas
+            return; // No hacer nada más si liberamos bolas
+        }
+    }
+
+    // Si el juego no ha empezado y no hay bolas pegadas, lanzar la primera bola
+    if (!gameStarted) {
+        gameStarted = true;
+        if (balls.length > 0) {
+            balls[0].vx = (Math.random() < 0.5 ? -1 : 1) * BASE_VX;
+            balls[0].vy = BASE_VY;
+            balls[0].stuck = false; // Asegurarse de que no esté pegada
+        }
+    }
 }
+
 
 /*==================== DIBUJO ====================*/
 function drawPaddle(){
   ctx.beginPath();
   ctx.rect(paddleX, paddleY, paddleW, paddleH);
   ctx.fillStyle="#00FF00";
+  if (paddleSticky) ctx.fillStyle="#00FFFF"; // Color diferente si es pegajosa
   ctx.fill(); ctx.closePath();
 }
-function drawBall(){
-  ctx.beginPath();
-  ctx.arc(ballX, ballY, ballR, 0, Math.PI*2);
-  ctx.fillStyle="#00FFFF";
-  ctx.fill(); ctx.closePath();
+
+// Dibujar todas las bolas
+function drawBalls(){
+  balls.forEach(ball => {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ballR, 0, Math.PI*2);
+    ctx.fillStyle="#00FFFF";
+    ctx.fill(); ctx.closePath();
+  });
 }
+
 function drawBlocks(){
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
@@ -166,17 +245,20 @@ function drawBlocks(){
       const y = offsetTop  + r*(blockH+pad);
       ctx.beginPath();
       ctx.rect(x,y,blockW,blockH);
+      // Usar módulo para evitar errores si el tipo es mayor que los colores definidos
       ctx.fillStyle = blockColors[(b.type-1) % blockColors.length];
       ctx.fill(); ctx.closePath();
     }
   }
 }
+
 function drawLives(){
   ctx.font="20px Arial"; ctx.fillStyle="#00FF00";
   for(let i=0;i<lives;i++){
     ctx.fillText("❤️", canvas.width-30*(i+1), 25);
   }
 }
+
 function drawEnd(text){
   ctx.font="48px sans-serif"; ctx.fillStyle="#00FF00";
   ctx.textAlign="center";
@@ -185,40 +267,234 @@ function drawEnd(text){
   ctx.strokeText(text, canvas.width/2, canvas.height/2);
 }
 
-/*==================== COLISIONES ====================*/
-function paddleCollision(){
-  if(ballY+ballR >= paddleY && ballY+ballR <= paddleY+paddleH &&
-     ballX >= paddleX && ballX <= paddleX+paddleW){
-    const center = paddleX+paddleW/2;
-    const diff = ballX-center;
-    ballVY = -ballVY;
-    ballVX = diff*0.1;  // cambia ángulo según impacto
+// Dibujar las mejoras cayendo
+function drawPowerUps() {
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    activePowerUps.forEach(p => {
+        ctx.beginPath();
+        ctx.rect(p.x, p.y, powerUpSize.w, powerUpSize.h);
+        ctx.fillStyle = powerUpColors[p.type] || '#FFFFFF'; // Color por defecto blanco
+        ctx.fill();
+        ctx.fillStyle = "#000000"; // Texto negro para contraste
+        // Dibujar abreviatura del tipo
+        let text = p.type.substring(0, 1);
+        if (p.type === 'MULTIBALL') text = 'x2';
+        if (p.type === 'SPEED') text = 'SPD';
+        if (p.type === 'STICKY') text = 'STK';
+        if (p.type === 'LARGE') text = 'LRG';
+        if (p.type === 'SMALL') text = 'SML';
+        ctx.fillText(text, p.x + powerUpSize.w / 2, p.y + powerUpSize.h / 1.5);
+        ctx.closePath();
+    });
+    ctx.textAlign = "start"; // Reset text align
+}
+
+/*==================== LÓGICA DE ACTUALIZACIÓN ====================*/
+
+// Mover todas las bolas
+function updateBalls() {
+    balls.forEach((ball, index) => {
+        if (ball.stuck) return; // No mover si está pegada
+
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Colisiones para esta bola
+        paddleCollision(ball);
+        wallCollision(ball, index); // Pasar índice para poder quitarla si se pierde
+        blockCollision(ball);
+    });
+
+    // Limpiar bolas que salieron por abajo (si wallCollision las marcó para eliminar)
+    balls = balls.filter(ball => ball !== null);
+
+    // Si no quedan bolas, perder una vida
+    if (balls.length === 0 && gameStarted && !gameOver && !gameFinished) {
+        loseLife();
+    }
+}
+
+// Mover y detectar colisión de mejoras
+function updatePowerUps() {
+    for (let i = activePowerUps.length - 1; i >= 0; i--) {
+        const p = activePowerUps[i];
+        p.y += powerUpSpeed;
+
+        // Eliminar si sale de pantalla
+        if (p.y > canvas.height) {
+            activePowerUps.splice(i, 1);
+            continue;
+        }
+
+        // Detectar colisión con la paleta
+        if (p.y + powerUpSize.h >= paddleY &&
+            p.y <= paddleY + paddleH &&
+            p.x + powerUpSize.w >= paddleX &&
+            p.x <= paddleX + paddleW)
+        {
+            applyPowerUp(p.type);
+            activePowerUps.splice(i, 1); // Eliminar mejora al recogerla
+        }
+    }
+}
+
+/*==================== COLISIONES (Modificadas para múltiples bolas) ====================*/
+
+// Colisión con la paleta (para una bola específica)
+function paddleCollision(ball){
+  // Comprobar si la bola está en la zona Y de la paleta y moviéndose hacia abajo
+  if(ball.vy > 0 &&
+     ball.y + ballR >= paddleY &&
+     ball.y - ballR <= paddleY + paddleH && // margen de error por si va muy rápido
+     ball.x + ballR >= paddleX &&
+     ball.x - ballR <= paddleX + paddleW)
+  {
+    if (paddleSticky) {
+        ball.stuck = true;
+        ball.y = paddleY - ballR; // Colocarla justo encima de la paleta
+        ball.vx = 0;
+        ball.vy = 0;
+    } else {
+        const center = paddleX + paddleW / 2;
+        const diff = ball.x - center;
+        ball.vy = -Math.abs(ball.vy); // Asegurar que rebote hacia arriba
+        // Ajustar velocidad horizontal basada en el punto de impacto
+        ball.vx = diff * 0.1;
+        // Limitar velocidad horizontal máxima para que no se acelere demasiado
+        ball.vx = Math.max(-BASE_VX * 1.5, Math.min(BASE_VX * 1.5, ball.vx));
+        // Asegurar un mínimo de velocidad y para evitar quedarse pegada verticalmente
+         if (Math.abs(ball.vy) < Math.abs(BASE_VY * 0.8)) {
+             ball.vy = BASE_VY * (ball.vy > 0 ? 1 : -1); // Restaurar base si es muy lenta
+         }
+    }
   }
 }
-function wallCollision(){
-  if(ballX-ballR<=0 || ballX+ballR>=canvas.width) ballVX=-ballVX;
-  if(ballY-ballR<=0) ballVY=-ballVY;
-  if(ballY+ballR>=canvas.height) loseLife();
+
+// Colisión con las paredes (para una bola específica)
+function wallCollision(ball, index){
+  // Paredes laterales
+  if(ball.x - ballR <= 0 || ball.x + ballR >= canvas.width) {
+      ball.vx = -ball.vx;
+      // Ajustar posición para evitar que se quede pegada
+      if (ball.x - ballR <= 0) ball.x = ballR;
+      if (ball.x + ballR >= canvas.width) ball.x = canvas.width - ballR;
+  }
+  // Pared superior
+  if(ball.y - ballR <= 0) {
+       ball.vy = -ball.vy;
+       ball.y = ballR; // Ajustar posición
+  }
+  // Pared inferior (pierde bola)
+  if(ball.y + ballR >= canvas.height) {
+      // Marcar para eliminar en lugar de llamar a loseLife directamente
+      // loseLife se llamará solo si es la última bola
+      balls[index] = null; // Marcar para eliminación (se filtrará después)
+  }
 }
-function blockCollision(){
+
+// Colisión con los bloques (para una bola específica)
+function blockCollision(ball){
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
       const b = blocks[r][c];
       if(!b.visible) continue;
-      const x = offsetLeft + c*(blockW+pad);
-      const y = offsetTop  + r*(blockH+pad);
-      if(ballX>x && ballX<x+blockW && ballY>y && ballY<y+blockH){
-        b.visible=false;
-        ballVY=-ballVY;
-        if(levelCleared()) nextLevel();
-        return;
+
+      const blockX = offsetLeft + c*(blockW+pad);
+      const blockY = offsetTop  + r*(blockH+pad);
+
+      // Detección de colisión simple (centro de la bola dentro del bloque)
+      // Una detección más precisa implicaría AABB vs Círculo
+      if(ball.x > blockX && ball.x < blockX + blockW &&
+         ball.y > blockY && ball.y < blockY + blockH)
+      {
+        b.visible = false; // Romper bloque
+
+        // Decidir si soltar mejora
+        const dropChance = powerUpDropChance[b.type] || 0; // Obtener probabilidad o 0 si no está definida
+        if (Math.random() < dropChance) {
+            spawnPowerUp(blockX + blockW / 2, blockY + blockH / 2);
+        }
+
+        // Rebote simple (invertir VY). Una mejor física consideraría el lado del impacto.
+        ball.vy = -ball.vy;
+
+        if(levelCleared()) {
+            nextLevel();
+        }
+        return; // Salir después de la primera colisión detectada
       }
     }
   }
 }
-function levelCleared(){
-  return blocks.every(row=>row.every(b=>!b.visible));
+
+/*==================== LÓGICA DE MEJORAS ====================*/
+
+// Crear una nueva mejora en la posición del bloque roto
+function spawnPowerUp(x, y) {
+    const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+    activePowerUps.push({
+        x: x - powerUpSize.w / 2, // Centrar la mejora
+        y: y,
+        type: type
+    });
 }
+
+// Aplicar el efecto de la mejora recogida
+function applyPowerUp(type) {
+    switch (type) {
+        case 'MULTIBALL':
+            // Duplicar una bola existente (la primera encontrada)
+            if (balls.length > 0) {
+                 const originalBall = balls[0]; // Duplicar la primera bola
+                 // Añadir nueva bola con ligera variación de velocidad/posición
+                 balls.push({
+                    x: originalBall.x + (Math.random() - 0.5) * 10, // Pequeño offset
+                    y: originalBall.y,
+                    vx: -originalBall.vx + (Math.random() - 0.5) * 1, // Dirección opuesta +- aleatorio
+                    vy: originalBall.vy + (Math.random() - 0.5) * 1, // Misma Vy +- aleatorio
+                    stuck: false
+                 });
+            }
+            break;
+        case 'SPEED':
+            // Aumentar velocidad de todas las bolas (con límite)
+            balls.forEach(ball => {
+                ball.vx *= 1.2;
+                ball.vy *= 1.2;
+                // Limitar velocidad máxima
+                const maxSpeed = BASE_VX * 2.5;
+                ball.vx = Math.max(-maxSpeed, Math.min(maxSpeed, ball.vx));
+                ball.vy = Math.max(-maxSpeed, Math.min(maxSpeed, ball.vy));
+                 // Asegurar velocidad mínima para evitar paradas
+                 if(Math.abs(ball.vx) < BASE_VX * 0.5) ball.vx = BASE_VX * 0.5 * Math.sign(ball.vx || 1);
+                 if(Math.abs(ball.vy) < BASE_VY * 0.5) ball.vy = BASE_VY * 0.5 * Math.sign(ball.vy || -1);
+            });
+            break;
+        case 'STICKY':
+            paddleSticky = true;
+            // Resetear cualquier bola que estuviera 'stuck' por error (no debería pasar)
+            balls.forEach(b => b.stuck = false);
+            break;
+        case 'LARGE':
+            paddleW = BASE_PADDLE_W * 1.5;
+            paddleX = Math.max(0, Math.min(canvas.width - paddleW, paddleX)); // Ajustar si se sale
+            paddleSticky = false; // Quitar sticky al cambiar tamaño
+            break;
+        case 'SMALL':
+            paddleW = BASE_PADDLE_W * 0.75;
+            paddleSticky = false; // Quitar sticky al cambiar tamaño
+            break;
+    }
+}
+
+/*==================== ESTADO DEL JUEGO ====================*/
+
+function levelCleared(){
+  // Comprobar si todos los bloques visibles son 0 (invisibles)
+  return blocks.every(row => row.every(b => !b.visible));
+}
+
 function nextLevel(){
   currentLevel++;
   if(currentLevel < levelData.length){
@@ -230,14 +506,17 @@ function nextLevel(){
     restartBtn.style.display="block";
   }
 }
+
 function loseLife(){
   lives--;
-  if(lives===0){
+  if(lives === 0){
     gameOver=true;
     restartBtn.style.display="block";
+  } else {
+      // Si quedan vidas, resetear bola(s), paleta y estado
+      resetBallAndPaddle();
+      gameStarted = false;
   }
-  resetBallAndPaddle();
-  gameStarted=false;
 }
 
 /*==================== BUCLE PRINCIPAL ====================*/
@@ -245,25 +524,39 @@ function gameLoop(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.shadowColor="#00FF00"; ctx.shadowBlur=10; ctx.shadowOffsetX=ctx.shadowOffsetY=0;
 
-  drawPaddle(); drawBall(); drawBlocks(); drawLives();
+  drawPaddle();
+  drawBalls(); // Dibujar todas las bolas
+  drawBlocks();
+  drawLives();
+  drawPowerUps(); // Dibujar mejoras
 
   if(!gameOver && !gameFinished){
     if(gameStarted){
-      ballX+=ballVX; ballY+=ballVY;
-      paddleCollision(); wallCollision(); blockCollision();
+      updateBalls(); // Mover y comprobar colisiones de todas las bolas
+      updatePowerUps(); // Mover y comprobar colisiones de las mejoras
     }
     requestAnimationFrame(gameLoop);
   }else{
-    drawEnd(gameFinished ? "¡Juego terminado!" : "Game Over");
+    drawEnd(gameFinished ? "¡Juego terminado!" : "Game Over");
+    ctx.shadowBlur=0; // Quitar sombra para el texto final
   }
 }
 
 /*==================== ¡ARRANQUE! ====================*/
 initGame();
 
-/*===== CÓMO AÑADIR MÁS MAPAS =========================
-   - Crea otra matriz (misma sintaxis) y añádela a levelData.
-   - Aumenta blockColors si necesitas más colores.          */
+/*===== NOTAS ADICIONALES =========================
+   - Se ha añadido soporte para múltiples bolas (array `balls`).
+   - Se ha añadido el sistema de mejoras (power-ups) que caen de bloques.
+   - La probabilidad de caída depende del `type` del bloque.
+   - Se han implementado 5 tipos de mejoras: MULTIBALL, SPEED, STICKY, LARGE, SMALL.
+   - La lógica de colisiones y movimiento se ha adaptado para múltiples bolas.
+   - Se pierde una vida solo cuando la *última* bola sale por abajo.
+   - La paleta STICKY ahora retiene las bolas hasta el clic.
+   - LARGE/SMALL modifican el ancho de la paleta.
+   - SPEED acelera las bolas existentes.
+   - Reiniciar el juego o perder una vida resetea las mejoras activas y el estado de la paleta/bolas.
+*/
 </script>
 </body>
 </html>
