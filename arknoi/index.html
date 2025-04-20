@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Arkanoid – mapas por matriz con Mejoras (touch + colisiones)</title>
+<style>
+/*------------ CENTRAR EL LIENZO EN PANTALLA ------------*/
+html,body{
+  height:100%; margin:0;
+  display:flex; justify-content:center; align-items:center;
+  background:#000;
+  overscroll-behavior:none; /* Evita rebotes en móvil */
+}
+/*------------ CANVAS Y BOTÓN REINICIO ------------*/
+#gameCanvas{
+  border:3px solid #00FF00;
+  background:#000;
+  box-shadow:0 0 15px #00FF00;
+  width:100vw;           /* Pantalla completa en móvil */
+  height:100vh;
+  touch-action:none;     /* Deshabilita scroll al arrastrar */
+}
+#restartBtn{
+  position:absolute; top:20px; left:50%; transform:translateX(-50%);
+  padding:8px 18px; font-size:18px; font-family:sans-serif;
+  border:2px solid #00FF00; background:#000; color:#00FF00;
+  cursor:pointer; display:none;
+}
+</style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="1000" height="600"></canvas>
+  <button id="restartBtn">Reiniciar</button>
+
+<script>
+/*==================== CONSTANTES GLOBALES ====================*/
+const canvas = document.getElementById("gameCanvas");
+const ctx    = canvas.getContext("2d");
+const restartBtn = document.getElementById("restartBtn");
+
+/* Paleta */
+const BASE_PADDLE_W = 100, paddleH = 10, paddleY = canvas.height - 20;
+let paddleW = BASE_PADDLE_W;
+let paddleX = canvas.width/2 - paddleW/2;
+let paddleSticky = false; // Para la mejora STICKY
+
+/* Bola(s) */
+const BASE_VX = 4, BASE_VY = -4, ballR = 10;
+let balls = []; // Ahora es un array para soportar multiball
+
+/* Vidas y estado */
+const MAX_LIVES = 3;
+let lives, gameStarted, gameOver, gameFinished;
+
+/* Colores */
+const blockColors = [
+  "#00FF00", // 1 - Verde
+  "#FFA500", // 2 - Naranja
+  "#FFFF00", // 3 - Amarillo
+  "#FF1493", // 4 - Rosa Fuerte
+  "#1E90FF", // 5 - Azul Dodger
+  "#FF69B4"  // 6 - Rosa Caliente
+];
+
+/*==================== MEJORAS (Power-ups) ====================*/
+const powerUpTypes = ['MULTIBALL', 'SPEED', 'STICKY', 'LARGE', 'SMALL'];
+const powerUpColors = {
+    'MULTIBALL': '#FFFFFF',
+    'SPEED':     '#FF0000',
+    'STICKY':    '#00FFFF',
+    'LARGE':     '#FFFF00',
+    'SMALL':     '#800080'
+};
+const powerUpSize = { w: 40, h: 15 };
+const powerUpSpeed = 2;
+let activePowerUps = [];
+
+/* Probabilidades de soltar mejora por tipo de bloque */
+const powerUpDropChance = {1:0.10,2:0.15,3:0.20,4:0.25,5:0.30,6:0.35};
+
+/*==================== MAPAS ====================*/
+const levelData = [
+  [
+    [1,2,3,1,2,3,4,4,4],
+    [1,1,1,1,2,2,2,2,2],
+    [1,2,3,0,5,0,4,4,4],
+    [2,2,0,0,6,0,0,2,2]
+  ],
+  [
+    [4,3,2,1,0,1,2,3,4],
+    [0,4,3,2,5,5,2,3,4],
+    [0,0,4,3,6,6,3,4,0],
+    [0,0,0,4,3,3,4,0,0]
+  ],
+  [
+    [1,0,2,0,3,0,4,0,1],
+    [0,5,0,6,0,5,0,6,0],
+    [1,0,2,0,3,0,4,0,1],
+    [0,5,0,6,0,5,0,6,0]
+  ]
+];
+
+/*------------ Variables dependientes del nivel ------------*/
+let blocks = [];
+let rows = 0, cols = 0;
+let offsetLeft = 0;
+const blockW = 70, blockH = 20, pad = 10, offsetTop = 40;
+
+/*==================== INICIALIZACIÓN ====================*/
+let currentLevel = 0;
+function initGame(){
+  lives = MAX_LIVES;
+  gameStarted = false; gameOver = false; gameFinished = false;
+  restartBtn.style.display = "none";
+  currentLevel = 0;
+  activePowerUps = [];
+  buildLevel();
+  resetBallAndPaddle();
+  gameLoop();
+}
+
+/* Construye blocks[] a partir de levelData[currentLevel] */
+function buildLevel(){
+  const layout = levelData[currentLevel];
+  rows = layout.length;
+  cols = layout[0].length;
+  const innerW = cols*(blockW+pad) - pad;
+  offsetLeft = (canvas.width - innerW)/2;
+
+  blocks = [];
+  for(let r=0;r<rows;r++){
+    blocks[r] = [];
+    for(let c=0;c<cols;c++){
+      const type = layout[r][c];
+      blocks[r][c] = { visible: type !== 0, type };
+    }
+  }
+}
+
+function resetBallAndPaddle(){
+  paddleX = canvas.width/2 - BASE_PADDLE_W/2;
+  paddleW = BASE_PADDLE_W;
+  paddleSticky = false;
+  balls = [{x:canvas.width/2,y:canvas.height/2,vx:0,vy:0,stuck:false}];
+  activePowerUps = [];
+}
+
+/*==================== CONTROL DE ENTRADA ====================*/
+function handlePointerMove(clientX){
+  const rect = canvas.getBoundingClientRect();
+  const posX = clientX - rect.left;
+  paddleX = Math.max(0, Math.min(canvas.width - paddleW, posX - paddleW/2));
+  if(paddleSticky){
+    balls.forEach(ball=>{ if(ball.stuck){ ball.x = paddleX + paddleW/2; }});
+  }
+}
+
+canvas.addEventListener("mousemove", e => {
+  if(gameOver||gameFinished) return;
+  handlePointerMove(e.clientX);
+});
+
+/*------ SOPORTE TÁCTIL ------*/
+let touchOffset = 0;
+canvas.addEventListener("touchstart", e => {
+  if(gameOver||gameFinished) return;
+  const rect = canvas.getBoundingClientRect();
+  const touchX = e.touches[0].clientX - rect.left;
+  touchOffset = touchX - paddleX;
+  e.preventDefault();
+});
+canvas.addEventListener("touchmove", e => {
+  if(gameOver||gameFinished) return;
+  const rect = canvas.getBoundingClientRect();
+  const touchX = e.touches[0].clientX - rect.left;
+  handlePointerMove(touchX - touchOffset + paddleW/2);
+  e.preventDefault();
+});
+canvas.addEventListener("touchend", e => { startBall(); });
+
+canvas.addEventListener("click", startBall);
+restartBtn.addEventListener("click", initGame);
+document.addEventListener("keydown", e=>{
+  if(e.key==="r" && (gameOver||gameFinished)) initGame();
+});
+
+function startBall(){
+  if (paddleSticky) {
+    let released = false;
+    balls.forEach(ball => {
+      if (ball.stuck) {
+        ball.stuck = false;
+        ball.vy = BASE_VY;
+        const center = paddleX + paddleW / 2;
+        const diff = ball.x - center;
+        ball.vx = diff * 0.1;
+        if (Math.abs(ball.vx) < 0.5) ball.vx = (Math.random()<0.5?-1:1)*BASE_VX*0.5;
+        released = true;
+      }
+    });
+    if(released){ gameStarted=true; return; }
+  }
+  if(!gameStarted){
+    gameStarted=true;
+    if(balls.length>0){
+      balls[0].vx = (Math.random()<0.5?-1:1)*BASE_VX;
+      balls[0].vy = BASE_VY;
+      balls[0].stuck=false;
+    }
+  }
+}
+
+/*==================== DIBUJO ====================*/
+function drawPaddle(){
+  ctx.beginPath();
+  ctx.rect(paddleX, paddleY, paddleW, paddleH);
+  ctx.fillStyle = paddleSticky ? "#00FFFF" : "#00FF00";
+  ctx.fill(); ctx.closePath();
+}
+
+function drawBalls(){
+  balls.forEach(ball=>{
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ballR, 0, Math.PI*2);
+    ctx.fillStyle="#00FFFF";
+    ctx.fill(); ctx.closePath();
+  });
+}
+
+function drawBlocks(){
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const b = blocks[r][c];
+      if(!b.visible) continue;
+      const x = offsetLeft + c*(blockW+pad);
+      const y = offsetTop  + r*(blockH+pad);
+      ctx.beginPath();
+      ctx.rect(x,y,blockW,blockH);
+      ctx.fillStyle = blockColors[(b.type-1)%blockColors.length];
+      ctx.fill(); ctx.closePath();
+    }
+  }
+}
+
+function drawLives(){
+  ctx.font="20px Arial"; ctx.fillStyle="#00FF00";
+  for(let i=0;i<lives;i++) ctx.fillText("❤️", canvas.width-30*(i+1), 25);
+}
+
+function drawEnd(text){
+  ctx.font="48px sans-serif"; ctx.fillStyle="#00FF00";
+  ctx.textAlign="center";
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+  ctx.lineWidth=2; ctx.strokeStyle="#00FF00";
+  ctx.strokeText(text, canvas.width/2, canvas.height/2);
+}
+
+function drawPowerUps(){
+  ctx.font="12px Arial"; ctx.textAlign="center";
+  activePowerUps.forEach(p=>{
+    ctx.beginPath();
+    ctx.rect(p.x, p.y, powerUpSize.w, powerUpSize.h);
+    ctx.fillStyle = powerUpColors[p.type] || '#FFFFFF';
+    ctx.fill();
+    ctx.fillStyle="#000";
+    let text=p.type.substring(0,1);
+    if(p.type==='MULTIBALL') text='x2';
+    if(p.type==='SPEED')    text='SPD';
+    if(p.type==='STICKY')   text='STK';
+    if(p.type==='LARGE')    text='LRG';
+    if(p.type==='SMALL')    text='SML';
+    ctx.fillText(text, p.x + powerUpSize.w/2, p.y + powerUpSize.h/1.5);
+    ctx.closePath();
+  });
+  ctx.textAlign="start";
+}
+
+/*==================== LÓGICA DE ACTUALIZACIÓN ====================*/
+function updateBalls(){
+  balls.forEach((ball,index)=>{
+    if(ball.stuck) return;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    paddleCollision(ball);
+    wallCollision(ball,index);
+    blockCollision(ball);
+  });
+  balls = balls.filter(b=>b!==null);
+  if(balls.length===0 && gameStarted && !gameOver && !gameFinished) loseLife();
+}
+
+function updatePowerUps(){
+  for(let i=activePowerUps.length-1;i>=0;i--){
+    const p = activePowerUps[i];
+    p.y += powerUpSpeed;
+    if(p.y>canvas.height){ activePowerUps.splice(i,1); continue; }
+    if(p.y+powerUpSize.h >= paddleY && p.y <= paddleY+paddleH && p.x+powerUpSize.w>=paddleX && p.x<=paddleX+paddleW){
+      applyPowerUp(p.type);
+      activePowerUps.splice(i,1);
+    }
+  }
+}
+
+/*==================== COLISIONES ====================*/
+function paddleCollision(ball){
+  if(ball.vy>0 && ball.y+ballR>=paddleY && ball.y-ballR<=paddleY+paddleH && ball.x+ballR>=paddleX && ball.x-ballR<=paddleX+paddleW){
+    if(paddleSticky){
+      ball.stuck=true; ball.y=paddleY-ballR; ball.vx=0; ball.vy=0;
+    }else{
+      const center=paddleX+paddleW/2; const diff=ball.x-center;
+      ball.vy=-Math.abs(ball.vy);
+      ball.vx=diff*0.1;
+      ball.vx=Math.max(-BASE_VX*1.5, Math.min(BASE_VX*1.5, ball.vx));
+      if(Math.abs(ball.vy)<Math.abs(BASE_VY*0.8)) ball.vy=BASE_VY*(ball.vy>0?1:-1);
+    }
+  }
+}
+
+function wallCollision(ball,index){
+  if(ball.x-ballR<=0 || ball.x+ballR>=canvas.width){ ball.vx=-ball.vx; ball.x=ball.x-ballR<=0?ballR:canvas.width-ballR; }
+  if(ball.y-ballR<=0){ ball.vy=-ball.vy; ball.y=ballR; }
+  if(ball.y+ballR>=canvas.height){ balls[index]=null; }
+}
+
+/*----- NUEVA COLISIÓN CON BLOQUES (rada completa) -----*/
+function blockCollision(ball){
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const b = blocks[r][c];
+      if(!b.visible) continue;
+      const blockX = offsetLeft + c*(blockW+pad);
+      const blockY = offsetTop  + r*(blockH+pad);
+      // Comprobación AABB vs círculo simplificada
+      if(ball.x + ballR > blockX && ball.x - ballR < blockX + blockW && ball.y + ballR > blockY && ball.y - ballR < blockY + blockH){
+        // Determinar lado de impacto
+        const diffX = ball.x - (blockX + blockW/2);
+        const diffY = ball.y - (blockY + blockH/2);
+        if(Math.abs(diffX) > Math.abs(diffY)) ball.vx = -ball.vx; else ball.vy = -ball.vy;
+
+        b.visible=false;
+        const dropChance = powerUpDropChance[b.type] || 0;
+        if(Math.random()<dropChance) spawnPowerUp(blockX+blockW/2, blockY+blockH/2);
+        if(levelCleared()) nextLevel();
+        return;
+      }
+    }
+  }
+}
+
+/*==================== LÓGICA DE MEJORAS ====================*/
+function spawnPowerUp(x,y){
+  const type = powerUpTypes[Math.floor(Math.random()*powerUpTypes.length)];
+  activePowerUps.push({x:x-powerUpSize.w/2,y,type});
+}
+function applyPowerUp(type){
+  switch(type){
+    case 'MULTIBALL':
+      if(balls.length>0){
+        const original=balls[0];
+        balls.push({x:original.x+ (Math.random()-0.5)*10, y:original.y, vx:-original.vx+(Math.random()-0.5), vy:original.vy+(Math.random()-0.5), stuck:false});
+      }
+      break;
+    case 'SPEED':
+      balls.forEach(ball=>{ ball.vx*=1.2; ball.vy*=1.2; const max=BASE_VX*2.5; ball.vx=Math.max(-max,Math.min(max,ball.vx)); ball.vy=Math.max(-max,Math.min(max,ball.vy)); if(Math.abs(ball.vx)<BASE_VX*0.5) ball.vx=BASE_VX*0.5*Math.sign(ball.vx||1); if(Math.abs(ball.vy)<BASE_VY*0.5) ball.vy=BASE_VY*0.5*Math.sign(ball.vy||-1); });
+      break;
+    case 'STICKY':
+      paddleSticky=true; balls.forEach(b=>b.stuck=false); break;
+    case 'LARGE':
+      paddleW=BASE_PADDLE_W*1.5; paddleX=Math.max(0,Math.min(canvas.width-paddleW,paddleX)); paddleSticky=false; break;
+    case 'SMALL':
+      paddleW=BASE_PADDLE_W*0.75; paddleSticky=false; break;
+  }
+}
+
+/*==================== ESTADO DEL JUEGO ====================*/
+function levelCleared(){ return blocks.every(row=>row.every(b=>!b.visible)); }
+function nextLevel(){ currentLevel++; if(currentLevel<levelData.length){ buildLevel(); resetBallAndPaddle(); gameStarted=false; } else { gameFinished=true; restartBtn.style.display="block"; } }
+function loseLife(){ lives--; if(lives===0){ gameOver=true; restartBtn.style.display="block"; } else { resetBallAndPaddle(); gameStarted=false; } }
+
+/*==================== BUCLE PRINCIPAL ====================*/
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.shadowColor="#00FF00"; ctx.shadowBlur=10; ctx.shadowOffsetX=ctx.shadowOffsetY=0;
+  drawPaddle(); drawBalls(); drawBlocks(); drawLives(); drawPowerUps();
+  if(!gameOver && !gameFinished){
+    if(gameStarted){ updateBalls(); updatePowerUps(); }
+    requestAnimationFrame(gameLoop);
+  }else{
+    drawEnd(gameFinished?"¡Juego terminado!":"Game Over");
+    ctx.shadowBlur=0;
+  }
+}
+
+/*==================== AJUSTE AL REDIMENSIONAR ====================*/
+function resizeCanvas(){
+  // Mantener tamaño interno fijo, solo escala visual por CSS
+  // Si se quisiera adaptar la lógica, habría que recalcular muchos offsets
+}
+window.addEventListener('resize', resizeCanvas);
+
+/*==================== ¡ARRANQUE! ====================*/
+initGame();
+</script>
+</body>
+</html>
