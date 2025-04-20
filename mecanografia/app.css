@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
     background: linear-gradient(to left, #929292 0%, #bbbbbb 100%);
 }
 .container {
@@ -130,6 +132,7 @@ textarea {
 #timeArea{
     position: relative;    
     margin: 0 20px;
+    color: #888;
 }
 .logo {
     width: 50px; 
