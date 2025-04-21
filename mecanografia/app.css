@@ -245,11 +245,11 @@ textarea {
 }
 .dark-mode #displayArea  {
     background-color: #666;
-    color: #460000 ;
+    color: #111 ;
 }
 .dark-mode #displayArea2  {
     background-color: white;
-    color: #460000 ;
+    color: #111 ;
 }
 .dark-mode #scoreArea  {
     color: #460000 ;
