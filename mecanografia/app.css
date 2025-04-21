@@ -209,7 +209,7 @@ textarea {
 }
 .dark-mode body {
     background: black;
-    color: #fff;
+    color: #666;
 }
 
 .dark-mode .footer {
@@ -223,16 +223,16 @@ textarea {
 }
 .dark-mode h1 {
 
-    color:  #020d19;
+    color:  #460000;
 }
 .dark-mode h4 {
 
-    color:  #555;
+    color:  #666;
 }
 .dark-mode button {
 
     background-color: black;
-    color:#555;
+    color:#666;
 }
 .dark-mode button:hover {
 
@@ -244,13 +244,13 @@ textarea {
     background-color: #A0A7AC;
 }
 .dark-mode #displayArea  {
-    background-color: #555;
-    color: #020d19 ;
+    background-color: #666;
+    color: #460000 ;
 }
 .dark-mode #displayArea2  {
     background-color: white;
-    color: #020d19 ;
+    color: #460000 ;
 }
 .dark-mode #scoreArea  {
-    color: #020d19 ;
+    color: #460000 ;
 }
