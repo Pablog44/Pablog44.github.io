@@ -225,9 +225,14 @@ textarea {
 
     color:  #020d19;
 }
+.dark-mode h4 {
+
+    color:  #555;
+}
 .dark-mode button {
 
     background-color: black;
+    color:#555;
 }
 .dark-mode button:hover {
 
