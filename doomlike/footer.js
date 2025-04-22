@@ -127,9 +127,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Vertical: arriba = "w", abajo = "s"
   // Horizontal: izquierda y derecha se mantienen "ArrowLeft" y "ArrowRight"
   addButtonEvents(btnUp,    "w");
-  addButtonEvents(btnLeft,  "q");
+  addButtonEvents(btnLeft,  "a");
   addButtonEvents(btnDown,  "s");
-  addButtonEvents(btnRight, "e");
+  addButtonEvents(btnRight, "d");
 
   // Disparo al pulsar el botón
   shootBtn.addEventListener("touchstart", function(e) {
