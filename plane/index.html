@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Vuelo 3D Extendido - Three.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="container"></div>
+    <div id="ui">
+        <div id="score">Anillos: 0</div>
+        <div id="altitude">Altitud: 0 m</div>
+        <div id="speed">Velocidad: 0</div>
+        <div id="throttle-display">Throttle: 30%</div> <!-- Nuevo display de Throttle -->
+        <div id="instructions">
+            Gamepad: Stick Der(X/Y): Roll/Pitch | LT/RT: Freno/Acelerar | B: Reset<br>
+            Teclado: W/S: Pitch | A/D: Roll | Shift/Ctrl: Acelerar/Freno | R: Reset
+        </div>
+        <div id="gamepad-status">Gamepad: No detectado</div>
+        <div id="crash-message" style="display: none; color: red; font-weight: bold;">¡CRASH! Presiona Reset (R / B)</div>
+    </div>
+
+    <!-- Three.js CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Tu script principal -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
