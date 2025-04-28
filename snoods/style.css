@@ -1,0 +1,81 @@
+body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Usar min-height para permitir scroll si el contenido es más grande */
+    background-color: #f0f0f0;
+    margin: 0;
+    font-family: sans-serif;
+    overflow: hidden; /* Evitar barras de scroll innecesarias */
+}
+
+canvas {
+    border: 2px solid #333;
+    background-color: #e0e0ff;
+    display: block;
+    max-width: 100%; /* Hacer el canvas responsive */
+    /* Ajustar altura automáticamente o dejarla fija */
+     height: auto; /* O mantener height="700" en el HTML y ajustar aquí */
+}
+
+h1, p {
+    text-align: center;
+    color: #333;
+}
+
+#score {
+    font-weight: bold;
+}
+
+/* --- Estilos Controles Móvil --- */
+#mobile-controls {
+    display: none; /* Oculto por defecto */
+    width: 90%;
+    max-width: 400px; /* Limitar ancho máximo */
+    justify-content: space-around; /* Espaciar botones */
+    align-items: center;
+    margin-top: 15px; /* Espacio sobre los botones */
+    padding: 10px 0;
+    background-color: rgba(100, 100, 100, 0.5); /* Fondo semitransparente */
+    border-radius: 10px;
+    position: fixed; /* Fijar en la parte inferior */
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%); /* Centrar horizontalmente */
+    z-index: 10; /* Asegurar que esté por encima del canvas si hay solapamiento */
+}
+
+#mobile-controls button {
+    padding: 15px 20px;
+    font-size: 1.5em; /* Tamaño de fuente más grande */
+    border: 1px solid #555;
+    background-color: #eee;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none; /* Evitar selección de texto al tocar */
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE */
+    touch-action: manipulation; /* Optimizar respuesta táctil */
+}
+
+#mobile-controls button:active {
+    background-color: #ccc; /* Feedback visual al presionar */
+}
+
+/* Media Query para mostrar controles en pantallas pequeñas (táctiles) */
+/* Puedes ajustar el max-width según necesites */
+/* Usar pointer:coarse es más específico para dispositivos táctiles */
+@media (hover: none) and (pointer: coarse), (max-width: 768px) {
+    #mobile-controls {
+        display: flex; /* Mostrar en pantallas pequeñas o táctiles */
+    }
+    /* Opcional: Ocultar la línea de mira del ratón en táctil */
+    /* body.touch-device #gameCanvas { cursor: none; } */
+}
+
+/* Ajuste para que el canvas no quede debajo de los controles fijos */
+body {
+    padding-bottom: 80px; /* Añadir espacio en la parte inferior si los controles son fijos */
+}
