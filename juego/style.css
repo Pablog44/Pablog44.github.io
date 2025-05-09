@@ -2,8 +2,8 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1a1a2e; /* Dark blueish background */
-    color: #e0e0fc;
+    background-color: #181828; /* Darker blue/purple */
+    color: #e8e8ff;
 }
 
 #game-container {
@@ -25,19 +25,19 @@ canvas {
     width: 100%;
     height: 100%;
     pointer-events: none;
-    color: #e0e0fc;
-    text-shadow: 1px 1px 2px #0f0c29;
+    color: #e8e8ff;
+    text-shadow: 1px 1px 2px #0a0a14;
 }
 
 .player-info {
     position: absolute;
     top: 10px;
-    background-color: rgba(15, 12, 41, 0.8); /* Darker UI panel */
-    padding: 12px;
+    background-color: rgba(10, 10, 20, 0.85); /* Very dark blue */
+    padding: 12px 15px;
     border-radius: 8px;
-    border: 1px solid #4a4579; /* Purpleish border */
+    border: 1px solid #3a3a5a; /* Dark purple/blue border */
     font-size: 0.9em;
-    min-width: 200px;
+    min-width: 220px;
 }
 
 .player-info.left { left: 15px; }
@@ -45,38 +45,54 @@ canvas {
 
 .player-info h3 {
     margin-top: 0;
-    color: #9fa8da; /* Lighter purple for headers */
+    color: #a8a8ff; /* Light lavender for headers */
+}
+.player-info div { margin-bottom: 4px;}
+
+#p1-selected-unit-info, #p2-selected-unit-info {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #3a3a5a;
+    font-style: italic;
+    min-height: 40px; /* Space for 2-3 lines */
 }
 
 #turn-info {
     position: absolute;
-    bottom: 20px;
+    bottom: 15px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(15, 12, 41, 0.9);
-    padding: 15px;
+    background-color: rgba(10, 10, 20, 0.9);
+    padding: 15px 20px;
     border-radius: 10px;
-    border: 1px solid #4a4579;
+    border: 1px solid #3a3a5a;
     text-align: center;
     pointer-events: auto;
-    min-width: 300px;
+    min-width: 350px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
 }
 
-#turn-info h2 { color: #fbc02d; } /* Yellow for current player */
-#dice-roll-result { font-weight: bold; margin-top: 10px; min-height: 1.2em; }
+#turn-info h2 { color: #ffd700; } /* Gold for current player */
+#current-action-message { min-height: 1.2em; margin-bottom: 8px;}
+#dice-roll-result { font-weight: bold; margin-top: 10px; min-height: 1.5em; color: #ffeb3b; }
 
-#end-turn-button {
-    background-color: #d32f2f; /* Red */
+#end-turn-button, #end-unit-action-button {
+    background-color: #c62828; /* Darker Red */
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 10px 18px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 1em;
-    margin-top: 10px;
+    margin: 10px 5px 0 5px;
     transition: background-color 0.2s;
 }
-#end-turn-button:hover { background-color: #b71c1c; }
+#end-turn-button:hover, #end-unit-action-button:hover { background-color: #a31515; }
+
+#end-unit-action-button {
+    background-color: #28a745; /* Green */
+}
+#end-unit-action-button:hover { background-color: #1e7e34; }
 
 
 #message-overlay {
@@ -85,7 +101,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.9);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -95,38 +111,37 @@ canvas {
     z-index: 10;
 }
 
-#message-overlay h1 { font-size: 3.5em; margin-bottom: 25px; color: #7e57c2; } /* Deep purple */
+#message-overlay h1 { font-size: 3.8em; margin-bottom: 25px; color: #8e44ad; } /* Purple */
 #message-overlay button {
-    padding: 15px 30px;
-    font-size: 1.5em;
+    padding: 16px 32px;
+    font-size: 1.6em;
     cursor: pointer;
     margin-bottom: 20px;
-    background-color: #5e35b1; /* Purple button */
+    background-color: #7b1fa2; /* Darker Purple button */
     color: white;
     border: none;
     border-radius: 5px;
     transition: background-color 0.2s;
 }
-#message-overlay button:hover { background-color: #4527a0; }
+#message-overlay button:hover { background-color: #5a0f80; }
 
 #game-container::after { /* Split line */
     content: '';
     position: absolute;
     top: 0;
     left: 50%;
-    width: 2px;
+    width: 3px;
     height: 100%;
-    background-color: rgba(159, 168, 218, 0.4); /* Lighter purpleish line */
-    transform: translateX(-1px);
+    background-color: rgba(168, 168, 255, 0.3); /* Lighter lavender line */
+    transform: translateX(-1.5px);
     z-index: 5;
     pointer-events: none;
 }
 
-/* Highlighting specific units */
 .player-info.active-player {
-    box-shadow: 0 0 15px #fbc02d; /* Yellow glow for active player */
-    border-color: #fbc02d;
+    box-shadow: 0 0 20px #ffd700; /* Gold glow */
+    border-color: #ffd700;
 }
 .player-info.active-player h3 {
-    color: #fbc02d;
+    color: #ffd700;
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tactics3D SplitScreen</title>
+    <title>Tactics3D - Grid Style</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,12 +17,14 @@
             <div id="p1-status">Selecciona una unidad</div>
             <div>Unidades restantes: <span id="p1-units-left">15</span></div>
             <div>Activaciones este turno: <span id="p1-actions-left">3</span></div>
+            <div id="p1-selected-unit-info">Unidad: -</div>
         </div>
         <div id="player2-info" class="player-info right">
              <h3>Jugador 2</h3>
              <div id="p2-status">Esperando turno...</div>
              <div>Unidades restantes: <span id="p2-units-left">15</span></div>
              <div>Activaciones este turno: <span id="p2-actions-left">3</span></div>
+             <div id="p2-selected-unit-info">Unidad: -</div>
         </div>
 
         <div id="turn-info">
@@ -30,10 +32,11 @@
             <p id="current-action-message">Selecciona una unidad para activar.</p>
             <p id="dice-roll-result"></p>
             <button id="end-turn-button">Terminar Turno</button>
+            <button id="end-unit-action-button" style="display:none;">Finalizar Acción de Unidad</button>
         </div>
 
          <div id="message-overlay">
-            <h1 id="message-text">Tactics3D</h1>
+            <h1 id="message-text">Tactics3D Grid</h1>
             <button id="start-button">Iniciar Juego</button>
              <p>(P1: Pantalla Izquierda | P2: Pantalla Derecha)</p>
              <p>Click para seleccionar/mover/atacar.</p>
