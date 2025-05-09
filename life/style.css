@@ -1,2 +1,16 @@
-body { margin: 0; overflow: hidden; background-color: #222; } /* Dark background for smoke */
-canvas { display: block; }
+body {
+    margin: 0;
+    overflow: hidden; /* Evita scrollbars si el canvas es más grande */
+    background-color: #1a1a2e; /* Fondo oscuro para que el humo resalte */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+canvas {
+    display: block;
+    /* Podrías añadir un borde sutil si quieres verlo claramente
+    border: 1px solid #555;
+    */
+}
