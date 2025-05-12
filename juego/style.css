@@ -41,7 +41,7 @@ canvas {
 }
 
 .player-info.left { left: 15px; }
-.player-info.right { right: 15px; }
+.player-info.right { right: 15px; } /* Kept on the right, no longer tied to screen half */
 
 .player-info h3 {
     margin-top: 0;
@@ -124,18 +124,12 @@ canvas {
     transition: background-color 0.2s;
 }
 #message-overlay button:hover { background-color: #5a0f80; }
+#message-overlay p { font-size: 0.9em; color: #cccccc; margin-top: 5px; }
 
-#game-container::after { /* Split line */
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 3px;
-    height: 100%;
-    background-color: rgba(168, 168, 255, 0.3); /* Lighter lavender line */
-    transform: translateX(-1.5px);
-    z-index: 5;
-    pointer-events: none;
+
+/* Remove the split line if it was previously defined */
+#game-container::after {
+    display: none; 
 }
 
 .player-info.active-player {
