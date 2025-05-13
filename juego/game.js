@@ -309,7 +309,7 @@ function createUnit(playerIdx, type, gridPos, id) {
     if (stats.geom === 'cylinder') {
         geometry = new THREE.CylinderGeometry(unitWidth / 2, unitWidth / 2, unitHeight, 16);
     } else {
-        geometry = new THREE.CapsuleGeometry(unitWidth / 2, unitHeight - unitWidth, 8, 16);
+        geometry = new THREE.CapsuleGeometry(unitWidth / 2, unitHeight - unitWidth, 12, 24, 20) ;
     }
     const textureKey = `unit_${type.toLowerCase()}_${player.texturePrefix}`;
     let unitMaterial = materials[textureKey];
