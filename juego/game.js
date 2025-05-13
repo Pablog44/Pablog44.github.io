@@ -16,8 +16,8 @@ const UNIT_TYPES = {
 
 const UNIT_STATS = {
     [UNIT_TYPES.ARCHER]:    { move: 4, attackRange: 7, attackDie: [1, 2], geom: 'cylinder', size: {r: 0.3, h: 1.0} },
-    [UNIT_TYPES.SWORDSMAN]: { move: 3, attackRange: 2, attackDie: [1, 4], geom: 'capsule',  size: {r: 0.35, h: 0.3} },
-    [UNIT_TYPES.HORSEMAN]:  { move: 7, attackRange: 3, attackDie: [1, 3], geom: 'capsule',  size: {r: 0.4, h: 0.4} }
+    [UNIT_TYPES.SWORDSMAN]: { move: 3, attackRange: 2, attackDie: [1, 4], geom: 'capsule',  size: {r: 0.35, h: 0.6} },
+    [UNIT_TYPES.HORSEMAN]:  { move: 7, attackRange: 3, attackDie: [1, 3], geom: 'capsule',  size: {r: 0.4, h: 0.8} }
 };
 const UNITS_PER_TYPE = 5;
 const MAX_UNIT_ACTIVATIONS_PER_TURN = 3;
