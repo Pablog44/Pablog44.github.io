@@ -365,6 +365,10 @@ function createUnit(playerIdx, type, gridPos, id) {
         usedGLB = true;
         mesh = gltfData.scene.clone();
 
+        // Rotar 180 grados a los modelos del equipo azul
+        if (player.texturePrefix === 'p2') {
+            mesh.rotation.y = Math.PI; // Gira el modelo 180 grados sobre el eje Y
+        }
         const modelScale = stats.modelScaleFactor || 1.0;
         mesh.scale.set(modelScale, modelScale, modelScale);
         
