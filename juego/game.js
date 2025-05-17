@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; // Import OrbitControls
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; // <--- AÑADIDO: Import GLTFLoader
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // --- Constants & Config ---
-const GRID_SIZE_X = 10; // Columns
-const GRID_SIZE_Z = 16; // Rows (depth)
+const GRID_SIZE_X = 10;
+const GRID_SIZE_Z = 16;
 const CELL_SIZE = 4;
+// UNIT_BASE_SCALE y UNIT_HEIGHT_SCALE ahora son menos relevantes si todos usan GLB,
+// pero se mantienen para el fallback a primitivas.
 const UNIT_BASE_SCALE = 0.6;
 const UNIT_HEIGHT_SCALE = 0.8;
 
@@ -16,9 +18,9 @@ const UNIT_TYPES = {
 };
 
 const UNIT_STATS = {
-    [UNIT_TYPES.ARCHER]:    { move: 4, attackRange: 7, attackDie: [1, 2], geom: 'cylinder', size: {r: 0.3, h: 1.0} },
-    [UNIT_TYPES.SWORDSMAN]: { move: 3, attackRange: 2, attackDie: [1, 4], geom: 'capsule',  size: {r: 0.35, h: 0.6}, modelScaleFactor: 2.0 /* <--- AÑADIDO: Ajusta esta escala para tu GLB */ },
-    [UNIT_TYPES.HORSEMAN]:  { move: 7, attackRange: 3, attackDie: [1, 3], geom: 'capsule',  size: {r: 0.4, h: 0.8} }
+    [UNIT_TYPES.ARCHER]:    { move: 4, attackRange: 7, attackDie: [1, 2], geom: 'cylinder', size: {r: 0.3, h: 1.0}, modelScaleFactor: 1.8 /* AJUSTA ESTO */ },
+    [UNIT_TYPES.SWORDSMAN]: { move: 3, attackRange: 2, attackDie: [1, 4], geom: 'capsule',  size: {r: 0.35, h: 0.6}, modelScaleFactor: 2.0 /* AJUSTA ESTO */ },
+    [UNIT_TYPES.HORSEMAN]:  { move: 7, attackRange: 3, attackDie: [1, 3], geom: 'capsule',  size: {r: 0.4, h: 0.8}, modelScaleFactor: 2.2 /* AJUSTA ESTO */ }
 };
 const UNITS_PER_TYPE = 5;
 const MAX_UNIT_ACTIVATIONS_PER_TURN = 3;
@@ -27,7 +29,7 @@ const TEXTURES = {
     floor_cell_p1: 'textures/floor_p1.png',
     floor_cell_p2: 'textures/floor_p2.png',
     unit_archer_p1: 'textures/archer_red.png',
-    unit_swordsman_p1: 'textures/swordsman_red.png', // Se usará si el GLB no carga o para P2
+    unit_swordsman_p1: 'textures/swordsman_red.png',
     unit_horseman_p1: 'textures/horseman_red.png',
     unit_archer_p2: 'textures/archer_blue.png',
     unit_swordsman_p2: 'textures/swordsman_blue.png',
@@ -36,10 +38,22 @@ const TEXTURES = {
     highlight_attack: 'textures/highlight_attack.png'
 };
 
-// --- AÑADIDO: Rutas a los modelos GLB ---
+// --- Rutas a los modelos GLB ---
+// Asegúrate de que estos archivos existen en tu carpeta 'models'
+// y que los nombres coincidan.
 const MODEL_PATHS = {
-    SWORDSMAN_P1: 'models/swordman_red.glb' // Asume que el archivo está en models/swordman_red.glb
-    // Puedes añadir más modelos aquí, ej: SWORDSMAN_P2: 'models/swordman_blue.glb'
+    [UNIT_TYPES.ARCHER]: {
+        p1: 'models/archer_red.glb',
+        p2: 'models/archer_blue.glb'
+    },
+    [UNIT_TYPES.SWORDSMAN]: {
+        p1: 'models/swordsman_red.glb',
+        p2: 'models/swordsman_blue.glb'
+    },
+    [UNIT_TYPES.HORSEMAN]: {
+        p1: 'models/horseman_red.glb',
+        p2: 'models/horseman_blue.glb'
+    }
 };
 
 const GAME_STATE = {
@@ -61,8 +75,8 @@ let grid = [];
 let floorCells = {};
 let materials = {};
 let textureLoader = new THREE.TextureLoader();
-let gltfLoader = new GLTFLoader(); // <--- AÑADIDO: Instancia de GLTFLoader
-let loadedModels = {}; // <--- AÑADIDO: Para almacenar modelos GLB cargados
+let gltfLoader = new GLTFLoader();
+let loadedModels = {}; // Almacenará modelos GLB cargados
 let clock = new THREE.Clock();
 
 let gameRunning = false;
@@ -148,7 +162,7 @@ function init() {
     const hemisphereLight = new THREE.HemisphereLight(0xaaaaee, 0x333355, 0.5);
     scene.add(hemisphereLight);
 
-    loadAssets(() => { // <--- MODIFICADO: Llamada a loadAssets
+    loadAssets(() => {
         createBoard();
         setupInitialUnits();
         ui.startButton.onclick = startGame;
@@ -185,12 +199,20 @@ function init() {
     });
 }
 
-// --- MODIFICADO: Renombrado de loadMaterials a loadAssets y añadido carga de modelos ---
 function loadAssets(callback) {
     let textureKeys = Object.keys(TEXTURES);
-    let modelKeys = Object.keys(MODEL_PATHS);
+    let modelsToLoad = [];
+
+    // Construir lista de modelos a cargar y sus claves
+    for (const unitType in MODEL_PATHS) {
+        for (const playerPrefix in MODEL_PATHS[unitType]) {
+            const modelKey = `${unitType.toUpperCase()}_${playerPrefix.toUpperCase()}`;
+            modelsToLoad.push({ key: modelKey, path: MODEL_PATHS[unitType][playerPrefix] });
+        }
+    }
+
     let assetsLoadedCount = 0;
-    const totalAssetsToLoad = textureKeys.length + modelKeys.length;
+    const totalAssetsToLoad = textureKeys.length + modelsToLoad.length;
 
     function checkAllAssetsLoaded() {
         if (assetsLoadedCount === totalAssetsToLoad) {
@@ -199,13 +221,13 @@ function loadAssets(callback) {
         }
     }
 
-    function assetLoadedLog(assetKey, type = "texture") { // Renombrado para evitar conflicto con variable local
+    function assetLoadedLog(assetKey, type = "texture") {
         console.log(`${type} loaded: ${assetKey}`);
         assetsLoadedCount++;
         checkAllAssetsLoaded();
     }
 
-    function assetErrorLog(url, assetKey, type = "texture") { // Renombrado
+    function assetErrorLog(url, assetKey, type = "texture") {
         console.warn(`Failed to load ${type}: ${url}. Using fallback for ${assetKey}.`);
         if (type === "texture") {
             let fallbackColor = 0x888888;
@@ -222,27 +244,20 @@ function loadAssets(callback) {
                 materials[assetKey] = new THREE.MeshStandardMaterial({ color: fallbackColor, metalness: 0.1, roughness: 0.9 });
             }
         } else if (type === "model") {
-            console.error(`Model ${assetKey} failed to load. Unit creation will use placeholder geometry.`);
+            console.error(`Model ${assetKey} (${url}) failed to load. Unit creation will use placeholder geometry for this type.`);
+            // No se almacena nada en loadedModels[assetKey] para que createUnit use el fallback.
         }
         assetsLoadedCount++;
         checkAllAssetsLoaded();
     }
 
-    if (totalAssetsToLoad === 0) {
-        console.warn("No assets (textures or models) defined. Using default colors/placeholders.");
-        materials.floor_cell_p1 = new THREE.MeshStandardMaterial({ color: players[0].color, metalness: 0.1, roughness: 0.9 });
-        materials.floor_cell_p2 = new THREE.MeshStandardMaterial({ color: players[1].color, metalness: 0.1, roughness: 0.9 });
-        Object.values(UNIT_TYPES).forEach(type => {
-            materials[`unit_${type.toLowerCase()}_p1`] = new THREE.MeshStandardMaterial({ color: players[0].color });
-            materials[`unit_${type.toLowerCase()}_p2`] = new THREE.MeshStandardMaterial({ color: players[1].color });
-        });
-        materials.highlight_move = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
-        materials.highlight_attack = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
-        materials.selected_unit_indicator = new THREE.MeshBasicMaterial({color: 0xf0e68c, transparent: true, opacity: 0.7, side: THREE.DoubleSide});
+    if (totalAssetsToLoad === 0 && !Object.keys(TEXTURES).includes('selected_unit_indicator')) { // Ajuste para asegurar que siempre haya al menos el indicador
+        console.warn("No assets (textures or models) defined beyond indicator. Using default colors/placeholders.");
+        // ... (código de fallback de materiales si es necesario, pero las texturas de unidad ya tienen fallback)
         if (callback) callback();
         return;
     }
-
+    
     // Cargar texturas
     textureKeys.forEach(key => {
         const path = TEXTURES[key];
@@ -263,23 +278,29 @@ function loadAssets(callback) {
             }
         );
     });
+    // Material para el indicador de selección
     materials.selected_unit_indicator = new THREE.MeshBasicMaterial({color: 0xf0e68c, transparent: true, opacity: 0.7, side: THREE.DoubleSide});
 
+
     // Cargar modelos GLB
-    modelKeys.forEach(key => {
-        const path = MODEL_PATHS[key];
+    modelsToLoad.forEach(modelInfo => {
         gltfLoader.load(
-            path,
+            modelInfo.path,
             (gltf) => {
-                loadedModels[key] = gltf; // Almacena el GLTF completo
-                assetLoadedLog(key, "model");
+                loadedModels[modelInfo.key] = gltf;
+                assetLoadedLog(modelInfo.key, "model");
             },
             undefined, 
             (error) => {
-                assetErrorLog(path, key, "model");
+                assetErrorLog(modelInfo.path, modelInfo.key, "model");
             }
         );
     });
+
+    // Si no hay texturas ni modelos (improbable pero por si acaso), llama al callback directamente.
+    if (totalAssetsToLoad === 0) {
+         setTimeout(checkAllAssetsLoaded, 100); // Pequeño delay por si acaso
+    }
 }
 
 
@@ -320,7 +341,7 @@ function setupInitialUnits() {
                 if (unitsPlacedCount >= unitsToPlaceTotal) break;
                 const currentX = startX + xColOffset;
                 if (currentX >= GRID_SIZE_X -1 || currentX < 1 ) continue;
-                const type = unitTypesCycle[unitsPlacedCount % 3];
+                const type = unitTypesCycle[unitsPlacedCount % 3]; // Cicla entre los 3 tipos
                 if (grid[currentZ][currentX] === null) {
                     createUnit(playerIdx, type, { x: currentX, z: currentZ }, unitIdCounter++);
                     unitsPlacedCount++;
@@ -331,45 +352,53 @@ function setupInitialUnits() {
     });
 }
 
-// --- MODIFICADO: createUnit para manejar GLB ---
 function createUnit(playerIdx, type, gridPos, id) {
     const stats = UNIT_STATS[type];
     const player = players[playerIdx];
     let mesh;
+    let usedGLB = false;
 
-    // Condición para usar GLB: tipo SWORDSMAN, jugador 1 (p1), y modelo SWORDSMAN_P1 cargado
-    if (type === UNIT_TYPES.SWORDSMAN && player.texturePrefix === 'p1' && loadedModels.SWORDSMAN_P1) {
-        const gltfData = loadedModels.SWORDSMAN_P1;
-        mesh = gltfData.scene.clone(); // Clona la escena del modelo
+    const modelKey = `${type.toUpperCase()}_${player.texturePrefix.toUpperCase()}`;
+    const gltfData = loadedModels[modelKey];
 
-        const modelScale = stats.modelScaleFactor || 1.0; // Usa el factor de escala definido en UNIT_STATS
+    if (gltfData) {
+        usedGLB = true;
+        mesh = gltfData.scene.clone();
+
+        const modelScale = stats.modelScaleFactor || 1.0;
         mesh.scale.set(modelScale, modelScale, modelScale);
+        
+        mesh.userData = { unitId: id, owner: playerIdx, type: 'unit' }; // Crucial: userData en el objeto raíz del modelo
 
-        // Aplicar sombras y userData. userData en el objeto raíz es importante para raycasting.
-        mesh.userData = { unitId: id, owner: playerIdx, type: 'unit' };
         mesh.traverse(function (child) {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
-                
-                // OPCIONAL: Si quieres aplicar la textura del juego (e.g., swordsman_red.png) al GLB
-                // Asegúrate que el GLB use materiales que puedan aceptar un 'map' (como MeshStandardMaterial)
-                // Y que la textura sea adecuada para el UV mapping del modelo.
-                /*
-                const textureKey = `unit_${type.toLowerCase()}_${player.texturePrefix}`;
-                let unitMaterial = materials[textureKey];
-                if (unitMaterial && unitMaterial.map) { // Solo si la textura cargó
-                    child.material = unitMaterial.clone(); // Clona para no afectar otros usos
-                } else if (unitMaterial) { // Si no hay mapa pero sí material (fallback de color)
-                     child.material = unitMaterial.clone();
-                } else { // Fallback de color si ni siquiera el material base existe
-                    child.material = new THREE.MeshStandardMaterial({ color: player.color });
+
+                // Intentar aplicar textura 2D del juego al modelo GLB
+                const textureKeyForUnit = `unit_${type.toLowerCase()}_${player.texturePrefix}`;
+                const unitSpecificMaterial = materials[textureKeyForUnit];
+
+                if (unitSpecificMaterial && unitSpecificMaterial.map) {
+                    // Clona el material base del GLB para no modificar el original y aplica el mapa.
+                    // Esto es un intento; puede que necesites ajustar el material original del GLB
+                    // o asegurarte de que es un MeshStandardMaterial.
+                    let newMaterial = child.material.clone();
+                    newMaterial.map = unitSpecificMaterial.map;
+                    newMaterial.color = new THREE.Color(0xffffff); // Reset color para que la textura se vea pura
+                    newMaterial.metalness = unitSpecificMaterial.metalness !== undefined ? unitSpecificMaterial.metalness : 0.2;
+                    newMaterial.roughness = unitSpecificMaterial.roughness !== undefined ? unitSpecificMaterial.roughness : 0.8;
+                    // Conserva otras propiedades del material original si es necesario
+                    child.material = newMaterial;
+                } else if (unitSpecificMaterial) { // Si no hay mapa (textura no cargada) pero sí material de fallback (color)
+                    child.material = unitSpecificMaterial.clone();
                 }
-                */
+                // Si unitSpecificMaterial no existe, el GLB usará sus propios materiales (si los tiene) o un gris por defecto.
             }
         });
     } else {
-        // Lógica existente para otras unidades o si el modelo GLB no cargó/no aplica
+        // Fallback a geometría primitiva si el modelo GLB no está disponible
+        console.warn(`GLB model for ${modelKey} not found. Using placeholder geometry for unit ID ${id}.`);
         let geometry;
         const unitWidth = CELL_SIZE * UNIT_BASE_SCALE * stats.size.r * 2;
         const unitHeight = CELL_SIZE * UNIT_HEIGHT_SCALE * stats.size.h;
@@ -379,38 +408,34 @@ function createUnit(playerIdx, type, gridPos, id) {
             geometry = new THREE.CapsuleGeometry(unitWidth / 2, unitHeight - unitWidth, 12, 24);
         }
         
-        const textureKey = `unit_${type.toLowerCase()}_${player.texturePrefix}`;
-        let unitMaterial = materials[textureKey];
-        if (!unitMaterial || !unitMaterial.map) { // Fallback si la textura no cargó
-            unitMaterial = new THREE.MeshStandardMaterial({ color: player.color, metalness:0.2, roughness:0.7 });
-        } else {
-            unitMaterial = unitMaterial.clone();
-        }
-        mesh = new THREE.Mesh(geometry, unitMaterial);
+        // Usar el color del jugador como material de fallback
+        const fallbackMaterial = new THREE.MeshStandardMaterial({ color: player.color, metalness:0.2, roughness:0.7 });
+        mesh = new THREE.Mesh(geometry, fallbackMaterial);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData = { unitId: id, owner: playerIdx, type: 'unit' };
     }
 
-    const worldPos = gridToWorld(gridPos.x, gridPos.z); // worldPos.y es 0
+    const worldPos = gridToWorld(gridPos.x, gridPos.z);
     mesh.position.copy(worldPos);
 
-    // Ajuste de altura Y: GLB se asume con base en y=0, primitivas se levantan
-    if (type === UNIT_TYPES.SWORDSMAN && player.texturePrefix === 'p1' && loadedModels.SWORDSMAN_P1) {
-        mesh.position.y = 0; // Base del GLB en el suelo (y=0 del mundo)
-        // Si el pivote de tu GLB no está en su base, necesitarás ajustar esto.
-        // Por ejemplo, si el pivote está en el centro geométrico:
+    if (usedGLB) {
+        mesh.position.y = 0; // Asume que el pivote del GLB está en su base. Ajusta si es necesario.
+        // Ejemplo de ajuste si el pivote está en el centro:
         // const box = new THREE.Box3().setFromObject(mesh);
-        // mesh.position.y = -(box.min.y); // Esto asume que min.y es negativo
+        // const size = box.getSize(new THREE.Vector3());
+        // mesh.position.y = size.y / 2; (o -box.min.y si min.y es negativo y pivote es 0)
     } else {
+        // Posicionamiento para primitivas
         const unitHeight = CELL_SIZE * UNIT_HEIGHT_SCALE * stats.size.h;
-        mesh.position.y = unitHeight / 2; // Centra la primitiva verticalmente
+        mesh.position.y = unitHeight / 2;
     }
 
     const unit = {
         id: id, owner: playerIdx, type: type, stats: stats, gridPos: { ...gridPos },
         mesh: mesh, alive: true, hasBeenActivatedThisTurn: false,
-        hasMovedThisActivation: false, hasAttackedThisActivation: false, selectedIndicator: null
+        hasMovedThisActivation: false, hasAttackedThisActivation: false, selectedIndicator: null,
+        isGLB: usedGLB // Para referencia futura si es necesario
     };
     
     player.units.push(unit);
@@ -432,7 +457,7 @@ function startGame() {
     selectedUnitForAction = null;
     unitActivationsThisTurn = 0;
     currentPlayerIndex = 0;
-    setupInitialUnits(); // Esto llamará a createUnit con la nueva lógica
+    setupInitialUnits();
     ui.messageOverlay.style.display = 'none';
     gameRunning = true;
     if (!clock.running) clock.start(); else clock.getDelta();
@@ -449,7 +474,7 @@ function animate() {
 
     if (selectedUnitForAction && selectedUnitForAction.selectedIndicator) {
         const unitMeshPos = selectedUnitForAction.mesh.position;
-        selectedUnitForAction.selectedIndicator.position.set(unitMeshPos.x, 0.1, unitMeshPos.z);
+        selectedUnitForAction.selectedIndicator.position.set(unitMeshPos.x, 0.1, unitMeshPos.z); // Un poco por encima del suelo
         selectedUnitForAction.selectedIndicator.visible = true;
     }
     
@@ -472,13 +497,12 @@ function onMouseClick(event) {
     let clickedOnUnitObject = null;
 
     for (const intersect of intersects) {
-        // Recorre hacia arriba para encontrar el objeto con userData que nos interesa (el raíz del modelo GLB o la primitiva)
         let objectWithUserData = intersect.object;
         while (objectWithUserData && !objectWithUserData.userData.type) {
             objectWithUserData = objectWithUserData.parent;
         }
         if (objectWithUserData && objectWithUserData.userData) {
-             const objUserData = objectWithUserData.userData;
+            const objUserData = objectWithUserData.userData;
             if (objUserData.type === 'unit') {
                 clickedOnUnitObject = players[objUserData.owner].units.find(u => u.id === objUserData.unitId && u.alive);
                 if (clickedOnUnitObject) clickedGridPos = clickedOnUnitObject.gridPos;
@@ -486,11 +510,11 @@ function onMouseClick(event) {
             }
             if (objUserData.type === 'floor_cell') {
                 clickedGridPos = { x: objUserData.gridX, z: objUserData.gridZ };
-                break;
+                break; 
             }
             if (objUserData.type === 'move_highlight' || objUserData.type === 'attack_highlight') {
                 clickedGridPos = { x: objUserData.x, z: objUserData.z };
-                // No rompemos aquí por si hay una unidad encima del highlight, priorizamos la unidad.
+                // No rompemos aquí para priorizar unidades sobre highlights si están superpuestos.
             }
         }
     }
@@ -502,13 +526,13 @@ function onMouseClick(event) {
             selectUnitForActivation(clickedOnUnitObject);
         }
     } else if (currentGameState === GAME_STATE.UNIT_ACTION_PENDING && selectedUnitForAction) {
-        if (clickedOnUnitObject && clickedOnUnitObject.owner !== currentPlayerIndex && clickedOnUnitObject.alive) {
+        if (clickedOnUnitObject && clickedOnUnitObject.owner !== currentPlayerIndex && clickedOnUnitObject.alive) { // Clic en unidad enemiga
             if (isCellInHighlights(clickedGridPos, highlightMeshes.attack) && !selectedUnitForAction.hasAttackedThisActivation) {
                 performAttackAction(selectedUnitForAction, clickedOnUnitObject);
             }
         }
-        else if (isCellInHighlights(clickedGridPos, highlightMeshes.move) && !selectedUnitForAction.hasMovedThisActivation) {
-            if (grid[clickedGridPos.z][clickedGridPos.x] === null) {
+        else if (isCellInHighlights(clickedGridPos, highlightMeshes.move) && !selectedUnitForAction.hasMovedThisActivation) { // Clic en highlight de movimiento
+            if (grid[clickedGridPos.z][clickedGridPos.x] === null) { // Celda vacía
                  performMoveAction(selectedUnitForAction, clickedGridPos);
             } else {
                 ui.currentActionMessage.textContent = "La celda de destino está ocupada.";
@@ -520,6 +544,7 @@ function onMouseClick(event) {
 
 function changeGameState(newState) {
     currentGameState = newState;
+    // console.log("Game state changed to: ", newState);
     switch (newState) {
         case GAME_STATE.PLAYER_TURN_START:
             clearHighlights();
@@ -529,7 +554,9 @@ function changeGameState(newState) {
             }
             unitActivationsThisTurn = 0;
             players[currentPlayerIndex].units.forEach(u => {
-                u.hasBeenActivatedThisTurn = false; u.hasMovedThisActivation = false; u.hasAttackedThisActivation = false;
+                u.hasBeenActivatedThisTurn = false; 
+                u.hasMovedThisActivation = false; 
+                u.hasAttackedThisActivation = false;
                  if (u.selectedIndicator) u.selectedIndicator.visible = false;
             });
             changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION);
@@ -541,7 +568,11 @@ function changeGameState(newState) {
                 `Selecciona unidad (${MAX_UNIT_ACTIVATIONS_PER_TURN - unitActivationsThisTurn} restantes).`;
             break;
         case GAME_STATE.UNIT_ACTION_PENDING:
-            if (!selectedUnitForAction) { changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); return; }
+            if (!selectedUnitForAction) { 
+                console.warn("UNIT_ACTION_PENDING sin selectedUnitForAction. Volviendo a SELECT_UNIT_FOR_ACTIVATION.");
+                changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+                return; 
+            }
             ui.currentActionMessage.textContent = `Mueve o Ataca con ${selectedUnitForAction.type}.`;
             ui.endUnitActionButton.style.display = 'inline-block';
             showPossibleMoves(selectedUnitForAction);
@@ -563,6 +594,7 @@ function setUnitSelectionVisual(unit, isSelected) {
             unit.selectedIndicator.rotation.x = -Math.PI / 2;
             scene.add(unit.selectedIndicator);
         }
+        // Posicionamiento del indicador ya se hace en animate()
     } else {
         if (unit.selectedIndicator) unit.selectedIndicator.visible = false;
     }
@@ -586,36 +618,38 @@ function finalizeSelectedUnitAction() {
     selectedUnitForAction = null;
     unitActivationsThisTurn++;
     clearHighlights();
-    changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+    if (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) {
+         ui.currentActionMessage.textContent = "Todas las activaciones usadas. Termina tu turno.";
+         // Podrías forzar SELECT_UNIT_FOR_ACTIVATION para que se actualice el mensaje, 
+         // o simplemente manejarlo en la UI.
+         changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+    } else {
+        changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+    }
 }
 
-// --- MODIFICADO: performMoveAction para altura Y de GLB ---
 function performMoveAction(unit, targetGridPos) {
     if (unit.hasMovedThisActivation || grid[targetGridPos.z][targetGridPos.x] !== null) return;
     
-    grid[unit.gridPos.z][unit.gridPos.x] = null; // Vaciar celda antigua
-    unit.gridPos = { ...targetGridPos };         // Actualizar posición en la grid de la unidad
-    grid[unit.gridPos.z][unit.gridPos.x] = unit; // Ocupar nueva celda en la grid
+    grid[unit.gridPos.z][unit.gridPos.x] = null;
+    unit.gridPos = { ...targetGridPos };
+    grid[unit.gridPos.z][unit.gridPos.x] = unit;
 
-    const worldPos = gridToWorld(targetGridPos.x, targetGridPos.z); // worldPos.y es 0
-
-    // Actualizar posición del mesh
+    const worldPos = gridToWorld(targetGridPos.x, targetGridPos.z);
     unit.mesh.position.x = worldPos.x;
     unit.mesh.position.z = worldPos.z;
 
-    // Ajustar la altura Y basada en si es un GLB (base en y=0) o primitiva (centro en y=unitHeight/2)
-    const player = players[unit.owner];
-    if (unit.type === UNIT_TYPES.SWORDSMAN && player.texturePrefix === 'p1' && loadedModels.SWORDSMAN_P1) {
-        unit.mesh.position.y = 0; // Los GLB se asumen con base en y=0
+    if (unit.isGLB) {
+        unit.mesh.position.y = 0; // Asumiendo pivote en la base para GLB
     } else {
-        const unitHeight = CELL_SIZE * UNIT_HEIGHT_SCALE * unit.stats.size.h;
-        unit.mesh.position.y = unitHeight / 2;
+        const unitHeightPrimitive = CELL_SIZE * UNIT_HEIGHT_SCALE * unit.stats.size.h;
+        unit.mesh.position.y = unitHeightPrimitive / 2;
     }
     
     unit.hasMovedThisActivation = true;
-    clearHighlights(); // Limpia viejos highlights
-    showPossibleMoves(unit); // Muestra nuevos posibles movimientos (ninguno si ya movió)
-    showAttackableTargets(unit); // Muestra nuevos posibles ataques
+    clearHighlights();
+    showPossibleMoves(unit);
+    showAttackableTargets(unit);
     ui.currentActionMessage.textContent = `${unit.type} movido. Puedes atacar o finalizar.`;
     updateUI();
 }
@@ -625,21 +659,31 @@ function performAttackAction(attacker, defender) {
     changeGameState(GAME_STATE.PERFORMING_ACTION);
     ui.diceRollResult.textContent = "...";
 
-    // Ajustar altura de línea de ataque para que se vea mejor con GLBs y primitivas
-    let attackerYOffset = (attacker.type === UNIT_TYPES.SWORDSMAN && players[attacker.owner].texturePrefix === 'p1' && loadedModels.SWORDSMAN_P1) ?
-                          (attacker.mesh.scale.y * 0.5) : // Estimación para GLB, ajustar si es necesario
-                          (CELL_SIZE * UNIT_HEIGHT_SCALE * attacker.stats.size.h * 0.5); // Mitad de la altura para primitivas
+    // Estimar la altura para la línea de ataque.
+    // Esto es aproximado y podría necesitar ajustes según tus modelos.
+    let attackerCenterY = attacker.mesh.position.y;
+    if (attacker.isGLB) {
+        // Para GLB, podríamos intentar obtener su altura de su bounding box
+        // o usar una fracción de su escala si todos los modelos son proporcionales.
+        // Aquí uso una estimación basada en la escala, asumiendo que modelScaleFactor
+        // da una altura total aproximada igual a CELL_SIZE o similar.
+        attackerCenterY += (attacker.mesh.scale.y * UNIT_HEIGHT_SCALE * CELL_SIZE * 0.25); // Mitad de una altura "típica"
+    } else {
+        attackerCenterY += (CELL_SIZE * UNIT_HEIGHT_SCALE * attacker.stats.size.h * 0.25); // Un poco por encima del centro de la primitiva
+    }
 
-    let defenderYOffset = (defender.type === UNIT_TYPES.SWORDSMAN && players[defender.owner].texturePrefix === 'p1' && loadedModels.SWORDSMAN_P1) ?
-                          (defender.mesh.scale.y * 0.5) :
-                          (CELL_SIZE * UNIT_HEIGHT_SCALE * defender.stats.size.h * 0.5);
-
+    let defenderCenterY = defender.mesh.position.y;
+    if (defender.isGLB) {
+        defenderCenterY += (defender.mesh.scale.y * UNIT_HEIGHT_SCALE * CELL_SIZE * 0.25);
+    } else {
+        defenderCenterY += (CELL_SIZE * UNIT_HEIGHT_SCALE * defender.stats.size.h * 0.25);
+    }
 
     const startPos = attacker.mesh.position.clone();
-    startPos.y += attackerYOffset * 0.5; // Origen un poco más arriba del centro de la unidad
+    startPos.y = attackerCenterY;
     
     const endPos = defender.mesh.position.clone();
-    endPos.y += defenderYOffset * 0.5; // Destino un poco más arriba del centro de la unidad
+    endPos.y = defenderCenterY;
 
     const points = [startPos, endPos];
     const attackLineMaterial = new THREE.LineBasicMaterial({ color: 0xff2222, linewidth: 3});
@@ -660,10 +704,21 @@ function performAttackAction(attacker, defender) {
         }
         ui.diceRollResult.textContent = message;
         attacker.hasAttackedThisActivation = true;
-        clearHighlights();
-        showPossibleMoves(attacker); 
-        showAttackableTargets(attacker);         
-        changeGameState(GAME_STATE.UNIT_ACTION_PENDING); 
+        
+        // Si la unidad atacante sigue viva y seleccionada
+        if (attacker.alive && selectedUnitForAction === attacker) {
+            clearHighlights();
+            showPossibleMoves(attacker); 
+            showAttackableTargets(attacker);
+            changeGameState(GAME_STATE.UNIT_ACTION_PENDING); 
+        } else if (!attacker.alive && selectedUnitForAction === attacker) { // Si la unidad atacante murió (ej. contraataque futuro)
+             selectedUnitForAction = null;
+             clearHighlights();
+             changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION);
+        } else { // La unidad atacante está viva pero ya no es la seleccionada (no debería pasar aquí)
+            changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+        }
+        
         updateUI();
         checkWinCondition();
     }, 700);
@@ -679,16 +734,26 @@ function killUnit(unit) {
     if(grid[unit.gridPos.z]?.[unit.gridPos.x] === unit) {
         grid[unit.gridPos.z][unit.gridPos.x] = null;
     }
-    if (selectedUnitForAction === unit) {
-        selectedUnitForAction = null; // Deseleccionar si la unidad activa es la que muere
+
+    if (selectedUnitForAction === unit) { // Si la unidad que muere era la activa
+        selectedUnitForAction = null;
         clearHighlights();
-        changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+        // Si la unidad activa muere, no se pueden realizar más acciones con ella.
+        // Volver a la selección de unidad, no finalizar la acción (ya que no hay acción que finalizar).
+        // Esto también evita que se cuente una activación si la unidad muere antes de hacer algo.
+        // Sin embargo, si la unidad muere *después* de atacar, la activación ya contó.
+        // El estado ya debería cambiar en performAttackAction.
+        // Si la unidad muere por otra razón mientras está activa (ej. trampa futura),
+        // esto la deselecciona y permite al jugador seleccionar otra.
+        if (currentGameState === GAME_STATE.UNIT_ACTION_PENDING || currentGameState === GAME_STATE.PERFORMING_ACTION) {
+             changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION);
+        }
     }
 }
 
 function handleEndTurn() {
     if (selectedUnitForAction) { 
-        finalizeSelectedUnitAction();
+        finalizeSelectedUnitAction(); // Finaliza la acción de la unidad actual si hay una
     }
     currentPlayerIndex = (currentPlayerIndex + 1) % 2;
     changeGameState(GAME_STATE.PLAYER_TURN_START);
@@ -698,51 +763,61 @@ function handleEndTurn() {
 
 function checkWinCondition() { 
     if (!gameRunning && currentGameState !== GAME_STATE.START_MENU && currentGameState !== GAME_STATE.GAME_OVER) return;
+    
     const p0AliveUnits = players[0].units.filter(u => u.alive).length;
     const p1AliveUnits = players[1].units.filter(u => u.alive).length;
-    if ((p0AliveUnits === 0 || p1AliveUnits === 0) && gameRunning) {
-        gameRunning = false;
+
+    if ((p0AliveUnits === 0 || p1AliveUnits === 0) && gameRunning) { // Solo si el juego estaba corriendo
+        gameRunning = false; // Detener el juego aquí
         let winnerMessage = (p0AliveUnits === 0 && p1AliveUnits === 0) ? "¡EMPATE! Todos aniquilados." :
                             (p1AliveUnits === 0) ? `¡${players[0].name.toUpperCase()} GANA!` :
                             `¡${players[1].name.toUpperCase()} GANA!`;
         ui.messageText.textContent = winnerMessage;
         ui.startButton.textContent = "Jugar de Nuevo";
         ui.messageOverlay.style.display = 'flex';
-        changeGameState(GAME_STATE.GAME_OVER);
+        changeGameState(GAME_STATE.GAME_OVER); // Cambiar estado a GAME_OVER
     }
 }
 
 function showPossibleMoves(unit) {
     clearHighlights('move');
-    if (unit.hasMovedThisActivation) return;
+    if (unit.hasMovedThisActivation) return; // No mostrar si ya movió
     const moves = []; 
     const { x, z } = unit.gridPos;
     const maxMove = unit.stats.move;
+    
     let queue = [{x:x, z:z, dist:0}];
     let visited = new Set([`${x}_${z}`]);
+
     while(queue.length > 0){
         let curr = queue.shift();
-        if(curr.dist > 0 && grid[curr.z]?.[curr.x] === null) moves.push({x: curr.x, z: curr.z});
+        // Solo añadir a 'moves' si es una celda alcanzable y vacía (dist > 0)
+        if(curr.dist > 0 && grid[curr.z]?.[curr.x] === null) {
+             moves.push({x: curr.x, z: curr.z});
+        }
+
         if(curr.dist < maxMove){
             const neighbors = [
                 {x: curr.x + 1, z: curr.z}, {x: curr.x - 1, z: curr.z},
                 {x: curr.x, z: curr.z + 1}, {x: curr.x, z: curr.z - 1}
             ];
             for(const n of neighbors){
-                if(n.x >= 0 && n.x < GRID_SIZE_X && n.z >= 0 && n.z < GRID_SIZE_Z &&
-                   !visited.has(`${n.x}_${n.z}`) && grid[n.z][n.x] === null) { 
+                if(n.x >= 0 && n.x < GRID_SIZE_X && n.z >= 0 && n.z < GRID_SIZE_Z && // Dentro del tablero
+                   !visited.has(`${n.x}_${n.z}`) && // No visitado
+                   grid[n.z][n.x] === null) { // Celda vacía
                     visited.add(`${n.x}_${n.z}`);
                     queue.push({x:n.x, z:n.z, dist: curr.dist + 1});
                 }
             }
         }
     }
+
     const highlightGeo = new THREE.PlaneGeometry(CELL_SIZE * 0.9, CELL_SIZE * 0.9);
     const hlMat = materials.highlight_move || new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.5, side:THREE.DoubleSide });
     moves.forEach(pos => {
         const hlMesh = new THREE.Mesh(highlightGeo, hlMat);
         const worldPos = gridToWorld(pos.x, pos.z);
-        hlMesh.position.set(worldPos.x, 0.02, worldPos.z);
+        hlMesh.position.set(worldPos.x, 0.02, worldPos.z); // Ligeramente sobre el suelo
         hlMesh.rotation.x = -Math.PI / 2;
         hlMesh.userData = { ...pos, type: 'move_highlight' };
         scene.add(hlMesh);
@@ -752,27 +827,29 @@ function showPossibleMoves(unit) {
 
 function showAttackableTargets(unit) {
     clearHighlights('attack');
-    if (unit.hasAttackedThisActivation) return;
+    if (unit.hasAttackedThisActivation) return; // No mostrar si ya atacó
     const targets = [];
     const { x, z } = unit.gridPos;
     const range = unit.stats.attackRange;
+
     for (let r = 0; r < GRID_SIZE_Z; r++) {
         for (let c = 0; c < GRID_SIZE_X; c++) {
-            const dist = Math.abs(x - c) + Math.abs(z - r); // Manhattan distance
-            if (dist > 0 && dist <= range) {
+            const dist = Math.abs(x - c) + Math.abs(z - r); // Distancia Manhattan
+            if (dist > 0 && dist <= range) { // Dentro del rango y no la propia celda
                 const targetUnit = grid[r][c];
-                if (targetUnit && targetUnit.owner !== unit.owner && targetUnit.alive) {
+                if (targetUnit && targetUnit.owner !== unit.owner && targetUnit.alive) { // Unidad enemiga viva
                     targets.push({ x: c, z: r });
                 }
             }
         }
     }
+
     const highlightGeo = new THREE.PlaneGeometry(CELL_SIZE * 0.9, CELL_SIZE * 0.9);
     const hlMat = materials.highlight_attack || new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.5, side:THREE.DoubleSide });
     targets.forEach(pos => {
         const hlMesh = new THREE.Mesh(highlightGeo, hlMat);
         const worldPos = gridToWorld(pos.x, pos.z);
-        hlMesh.position.set(worldPos.x, 0.03, worldPos.z); // Attack highlight slightly above move highlight
+        hlMesh.position.set(worldPos.x, 0.03, worldPos.z); // Ligeramente sobre el highlight de movimiento
         hlMesh.rotation.x = -Math.PI / 2;
         hlMesh.userData = { ...pos, type: 'attack_highlight' };
         scene.add(hlMesh);
@@ -811,8 +888,11 @@ function updateUI() {
                 pStatus[idx].textContent = (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) ? "Sin activaciones" : "Selecciona unidad";
             } else if (currentGameState === GAME_STATE.UNIT_ACTION_PENDING && selectedUnitForAction?.owner === idx) {
                 pStatus[idx].textContent = `Activando ${selectedUnitForAction.type}`;
-            } else {
-                pStatus[idx].textContent = "Procesando...";
+            } else if (currentGameState === GAME_STATE.PERFORMING_ACTION && selectedUnitForAction?.owner === idx) {
+                pStatus[idx].textContent = "Realizando acción...";
+            }
+             else {
+                pStatus[idx].textContent = "Procesando..."; // Estado intermedio o desconocido
             }
             if (selectedUnitForAction?.owner === idx) {
                 let info = `Unidad: ${selectedUnitForAction.type}<br>`;
@@ -831,7 +911,7 @@ function updateUI() {
     });
     if (gameRunning) {
         ui.currentPlayerTurn.textContent = `Turno de ${players[currentPlayerIndex].name}`;
-        ui.endTurnButton.style.display = 'inline-block';
+        ui.endTurnButton.style.display = (currentGameState !== GAME_STATE.PERFORMING_ACTION) ? 'inline-block' : 'none';
         ui.endUnitActionButton.style.display = (currentGameState === GAME_STATE.UNIT_ACTION_PENDING && selectedUnitForAction) ? 'inline-block' : 'none';
     } else {
         ui.currentPlayerTurn.textContent = (currentGameState === GAME_STATE.GAME_OVER && ui.messageText.textContent) ? "" : "Tactics3D Grid";
@@ -844,7 +924,7 @@ function updateUI() {
 function gridToWorld(col, row) {
     const worldX = (col - (GRID_SIZE_X - 1) / 2) * CELL_SIZE;
     const worldZ = (row - (GRID_SIZE_Z - 1) / 2) * CELL_SIZE;
-    return new THREE.Vector3(worldX, 0, worldZ); // Y es 0 a nivel del "suelo" del tablero
+    return new THREE.Vector3(worldX, 0, worldZ);
 }
 
 function worldToGrid(worldPos) {
