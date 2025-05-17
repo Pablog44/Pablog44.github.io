@@ -364,6 +364,7 @@ function createUnit(playerIdx, type, gridPos, id) {
     if (gltfData) {
         usedGLB = true;
         mesh = gltfData.scene.clone();
+        mesh.traverse(o => o.matrixAutoUpdate = true);
 
         // Rotar 180 grados a los modelos del equipo azul
         if (player.texturePrefix === 'p2') {
