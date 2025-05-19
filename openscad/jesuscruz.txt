@@ -1,0 +1,203 @@
+// Definición de la calidad de los círculos y esferas
+$fn = 50; // Aumenta para más detalle, disminuye para renderizado más rápido
+
+// --- Dimensiones de la Cruz ---
+cross_vertical_height = 100;
+cross_vertical_width = 8;
+cross_vertical_depth = 8;
+
+cross_horizontal_length = 60;
+cross_horizontal_width = cross_vertical_width;
+cross_horizontal_depth = cross_vertical_depth;
+
+cross_color = "SaddleBrown";
+
+// --- Dimensiones de la Figura de Cristo ---
+christ_scale_factor = 0.9;
+
+head_radius = 5 * christ_scale_factor;
+
+torso_height = 25 * christ_scale_factor;
+torso_radius = 5 * christ_scale_factor;
+
+arm_length = 18 * christ_scale_factor;
+arm_radius = 1.8 * christ_scale_factor;
+
+leg_length = 30 * christ_scale_factor;
+leg_radius = 2.0 * christ_scale_factor;
+
+hand_foot_radius = 2.5 * christ_scale_factor;
+
+christ_color = "Tan";
+
+// --- AJUSTES DE POSICIÓN INDIVIDUAL DE LAS PARTES DE CRISTO ---
+// Modifica estos vectores [x, y, z] para ajustar la posición de cada parte.
+// Por defecto, están en [0,0,0] (sin ajuste).
+
+head_pos_adj = [0, 0, 0];         // Ajuste para la cabeza
+torso_pos_adj = [0, 0, -7];        // Ajuste para el torso
+
+right_arm_pos_adj = [2.3, 0, 0];    // Ajuste para el brazo derecho (desde el hombro)
+right_hand_pos_adj = [0, 0, 0];   // Ajuste para la mano derecha (relativo al final del brazo)
+left_arm_pos_adj = [-2.3, 0, 0];     // Ajuste para el brazo izquierdo (desde el hombro)
+left_hand_pos_adj = [0, 0, 0];    // Ajuste para la mano izquierda (relativo al final del brazo)
+
+right_leg_pos_adj = [0, 0, 0];    // Ajuste para la pierna derecha (desde la cadera)
+right_foot_pos_adj = [0, 0, 0];   // Ajuste para el pie derecho (relativo al final de la pierna)
+left_leg_pos_adj = [0, 0, 0];     // Ajuste para la pierna izquierda (desde la cadera)
+left_foot_pos_adj = [0, 0, 0];    // Ajuste para el pie izquierdo (relativo al final de la pierna)
+
+// --- Módulo para la Cruz ---
+module ChristianCross() {
+    color(cross_color) {
+        // Viga Vertical
+        cube([cross_vertical_width, cross_vertical_depth, cross_vertical_height], center = true);
+        // Viga Horizontal
+        translate([0, 0, cross_vertical_height * 0.20]) {
+            cube([cross_horizontal_length, cross_horizontal_depth, cross_horizontal_width], center = true);
+        }
+    }
+}
+
+// --- Módulo para la Figura de Cristo ---
+module ChristFigure() {
+    // --- Posiciones base calculadas (antes de ajustes) ---
+    // Estas posiciones son relativas al centro de la figura (que inicialmente es 0,0,0)
+
+    // Torso
+    // El torso es la referencia principal para otras partes
+    module Torso() {
+        translate(torso_pos_adj) { // Aplicar ajuste de posición del torso
+            cylinder(h = torso_height, r1 = torso_radius, r2 = torso_radius * 0.9, center = true);
+        }
+    }
+
+    // Cabeza
+    // Posicionada relativa a la parte superior del torso
+    module Head() {
+        translate(torso_pos_adj) { // La cabeza se mueve con el torso
+            translate([0, 0, torso_height / 2 + head_radius * 0.8]) {
+                translate(head_pos_adj) { // Aplicar ajuste de posición de la cabeza
+                    sphere(r = head_radius);
+                }
+            }
+        }
+    }
+
+    // Brazos
+    arm_base_y_offset = torso_height * 0.35; // Altura de los hombros relativa al centro del torso
+
+    // Brazo Derecho y Mano Derecha
+    module RightArmAndHand() {
+        translate(torso_pos_adj) { // El brazo se mueve con el torso
+            translate([torso_radius, 0, arm_base_y_offset]) { // Posición base del hombro derecho
+                translate(right_arm_pos_adj) { // Aplicar ajuste de posición del brazo derecho
+                    // Rotación del brazo (puedes cambiar esto para diferentes poses)
+                    // Por ejemplo, para crucifixión: rotate([0, 0, -90]) o similar
+                    rotate([0, 90, -7]) { // Brazo extendido y ligeramente hacia abajo/adelante
+                        cylinder(h = arm_length, r = arm_radius, center = true);
+                        // Mano Derecha (al final del cilindro del brazo)
+                        translate([0, 0, arm_length / 2]) {
+                            translate(right_hand_pos_adj) { // Aplicar ajuste de posición de la mano derecha
+                                sphere(r = hand_foot_radius);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Brazo Izquierdo y Mano Izquierda
+    module LeftArmAndHand() {
+        translate(torso_pos_adj) { // El brazo se mueve con el torso
+            translate([-torso_radius, 0, arm_base_y_offset]) { // Posición base del hombro izquierdo
+                translate(left_arm_pos_adj) { // Aplicar ajuste de posición del brazo izquierdo
+                    rotate([0, -90, 7]) { // Brazo extendido y ligeramente hacia abajo/adelante
+                        cylinder(h = arm_length, r = arm_radius, center = true);
+                        // Mano Izquierda
+                        translate([0, 0, arm_length / 2]) {
+                            translate(left_hand_pos_adj) { // Aplicar ajuste de posición de la mano izquierda
+                                sphere(r = hand_foot_radius);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Piernas
+    leg_base_y_offset = -torso_height / 2; // Parte inferior del torso
+    leg_separation_x = torso_radius * 0.4; // Separación entre piernas en el origen
+    leg_angle_x = 10; // Angulo de apertura de las piernas
+
+    // Pierna Derecha y Pie Derecho
+    module RightLegAndFoot() {
+        translate(torso_pos_adj) { // La pierna se mueve con el torso
+            translate([leg_separation_x, 0, leg_base_y_offset]) { // Posición base cadera derecha
+                translate(right_leg_pos_adj) { // Aplicar ajuste de posición de la pierna derecha
+                     // Rotación de la pierna (puedes cambiar esto)
+                    rotate([leg_angle_x - 2, 0, 0]) {
+                        // Mover el origen de la pierna a su parte superior para rotar desde la cadera
+                        translate([0,0, -leg_length/2]){
+                            cylinder(h = leg_length, r = leg_radius, center = false);
+                            // Pie Derecho (en la base del cilindro de la pierna)
+                            translate([0, 0, 0]) {
+                                translate(right_foot_pos_adj) { // Aplicar ajuste de posición del pie derecho
+                                    sphere(r = hand_foot_radius);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Pierna Izquierda y Pie Izquierdo
+    module LeftLegAndFoot() {
+        translate(torso_pos_adj) { // La pierna se mueve con el torso
+            translate([-leg_separation_x, 0, leg_base_y_offset]) { // Posición base cadera izquierda
+                translate(left_leg_pos_adj) { // Aplicar ajuste de posición de la pierna izquierda
+                    rotate([-leg_angle_x + 7, 0, 0]) {
+                        translate([0,0, -leg_length/2]){
+                            cylinder(h = leg_length, r = leg_radius, center = false);
+                            // Pie Izquierdo
+                            translate([0, 0, 0]) {
+                                translate(left_foot_pos_adj) { // Aplicar ajuste de posición del pie izquierdo
+                                    sphere(r = hand_foot_radius);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Ensamblar las partes de la figura de Cristo ---
+    color(christ_color) {
+        Torso();
+        Head();
+        RightArmAndHand();
+        LeftArmAndHand();
+        RightLegAndFoot();
+        LeftLegAndFoot();
+    }
+}
+
+// --- Ensamblaje Final ---
+
+// Dibuja la Cruz
+ChristianCross();
+
+// Dibuja la figura de Cristo y la posiciona en la cruz
+figure_global_offset_y = cross_vertical_depth / 2 + torso_radius * 0.5; // Justo delante de la cruz
+figure_global_offset_z = cross_vertical_height * 0.20; // A la altura de la viga horizontal
+
+// Posición global y rotación de toda la figura de Cristo
+translate([0, figure_global_offset_y, figure_global_offset_z]) {
+    // rotate([90,0,0]) // Ejemplo: Rotar toda la figura para una crucifixión más tradicional
+    ChristFigure();
+}
