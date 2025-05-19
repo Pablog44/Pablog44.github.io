@@ -1,0 +1,56 @@
+// Parámetros del fractal
+profundidad_sierpinski = 5; // "Paso 3" o nivel de recursión
+lado_triangulo_grande = 50; // Tamaño del triángulo más grande (en mm, por ejemplo)
+grosor_extrusion = 2;       // Grosor si lo quieres hacer 3D
+
+// Módulo para dibujar un solo triángulo equilátero
+// Su esquina inferior izquierda está en (0,0)
+module triangulo_equilatero(lado) {
+    altura = lado * sqrt(3) / 2; // Altura de un triángulo equilátero
+    polygon(points=[
+        [0, 0],         // Vértice inferior izquierdo
+        [lado, 0],      // Vértice inferior derecho
+        [lado / 2, altura] // Vértice superior
+    ]);
+}
+
+// Módulo recursivo para el fractal de Sierpinski
+module sierpinski(nivel, lado_actual) {
+    if (nivel == 0) {
+        // Caso base: dibujar un solo triángulo
+        triangulo_equilatero(lado_actual);
+    } else {
+        // Paso recursivo:
+        // Dividir el lado actual por 2 para los subtriángulos
+        nuevo_lado = lado_actual / 2;
+        
+        // Altura de los subtriángulos (necesaria para el posicionamiento del triángulo superior)
+        altura_subtriangulo = nuevo_lado * sqrt(3) / 2;
+
+        // 1. Triángulo inferior izquierdo
+        // No necesita traslación, ya está en el origen local de este módulo
+        sierpinski(nivel - 1, nuevo_lado);
+
+        // 2. Triángulo inferior derecho
+        // Se traslada a la derecha por la longitud del lado del subtriángulo
+        translate([nuevo_lado, 0]) {
+            sierpinski(nivel - 1, nuevo_lado);
+        }
+
+        // 3. Triángulo superior
+        // Se traslada a la mitad del lado del subtriángulo en X,
+        // y la altura del subtriángulo en Y.
+        // (El origen del triángulo superior estará en el vértice superior del "hueco" central)
+        translate([nuevo_lado / 2, altura_subtriangulo]) {
+            sierpinski(nivel - 1, nuevo_lado);
+        }
+    }
+}
+
+// --- Dibujar el fractal ---
+// Centrarlo opcionalmente para mejor visualización
+// translate([-lado_triangulo_grande / 2, -lado_triangulo_grande * sqrt(3) / 6, 0]) { // Descomentar para centrar
+    linear_extrude(height = grosor_extrusion) {
+        sierpinski(profundidad_sierpinski, lado_triangulo_grande);
+    }
+// } // Descomentar para centrar
