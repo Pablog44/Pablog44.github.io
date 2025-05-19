@@ -1,0 +1,334 @@
+// Definición de la calidad de los círculos y esferas
+$fn = 30; // Aumenta para más detalle, disminuye para renderizado más rápido
+
+// --- COLORES ---
+color_body = "SteelBlue";
+color_roof = "LightSteelBlue";
+color_windows = "SkyBlue";
+color_tires = "DimGray";
+color_hubs = "Silver";
+color_lights = "Yellow";
+color_rearlights = "Red";
+color_bumper = "DarkGray";
+color_steering = "Black";
+color_mirror = "LightGray";
+
+// --- DIMENSIONES GENERALES DEL COCHE ---
+car_length = 150;
+car_width = 60;
+car_body_height = 40;
+car_wheel_radius = 15;
+car_wheel_thickness = 10;
+
+// --- AJUSTES DE POSICIÓN Y ROTACIÓN DE COMPONENTES ---
+// Modifica estos vectores [x, y, z] para ajustar la posición o rotación de cada parte.
+// _pos_adj: [dx, dy, dz] -> Desplazamiento desde la posición por defecto
+// _rot_adj: [rx, ry, rz] -> Rotación adicional en grados
+
+// Cuerpo Principal
+body_pos_adj = [0, 0, 0];
+body_rot_adj = [0, 0, 0];
+
+// Techo/Cabina
+roof_pos_adj = [0, 0, 5]; // Un poco más arriba por defecto
+roof_rot_adj = [0, 0, 0];
+
+// Ruedas (Ajustes globales para el conjunto de 4 ruedas,
+// las posiciones individuales se calculan más abajo)
+wheels_assembly_pos_adj = [0,0,-8];
+wheels_assembly_rot_adj = [0,0,0];
+
+// Rueda Individual (estos ajustes se aplicarían a CADA rueda ADEMÁS de su posición calculada)
+// Útil si quieres, por ejemplo, que todas las ruedas estén un poco más salidas o metidas.
+wheel_individual_pos_adj = [0,0,0];
+wheel_individual_rot_adj = [0,0,0]; // e.g. [0,10,0] para ruedas giradas
+
+// Parabrisas Frontal
+windshield_front_pos_adj = [18, 0, 4];
+windshield_front_rot_adj = [0, 0, 0];
+
+// Ventana Trasera
+windshield_rear_pos_adj = [0, 0, 4];
+windshield_rear_rot_adj = [0, 0, 0];
+
+// Faros (ajuste para el par)
+headlights_pos_adj = [0, 0, 0];
+headlights_rot_adj = [0, 0, 0];
+
+// Luces Traseras (ajuste para el par)
+taillights_pos_adj = [0, 0, 0];
+taillights_rot_adj = [0, 0, 0];
+
+// Parachoques Frontal
+bumper_front_pos_adj = [0, 0, 0];
+bumper_front_rot_adj = [0, 0, 0];
+
+// Parachoques Trasero
+bumper_rear_pos_adj = [0, 0, 0];
+bumper_rear_rot_adj = [0, 0, 0];
+
+// Volante
+steering_wheel_pos_adj = [0, 0, 0];
+steering_wheel_rot_adj = [0, 0, 0];
+
+// Retrovisores (ajuste para el par)
+mirrors_pos_adj = [0,0,0];
+mirrors_rot_adj = [0,0,0];
+
+
+// --- MÓDULOS PARA LAS PARTES DEL COCHE ---
+
+// Módulo para el cuerpo principal
+module CarBody() {
+    translate(body_pos_adj) rotate(body_rot_adj) {
+        color(color_body) {
+            // Base del cuerpo
+            cube([car_length, car_width, car_body_height], center = true);
+
+            // Capó (un poco más bajo y estrecho)
+            hood_height_factor = 0.8;
+            hood_width_factor = 0.9;
+            translate([car_length * 0.3, 0, -car_body_height * (1 - hood_height_factor) / 2]) {
+                 cube([car_length * 0.4, car_width * hood_width_factor, car_body_height * hood_height_factor], center = true);
+            }
+            // Maletero (similar al capó pero atrás)
+             translate([-car_length * 0.32, 0, -car_body_height * (1 - hood_height_factor) / 2]) {
+                 cube([car_length * 0.35, car_width * hood_width_factor, car_body_height * hood_height_factor], center = true);
+            }
+        }
+    }
+}
+
+// Módulo para el techo/cabina
+module CarRoof() {
+    roof_length = car_length * 0.45;
+    roof_width = car_width * 0.9;
+    roof_height = car_body_height * 0.7;
+    // Posición base del techo (centrado encima de la parte media del cuerpo)
+    base_pos = [0, 0, car_body_height / 2 + roof_height / 2 -5]; // -5 para que se solape un poco
+
+    translate(base_pos + roof_pos_adj) rotate(roof_rot_adj) {
+        color(color_roof) {
+            cube([roof_length, roof_width, roof_height], center = true);
+        }
+    }
+}
+
+// Módulo para una rueda
+module Wheel() {
+    translate(wheel_individual_pos_adj) rotate(wheel_individual_rot_adj){
+        rotate([0, 90, 90]) { // Para orientar el cilindro como rueda
+            // Neumático
+            color(color_tires) {
+                cylinder(r = car_wheel_radius, h = car_wheel_thickness, center = true);
+            }
+            // Embellecedor/Llanta
+            color(color_hubs) {
+                cylinder(r = car_wheel_radius * 0.6, h = car_wheel_thickness * 1.1, center = true); // Un poco más ancho
+            }
+        }
+    }
+}
+
+// Módulo para ensamblar las 4 ruedas
+module WheelsAssembly() {
+    // Distancia de las ruedas al centro del coche
+    axle_offset_x = car_length * 0.35; // Distancia del eje delantero/trasero al centro
+    axle_offset_y = car_width / 2 + car_wheel_thickness / 2 -3; // Ruedas un poco metidas bajo el chasis
+    wheel_z_pos = -car_body_height / 2 + car_wheel_radius * 0.7; // Altura de las ruedas
+
+    translate(wheels_assembly_pos_adj) rotate(wheels_assembly_rot_adj){
+        // Delantera Derecha
+        translate([axle_offset_x, axle_offset_y, wheel_z_pos]) Wheel();
+        // Delantera Izquierda
+        translate([axle_offset_x, -axle_offset_y, wheel_z_pos]) Wheel();
+        // Trasera Derecha
+        translate([-axle_offset_x, axle_offset_y, wheel_z_pos]) Wheel();
+        // Trasera Izquierda
+        translate([-axle_offset_x, -axle_offset_y, wheel_z_pos]) Wheel();
+    }
+}
+
+// Módulo para el parabrisas frontal
+module WindshieldFront() {
+    windshield_width = car_width * 0.85;
+    windshield_height = car_body_height * 0.6;
+    windshield_thickness = 3;
+    // Posición base (delante del techo, inclinado)
+    base_pos = [car_length * 0.22 / 2, 0, car_body_height / 2 + windshield_height*0.4];
+    base_rot = [0, 0, 0]; // Inclinación
+
+    translate(base_pos + windshield_front_pos_adj) rotate(base_rot + windshield_front_rot_adj) {
+        color(color_windows, 0.5) { // 0.5 para transparencia
+            cube([windshield_thickness, windshield_width, windshield_height], center = true);
+        }
+    }
+}
+
+// Módulo para la ventana trasera
+module WindshieldRear() {
+    rear_window_width = car_width * 0.8;
+    rear_window_height = car_body_height * 0.55;
+    rear_window_thickness = 3;
+    // Posición base (detrás del techo, inclinado)
+    base_pos = [-car_length * 0.45 / 2 - car_length*0.01, 0, car_body_height / 2 + rear_window_height*0.4];
+    base_rot = [-0, 0, 0]; // Inclinación opuesta al frontal
+
+    translate(base_pos + windshield_rear_pos_adj) rotate(base_rot + windshield_rear_rot_adj) {
+        color(color_windows, 0.5) {
+            cube([rear_window_thickness, rear_window_width, rear_window_height], center = true);
+        }
+    }
+}
+
+// Módulo para un faro
+module Headlight() {
+    radius = car_wheel_radius * 0.3;
+    depth = 5;
+    color(color_lights) sphere(r = radius);
+    color("DarkSlateGray") translate([depth/3,0,0]) cylinder(r=radius*1.1, h=depth, center=true); // Carcasa
+}
+
+// Módulo para el par de faros delanteros
+module HeadlightsAssembly() {
+    // Posición base de los faros
+    headlight_y_offset = car_width * 0.35;
+    headlight_x_pos = car_length / 2 - 5; // Al frente
+    headlight_z_pos = -car_body_height * 0.1;
+
+    translate(headlights_pos_adj) rotate(headlights_rot_adj){
+        translate([headlight_x_pos, headlight_y_offset, headlight_z_pos]) rotate([0,90,0]) Headlight();
+        translate([headlight_x_pos, -headlight_y_offset, headlight_z_pos]) rotate([0,90,0]) Headlight();
+    }
+}
+// Módulo para una luz trasera
+module Taillight() {
+    width = car_wheel_radius * 0.4;
+    height = car_wheel_radius * 0.25;
+    depth = 4;
+    color(color_rearlights) cube([depth, width, height], center=true);
+    color("DarkSlateGray") translate([-depth/3,0,0]) cube([depth, width*1.1, height*1.1], center=true); // Carcasa
+}
+
+// Módulo para el par de luces traseras
+module TaillightsAssembly() {
+    taillight_y_offset = car_width * 0.38;
+    taillight_x_pos = -car_length / 2 + 2; // Atrás
+    taillight_z_pos = -car_body_height * 0.05;
+
+    translate(taillights_pos_adj) rotate(taillights_rot_adj){
+        translate([taillight_x_pos, taillight_y_offset, taillight_z_pos]) rotate([0,0,0]) Taillight();
+        translate([taillight_x_pos, -taillight_y_offset, taillight_z_pos]) rotate([0,0,0]) Taillight();
+    }
+}
+
+// Módulo para parachoques
+module Bumper(len_factor = 0.95, thickness_factor = 0.08) {
+    color(color_bumper) {
+        cube([car_width * len_factor, car_body_height * thickness_factor, car_body_height * thickness_factor * 1.5], center = true);
+    }
+}
+
+// Módulo para parachoques frontal
+module BumperFront() {
+    // Posición base
+    base_pos = [car_length / 2 + (car_body_height * 0.08)/2 -2 , 0, -car_body_height / 2 * 0.7];
+    translate(base_pos + bumper_front_pos_adj) rotate([0,0,90] + bumper_front_rot_adj) {
+        Bumper();
+    }
+}
+
+// Módulo para parachoques trasero
+module BumperRear() {
+    // Posición base
+    base_pos = [-car_length / 2 - (car_body_height * 0.08)/2 +2, 0, -car_body_height / 2 * 0.7];
+     translate(base_pos + bumper_rear_pos_adj) rotate([0,0,90] + bumper_rear_rot_adj) {
+        Bumper();
+    }
+}
+
+// Módulo para el volante
+module SteeringWheel() {
+    rim_radius = car_wheel_radius * 0.4;
+    rim_thickness = rim_radius * 0.15;
+    column_length = car_body_height * 0.5;
+    column_radius = rim_thickness;
+
+    // Posición base (dentro de la cabina, lado del conductor - asumimos izquierdo)
+    base_pos = [car_length * 0.05, -car_width * 0.2, -car_body_height *0.1];
+    base_rot = [70, 0, 0]; // Inclinación del volante
+
+    translate(base_pos + steering_wheel_pos_adj) rotate(base_rot + steering_wheel_rot_adj) {
+        color(color_steering) {
+            // Aro
+            rotate([0,0,0]) // El rotate_extrude ya lo orienta bien si el círculo está en XY
+                torus(r1 = rim_radius, r2 = rim_thickness, $fn=30); // Usar torus es más fácil
+
+            // Columna
+            translate([0, 0, -column_length / 2]) {
+                cylinder(h = column_length, r = column_radius, center = true);
+            }
+            // Radios (simplificado)
+            for (a = [0, 120, 240]) {
+                rotate([0,0,a]) translate([rim_radius/2,0,0])
+                    cube([rim_radius, column_radius*0.8, column_radius*0.8], center=true);
+            }
+        }
+    }
+}
+
+// Módulo para un retrovisor lateral
+module SideMirror() {
+    mirror_size = [car_wheel_radius * 0.1, car_wheel_radius * 0.25, car_wheel_radius * 0.35];
+    stalk_length = car_width * 0.05;
+    stalk_radius = mirror_size[0] *0.8;
+
+    color(color_mirror) {
+        // Espejo
+        cube(mirror_size, center=true);
+        // Brazo/Soporte
+        translate([-mirror_size[0]/2 - stalk_length/2, 0,0])
+            cylinder(h=stalk_length, r=stalk_radius, center=true, $fn=10);
+    }
+}
+
+// Módulo para ensamblar los retrovisores
+module MirrorsAssembly(){
+    // Posiciones base (a los lados de la cabina/puertas delanteras)
+    mirror_x_pos = car_length * 0.15;
+    mirror_y_offset = car_width/2 -3;
+    mirror_z_pos = car_body_height *0.1;
+
+    translate(mirrors_pos_adj) rotate(mirrors_rot_adj){
+        // Retrovisor Derecho
+        translate([mirror_x_pos, mirror_y_offset + (car_wheel_radius * 0.1)/2, mirror_z_pos])
+            rotate([0,90,0]) // Orientar el cubo del espejo
+            rotate([0,0,-10]) // Angulo ligero
+                SideMirror();
+
+        // Retrovisor Izquierdo
+        translate([mirror_x_pos, -mirror_y_offset - (car_wheel_radius * 0.1)/2, mirror_z_pos])
+            rotate([0,90,0])
+            rotate([0,0,190]) // Angulo y espejo invertido
+                SideMirror();
+    }
+}
+
+
+// --- ENSAMBLAJE FINAL DEL COCHE ---
+module VintageCar() {
+    CarBody();
+    CarRoof();
+    WheelsAssembly();
+    WindshieldFront();
+    WindshieldRear();
+    HeadlightsAssembly();
+    TaillightsAssembly();
+    BumperFront();
+    BumperRear();
+    SteeringWheel();
+    MirrorsAssembly();
+}
+
+// Dibuja el coche
+VintageCar();
