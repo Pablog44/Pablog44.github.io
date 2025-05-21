@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Doom con GLB (Importmaps)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Stats.js (se carga como script global) -->
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+
+    <!-- Mapa de Importación para Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Tu script principal del juego -->
+    <script type="module" src="script.js"></script> {/* Asegúrate que 'game.js' es el nombre correcto */}
+</body>
+</html>
