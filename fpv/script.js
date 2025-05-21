@@ -24,10 +24,10 @@ const wallMap = [
   [1, 0, 1, 1, 0, -1, 2, 0, 0, 1], // -1 para el primer modelo
   [1, 0, 1, 1, 0, 0, 2, 0, 0, 1],
   [1, 0, 0, 0, 0, 0, 0,-2, 0, 1],  // -2 para el segundo modelo
-  [1, 0, 0, 0, 0, 1, 1, 1, 0, 1],
+  [1, 0, 0, 0, -5, 0, 1, 1, 0, 1],
   [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
-  [1, -3, 0, 0, 0, 0, 0, 0, -4, 1],
+  [1, 0, 2, 0, 0, -3, 0, -4, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
 ];
 const floorMap = [
@@ -62,7 +62,7 @@ const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Rutas de Modelos GLB ---
-const modelUrls = ['models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 'models/statue.glb']; // Rutas a tus modelos GLB
+const modelUrls = ['models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 'models/statue.glb', 'models/cruz.glb']; // Rutas a tus modelos GLB
 const placeholderModelUrl = 'models/placeholder_cube.glb'; // Un GLB simple como fallback
 
 // --- Variables Globales ---
