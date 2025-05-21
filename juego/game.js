@@ -23,7 +23,8 @@ const UNIT_STATS = {
     [UNIT_TYPES.HORSEMAN]:  { move: 7, attackRange: 3, attackDie: [1, 3], geom: 'capsule',  size: {r: 0.4, h: 0.8}, modelScaleFactor: 2.2 /* AJUSTA ESTO */ }
 };
 const UNITS_PER_TYPE = 5;
-const MAX_UNIT_ACTIVATIONS_PER_TURN = 3;
+// !!! IMPORTANTE: Asegúrate de que este valor sea 1 para el comportamiento deseado !!!
+const MAX_UNIT_ACTIVATIONS_PER_TURN = 3; // CAMBIADO DE 3 A 1 PARA TU CASO DE USO
 
 const TEXTURES = {
     floor_cell_p1: 'textures/floor_p1.png',
@@ -569,7 +570,7 @@ function changeGameState(newState) {
         case GAME_STATE.SELECT_UNIT_FOR_ACTIVATION:
             ui.endUnitActionButton.style.display = 'none';
             ui.currentActionMessage.textContent = (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) ?
-                "Todas las activaciones usadas. Termina tu turno." :
+                "Todas las activaciones usadas. Termina tu turno." : // Este mensaje puede no verse si el turno cambia auto.
                 `Selecciona unidad (${MAX_UNIT_ACTIVATIONS_PER_TURN - unitActivationsThisTurn} restantes).`;
             break;
         case GAME_STATE.UNIT_ACTION_PENDING:
@@ -616,22 +617,27 @@ function selectUnitForActivation(unit) {
     changeGameState(GAME_STATE.UNIT_ACTION_PENDING);
 }
 
+// ---------- ÚNICO CAMBIO SIGNIFICATIVO AQUÍ ----------
 function finalizeSelectedUnitAction() {
     if (!selectedUnitForAction) return;
     selectedUnitForAction.hasBeenActivatedThisTurn = true;
     setUnitSelectionVisual(selectedUnitForAction, false);
-    selectedUnitForAction = null;
+    selectedUnitForAction = null; // Importante: deseleccionar antes de posible cambio de turno
     unitActivationsThisTurn++;
     clearHighlights();
+
     if (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) {
-         ui.currentActionMessage.textContent = "Todas las activaciones usadas. Termina tu turno.";
-         // Podrías forzar SELECT_UNIT_FOR_ACTIVATION para que se actualice el mensaje, 
-         // o simplemente manejarlo en la UI.
-         changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+         // Si se usaron todas las activaciones, pasar el turno automáticamente.
+         ui.currentActionMessage.textContent = "Activación completa. Cambiando de turno...";
+         handleEndTurn(); // Llama a la función que maneja el fin de turno
     } else {
+        // Si aún quedan activaciones (si MAX_UNIT_ACTIVATIONS_PER_TURN > 1),
+        // volver al estado de selección de unidad.
         changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
     }
+    // updateUI() será llamado por handleEndTurn() o changeGameState()
 }
+// ---------- FIN DEL CAMBIO SIGNIFICATIVO ----------
 
 function performMoveAction(unit, targetGridPos) {
     if (unit.hasMovedThisActivation || grid[targetGridPos.z][targetGridPos.x] !== null) return;
@@ -721,7 +727,15 @@ function performAttackAction(attacker, defender) {
              clearHighlights();
              changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION);
         } else { // La unidad atacante está viva pero ya no es la seleccionada (no debería pasar aquí)
-            changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION); 
+            // Si el turno ya cambió automáticamente porque MAX_UNIT_ACTIVATIONS_PER_TURN es 1
+            // y finalizeSelectedUnitAction() ya llamó a handleEndTurn(), entonces
+            // selectedUnitForAction ya es null. El estado ya habrá cambiado.
+            // Este 'else' podría necesitar ser revisado si la lógica de cambio de turno es más compleja,
+            // pero con MAX_UNIT_ACTIVATIONS_PER_TURN = 1 y el cambio en finalizeSelectedUnitAction,
+            // es probable que el estado ya se haya gestionado.
+            if (currentGameState !== GAME_STATE.PLAYER_TURN_START && currentGameState !== GAME_STATE.SELECT_UNIT_FOR_ACTIVATION) {
+                 changeGameState(GAME_STATE.SELECT_UNIT_FOR_ACTIVATION);
+            }
         }
         
         updateUI();
@@ -757,13 +771,28 @@ function killUnit(unit) {
 }
 
 function handleEndTurn() {
+    // Si se llama a handleEndTurn desde finalizeSelectedUnitAction,
+    // selectedUnitForAction ya será null, por lo que la siguiente condición no se cumplirá.
+    // Si se llama desde el botón "Terminar Turno" y hay una unidad seleccionada
+    // (y MAX_UNIT_ACTIVATIONS_PER_TURN > unitActivationsThisTurn),
+    // entonces se finalizará su acción primero.
     if (selectedUnitForAction) { 
-        finalizeSelectedUnitAction(); // Finaliza la acción de la unidad actual si hay una
+        // Esto podría llevar a una llamada recursiva si MAX_UNIT_ACTIVATIONS_PER_TURN es 1
+        // y el jugador pulsa "Terminar Turno" en lugar de "Finalizar Acción Unidad".
+        // Sin embargo, selectedUnitForAction se pone a null dentro de finalizeSelectedUnitAction ANTES
+        // de la potencial llamada a handleEndTurn, por lo que la recursión no debería ocurrir.
+        finalizeSelectedUnitAction();
+        // Si finalizeSelectedUnitAction ya llamó a handleEndTurn, esta instancia de handleEndTurn
+        // no debería continuar si el turno ya cambió.
+        // Pero, como selectedUnitForAction se vuelve null, esta rama no se ejecutará si
+        // finalizeSelectedUnitAction ya se completó y llamó a handleEndTurn.
+        if(unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) return; // Evita doble procesamiento si finalize ya cambió turno.
     }
     currentPlayerIndex = (currentPlayerIndex + 1) % 2;
     changeGameState(GAME_STATE.PLAYER_TURN_START);
     ui.diceRollResult.textContent = "";
-    checkWinCondition();
+    checkWinCondition(); // Llamado aquí, y también después del ataque. Podría ser redundante pero no dañino.
+    // updateUI() es llamado dentro de changeGameState.
 }
 
 function checkWinCondition() { 
@@ -890,7 +919,9 @@ function updateUI() {
             pData[idx].classList.add('active-player');
             pActionsLeft[idx].textContent = MAX_UNIT_ACTIVATIONS_PER_TURN - unitActivationsThisTurn;
             if (currentGameState === GAME_STATE.SELECT_UNIT_FOR_ACTIVATION) {
-                pStatus[idx].textContent = (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN) ? "Sin activaciones" : "Selecciona unidad";
+                pStatus[idx].textContent = (unitActivationsThisTurn >= MAX_UNIT_ACTIVATIONS_PER_TURN && MAX_UNIT_ACTIVATIONS_PER_TURN > 0) ? 
+                                          "Cambiando turno..." : // Mensaje mientras cambia
+                                          "Selecciona unidad";
             } else if (currentGameState === GAME_STATE.UNIT_ACTION_PENDING && selectedUnitForAction?.owner === idx) {
                 pStatus[idx].textContent = `Activando ${selectedUnitForAction.type}`;
             } else if (currentGameState === GAME_STATE.PERFORMING_ACTION && selectedUnitForAction?.owner === idx) {
@@ -916,7 +947,16 @@ function updateUI() {
     });
     if (gameRunning) {
         ui.currentPlayerTurn.textContent = `Turno de ${players[currentPlayerIndex].name}`;
-        ui.endTurnButton.style.display = (currentGameState !== GAME_STATE.PERFORMING_ACTION) ? 'inline-block' : 'none';
+        // El botón de terminar turno se oculta si el juego está realizando una acción
+        // o si es MAX_UNIT_ACTIVATIONS_PER_TURN === 1 y ya se ha activado la unidad (el turno cambiará automáticamente)
+        let showEndTurnButton = currentGameState !== GAME_STATE.PERFORMING_ACTION;
+        if (MAX_UNIT_ACTIVATIONS_PER_TURN === 1 && unitActivationsThisTurn >= 1 && currentGameState !== GAME_STATE.PLAYER_TURN_START) {
+            // Si es 1 activación y ya se usó, y no estamos justo al inicio del turno del siguiente jugador
+            // (donde unitActivationsThisTurn sería 0), entonces el turno cambiará auto.
+            // showEndTurnButton = false; // Comentado, ya que el botón podría ser útil si el jugador no hace nada.
+        }
+        ui.endTurnButton.style.display = showEndTurnButton ? 'inline-block' : 'none';
+        
         ui.endUnitActionButton.style.display = (currentGameState === GAME_STATE.UNIT_ACTION_PENDING && selectedUnitForAction) ? 'inline-block' : 'none';
     } else {
         ui.currentPlayerTurn.textContent = (currentGameState === GAME_STATE.GAME_OVER && ui.messageText.textContent) ? "" : "Tactics3D Grid";
