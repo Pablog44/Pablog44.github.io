@@ -57,7 +57,7 @@ const ceilingMap = [
 
 // --- Rutas de Texturas ---
 const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png', 'textures/wall3.png'];
-const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png', 'textures/floor3.png', 'textures/floor4.png'];
+const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png', 'textures/floor3.png', 'textures/floor4.png', 'textures/floor5.png'];
 const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
 
