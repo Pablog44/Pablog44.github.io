@@ -22,7 +22,7 @@ const wallMap = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, -7, 0, -8, 0, 0, 0, 0, -6, 1],
   [1, 0, 0, 0, 0, -1, 2, 0, 0, 1], // -1 para el primer modelo
-  [1, 0, 1, 0, 0, 0, 2, 0, 0, 1],
+  [1, 0, 3, 0, 0, 0, 2, 0, 0, 1],
   [1, 0, 0, 0, 0, 0, 0,-2, 0, 1],  // -2 para el segundo modelo
   [1, 0, 0, 0, -5, 0, 1, 1, 0, 1],
   [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
@@ -32,12 +32,12 @@ const wallMap = [
 ];
 const floorMap = [
   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 4, 4, 1, 1, 1, 1, 1, 1, 0],
-  [0, 4, 4, 4, 1, 1, 0, 1, 1, 0],
-  [0, 1, 0, 4, 1, 1, 0, 1, 1, 0],
-  [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-  [0, 1, 1, 1, 1, 0, 0, 0, 1, 0],
-  [0, 1, 0, 1, 1, 3, 3, 3, 3, 0],
+  [0, 4, 4, 4, 4, 4, 1, 1, 1, 0],
+  [0, 4, 4, 4, 4, 4, 0, 1, 1, 0],
+  [0, 4, 0, 4, 4, 4, 0, 1, 1, 0],
+  [0, 1, 1, 5, 5, 5, 1, 1, 1, 0],
+  [0, 1, 1, 5, 5, 5, 0, 0, 1, 0],
+  [0, 1, 0, 5, 5, 3, 3, 3, 3, 0],
   [0, 1, 0, 1, 2, 3, 3, 3, 3, 0],
   [0, 1, 1, 1, 1, 3, 3, 3, 3, 0],
   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -56,7 +56,7 @@ const ceilingMap = [
 ];
 
 // --- Rutas de Texturas ---
-const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png'];
+const wallTextureUrls = ['textures/wall1.png', 'textures/wall2.png', 'textures/wall3.png'];
 const floorTextureUrls = ['textures/floor1.png', 'textures/floor2.png', 'textures/floor3.png', 'textures/floor4.png'];
 const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
