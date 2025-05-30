@@ -711,8 +711,8 @@ function updateLeftDPadState(touch) {
 
     moveState.forward = 0;
     moveState.back = 0;
-    moveState.left = 0;
-    moveState.right = 0;
+    moveState.left = 0;  // Representa la intención de moverse a la DERECHA en tu sistema actual
+    moveState.right = 0; // Representa la intención de moverse a la IZQUIERDA en tu sistema actual
 
     if (distSq < touchControls.left.deadZone * touchControls.left.deadZone) {
         return; // Inside deadzone
@@ -720,19 +720,19 @@ function updateLeftDPadState(touch) {
 
     const angle = Math.atan2(dy, dx); // Angle: 0 to right, PI/2 down, PI left, -PI/2 up
 
-    // Define angle ranges for 4-way movement (each gets PI/2 or 90 degrees slice)
+    // Define angle ranges for 4-way movement
     // Right: -PI/4 to PI/4
     // Down:  PI/4 to 3PI/4
     // Left:  3PI/4 to 5PI/4 (or -3PI/4 using atan2's -PI to PI range)
     // Up:   -3PI/4 to -PI/4
 
-    if (angle > -Math.PI / 4 && angle <= Math.PI / 4) { // Right
-        moveState.right = 1;
-    } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) { // Down (towards bottom of screen)
+    if (angle > -Math.PI / 4 && angle <= Math.PI / 4) { // Tocar el segmento DERECHO del D-Pad
+        moveState.left = 1; // Activar "intención de moverse a la DERECHA"
+    } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) { // Tocar ABAJO (hacia la parte inferior de la pantalla)
         moveState.back = 1;
-    } else if (angle > 3 * Math.PI / 4 || angle <= -3 * Math.PI / 4) { // Left
-        moveState.left = 1;
-    } else if (angle > -3 * Math.PI / 4 && angle <= -Math.PI / 4) { // Up (towards top of screen)
+    } else if (angle > 3 * Math.PI / 4 || angle <= -3 * Math.PI / 4) { // Tocar el segmento IZQUIERDO del D-Pad
+        moveState.right = 1; // Activar "intención de moverse a la IZQUIERDA"
+    } else if (angle > -3 * Math.PI / 4 && angle <= -Math.PI / 4) { // Tocar ARRIBA (hacia la parte superior de la pantalla)
         moveState.forward = 1;
     }
 }
