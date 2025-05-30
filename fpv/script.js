@@ -564,53 +564,26 @@ function handleGamepadInput(delta) {
     const rightStickX = gp.axes[2] || 0;
     const rightStickY = gp.axes[3] || 0;
 
-    let gpForward = 0, gpBack = 0, gpLeft = 0, gpRight = 0;
+    // --- INICIO DE LA RESTAURACIÓN A LA LÓGICA ORIGINAL DEL USUARIO ---
+    let gpForward = 0, gpBack = 0, gpLeft = 0, gpRight = 0; // Se restauran gpLeft y gpRight
+
     if (leftStickY < -gamepadDeadZone) gpForward = 1;
     else if (leftStickY > gamepadDeadZone) gpBack = 1;
 
-    if (leftStickX > gamepadDeadZone) gpLeft = 1; // Corresponds to 'A' or 'ArrowRight' (move right)
-    else if (leftStickX < -gamepadDeadZone) gpRight = 1; // Corresponds to 'D' or 'ArrowLeft' (move left)
-                                                // Note: My variable names are inverted in original code's keydown
-                                                // d/arrowleft = moveState.left = move player left
-                                                // a/arrowright = moveState.right = move player right
-                                                // So, gamepad stick left should set moveState.left
-                                                // gamepad stick right should set moveState.right
-    
-    // Adjusting gamepad stick to moveState mapping for consistency with keyboard
-    if (leftStickX < -gamepadDeadZone) moveState.left = Math.max(moveState.left, 1); // Stick left -> player left
-    else if (leftStickX > gamepadDeadZone) moveState.right = Math.max(moveState.right, 1); // Stick right -> player right
-    else { // if stick is centered for X, don't let gamepad override keyboard/touch if they are active
-        // This needs careful thought. If keyboard had moveState.left=1, and gamepad stick is centered,
-        // we don't want gamepad to set moveState.left=0.
-        // The Math.max handles the "additive" nature.
-        // If keyboard set moveState.left=0, and gamepad centers, moveState.left remains 0.
-        // If keyboard set moveState.left=1, and gamepad centers, moveState.left remains 1.
-        // So, only set to 0 if keyboard/touch are also 0 for that direction.
-        // The current keyboard onKeyUp will set to 0.
-        // The current gamepad logic will *only add* if stick is pushed.
-        // This is what the current Math.max does.
-    }
-
+    // Lógica original del usuario para el eje X del stick izquierdo:
+    // Stick físico DERECHA -> activa gpLeft
+    // Stick físico IZQUIERDA -> activa gpRight
+    if (leftStickX > gamepadDeadZone) gpLeft = 1;
+    else if (leftStickX < -gamepadDeadZone) gpRight = 1;
 
     moveState.forward = Math.max(moveState.forward, gpForward);
     moveState.back = Math.max(moveState.back, gpBack);
-    // The X-axis for gamepad movement logic was a bit tangled. Let's simplify:
-    // If gamepad stick is left, set moveState.left. If right, set moveState.right.
-    // This needs to be ORed like forward/back.
-    // Original:
-    // if (leftStickX > gamepadDeadZone) gpLeft = 1; (This was mapped to player's left movement key 'D')
-    // else if (leftStickX < -gamepadDeadZone) gpRight = 1; (This was mapped to player's right movement key 'A')
-    // moveState.left = Math.max(moveState.left, gpLeft);
-    // moveState.right = Math.max(moveState.right, gpRight);
-
-    // Corrected mapping based on how `moveState.left` and `moveState.right` are used:
-    let gpMoveLeft = 0, gpMoveRight = 0;
-    if (leftStickX < -gamepadDeadZone) gpMoveLeft = 1; // Gamepad stick physically left
-    else if (leftStickX > gamepadDeadZone) gpMoveRight = 1; // Gamepad stick physically right
-    
-    moveState.left = Math.max(moveState.left, gpMoveLeft);   // Player moves left
-    moveState.right = Math.max(moveState.right, gpMoveRight); // Player moves right
-
+    // Aplicación original:
+    // gpLeft (stick físico DERECHA) se asigna a moveState.left
+    // gpRight (stick físico IZQUIERDA) se asigna a moveState.right
+    moveState.left = Math.max(moveState.left, gpLeft);
+    moveState.right = Math.max(moveState.right, gpRight);
+    // --- FIN DE LA RESTAURACIÓN A LA LÓGICA ORIGINAL DEL USUARIO ---
 
     let lookX = 0, lookY = 0;
     if (Math.abs(rightStickX) > gamepadDeadZone) lookX = rightStickX;
