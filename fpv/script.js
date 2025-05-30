@@ -13,6 +13,9 @@ const gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad
 const PLAYER_RADIUS = TILE_SIZE * 0.2; // Radio de colisión del jugador
 const PLAYER_COLLISION_HEIGHT_FACTOR = 0.9; // Factor para la altura de colisión del jugador (0.9 = 90% de WALL_HEIGHT)
 
+// --- Touch Control Config ---
+const TOUCH_LOOK_SENSITIVITY = 0.004; // Sensibilidad para la vista táctil
+const TOUCH_DPAD_DEADZONE_RATIO = 0.15; // 15% del radio del D-Pad como zona muerta
 
 // --- Datos del Mapa (¡Aquí defines tus mapas!) ---
 // 0 = Espacio vacío
@@ -96,8 +99,40 @@ let isPointerLocked = false;
 let activeGamepadIndex = null;
 let stats; // Para stats.js
 
+let isMobileDevice = false; // Flag for mobile device
+let touchControls = { // Object to store touch control state
+    dPadContainer: null,
+    left: {
+        element: null,
+        rect: null,
+        touchId: null,
+        center: { x: 0, y: 0 },
+        radius: 0,
+        deadZone: 0
+    },
+    right: {
+        element: null,
+        rect: null,
+        touchId: null,
+        startPos: { x: 0, y: 0 },
+        center: { x: 0, y: 0 }, // Added for consistency, though less critical for look
+        radius: 0
+    }
+};
+
+
+// --- Detección de Móvil ---
+function detectMobile() {
+    const toMatch = [
+        /Android/i, /webOS/i, /iPhone/i, /iPad/i, /iPod/i,
+        /BlackBerry/i, /Windows Phone/i
+    ];
+    return toMatch.some(toMatchItem => navigator.userAgent.match(toMatchItem));
+}
+
 // --- Inicialización ---
 function init() {
+    isMobileDevice = detectMobile();
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xADD8E6); // Light blue background
 
@@ -116,12 +151,12 @@ function init() {
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.outputColorSpace = THREE.SRGBColorSpace; // Corrected from outputEncoding
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Brighter ambient
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Brighter directional
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(15, 30, 20);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 1024;
@@ -129,12 +164,13 @@ function init() {
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 500;
     scene.add(directionalLight);
-    const playerLight = new THREE.PointLight(0xffccaa, 0.8, TILE_SIZE * 7); // Brighter player light, larger range
+    const playerLight = new THREE.PointLight(0xffccaa, 0.8, TILE_SIZE * 7);
     camera.add(playerLight);
     scene.add(camera);
 
     // Controles
-    setupPointerLock();
+    setupControls(); // Combined setup function
+
     window.addEventListener('gamepadconnected', (event) => {
         console.log('Gamepad conectado:', event.gamepad.id);
         if (activeGamepadIndex === null) activeGamepadIndex = event.gamepad.index;
@@ -179,7 +215,7 @@ async function loadTexture(url, isPlaceholder = false) {
         textureLoader.load(
             url,
             (texture) => {
-                texture.colorSpace = THREE.SRGBColorSpace; // Corrected from encoding
+                texture.colorSpace = THREE.SRGBColorSpace;
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
                 texture.magFilter = THREE.NearestFilter;
@@ -220,7 +256,7 @@ async function loadModel(url, isPlaceholder = false) {
                     console.error(`Error cargando modelo GLB: ${url}`, error);
                     if (placeholderModel) {
                         console.warn(`Usando modelo placeholder para ${url}`);
-                        resolve(placeholderModel); // Resolve with the GLTF object
+                        resolve(placeholderModel);
                     } else {
                         reject(`No se pudo cargar ${url} y el modelo placeholder no está disponible.`);
                     }
@@ -237,7 +273,7 @@ async function preloadAssets() {
     try {
         placeholderTexture = await loadTexture(placeholderTextureUrl, true);
         console.log("Textura placeholder cargada.");
-        placeholderModel = await loadModel(placeholderModelUrl, true); // placeholderModel is a GLTF object
+        placeholderModel = await loadModel(placeholderModelUrl, true);
         console.log("Modelo placeholder cargado.");
 
         const loadTextureArray = async (urls) => Promise.all(urls.map(url => loadTexture(url)));
@@ -253,7 +289,7 @@ async function preloadAssets() {
         wallTextures = [placeholderTexture, ...results[0]];
         floorTextures = [placeholderTexture, ...results[1]];
         ceilingTextures = [placeholderTexture, ...results[2]];
-        loadedModels = results[3]; // Array of GLTF objects
+        loadedModels = results[3];
 
         console.log("Texturas y Modelos de mapa procesados.");
     } catch (error) {
@@ -264,7 +300,7 @@ async function preloadAssets() {
 
 // --- Construcción de la Geometría del Mapa ---
 function buildMapGeometry() {
-    modelCollisionCapsules.length = 0; // Clear previous capsules
+    modelCollisionCapsules.length = 0;
 
     while (mapMeshesGroup.children.length > 0) {
         const object = mapMeshesGroup.children[0];
@@ -275,7 +311,6 @@ function buildMapGeometry() {
             materials.forEach(mat => {
                 Object.keys(mat).forEach(key => {
                     if (mat[key] && typeof mat[key].dispose === 'function' && mat[key] !== mat) {
-                         // Dispose textures, etc.
                         if (mat[key].isTexture) mat[key].dispose();
                     }
                 });
@@ -310,13 +345,13 @@ function buildMapGeometry() {
 
     const materialsCache = {};
     const getMaterial = (texture) => {
-        if (!texture || !texture.uuid) return new THREE.MeshStandardMaterial({ color: 0xff00ff }); // Error color
+        if (!texture || !texture.uuid) return new THREE.MeshStandardMaterial({ color: 0xff00ff });
         const cacheKey = texture.uuid;
         if (!materialsCache[cacheKey]) {
             materialsCache[cacheKey] = new THREE.MeshStandardMaterial({
                 map: texture,
-                roughness: 0.7, // Slightly less rough for more vividness
-                metalness: 0.05, // Very slightly metallic
+                roughness: 0.7,
+                metalness: 0.05,
                 side: THREE.FrontSide
             });
         }
@@ -329,7 +364,7 @@ function buildMapGeometry() {
             const worldZ = y * TILE_SIZE;
             const wallType = wallMap[y]?.[x];
 
-            if (wallType !== undefined && wallType > 0) { // Actual Wall
+            if (wallType !== undefined && wallType > 0) {
                 const texture = wallTextures[wallType] || wallTextures[0];
                 const wallMaterial = getMaterial(texture);
                 const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
@@ -338,7 +373,7 @@ function buildMapGeometry() {
                 wallMesh.receiveShadow = true;
                 mapMeshesGroup.add(wallMesh);
 
-            } else if (wallType !== undefined && wallType < 0) { // Model
+            } else if (wallType !== undefined && wallType < 0) {
                 const modelIndex = Math.abs(wallType) - 1;
                 let modelGltf = loadedModels[modelIndex];
 
@@ -351,36 +386,31 @@ function buildMapGeometry() {
                     const modelInstance = SkeletonUtils.clone(modelGltf.scene);
                     modelInstance.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
                     
-                    // Scale model to roughly fit within a tile, pivot at base
-                    modelInstance.updateMatrixWorld(true); // Ensure current transforms are applied for bbox
+                    modelInstance.updateMatrixWorld(true);
                     const box = new THREE.Box3().setFromObject(modelInstance);
                     const size = box.getSize(new THREE.Vector3());
                     const currentMaxDim = Math.max(size.x, size.y, size.z);
                     if (currentMaxDim > 0) {
-                        const desiredMaxDim = TILE_SIZE * 0.6; // Model will be 90% of tile size max dimension
+                        const desiredMaxDim = TILE_SIZE * 0.6;
                         const scale = desiredMaxDim / currentMaxDim;
                         modelInstance.scale.set(scale, scale, scale);
                         
-                        // Adjust Y so model base is at y=0 after scaling
-                        // Re-calculate box with new scale to get accurate min.y
                         modelInstance.updateMatrixWorld(true);
                         const scaledBox = new THREE.Box3().setFromObject(modelInstance);
                         modelInstance.position.y = -scaledBox.min.y; 
                     }
 
-                    modelInstance.updateMatrixWorld(true); // Final update for accurate position/size
+                    modelInstance.updateMatrixWorld(true);
                     const finalBox = new THREE.Box3().setFromObject(modelInstance);
                     const finalSize = finalBox.getSize(new THREE.Vector3());
 
-                    const capsuleRadius = Math.max(finalSize.x, finalSize.z) / 2 * 0.85; // Capsule is 85% of model's XZ extent
+                    const capsuleRadius = Math.max(finalSize.x, finalSize.z) / 2 * 0.85;
                     const capsuleHeight = finalSize.y;
                     
                     modelCollisionCapsules.push({
-                        worldPosition: modelInstance.position.clone(), // This is the base of the model
+                        worldPosition: modelInstance.position.clone(),
                         radius: capsuleRadius,
                         height: capsuleHeight,
-                        // For debug:
-                        // center: modelInstance.position.clone().add(new THREE.Vector3(0, capsuleHeight / 2, 0))
                     });
 
                     modelInstance.traverse(child => {
@@ -393,10 +423,9 @@ function buildMapGeometry() {
                 } else {
                     console.error(`Fallo: No hay modelo GLTF para el índice ${modelIndex} (${x},${y}) ni placeholder.`);
                 }
-                // Render floor and ceiling under models too
                 renderFloorAndCeiling(x, y, worldX, worldZ, getMaterial, floorCeilingGeometry, ceilingGeometry);
 
-            } else if (wallType === 0) { // Empty space
+            } else if (wallType === 0) {
                 renderFloorAndCeiling(x, y, worldX, worldZ, getMaterial, floorCeilingGeometry, ceilingGeometry);
             }
         }
@@ -423,7 +452,6 @@ function renderFloorAndCeiling(mapGridX, mapGridY, worldX, worldZ, getMaterialFu
         const ceilingMaterial = getMaterialFunc(ceilingTexture);
         const ceilingMesh = new THREE.Mesh(ceilingGeom, ceilingMaterial);
         ceilingMesh.position.set(worldX + TILE_SIZE / 2, WALL_HEIGHT, worldZ + TILE_SIZE / 2);
-        // ceilingMesh.castShadow = true; // Ceilings usually don't cast strong shadows downwards
         mapMeshesGroup.add(ceilingMesh);
     }
 }
@@ -432,7 +460,7 @@ function renderFloorAndCeiling(mapGridX, mapGridY, worldX, worldZ, getMaterialFu
 function findStartPosition() {
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
-            if (wallMap[y]?.[x] === 0) { // Start in an empty space
+            if (wallMap[y]?.[x] === 0) {
                 camera.position.x = x * TILE_SIZE + TILE_SIZE / 2;
                 camera.position.z = y * TILE_SIZE + TILE_SIZE / 2;
                 camera.position.y = WALL_HEIGHT / 2;
@@ -447,7 +475,20 @@ function findStartPosition() {
     camera.position.y = WALL_HEIGHT / 2;
 }
 
-// --- Controles de Movimiento y Cámara ---
+// --- Controles ---
+function setupControls() {
+    document.addEventListener('keydown', onKeyDown, false);
+    document.addEventListener('keyup', onKeyUp, false);
+
+    if (isMobileDevice) {
+        console.log("Mobile device detected, setting up touch controls.");
+        setupTouchControls();
+    } else {
+        console.log("Desktop device detected, setting up pointer lock.");
+        setupPointerLock();
+    }
+}
+
 function setupPointerLock() {
     const canvas = renderer.domElement;
     canvas.addEventListener('click', () => {
@@ -464,10 +505,7 @@ function setupPointerLock() {
     document.addEventListener('pointerlockchange', pointerLockChange, false);
     document.addEventListener('mozpointerlockchange', pointerLockChange, false);
     document.addEventListener('webkitpointerlockchange', pointerLockChange, false);
-
     document.addEventListener('mousemove', onMouseMove, false);
-    document.addEventListener('keydown', onKeyDown, false);
-    document.addEventListener('keyup', onKeyUp, false);
 }
 
 function rotateCamera(deltaX, deltaY) {
@@ -488,7 +526,9 @@ function onMouseMove(event) {
 
 function onKeyDown(event) {
     if (event.repeat) return;
-    if (!isPointerLocked && ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
+    // On desktop, try to lock pointer if not locked and movement key is pressed
+    if (!isMobileDevice && !isPointerLocked && 
+        ['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(event.key.toLowerCase())) {
          renderer.domElement.click();
     }
     switch (event.key.toLowerCase()) {
@@ -528,13 +568,49 @@ function handleGamepadInput(delta) {
     if (leftStickY < -gamepadDeadZone) gpForward = 1;
     else if (leftStickY > gamepadDeadZone) gpBack = 1;
 
-    if (leftStickX > gamepadDeadZone) gpLeft = 1;
-    else if (leftStickX < -gamepadDeadZone) gpRight = 1;
+    if (leftStickX > gamepadDeadZone) gpLeft = 1; // Corresponds to 'A' or 'ArrowRight' (move right)
+    else if (leftStickX < -gamepadDeadZone) gpRight = 1; // Corresponds to 'D' or 'ArrowLeft' (move left)
+                                                // Note: My variable names are inverted in original code's keydown
+                                                // d/arrowleft = moveState.left = move player left
+                                                // a/arrowright = moveState.right = move player right
+                                                // So, gamepad stick left should set moveState.left
+                                                // gamepad stick right should set moveState.right
+    
+    // Adjusting gamepad stick to moveState mapping for consistency with keyboard
+    if (leftStickX < -gamepadDeadZone) moveState.left = Math.max(moveState.left, 1); // Stick left -> player left
+    else if (leftStickX > gamepadDeadZone) moveState.right = Math.max(moveState.right, 1); // Stick right -> player right
+    else { // if stick is centered for X, don't let gamepad override keyboard/touch if they are active
+        // This needs careful thought. If keyboard had moveState.left=1, and gamepad stick is centered,
+        // we don't want gamepad to set moveState.left=0.
+        // The Math.max handles the "additive" nature.
+        // If keyboard set moveState.left=0, and gamepad centers, moveState.left remains 0.
+        // If keyboard set moveState.left=1, and gamepad centers, moveState.left remains 1.
+        // So, only set to 0 if keyboard/touch are also 0 for that direction.
+        // The current keyboard onKeyUp will set to 0.
+        // The current gamepad logic will *only add* if stick is pushed.
+        // This is what the current Math.max does.
+    }
+
 
     moveState.forward = Math.max(moveState.forward, gpForward);
     moveState.back = Math.max(moveState.back, gpBack);
-    moveState.left = Math.max(moveState.left, gpLeft);
-    moveState.right = Math.max(moveState.right, gpRight);
+    // The X-axis for gamepad movement logic was a bit tangled. Let's simplify:
+    // If gamepad stick is left, set moveState.left. If right, set moveState.right.
+    // This needs to be ORed like forward/back.
+    // Original:
+    // if (leftStickX > gamepadDeadZone) gpLeft = 1; (This was mapped to player's left movement key 'D')
+    // else if (leftStickX < -gamepadDeadZone) gpRight = 1; (This was mapped to player's right movement key 'A')
+    // moveState.left = Math.max(moveState.left, gpLeft);
+    // moveState.right = Math.max(moveState.right, gpRight);
+
+    // Corrected mapping based on how `moveState.left` and `moveState.right` are used:
+    let gpMoveLeft = 0, gpMoveRight = 0;
+    if (leftStickX < -gamepadDeadZone) gpMoveLeft = 1; // Gamepad stick physically left
+    else if (leftStickX > gamepadDeadZone) gpMoveRight = 1; // Gamepad stick physically right
+    
+    moveState.left = Math.max(moveState.left, gpMoveLeft);   // Player moves left
+    moveState.right = Math.max(moveState.right, gpMoveRight); // Player moves right
+
 
     let lookX = 0, lookY = 0;
     if (Math.abs(rightStickX) > gamepadDeadZone) lookX = rightStickX;
@@ -547,9 +623,153 @@ function handleGamepadInput(delta) {
     }
 }
 
+// --- Touch Controls Setup ---
+function setupTouchControls() {
+    touchControls.dPadContainer = document.getElementById('dPadContainer');
+    touchControls.left.element = document.getElementById('leftDPad');
+    touchControls.right.element = document.getElementById('rightDPad');
+
+    if (!touchControls.left.element || !touchControls.right.element || !touchControls.dPadContainer) {
+        console.error("D-Pad elements not found in HTML!");
+        return;
+    }
+    touchControls.dPadContainer.style.display = 'block'; // Show the D-pads
+
+    // Calculate D-Pad dimensions and centers after a short delay for layout
+    setTimeout(() => {
+        const leftRect = touchControls.left.element.getBoundingClientRect();
+        touchControls.left.rect = leftRect;
+        touchControls.left.center.x = leftRect.left + leftRect.width / 2;
+        touchControls.left.center.y = leftRect.top + leftRect.height / 2;
+        touchControls.left.radius = leftRect.width / 2;
+        touchControls.left.deadZone = touchControls.left.radius * TOUCH_DPAD_DEADZONE_RATIO;
+
+        const rightRect = touchControls.right.element.getBoundingClientRect();
+        touchControls.right.rect = rightRect;
+        touchControls.right.center.x = rightRect.left + rightRect.width / 2;
+        touchControls.right.center.y = rightRect.top + rightRect.height / 2;
+        touchControls.right.radius = rightRect.width / 2; // Radius for general touch area
+    }, 100);
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+}
+
+function isTouchOnElement(touch, elementControl) {
+    if (!elementControl.rect) return false;
+    return (
+        touch.clientX >= elementControl.rect.left &&
+        touch.clientX <= elementControl.rect.right &&
+        touch.clientY >= elementControl.rect.top &&
+        touch.clientY <= elementControl.rect.bottom
+    );
+}
+
+function handleTouchStart(event) {
+    if (!isMobileDevice) return;
+    // Iterate over all new touches
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+
+        if (touchControls.left.touchId === null && isTouchOnElement(touch, touchControls.left)) {
+            event.preventDefault(); // Prevent default only if we handle the touch on our controls
+            touchControls.left.touchId = touch.identifier;
+            updateLeftDPadState(touch);
+        } else if (touchControls.right.touchId === null && isTouchOnElement(touch, touchControls.right)) {
+            event.preventDefault();
+            touchControls.right.touchId = touch.identifier;
+            touchControls.right.startPos.x = touch.clientX;
+            touchControls.right.startPos.y = touch.clientY;
+        }
+    }
+}
+
+function handleTouchMove(event) {
+    if (!isMobileDevice) return;
+    // Iterate over all moved touches
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+
+        if (touch.identifier === touchControls.left.touchId) {
+            event.preventDefault();
+            updateLeftDPadState(touch);
+        } else if (touch.identifier === touchControls.right.touchId) {
+            event.preventDefault();
+            const deltaX = touch.clientX - touchControls.right.startPos.x;
+            const deltaY = touch.clientY - touchControls.right.startPos.y;
+            
+            rotateCamera(deltaX * TOUCH_LOOK_SENSITIVITY, deltaY * TOUCH_LOOK_SENSITIVITY);
+
+            touchControls.right.startPos.x = touch.clientX;
+            touchControls.right.startPos.y = touch.clientY;
+        }
+    }
+}
+
+function handleTouchEnd(event) {
+    if (!isMobileDevice) return;
+    // Iterate over all ended touches
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+
+        if (touch.identifier === touchControls.left.touchId) {
+            event.preventDefault();
+            touchControls.left.touchId = null;
+            moveState.forward = 0;
+            moveState.back = 0;
+            moveState.left = 0;
+            moveState.right = 0;
+        } else if (touch.identifier === touchControls.right.touchId) {
+            event.preventDefault();
+            touchControls.right.touchId = null;
+            // No action needed for look, it just stops receiving updates
+        }
+    }
+}
+
+function updateLeftDPadState(touch) {
+    if (!touchControls.left.rect) return;
+
+    const dx = touch.clientX - touchControls.left.center.x;
+    const dy = touch.clientY - touchControls.left.center.y;
+    const distSq = dx * dx + dy * dy;
+
+    moveState.forward = 0;
+    moveState.back = 0;
+    moveState.left = 0;
+    moveState.right = 0;
+
+    if (distSq < touchControls.left.deadZone * touchControls.left.deadZone) {
+        return; // Inside deadzone
+    }
+
+    const angle = Math.atan2(dy, dx); // Angle: 0 to right, PI/2 down, PI left, -PI/2 up
+
+    // Define angle ranges for 4-way movement (each gets PI/2 or 90 degrees slice)
+    // Right: -PI/4 to PI/4
+    // Down:  PI/4 to 3PI/4
+    // Left:  3PI/4 to 5PI/4 (or -3PI/4 using atan2's -PI to PI range)
+    // Up:   -3PI/4 to -PI/4
+
+    if (angle > -Math.PI / 4 && angle <= Math.PI / 4) { // Right
+        moveState.right = 1;
+    } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) { // Down (towards bottom of screen)
+        moveState.back = 1;
+    } else if (angle > 3 * Math.PI / 4 || angle <= -3 * Math.PI / 4) { // Left
+        moveState.left = 1;
+    } else if (angle > -3 * Math.PI / 4 && angle <= -Math.PI / 4) { // Up (towards top of screen)
+        moveState.forward = 1;
+    }
+}
+
+
 function updateMovement(delta) {
-    const keyboardState = { ...moveState }; // Preserve keyboard state
-    handleGamepadInput(delta); // Update moveState from gamepad, potentially ORing with keyboard
+    // Note: The original code's keyboardState backup/restore for gamepad input
+    // is maintained. Touch input modifies moveState directly, similar to keyboard.
+    const keyboardState = { ...moveState }; 
+    handleGamepadInput(delta); 
 
     const moveDistance = moveSpeed * delta;
     const velocity = new THREE.Vector3();
@@ -562,28 +782,36 @@ function updateMovement(delta) {
     const rightDirection = new THREE.Vector3().crossVectors(camera.up, worldDirection).normalize();
 
     let moveZ = (moveState.forward ? 1 : 0) - (moveState.back ? 1 : 0);
-    let moveX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0);
+    let moveX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0); // Corrected this line, was (left ? 1) - (right ? 1) in some earlier user versions.
+                                                                    // This maps: moveState.right=1 -> positive moveX (strafe right)
+                                                                    // moveState.left=1 -> negative moveX (strafe left)
+                                                                    // Which is consistent with how 'A'/'D' usually work.
 
     velocity.add(worldDirection.multiplyScalar(moveZ));
     velocity.add(rightDirection.multiplyScalar(moveX));
 
-    // Restore keyboard state for next frame's independent check
+    // Restore keyboard state for next frame's independent check by gamepad
+    // (This ensures gamepad ORs correctly with pure keyboard state each frame)
     moveState.forward = keyboardState.forward;
     moveState.back = keyboardState.back;
     moveState.left = keyboardState.left;
     moveState.right = keyboardState.right;
+    // Now, re-apply gamepad contributions ON TOP of this restored keyboard state
+    // This is already done inside handleGamepadInput with Math.max, which is good.
+    // The current moveState (which was just used for velocity calculation)
+    // reflects the combined input of keyboard, touch, and gamepad for THIS frame.
+    // The backup/restore seems intended to ensure handleGamepadInput always works from a clean keyboard slate.
 
     if (velocity.lengthSq() > 0) {
         velocity.normalize().multiplyScalar(moveDistance);
     } else {
-        return; // No movement input
+        return; 
     }
 
     const currentPos = camera.position;
     let finalVelocity = velocity.clone();
 
     // --- Wall Collision (Grid-based) ---
-    // Colisión en X
     const nextPlayerPosX_wall = currentPos.x + finalVelocity.x;
     const gridXToCheck_wall = Math.floor((nextPlayerPosX_wall + PLAYER_RADIUS * Math.sign(finalVelocity.x)) / TILE_SIZE);
     const currentGridZ_wall = Math.floor(currentPos.z / TILE_SIZE);
@@ -591,7 +819,6 @@ function updateMovement(delta) {
         finalVelocity.x = 0;
     }
 
-    // Colisión en Z
     const nextPlayerPosZ_wall = currentPos.z + finalVelocity.z;
     const gridZToCheck_wall = Math.floor((nextPlayerPosZ_wall + PLAYER_RADIUS * Math.sign(finalVelocity.z)) / TILE_SIZE);
     const currentGridX_wall = Math.floor(currentPos.x / TILE_SIZE);
@@ -599,79 +826,68 @@ function updateMovement(delta) {
         finalVelocity.z = 0;
     }
     
-    // Diagonal wall collision (prevents corner snagging on grid walls)
     if (velocity.x !== 0 && finalVelocity.x === 0 && velocity.z !== 0 && finalVelocity.z === 0) {
         const cornerGridX = Math.floor((currentPos.x + velocity.x + PLAYER_RADIUS * Math.sign(velocity.x)) / TILE_SIZE);
         const cornerGridZ = Math.floor((currentPos.z + velocity.z + PLAYER_RADIUS * Math.sign(velocity.z)) / TILE_SIZE);
         if (isActualWallAt(cornerGridX, cornerGridZ)) {
-             // Blocked by diagonal wall, finalVelocity (0,0) is correct
+            // Blocked
         }
     }
     
     // --- Model Collision (Capsule-based) ---
-    let allowedVelocityForModels = finalVelocity.clone(); // Start with velocity allowed by walls
+    let allowedVelocityForModels = finalVelocity.clone(); 
 
     for (const capsule of modelCollisionCapsules) {
-        // Check X-component of current allowed velocity
         if (allowedVelocityForModels.x !== 0) {
             const testVelX = new THREE.Vector3(allowedVelocityForModels.x, 0, 0);
             if (checkCapsuleCollision(currentPos, testVelX, capsule)) {
-                allowedVelocityForModels.x = 0; // Block X-movement if it collides with this capsule
+                allowedVelocityForModels.x = 0;
             }
         }
-        // Check Z-component of current allowed velocity (could have been modified by X check or other capsules)
         if (allowedVelocityForModels.z !== 0) {
             const testVelZ = new THREE.Vector3(0, 0, allowedVelocityForModels.z);
             if (checkCapsuleCollision(currentPos, testVelZ, capsule)) {
-                allowedVelocityForModels.z = 0; // Block Z-movement if it collides with this capsule
+                allowedVelocityForModels.z = 0;
             }
         }
-        // Optimization: if movement is fully blocked, no need to check more capsules
-        // if (allowedVelocityForModels.x === 0 && allowedVelocityForModels.z === 0) break; 
     }
     finalVelocity.copy(allowedVelocityForModels);
 
-
     camera.position.add(finalVelocity);
-    camera.position.y = WALL_HEIGHT / 2; // Mantener altura constante
+    camera.position.y = WALL_HEIGHT / 2;
 }
 
 function checkCapsuleCollision(playerCurrentPos, playerMoveVec, capsule) {
     const nextPlayerPosX = playerCurrentPos.x + playerMoveVec.x;
     const nextPlayerPosZ = playerCurrentPos.z + playerMoveVec.z;
 
-    // XZ plane collision (circle vs circle)
-    const dx = nextPlayerPosX - capsule.worldPosition.x; // capsule.worldPosition is its base center
+    const dx = nextPlayerPosX - capsule.worldPosition.x;
     const dz = nextPlayerPosZ - capsule.worldPosition.z;
     const distanceSqXZ = dx * dx + dz * dz;
     const minSeparationDist = PLAYER_RADIUS + capsule.radius;
 
     if (distanceSqXZ < minSeparationDist * minSeparationDist) {
-        // Potential XZ collision, now check Y axis overlap
         const playerHeight = WALL_HEIGHT * PLAYER_COLLISION_HEIGHT_FACTOR;
         const playerMinY = playerCurrentPos.y - playerHeight / 2;
         const playerMaxY = playerCurrentPos.y + playerHeight / 2;
 
-        const capsuleMinY = capsule.worldPosition.y; // Base of the model
+        const capsuleMinY = capsule.worldPosition.y;
         const capsuleMaxY = capsule.worldPosition.y + capsule.height;
 
         if (playerMaxY > capsuleMinY && playerMinY < capsuleMaxY) {
-            return true; // Collision detected
+            return true;
         }
     }
-    return false; // No collision
+    return false;
 }
 
-
-// Checks for actual walls (type > 0), ignoring empty space (0) and models (<0)
 function isActualWallAt(gridX, gridZ) {
     if (gridX < 0 || gridX >= mapWidth || gridZ < 0 || gridZ >= mapHeight) {
-        return true; // Out of bounds is a wall
+        return true;
     }
     const cellType = wallMap[gridZ]?.[gridX];
-    return cellType !== undefined && cellType > 0; // Only positive values are walls
+    return cellType !== undefined && cellType > 0;
 }
-
 
 // --- Bucle de Animación ---
 function animate() {
@@ -679,7 +895,7 @@ function animate() {
     const delta = clock.getDelta();
 
     if (stats) stats.begin();
-    updateMovement(delta);
+    updateMovement(delta); // Handles all input internally now
     renderer.render(scene, camera);
     if (stats) stats.end();
 }
@@ -689,6 +905,26 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+
+    if (isMobileDevice) { // Update D-Pad rects on resize
+        setTimeout(() => {
+            if (touchControls.left.element) {
+                const leftRect = touchControls.left.element.getBoundingClientRect();
+                touchControls.left.rect = leftRect;
+                touchControls.left.center.x = leftRect.left + leftRect.width / 2;
+                touchControls.left.center.y = leftRect.top + leftRect.height / 2;
+                touchControls.left.radius = leftRect.width / 2;
+                touchControls.left.deadZone = touchControls.left.radius * TOUCH_DPAD_DEADZONE_RATIO;
+            }
+            if (touchControls.right.element) {
+                const rightRect = touchControls.right.element.getBoundingClientRect();
+                touchControls.right.rect = rightRect;
+                touchControls.right.center.x = rightRect.left + rightRect.width / 2;
+                touchControls.right.center.y = rightRect.top + rightRect.height / 2;
+                touchControls.right.radius = rightRect.width / 2;
+            }
+        }, 100); // Delay for layout
+    }
 }
 
 // --- ¡Empezar! ---
