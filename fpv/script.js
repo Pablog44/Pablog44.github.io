@@ -14,8 +14,12 @@ const PLAYER_RADIUS = TILE_SIZE * 0.2; // Radio de colisión del jugador
 const PLAYER_COLLISION_HEIGHT_FACTOR = 0.9; // Factor para la altura de colisión del jugador (0.9 = 90% de WALL_HEIGHT)
 
 // --- Touch Control Config ---
-const TOUCH_LOOK_SENSITIVITY = 0.004; // Sensibilidad para la vista táctil
+const TOUCH_LOOK_SENSITIVITY = 0.004; // Sensibilidad para la vista táctil (swipe original)
 const TOUCH_DPAD_DEADZONE_RATIO = 0.15; // 15% del radio del D-Pad como zona muerta
+// NUEVAS CONSTANTES PARA EL JOYSTICK DE VISTA
+const TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de vista (ajusta según sea necesario)
+const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
+
 
 // --- Datos del Mapa (¡Aquí defines tus mapas!) ---
 // 0 = Espacio vacío
@@ -114,9 +118,13 @@ let touchControls = { // Object to store touch control state
         element: null,
         rect: null,
         touchId: null,
-        startPos: { x: 0, y: 0 },
-        center: { x: 0, y: 0 }, // Added for consistency, though less critical for look
-        radius: 0
+        center: { x: 0, y: 0 },
+        radius: 0,
+        // startPos: { x: 0, y: 0 }, // No se usará para el joystick de vista, pero se puede dejar si se alterna
+        isActive: false,       // Para saber si el joystick de vista está activo
+        currentRelX: 0,        // Posición X relativa del dedo (-1 a 1)
+        currentRelY: 0,        // Posición Y relativa del dedo (-1 a 1)
+        deadZone: 0            // Zona muerta para el joystick de vista
     }
 };
 
@@ -608,7 +616,6 @@ function setupTouchControls() {
     }
     touchControls.dPadContainer.style.display = 'block'; // Show the D-pads
 
-    // Calculate D-Pad dimensions and centers after a short delay for layout
     setTimeout(() => {
         const leftRect = touchControls.left.element.getBoundingClientRect();
         touchControls.left.rect = leftRect;
@@ -621,7 +628,13 @@ function setupTouchControls() {
         touchControls.right.rect = rightRect;
         touchControls.right.center.x = rightRect.left + rightRect.width / 2;
         touchControls.right.center.y = rightRect.top + rightRect.height / 2;
-        touchControls.right.radius = rightRect.width / 2; // Radius for general touch area
+        touchControls.right.radius = rightRect.width / 2; 
+        touchControls.right.deadZone = touchControls.right.radius * TOUCH_LOOK_DEADZONE_RATIO; 
+
+        touchControls.right.isActive = false;
+        touchControls.right.currentRelX = 0;
+        touchControls.right.currentRelY = 0;
+
     }, 100);
 
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -640,28 +653,45 @@ function isTouchOnElement(touch, elementControl) {
     );
 }
 
+function updateRightJoystickState(touch) {
+    if (!touchControls.right.rect || touchControls.right.radius === 0) return;
+
+    let relX = (touch.clientX - touchControls.right.center.x);
+    let relY = (touch.clientY - touchControls.right.center.y);
+
+    touchControls.right.currentRelX = relX / touchControls.right.radius;
+    touchControls.right.currentRelY = relY / touchControls.right.radius;
+
+    const magnitude = Math.sqrt(touchControls.right.currentRelX * touchControls.right.currentRelX + touchControls.right.currentRelY * touchControls.right.currentRelY);
+    if (magnitude > 1) {
+        touchControls.right.currentRelX /= magnitude;
+        touchControls.right.currentRelY /= magnitude;
+    }
+}
+
 function handleTouchStart(event) {
     if (!isMobileDevice) return;
-    // Iterate over all new touches
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
         if (touchControls.left.touchId === null && isTouchOnElement(touch, touchControls.left)) {
-            event.preventDefault(); // Prevent default only if we handle the touch on our controls
+            event.preventDefault(); 
             touchControls.left.touchId = touch.identifier;
             updateLeftDPadState(touch);
         } else if (touchControls.right.touchId === null && isTouchOnElement(touch, touchControls.right)) {
             event.preventDefault();
             touchControls.right.touchId = touch.identifier;
-            touchControls.right.startPos.x = touch.clientX;
-            touchControls.right.startPos.y = touch.clientY;
+            touchControls.right.isActive = true; 
+            updateRightJoystickState(touch); 
+            // Si usabas startPos para swipe, ya no es necesario para el joystick:
+            // touchControls.right.startPos.x = touch.clientX;
+            // touchControls.right.startPos.y = touch.clientY;
         }
     }
 }
 
 function handleTouchMove(event) {
     if (!isMobileDevice) return;
-    // Iterate over all moved touches
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
@@ -670,20 +700,21 @@ function handleTouchMove(event) {
             updateLeftDPadState(touch);
         } else if (touch.identifier === touchControls.right.touchId) {
             event.preventDefault();
-            const deltaX = touch.clientX - touchControls.right.startPos.x;
-            const deltaY = touch.clientY - touchControls.right.startPos.y;
-            
-            rotateCamera(deltaX * TOUCH_LOOK_SENSITIVITY, deltaY * TOUCH_LOOK_SENSITIVITY);
-
-            touchControls.right.startPos.x = touch.clientX;
-            touchControls.right.startPos.y = touch.clientY;
+            if (touchControls.right.isActive) {
+                updateRightJoystickState(touch); 
+            }
+            // La rotación se maneja en handleTouchLook, no directamente aquí
+            // const deltaX = touch.clientX - touchControls.right.startPos.x;
+            // const deltaY = touch.clientY - touchControls.right.startPos.y;
+            // rotateCamera(deltaX * TOUCH_LOOK_SENSITIVITY, deltaY * TOUCH_LOOK_SENSITIVITY);
+            // touchControls.right.startPos.x = touch.clientX;
+            // touchControls.right.startPos.y = touch.clientY;
         }
     }
 }
 
 function handleTouchEnd(event) {
     if (!isMobileDevice) return;
-    // Iterate over all ended touches
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
@@ -697,7 +728,9 @@ function handleTouchEnd(event) {
         } else if (touch.identifier === touchControls.right.touchId) {
             event.preventDefault();
             touchControls.right.touchId = null;
-            // No action needed for look, it just stops receiving updates
+            touchControls.right.isActive = false; 
+            touchControls.right.currentRelX = 0;  
+            touchControls.right.currentRelY = 0;
         }
     }
 }
@@ -711,36 +744,54 @@ function updateLeftDPadState(touch) {
 
     moveState.forward = 0;
     moveState.back = 0;
-    moveState.left = 0;  // Representa la intención de moverse a la DERECHA en tu sistema actual
-    moveState.right = 0; // Representa la intención de moverse a la IZQUIERDA en tu sistema actual
+    moveState.left = 0;
+    moveState.right = 0;
 
     if (distSq < touchControls.left.deadZone * touchControls.left.deadZone) {
-        return; // Inside deadzone
+        return; 
     }
 
-    const angle = Math.atan2(dy, dx); // Angle: 0 to right, PI/2 down, PI left, -PI/2 up
+    const angle = Math.atan2(dy, dx);
 
-    // Define angle ranges for 4-way movement
-    // Right: -PI/4 to PI/4
-    // Down:  PI/4 to 3PI/4
-    // Left:  3PI/4 to 5PI/4 (or -3PI/4 using atan2's -PI to PI range)
-    // Up:   -3PI/4 to -PI/4
-
-    if (angle > -Math.PI / 4 && angle <= Math.PI / 4) { // Tocar el segmento DERECHO del D-Pad
-        moveState.left = 1; // Activar "intención de moverse a la DERECHA"
-    } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) { // Tocar ABAJO (hacia la parte inferior de la pantalla)
+    if (angle > -Math.PI / 4 && angle <= Math.PI / 4) {
+        moveState.left = 1; 
+    } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) {
         moveState.back = 1;
-    } else if (angle > 3 * Math.PI / 4 || angle <= -3 * Math.PI / 4) { // Tocar el segmento IZQUIERDO del D-Pad
-        moveState.right = 1; // Activar "intención de moverse a la IZQUIERDA"
-    } else if (angle > -3 * Math.PI / 4 && angle <= -Math.PI / 4) { // Tocar ARRIBA (hacia la parte superior de la pantalla)
+    } else if (angle > 3 * Math.PI / 4 || angle <= -3 * Math.PI / 4) {
+        moveState.right = 1; 
+    } else if (angle > -3 * Math.PI / 4 && angle <= -Math.PI / 4) {
         moveState.forward = 1;
+    }
+}
+
+function handleTouchLook(delta) {
+    if (!isMobileDevice || !touchControls.right.isActive) {
+        return;
+    }
+
+    let lookX = touchControls.right.currentRelX;
+    let lookY = touchControls.right.currentRelY;
+
+    const magnitudeSq = lookX * lookX + lookY * lookY;
+    // La deadzone del control derecho (touchControls.right.deadZone) es un valor de radio (e.g., 0.1 * radio_del_control)
+    // currentRelX/Y están normalizados por el radio, así que su magnitud combinada
+    // debe compararse con (TOUCH_LOOK_DEADZONE_RATIO)^2 (ya que magnitudeSq es cuadrado)
+    // O, alternativamente, comparamos la magnitud con TOUCH_LOOK_DEADZONE_RATIO si calculamos Math.sqrt(magnitudeSq)
+    // Aquí usaremos la comparación de cuadrados para evitar un sqrt innecesario
+    if (magnitudeSq < TOUCH_LOOK_DEADZONE_RATIO * TOUCH_LOOK_DEADZONE_RATIO) {
+        lookX = 0;
+        lookY = 0;
+    }
+
+    if (lookX !== 0 || lookY !== 0) {
+        const deltaLookX = lookX * TOUCH_JOYSTICK_LOOK_SENSITIVITY * delta;
+        const deltaLookY = lookY * TOUCH_JOYSTICK_LOOK_SENSITIVITY * delta;
+        rotateCamera(deltaLookX, deltaLookY);
     }
 }
 
 
 function updateMovement(delta) {
-    // Note: The original code's keyboardState backup/restore for gamepad input
-    // is maintained. Touch input modifies moveState directly, similar to keyboard.
     const keyboardState = { ...moveState }; 
     handleGamepadInput(delta); 
 
@@ -755,26 +806,16 @@ function updateMovement(delta) {
     const rightDirection = new THREE.Vector3().crossVectors(camera.up, worldDirection).normalize();
 
     let moveZ = (moveState.forward ? 1 : 0) - (moveState.back ? 1 : 0);
-    let moveX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0); // Corrected this line, was (left ? 1) - (right ? 1) in some earlier user versions.
-                                                                    // This maps: moveState.right=1 -> positive moveX (strafe right)
-                                                                    // moveState.left=1 -> negative moveX (strafe left)
-                                                                    // Which is consistent with how 'A'/'D' usually work.
+    let moveX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0); 
 
     velocity.add(worldDirection.multiplyScalar(moveZ));
     velocity.add(rightDirection.multiplyScalar(moveX));
 
-    // Restore keyboard state for next frame's independent check by gamepad
-    // (This ensures gamepad ORs correctly with pure keyboard state each frame)
     moveState.forward = keyboardState.forward;
     moveState.back = keyboardState.back;
     moveState.left = keyboardState.left;
     moveState.right = keyboardState.right;
-    // Now, re-apply gamepad contributions ON TOP of this restored keyboard state
-    // This is already done inside handleGamepadInput with Math.max, which is good.
-    // The current moveState (which was just used for velocity calculation)
-    // reflects the combined input of keyboard, touch, and gamepad for THIS frame.
-    // The backup/restore seems intended to ensure handleGamepadInput always works from a clean keyboard slate.
-
+    
     if (velocity.lengthSq() > 0) {
         velocity.normalize().multiplyScalar(moveDistance);
     } else {
@@ -784,7 +825,6 @@ function updateMovement(delta) {
     const currentPos = camera.position;
     let finalVelocity = velocity.clone();
 
-    // --- Wall Collision (Grid-based) ---
     const nextPlayerPosX_wall = currentPos.x + finalVelocity.x;
     const gridXToCheck_wall = Math.floor((nextPlayerPosX_wall + PLAYER_RADIUS * Math.sign(finalVelocity.x)) / TILE_SIZE);
     const currentGridZ_wall = Math.floor(currentPos.z / TILE_SIZE);
@@ -807,7 +847,6 @@ function updateMovement(delta) {
         }
     }
     
-    // --- Model Collision (Capsule-based) ---
     let allowedVelocityForModels = finalVelocity.clone(); 
 
     for (const capsule of modelCollisionCapsules) {
@@ -868,7 +907,12 @@ function animate() {
     const delta = clock.getDelta();
 
     if (stats) stats.begin();
-    updateMovement(delta); // Handles all input internally now
+
+    if (isMobileDevice) { 
+        handleTouchLook(delta); 
+    }
+    updateMovement(delta); 
+    
     renderer.render(scene, camera);
     if (stats) stats.end();
 }
@@ -879,7 +923,7 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    if (isMobileDevice) { // Update D-Pad rects on resize
+    if (isMobileDevice) { 
         setTimeout(() => {
             if (touchControls.left.element) {
                 const leftRect = touchControls.left.element.getBoundingClientRect();
@@ -895,8 +939,9 @@ function onWindowResize() {
                 touchControls.right.center.x = rightRect.left + rightRect.width / 2;
                 touchControls.right.center.y = rightRect.top + rightRect.height / 2;
                 touchControls.right.radius = rightRect.width / 2;
+                touchControls.right.deadZone = touchControls.right.radius * TOUCH_LOOK_DEADZONE_RATIO; 
             }
-        }, 100); // Delay for layout
+        }, 100); 
     }
 }
 
