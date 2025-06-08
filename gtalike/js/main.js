@@ -16,7 +16,8 @@ const inputState = {
 };
 
 const crosshair = document.getElementById('crosshair');
-const gameCanvas = document.getElementById('gameCanvas'); // Obtener el canvas
+const gameCanvas = document.getElementById('gameCanvas');
+const mobileControlsContainer = document.getElementById('mobileControls'); // For mobile controls
 
 // --- Configuración Inicial ---
 function init() {
@@ -33,10 +34,9 @@ function init() {
     camera.position.set(0, 5, 10);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true }); // Usar el canvas obtenido
+    renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    // document.body.appendChild(renderer.domElement); // No es necesario si se pasa el canvas al constructor
 
     // Luces
     ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
@@ -61,6 +61,7 @@ function init() {
     createVehicles(5);
     createPedestrians(15);
     setupInputHandlers();
+    setupMobileControls(); // New function for mobile
 
     animate();
 }
@@ -103,13 +104,15 @@ function createPlayer() {
     const playerMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
     player = new THREE.Mesh(playerGeo, playerMat);
     player.castShadow = true;
-    player.position.y = 0.8;
+    player.position.y = 0.8; // Height of capsule center
     scene.add(player);
 }
 
 function createVehicles(count) {
     const carColors = [0xff0000, 0x0000ff, 0xffff00, 0x00ffff, 0xff00ff, 0x888888];
-    const carGeo = new THREE.BoxGeometry(4, 1.8, 2.2);
+    // FIX: Corrected car geometry: width, height, LENGTH.
+    // Length (depth/Z-axis) should be the longest dimension for forward movement.
+    const carGeo = new THREE.BoxGeometry(2.2, 1.8, 4);
     for (let i = 0; i < count; i++) {
         const carMat = new THREE.MeshStandardMaterial({ color: carColors[i % carColors.length] });
         const vehicle = new THREE.Mesh(carGeo, carMat);
@@ -117,7 +120,7 @@ function createVehicles(count) {
         vehicle.receiveShadow = true;
         vehicle.position.set(
             (Math.random() - 0.5) * 80 + 10,
-            0.9,
+            0.9, // Half of car height
             (Math.random() - 0.5) * 80 + 10
         );
         vehicle.userData = { id: `car_${i}`, speed: 0, steering: 0 };
@@ -127,14 +130,14 @@ function createVehicles(count) {
 }
 
 function createPedestrians(count) {
-    const pedGeo = new THREE.SphereGeometry(0.5, 16, 16);
+    const pedGeo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8); // Slightly more human-like
     for (let i = 0; i < count; i++) {
         const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
         const pedestrian = new THREE.Mesh(pedGeo, pedMat);
         pedestrian.castShadow = true;
         pedestrian.position.set(
             (Math.random() - 0.5) * 150,
-            0.5,
+            0.8, // Half of capsule height
             (Math.random() - 0.5) * 150
         );
         pedestrian.userData = {
@@ -166,7 +169,7 @@ function setupInputHandlers() {
             case 's': inputState.backward = 0; break;
             case 'a': inputState.left = 0; break;
             case 'd': inputState.right = 0; break;
-            case 'f': inputState.action = false; break;
+            case 'f': inputState.action = false; break; // Important to reset here for keyup
             case 'shift': inputState.run = false; break;
         }
     });
@@ -177,6 +180,49 @@ function setupInputHandlers() {
         if (event.button === 0) inputState.shoot = false;
     });
 }
+
+function setupMobileControls() {
+    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    if (!isTouchDevice || !mobileControlsContainer) return;
+
+    mobileControlsContainer.style.display = 'flex'; // Show controls
+
+    const controlsMap = {
+        'mc-forward': 'forward',
+        'mc-backward': 'backward',
+        'mc-left': 'left',
+        'mc-right': 'right',
+        'mc-action': 'action',
+        'mc-run': 'run',
+        'mc-shoot': 'shoot'
+    };
+
+    for (const id in controlsMap) {
+        const button = document.getElementById(id);
+        if (button) {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                inputState[controlsMap[id]] = true;
+                if (id === 'mc-action') { // For action, it's a one-shot
+                    // The action flag will be consumed in update loop
+                }
+            }, { passive: false });
+
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                // For continuous actions like movement/run/shoot, reset on touchend.
+                // Action 'f' is different, it's a press, not hold.
+                // But since action is reset after use, this is okay.
+                if (controlsMap[id] !== 'action') { // Action is reset after use
+                     inputState[controlsMap[id]] = false;
+                }
+                // For action button, we want it to behave like a key press
+                // Setting it to true on touchstart is enough, it will be reset in main loop
+            }, { passive: false });
+        }
+    }
+}
+
 
 // --- Lógica de Juego (Actualizaciones) ---
 function updatePlayer(deltaTime) {
@@ -196,72 +242,86 @@ function updatePlayer(deltaTime) {
         player.position.addScaledVector(moveDirection, currentSpeed * deltaTime);
     }
 
-    // Simple colisión con "edificios" (retroceder)
     scene.children.forEach(obj => {
-        if (obj.geometry instanceof THREE.BoxGeometry && obj !== player && obj !== currentVehicle && !(obj.geometry instanceof THREE.PlaneGeometry)) {
-            // AABB check (simplified)
+        if (obj.geometry instanceof THREE.BoxGeometry && obj !== player && !(obj.geometry instanceof THREE.PlaneGeometry)) {
             const playerBox = new THREE.Box3().setFromObject(player);
             const buildingBox = new THREE.Box3().setFromObject(obj);
             if (playerBox.intersectsBox(buildingBox)) {
-                 player.position.addScaledVector(moveDirection, -currentSpeed * deltaTime * 1.1); // Retrocede
+                 player.position.addScaledVector(moveDirection, -currentSpeed * deltaTime * 1.1);
             }
         }
     });
 
     if (inputState.action) {
+        // Moved toggleVehicleEntry call here for player-initiated action
         toggleVehicleEntry();
-        inputState.action = false;
+        inputState.action = false; // Consume the action
     }
 
     if (inputState.shoot) {
         shoot();
-        inputState.shoot = false;
+        inputState.shoot = false; // Consume the shoot action
     }
 }
 
 function updateVehicleControls(deltaTime) {
     if (!currentVehicle) return;
 
-    const driveSpeed = 15 * deltaTime;
-    let moveDirection = new THREE.Vector3();
-    let isDriving = false;
+    const driveSpeed = 15; // Base speed, deltaTime applied later
+    const turnSpeed = playerRotationSpeed * 0.7;
 
-    if (inputState.forward) { moveDirection.z -= 1; isDriving = true; }
-    if (inputState.backward) { moveDirection.z += 1; isDriving = true; }
-    if (inputState.left) currentVehicle.rotation.y += playerRotationSpeed * deltaTime * 0.7;
-    if (inputState.right) currentVehicle.rotation.y -= playerRotationSpeed * deltaTime * 0.7;
+    if (inputState.left) currentVehicle.rotation.y += turnSpeed * deltaTime;
+    if (inputState.right) currentVehicle.rotation.y -= turnSpeed * deltaTime;
 
-    if (isDriving) {
-        moveDirection.normalize().applyQuaternion(currentVehicle.quaternion);
-        currentVehicle.position.addScaledVector(moveDirection, driveSpeed);
+    let actualSpeed = 0;
+    if (inputState.forward) actualSpeed = driveSpeed;
+    if (inputState.backward) actualSpeed = -driveSpeed / 2; // Slower reverse
+
+    if (actualSpeed !== 0) {
+        // Correct forward vector based on vehicle's quaternion
+        const forward = new THREE.Vector3(0, 0, -1); // Local forward is -Z for Box
+        forward.applyQuaternion(currentVehicle.quaternion);
+        currentVehicle.position.addScaledVector(forward, actualSpeed * deltaTime);
+    }
+    
+    // Check for action to exit vehicle
+    if (inputState.action) {
+        toggleVehicleEntry(); // This will handle player repositioning
+        inputState.action = false; // Consume the action
     }
 
+
     pedestrians.forEach(ped => {
-        if (ped.userData.health > 0 && currentVehicle.position.distanceTo(ped.position) < 2.5) {
+        if (ped.userData.health > 0 && currentVehicle.position.distanceTo(ped.position) < 3) { // Adjusted collision radius
             console.log(`Peatón ${ped.userData.id} atropellado!`);
             ped.userData.health = 0;
-            ped.visible = false;
-            // Podrías añadir lógica para removerlo de la escena y del array pedestrians
-            // const index = pedestrians.indexOf(ped);
-            // if (index > -1) pedestrians.splice(index, 1);
-            // scene.remove(ped);
+            // Make them fall over or ragdoll instead of just disappearing
+            ped.rotation.x = Math.PI / 2;
+            ped.position.y = 0.2; // On the ground
+            // Could add: setTimeout(() => ped.visible = false, 5000);
         }
     });
 }
 
 function toggleVehicleEntry() {
     if (currentVehicle) {
-        player.position.copy(currentVehicle.position).add(new THREE.Vector3(2.5, 0, 0));
-        player.rotation.y = currentVehicle.rotation.y;
+        // Exiting vehicle
+        const exitOffset = new THREE.Vector3(1.5, 0, 0); // Offset to the car's local right side
+        exitOffset.applyQuaternion(currentVehicle.quaternion); // Rotate offset by car's rotation
+
+        player.position.copy(currentVehicle.position).add(exitOffset);
+        player.position.y = 0.8; // Ensure player is at correct height
+        player.rotation.copy(currentVehicle.rotation); // Match car's orientation initially
         player.visible = true;
         currentVehicle = null;
         crosshair.style.display = 'block';
     } else {
+        // Entering vehicle
         let closestCar = null;
         let minDistance = 3.5;
 
         vehicles.forEach(vehicle => {
-            if (!vehicle.visible) return;
+            if (!vehicle.visible) return; // Assuming cars can be destroyed/hidden
             const distance = player.position.distanceTo(vehicle.position);
             if (distance < minDistance) {
                 minDistance = distance;
@@ -273,8 +333,7 @@ function toggleVehicleEntry() {
             currentVehicle = closestCar;
             player.visible = false;
             crosshair.style.display = 'none';
-            player.position.copy(currentVehicle.position);
-            player.rotation.copy(currentVehicle.rotation);
+            // Player's logical position is now the car's; no need to move player mesh
         }
     }
 }
@@ -286,23 +345,26 @@ function shoot() {
     const shootOrigin = new THREE.Vector3();
     const shootDirection = new THREE.Vector3();
 
-    camera.getWorldPosition(shootOrigin);
+    camera.getWorldPosition(shootOrigin); // Shoot from camera
     camera.getWorldDirection(shootDirection);
 
     raycaster.set(shootOrigin, shootDirection);
 
     const livingPedestrians = pedestrians.filter(p => p.userData.health > 0 && p.visible);
-    const intersects = raycaster.intersectObjects(livingPedestrians); // No es necesario .map(p=>p)
+    const intersects = raycaster.intersectObjects(livingPedestrians);
 
     if (intersects.length > 0) {
         const hitObject = intersects[0].object;
+        // Find the pedestrian object from our array to access userData
         const hitPedestrian = pedestrians.find(p => p === hitObject);
         if (hitPedestrian) {
-            console.log(`Peatón ${hitPedestrian.userData.id} disparado!`);
+            console.log(`Peatón ${hitPedestrian.userData.id} disparado! Distancia: ${intersects[0].distance.toFixed(2)}`);
             hitPedestrian.userData.health -= 50;
             if (hitPedestrian.userData.health <= 0) {
                 console.log(`Peatón ${hitPedestrian.userData.id} eliminado.`);
-                hitPedestrian.visible = false;
+                hitPedestrian.rotation.x = Math.PI / 2; // Fall over
+                hitPedestrian.position.y = 0.2;
+                // setTimeout(() => hitPedestrian.visible = false, 5000); // Optional: remove after time
             } else {
                 hitPedestrian.userData.isFleeing = true;
                 const fleeDir = new THREE.Vector3().subVectors(hitPedestrian.position, player.position).normalize();
@@ -314,71 +376,101 @@ function shoot() {
 
 function updatePedestrians(deltaTime) {
     pedestrians.forEach(ped => {
-        if (ped.userData.health <= 0 || !ped.visible) return;
+        if (ped.userData.health <= 0) { // Keep them on ground if "dead"
+            if (ped.visible && ped.rotation.x !== Math.PI / 2) { // if not already "down"
+                 ped.rotation.x = Math.PI / 2;
+                 ped.position.y = 0.2;
+            }
+            return;
+        }
+        if(!ped.visible) return;
+
 
         const pedSpeed = ped.userData.isFleeing ? 4 : 1.5;
         const playerDistance = player.position.distanceTo(ped.position);
 
-        if (!ped.userData.isFleeing && !currentVehicle && playerDistance < 20 && inputState.shoot) {
+        // Pedestrians flee if player is shooting nearby (even if not at them)
+        if (!ped.userData.isFleeing && !currentVehicle && player.visible && playerDistance < 20 && inputState.shoot) {
              ped.userData.isFleeing = true;
+             // Set a flee target away from player
+             const fleeDirection = new THREE.Vector3().subVectors(ped.position, player.position).normalize();
+             ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 20 + 10));
         }
 
-        if (!ped.userData.isFleeing) {
-            vehicles.forEach(v => {
-                if (currentVehicle === v && v.position.distanceTo(ped.position) < 15) {
-                    ped.userData.isFleeing = true;
-                }
-            });
+        // Pedestrians flee from fast approaching player-controlled vehicles
+        if (!ped.userData.isFleeing && currentVehicle) {
+            const vehicleDistance = currentVehicle.position.distanceTo(ped.position);
+            // Check if vehicle is moving towards pedestrian (simplified)
+            const vehicleVelocity = new THREE.Vector3(0,0,-1).applyQuaternion(currentVehicle.quaternion); // Current direction
+            const dirToPed = new THREE.Vector3().subVectors(ped.position, currentVehicle.position).normalize();
+            const closingSpeedFactor = vehicleVelocity.dot(dirToPed); // Positive if moving towards
+
+            if (vehicleDistance < 15 && closingSpeedFactor > 0.5 ) { // Vehicle is somewhat close and heading towards ped
+                ped.userData.isFleeing = true;
+                const fleeDirection = new THREE.Vector3().subVectors(ped.position, currentVehicle.position).normalize();
+                ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 15 + 10));
+            }
         }
+
 
         if (ped.userData.isFleeing) {
             if (ped.position.distanceTo(ped.userData.targetPosition) < 2 || Math.random() < 0.01) {
-                 const sourceOfDanger = currentVehicle ? currentVehicle.position : player.position;
+                 const sourceOfDanger = currentVehicle ? currentVehicle.position : (player.visible ? player.position : ped.position); // if player not visible, don't use player pos
                  const fleeDirection = new THREE.Vector3().subVectors(ped.position, sourceOfDanger).normalize();
+                 // if fleeDirection is zero (e.g. sourceOfDanger is ped.position), pick random
+                 if (fleeDirection.lengthSq() < 0.01) {
+                    fleeDirection.set(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+                 }
                  ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 20 + 10));
             }
-        } else {
+        } else { // Wandering
             if (ped.position.distanceTo(ped.userData.targetPosition) < 1 || Math.random() < 0.01) {
                 ped.userData.targetPosition.set(
                     (Math.random() - 0.5) * 200,
-                    0.5,
+                    0.8, // Pedestrian height
                     (Math.random() - 0.5) * 200
                 );
             }
         }
 
-        const moveDirection = new THREE.Vector3().subVectors(ped.userData.targetPosition, ped.position).normalize();
+        const moveDirection = new THREE.Vector3().subVectors(ped.userData.targetPosition, ped.position);
+        moveDirection.y = 0; // Don't move up/down
+        moveDirection.normalize();
+
         ped.position.addScaledVector(moveDirection, pedSpeed * deltaTime);
-        if (moveDirection.lengthSq() > 0.01) {
-            ped.lookAt(ped.userData.targetPosition.x, ped.position.y, ped.userData.targetPosition.z);
+        if (moveDirection.lengthSq() > 0.01) { // Only look if actually moving
+            // Keep ped upright while looking
+            const lookAtPos = new THREE.Vector3(ped.userData.targetPosition.x, ped.position.y, ped.userData.targetPosition.z);
+            ped.lookAt(lookAtPos);
         }
 
-        // Simple colisión peatón-edificio
         scene.children.forEach(obj => {
              if (obj.geometry instanceof THREE.BoxGeometry && obj !== ped && !(obj.geometry instanceof THREE.PlaneGeometry)) {
                 const pedBox = new THREE.Box3().setFromObject(ped);
                 const buildingBox = new THREE.Box3().setFromObject(obj);
                 if (pedBox.intersectsBox(buildingBox)) {
-                    const avoidanceDir = new THREE.Vector3(moveDirection.z, 0, -moveDirection.x).normalize();
-                    ped.position.addScaledVector(avoidanceDir, pedSpeed * deltaTime * 0.5);
-                    ped.userData.targetPosition.addScaledVector(avoidanceDir, 5); // Cambia un poco el target
+                    // Simple avoidance: try to move perpendicular to collision building
+                    const avoidanceDir = new THREE.Vector3(moveDirection.z, 0, -moveDirection.x).normalize(); // Perpendicular
+                    ped.position.addScaledVector(avoidanceDir, pedSpeed * deltaTime * 0.5); // Move slightly
+                    ped.userData.targetPosition.addScaledVector(avoidanceDir, 5); // Adjust target
                 }
             }
         });
     });
 }
 
+
 function updateCamera(deltaTime) {
-    const cameraLookAtOffset = new THREE.Vector3(0, 1.5, 0); // Mirar un poco por encima del centro del target
+    const cameraLookAtOffset = new THREE.Vector3(0, 1.5, 0);
 
     if (currentVehicle) {
-        const offset = new THREE.Vector3(0, 5, 10); // Detrás y arriba
+        const offset = new THREE.Vector3(0, 4, 8); // Slightly adjusted for better view
         const cameraPosition = offset.applyMatrix4(currentVehicle.matrixWorld);
         camera.position.lerp(cameraPosition, 0.1);
         const lookAtPosition = new THREE.Vector3().copy(currentVehicle.position).add(cameraLookAtOffset);
         camera.lookAt(lookAtPosition);
-    } else if (player) {
-        const offset = new THREE.Vector3(0, 3, 5); // Detrás y arriba
+    } else if (player && player.visible) {
+        const offset = new THREE.Vector3(0, 2.5, 4.5); // Adjusted for player
         const cameraTargetPosition = new THREE.Vector3();
         player.getWorldPosition(cameraTargetPosition);
 
@@ -386,41 +478,33 @@ function updateCamera(deltaTime) {
         const cameraPosition = cameraTargetPosition.clone().add(cameraOffset);
 
         camera.position.lerp(cameraPosition, 0.1);
-        const lookAtPosition = cameraTargetPosition.clone().add(cameraLookAtOffset);
+        const lookAtPosition = cameraTargetPosition.clone().add(cameraLookAtOffset); // Look at player's center mass
         camera.lookAt(lookAtPosition);
     }
 }
 
 function updateDayNightCycle(deltaTime) {
     timeOfDay += deltaTime / dayDuration;
-    timeOfDay %= 1; // Mantener entre 0 y 1
+    timeOfDay %= 1;
 
-    const angle = timeOfDay * Math.PI * 2; // Ángulo completo en radianes
+    const angle = timeOfDay * Math.PI * 2;
 
-    // Posición del sol
-    sunLight.position.x = 50 * Math.cos(angle - Math.PI / 2); // Ajuste para que el mediodía sea arriba
+    sunLight.position.x = 50 * Math.cos(angle - Math.PI / 2);
     sunLight.position.y = 80 * Math.sin(angle - Math.PI / 2);
     sunLight.target.position.set(0, 0, 0);
 
-    // Colores e intensidades
     const daySkyColor = new THREE.Color(0x87CEEB);
     const nightSkyColor = new THREE.Color(0x000022);
     const dayFogColor = new THREE.Color(0x87CEEB);
     const nightFogColor = new THREE.Color(0x000022);
 
-    const sunIntensityFactor = Math.max(0, Math.sin(angle - Math.PI / 2)); // 0 (noche) a 1 (mediodía)
+    const sunIntensityFactor = Math.max(0, Math.sin(angle - Math.PI / 2));
 
     sunLight.intensity = 1.0 * sunIntensityFactor;
     ambientLight.intensity = 0.2 + 0.3 * sunIntensityFactor;
 
     scene.background.lerpColors(nightSkyColor, daySkyColor, sunIntensityFactor);
     scene.fog.color.lerpColors(nightFogColor, dayFogColor, sunIntensityFactor);
-
-    if (sunIntensityFactor < 0.1 && crosshair.style.display !== 'none') { // Noche
-        // Podrías añadir luces de calle aquí
-    } else { // Día
-        // Apagar luces de calle
-    }
 }
 
 // --- Bucle Principal de Animación ---
@@ -428,14 +512,15 @@ function animate() {
     requestAnimationFrame(animate);
     const deltaTime = clock.getDelta();
 
-    if (!currentVehicle) {
-        crosshair.style.display = 'block';
-    } else {
+    // Player/Vehicle updates first to handle input
+    if (currentVehicle) {
+        updateVehicleControls(deltaTime);
         crosshair.style.display = 'none';
+    } else {
+        updatePlayer(deltaTime); // updatePlayer now also handles toggleVehicleEntry for entering
+        crosshair.style.display = 'block';
     }
 
-    updatePlayer(deltaTime);
-    updateVehicleControls(deltaTime); // Renombrado para claridad
     updatePedestrians(deltaTime);
     updateCamera(deltaTime);
     updateDayNightCycle(deltaTime);

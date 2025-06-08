@@ -3,9 +3,12 @@ body {
     overflow: hidden;
     font-family: Arial, sans-serif;
     background-color: #000;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
 }
 
-canvas#gameCanvas { /* Aseguramos que se aplique al canvas correcto */
+canvas#gameCanvas {
     display: block;
 }
 
@@ -18,7 +21,7 @@ canvas#gameCanvas { /* Aseguramos que se aplique al canvas correcto */
     padding: 10px;
     border-radius: 5px;
     font-size: 14px;
-    z-index: 10; /* Para que esté por encima del canvas */
+    z-index: 10;
 }
 
 #crosshair {
@@ -31,5 +34,63 @@ canvas#gameCanvas { /* Aseguramos que se aplique al canvas correcto */
     transform: translate(-50%, -50%);
     border-radius: 50%;
     opacity: 0.5;
-    z-index: 10; /* Para que esté por encima del canvas */
+    z-index: 10;
+}
+
+#mobileControls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: none; /* Hidden by default, JS will show it */
+    justify-content: space-between;
+    align-items: flex-end; /* Align items to the bottom of the flex container */
+    padding: 0 20px;
+    z-index: 20;
+    pointer-events: none; /* Allow clicks to pass through container */
+}
+
+#mobileControls button {
+    background-color: rgba(100, 100, 100, 0.5);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    border-radius: 50%; /* Make them round */
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    touch-action: manipulation; /* Prevents double tap zoom */
+    pointer-events: auto; /* Enable pointer events for buttons */
+    width: 60px; /* Base size */
+    height: 60px; /* Base size */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 5px;
+}
+
+#mobileControls button:active {
+    background-color: rgba(150, 150, 150, 0.7);
+}
+
+.joystick-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.joystick-area div { /* Container for left, backward, right */
+    display: flex;
+}
+
+.action-buttons-area {
+    display: flex;
+    flex-direction: column; /* Stack action buttons vertically */
+    align-items: flex-end; /* Align to the right */
+}
+
+.action-buttons-area button {
+    width: 70px; /* Slightly larger action buttons */
+    height: 70px;
+    border-radius: 15px; /* More squarish */
+    margin-bottom: 10px;
 }

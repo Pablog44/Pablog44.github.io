@@ -2,20 +2,36 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini GTA-like Demo (3 Archivos)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> <!-- Added user-scalable=no -->
+    <title>Mini GTA-like Demo</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="info">
         Controles: <br>
-        WASD: Mover jugador / "Conducir" (mover cámara)<br>
-        F: Entrar/Salir del coche más cercano<br>
+        WASD: Mover jugador / Conducir<br>
+        F: Entrar/Salir del coche<br>
         Click Izquierdo: Disparar (a pie)<br>
         Shift: Correr (a pie)
     </div>
     <div id="crosshair" style="display: none;"></div>
     <canvas id="gameCanvas"></canvas>
+
+    <div id="mobileControls" style="display: none;">
+        <div class="joystick-area">
+            <button id="mc-forward">▲</button>
+            <div>
+                <button id="mc-left">◄</button>
+                <button id="mc-backward">▼</button>
+                <button id="mc-right">►</button>
+            </div>
+        </div>
+        <div class="action-buttons-area">
+            <button id="mc-run">Correr</button>
+            <button id="mc-action">Acción</button>
+            <button id="mc-shoot">Disparar</button>
+        </div>
+    </div>
 
     <script type="importmap">
         {
