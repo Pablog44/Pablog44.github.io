@@ -54,18 +54,19 @@ canvas#gameCanvas {
     background-color: rgba(100, 100, 100, 0.5);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.7);
-    border-radius: 50%; /* Make them round */
-    font-size: 18px;
+    border-radius: 15px; /* More squarish */
+    font-size: 16px;
     font-weight: bold;
     cursor: pointer;
     touch-action: manipulation; /* Prevents double tap zoom */
     pointer-events: auto; /* Enable pointer events for buttons */
-    width: 60px; /* Base size */
-    height: 60px; /* Base size */
+    width: 70px;
+    height: 70px;
     display: flex;
     justify-content: center;
     align-items: center;
     margin: 5px;
+    text-align: center;
 }
 
 #mobileControls button:active {
@@ -82,15 +83,14 @@ canvas#gameCanvas {
     display: flex;
 }
 
+.joystick-area button {
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+}
+
 .action-buttons-area {
     display: flex;
     flex-direction: column; /* Stack action buttons vertically */
     align-items: flex-end; /* Align to the right */
-}
-
-.action-buttons-area button {
-    width: 70px; /* Slightly larger action buttons */
-    height: 70px;
-    border-radius: 15px; /* More squarish */
-    margin-bottom: 10px;
 }

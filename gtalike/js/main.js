@@ -21,6 +21,7 @@ const inputState = {
 
 const crosshair = document.getElementById('crosshair');
 const gameCanvas = document.getElementById('gameCanvas');
+const mobileControlsContainer = document.getElementById('mobileControls');
 
 // --- Configuración Inicial ---
 function init() {
@@ -68,6 +69,7 @@ function init() {
     scene.add(pointerLockControls.getObject());
 
     setupInputHandlers();
+    setupMobileControls();
 
     animate();
 }
@@ -263,6 +265,48 @@ function setupInputHandlers() {
     });
 }
 
+function setupMobileControls() {
+    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    if (!isTouchDevice || !mobileControlsContainer) return;
+    mobileControlsContainer.style.display = 'flex';
+
+    const controlsMap = {
+        'mc-forward': 'forward', 'mc-backward': 'backward', 'mc-left': 'left',
+        'mc-right': 'right', 'mc-action': 'action', 'mc-run': 'run', 'mc-shoot': 'shoot'
+    };
+
+    for (const id in controlsMap) {
+        const button = document.getElementById(id);
+        if (button) {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                inputState[controlsMap[id]] = true;
+            }, { passive: false });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                // 'action' is a single press, not a hold
+                if (controlsMap[id] !== 'action') {
+                    inputState[controlsMap[id]] = false;
+                }
+            }, { passive: false });
+        }
+    }
+    
+    // Special handler for the new Aim button
+    const aimButton = document.getElementById('mc-aim');
+    if (aimButton) {
+        aimButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (currentVehicle || !player.visible) return;
+            if (pointerLockControls.isLocked) {
+                pointerLockControls.unlock();
+            } else {
+                pointerLockControls.lock();
+            }
+        }, { passive: false });
+    }
+}
+
 // --- Lógica de Juego (Actualizaciones) ---
 function updatePlayer(deltaTime) {
     if (!player || currentVehicle || !player.visible) return;
@@ -289,7 +333,7 @@ function updatePlayer(deltaTime) {
         // El jugador se alinea con la cámara
         player.rotation.y = pointerLockControls.getObject().rotation.y;
     } else {
-        // Rotación estilo "tanque" con A y D
+        // Rotación estilo "tanque" con A y D (o los botones izquiero/derecho en móvil)
         if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
         if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
     }
