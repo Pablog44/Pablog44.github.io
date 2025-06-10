@@ -16,13 +16,11 @@ let isFreelooking = false;
 
 const inputState = {
     forward: 0, backward: 0, left: 0, right: 0,
-    action: false, shoot: false, run: false,
-    freelook: false
+    action: false, shoot: false, run: false
 };
 
 const crosshair = document.getElementById('crosshair');
 const gameCanvas = document.getElementById('gameCanvas');
-const mobileControlsContainer = document.getElementById('mobileControls');
 
 // --- Configuración Inicial ---
 function init() {
@@ -64,12 +62,12 @@ function init() {
     });
     pointerLockControls.addEventListener('unlock', () => {
         isFreelooking = false;
+        crosshair.style.display = 'none';
         if (document.getElementById('info')) document.getElementById('info').style.display = 'block';
     });
     scene.add(pointerLockControls.getObject());
 
     setupInputHandlers();
-    setupMobileControls();
 
     animate();
 }
@@ -106,11 +104,27 @@ function createWorld() {
 }
 
 function createPlayer() {
-    const playerGeo = new THREE.CapsuleGeometry(0.4, 0.8, 8, 16);
-    const playerMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-    player = new THREE.Mesh(playerGeo, playerMat);
-    player.castShadow = true;
-    player.position.y = 0.4 + 0.8 / 2;
+    player = new THREE.Group();
+    const bodyRadius = 0.4;
+    const bodyHeight = 0.8;
+    const headRadius = 0.25;
+
+    const bodyGeo = new THREE.CapsuleGeometry(bodyRadius, bodyHeight, 8, 16);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true;
+    body.userData.type = 'body';
+    player.add(body);
+
+    const headGeo = new THREE.SphereGeometry(headRadius, 16, 12);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.castShadow = true;
+    head.position.y = (bodyHeight / 2) + headRadius * 0.8;
+    head.userData.type = 'head';
+    player.add(head);
+
+    player.position.y = bodyRadius + bodyHeight / 2;
     scene.add(player);
 }
 
@@ -134,14 +148,33 @@ function createVehicles(count) {
 }
 
 function createPedestrians(count) {
-    const pedGeo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
+    const bodyRadius = 0.3;
+    const bodyHeight = 1.0;
+    const headRadius = 0.2;
+    const bodyGeo = new THREE.CapsuleGeometry(bodyRadius, bodyHeight, 4, 8);
+    const headGeo = new THREE.SphereGeometry(headRadius, 12, 8);
+
     for (let i = 0; i < count; i++) {
-        const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
-        const pedestrian = new THREE.Mesh(pedGeo, pedMat);
-        pedestrian.castShadow = true;
+        const pedestrian = new THREE.Group();
+
+        const bodyMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.castShadow = true;
+        body.userData.type = 'body';
+        body.userData.parentGroup = pedestrian; // Reference to parent group
+        pedestrian.add(body);
+
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.castShadow = true;
+        head.position.y = (bodyHeight / 2) + headRadius * 0.8;
+        head.userData.type = 'head';
+        head.userData.parentGroup = pedestrian; // Reference to parent group
+        pedestrian.add(head);
+
         pedestrian.position.set(
             (Math.random() - 0.5) * 150,
-            0.3 + 1.0 / 2,
+            bodyRadius + bodyHeight / 2,
             (Math.random() - 0.5) * 150
         );
         pedestrian.userData = {
@@ -194,11 +227,6 @@ function setupInputHandlers() {
             case 'd': inputState.right = 1; break;
             case 'f': inputState.action = true; break;
             case 'shift': inputState.run = true; break;
-            case 'control':
-                if (event.code === 'ControlLeft' && !currentVehicle && player.visible) {
-                    pointerLockControls.lock();
-                }
-                break;
         }
     });
 
@@ -214,44 +242,25 @@ function setupInputHandlers() {
     });
 
     document.addEventListener('mousedown', (event) => {
-        if (event.button === 0) { // Left click
-            if (!isFreelooking && !currentVehicle) {
-                pointerLockControls.lock();
-            }
-            inputState.shoot = true;
+        if (currentVehicle || !player.visible) return;
+        
+        switch (event.button) {
+            case 0: // Left click
+                inputState.shoot = true;
+                break;
+            case 2: // Right click
+                if (pointerLockControls.isLocked) {
+                    pointerLockControls.unlock();
+                } else {
+                    pointerLockControls.lock();
+                }
+                break;
         }
     });
 
     document.addEventListener('mouseup', (event) => {
         if (event.button === 0) inputState.shoot = false;
     });
-}
-
-function setupMobileControls() {
-    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    if (!isTouchDevice || !mobileControlsContainer) return;
-    mobileControlsContainer.style.display = 'flex';
-
-    const controlsMap = {
-        'mc-forward': 'forward', 'mc-backward': 'backward', 'mc-left': 'left',
-        'mc-right': 'right', 'mc-action': 'action', 'mc-run': 'run', 'mc-shoot': 'shoot'
-    };
-
-    for (const id in controlsMap) {
-        const button = document.getElementById(id);
-        if (button) {
-            button.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                inputState[controlsMap[id]] = true;
-            }, { passive: false });
-            button.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                if (controlsMap[id] !== 'action') {
-                    inputState[controlsMap[id]] = false;
-                }
-            }, { passive: false });
-        }
-    }
 }
 
 // --- Lógica de Juego (Actualizaciones) ---
@@ -262,29 +271,33 @@ function updatePlayer(deltaTime) {
     const moveDirection = new THREE.Vector3();
     let isMoving = false;
 
-    if (!isFreelooking) {
-        if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
-        if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
-    } else {
-        player.rotation.y = pointerLockControls.getObject().rotation.y;
-    }
-
+    // Movimiento
     if (inputState.forward) { moveDirection.z = -1; isMoving = true; }
     if (inputState.backward) { moveDirection.z = 1; isMoving = true; }
-
-    if (isFreelooking) {
-        if (inputState.left) { moveDirection.x = -1; isMoving = true; }
-        if (inputState.right) { moveDirection.x = 1; isMoving = true; }
-    }
+    if (inputState.left) { moveDirection.x = -1; isMoving = true; }
+    if (inputState.right) { moveDirection.x = 1; isMoving = true; }
 
     if (isMoving) {
-        const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(player.quaternion);
+        // La dirección del movimiento depende del modo de cámara
+        const moveQuaternion = isFreelooking ? camera.quaternion : player.quaternion;
+        const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(moveQuaternion);
         player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
     }
 
+    // Rotación
+    if (isFreelooking) {
+        // El jugador se alinea con la cámara
+        player.rotation.y = pointerLockControls.getObject().rotation.y;
+    } else {
+        // Rotación estilo "tanque" con A y D
+        if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
+        if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
+    }
+    
     // Player-Building Collision
-    player.updateMatrixWorld();
-    const playerBox = new THREE.Box3().setFromObject(player);
+    const playerBody = player.children[0]; // Usar el cuerpo para la colisión
+    playerBody.updateMatrixWorld();
+    const playerBox = new THREE.Box3().setFromObject(playerBody);
     scene.children.forEach(obj => {
         if (obj.geometry instanceof THREE.BoxGeometry && obj !== player) {
             obj.updateMatrixWorld();
@@ -305,8 +318,8 @@ function updatePlayer(deltaTime) {
                     } else {
                         player.position.z += (centerA.z < centerB.z ? -overlapZ : overlapZ);
                     }
-                    player.updateMatrixWorld();
-                    playerBox.setFromObject(player);
+                    playerBody.updateMatrixWorld();
+                    playerBox.setFromObject(playerBody);
                 }
             }
         }
@@ -348,12 +361,13 @@ function updateVehicleControls(deltaTime) {
     const vehicleBox = new THREE.Box3().setFromObject(currentVehicle);
     pedestrians.forEach(ped => {
         if (ped.userData.health > 0 && ped.visible) {
-            const pedBox = new THREE.Box3().setFromObject(ped);
+            const pedBody = ped.children[0];
+            const pedBox = new THREE.Box3().setFromObject(pedBody);
             if (vehicleBox.intersectsBox(pedBox)) {
                 console.log(`Peatón ${ped.userData.id} atropellado!`);
                 ped.userData.health = 0;
                 ped.rotation.x = Math.PI / 2;
-                ped.position.y = ped.geometry.parameters.radius;
+                ped.position.y = pedBody.geometry.parameters.radius;
                 createBloodPuddle(ped.position);
             }
         }
@@ -364,55 +378,12 @@ function toggleVehicleEntry() {
     if (currentVehicle) { // Salir del vehículo
         player.visible = true;
         const carWidth = currentVehicle.geometry.parameters.width;
-        const carLength = currentVehicle.geometry.parameters.depth;
-
-        const potentialExitLocalOffsets = [
-            new THREE.Vector3(carWidth / 2 + 0.6, 0, 0),    // Lado derecho
-            new THREE.Vector3(-carWidth / 2 - 0.6, 0, 0),   // Lado izquierdo
-            new THREE.Vector3(0, 0, carLength / 2 + 0.6),   // Atrás
-            new THREE.Vector3(0, 0, -carLength / 2 - 0.6),  // Adelante
-        ];
+        const exitOffset = new THREE.Vector3(carWidth / 2 + 0.6, 0, 0).applyQuaternion(currentVehicle.quaternion);
+        player.position.copy(currentVehicle.position).add(exitOffset);
+        const playerBody = player.children[0];
+        player.position.y = playerBody.geometry.parameters.radius + playerBody.geometry.parameters.height / 2;
+        player.rotation.copy(currentVehicle.rotation);
         
-        let foundClearSpot = false;
-        for (const localOffset of potentialExitLocalOffsets) {
-            const exitOffset = localOffset.clone().applyQuaternion(currentVehicle.quaternion);
-            player.position.copy(currentVehicle.position).add(exitOffset);
-            player.position.y = player.geometry.parameters.radius + player.geometry.parameters.height / 2;
-            player.rotation.copy(currentVehicle.rotation);
-
-            player.updateMatrixWorld();
-            const playerExitBox = new THREE.Box3().setFromObject(player);
-            let isColliding = false;
-
-            for (const child of scene.children) {
-                if (child.geometry instanceof THREE.BoxGeometry && child !== currentVehicle) {
-                    const buildingBox = new THREE.Box3().setFromObject(child);
-                    if (playerExitBox.intersectsBox(buildingBox)) {
-                        isColliding = true;
-                        break;
-                    }
-                }
-            }
-            if (isColliding) continue;
-
-            const carBox = new THREE.Box3().setFromObject(currentVehicle);
-            if (playerExitBox.intersectsBox(carBox)) {
-                isColliding = true;
-            }
-
-            if (!isColliding) {
-                foundClearSpot = true;
-                break;
-            }
-        }
-
-        if (!foundClearSpot) {
-            console.warn("No se pudo encontrar un lugar de salida despejado. El jugador puede estar atascado.");
-            const exitOffset = potentialExitLocalOffsets[0].clone().applyQuaternion(currentVehicle.quaternion);
-            player.position.copy(currentVehicle.position).add(exitOffset);
-            player.position.y = player.geometry.parameters.radius + player.geometry.parameters.height / 2;
-        }
-
         currentVehicle = null;
         if (isFreelooking) pointerLockControls.unlock();
 
@@ -439,7 +410,7 @@ function toggleVehicleEntry() {
 }
 
 function shoot() {
-    if (!player || currentVehicle || !player.visible) return;
+    if (!player || currentVehicle || !player.visible || !isFreelooking) return;
 
     const raycaster = new THREE.Raycaster();
     const shootOrigin = new THREE.Vector3();
@@ -450,18 +421,23 @@ function shoot() {
     raycaster.set(shootOrigin, shootDirection);
 
     const livingPedestrians = pedestrians.filter(p => p.userData.health > 0 && p.visible);
-    const intersects = raycaster.intersectObjects(livingPedestrians, false);
+    const hittableMeshes = livingPedestrians.flatMap(p => p.children); // Obtener todas las mallas (cuerpo y cabeza)
+    const intersects = raycaster.intersectObjects(hittableMeshes, false);
 
     if (intersects.length > 0) {
-        const hitObject = intersects[0].object;
-        const hitPedestrian = pedestrians.find(p => p === hitObject);
+        const hitMesh = intersects[0].object;
+        const hitPedestrian = hitMesh.userData.parentGroup;
+
         if (hitPedestrian) {
-            console.log(`Peatón ${hitPedestrian.userData.id} disparado! Distancia: ${intersects[0].distance.toFixed(2)}`);
-            hitPedestrian.userData.health -= 50;
+            const damage = hitMesh.userData.type === 'head' ? 100 : 50;
+            console.log(`Disparo a ${hitPedestrian.userData.id} en ${hitMesh.userData.type}. Daño: ${damage}`);
+            
+            hitPedestrian.userData.health -= damage;
+
             if (hitPedestrian.userData.health <= 0) {
                 console.log(`Peatón ${hitPedestrian.userData.id} eliminado.`);
                 hitPedestrian.rotation.x = Math.PI / 2;
-                hitPedestrian.position.y = hitPedestrian.geometry.parameters.radius;
+                hitPedestrian.position.y = hitPedestrian.children[0].geometry.parameters.radius; // Caer al suelo
                 createBloodPuddle(hitPedestrian.position);
             } else {
                 hitPedestrian.userData.isFleeing = true;
@@ -522,7 +498,8 @@ function updatePedestrians(deltaTime) {
         }
 
         // Pedestrian-Building Collision
-        const pedBox = new THREE.Box3().setFromObject(ped);
+        const pedBody = ped.children[0];
+        const pedBox = new THREE.Box3().setFromObject(pedBody);
         scene.children.forEach(obj => {
              if (obj.geometry instanceof THREE.BoxGeometry && obj !== ped) {
                 const buildingBox = new THREE.Box3().setFromObject(obj);
@@ -541,13 +518,11 @@ function updatePedestrians(deltaTime) {
 
 function updateCamera(deltaTime) {
     if (isFreelooking && player.visible && !currentVehicle) {
-        const eyeHeightOffset = 0.6;
-        camera.position.set(
-            player.position.x,
-            player.position.y + eyeHeightOffset,
-            player.position.z
-        );
-        player.rotation.y = pointerLockControls.getObject().rotation.y;
+        // La cámara está fija en la cabeza del jugador
+        const head = player.children[1];
+        const headPosition = new THREE.Vector3();
+        head.getWorldPosition(headPosition);
+        camera.position.copy(headPosition);
     } else if (currentVehicle) {
         const cameraLookAtOffset = new THREE.Vector3(0, 1.0, 0);
         const offset = new THREE.Vector3(0, 4, 8);
@@ -599,12 +574,12 @@ function animate() {
 
     if (currentVehicle) {
         updateVehicleControls(deltaTime);
-        crosshair.style.display = 'none';
         if(isFreelooking) pointerLockControls.unlock();
     } else if (player.visible) {
         updatePlayer(deltaTime);
-        crosshair.style.display = 'block'; // Mostrar siempre la mira al estar a pie
-    } else {
+    }
+
+    if (!isFreelooking && !currentVehicle) {
         crosshair.style.display = 'none';
     }
 
@@ -623,9 +598,7 @@ window.addEventListener('resize', () => {
 });
 
 gameCanvas.addEventListener('contextmenu', (event) => {
-    if (pointerLockControls.isLocked) {
-        event.preventDefault();
-    }
+    event.preventDefault();
 });
 
 init();
