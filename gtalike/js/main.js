@@ -61,6 +61,15 @@ function init() {
 
     createWorld();
     createPlayer();
+
+    // --- CORRECCIÓN APLICADA AQUÍ ---
+    // Posiciona la cámara inicialmente para que no empiece dentro del jugador.
+    // Usamos los mismos cálculos que en updateCamera para la vista en tercera persona.
+    const initialCameraOffset = new THREE.Vector3(0, 2.5, 4.5);
+    camera.position.copy(player.position).add(initialCameraOffset);
+    camera.lookAt(player.position);
+    // --- FIN DE LA CORRECCIÓN ---
+
     createVehicles(5);
     createPedestrians(15);
     createStreetlights(40);
@@ -90,13 +99,16 @@ function createBuildingTexture(isNight = false) {
     canvas.width = 64;
     canvas.height = 128;
     const context = canvas.getContext('2d');
+
     context.fillStyle = '#6d6d6d';
     context.fillRect(0, 0, canvas.width, canvas.height);
+
     const windowColor = isNight ? '#ffffaa' : '#334455';
     context.fillStyle = windowColor;
     const windowPadding = 8;
     const windowWidth = 10;
     const windowHeight = 15;
+
     for (let y = windowPadding; y < canvas.height - windowHeight; y += windowHeight + windowPadding) {
         for (let x = windowPadding; x < canvas.width - windowWidth; x += windowWidth + windowPadding) {
             if (isNight && Math.random() < 0.3) {
@@ -125,6 +137,7 @@ function createWorld() {
     
     const dayMaterial = new THREE.MeshStandardMaterial({ map: dayTexture });
     const nightMaterial = new THREE.MeshStandardMaterial({ map: nightTexture, emissive: 0x222200, emissiveMap: nightTexture, emissiveIntensity: 1 });
+
 
     for (let i = 0; i < 30; i++) {
         const w = Math.random() * 10 + 5;
@@ -170,30 +183,38 @@ function createStreetlights(count) {
     const lampMatOff = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
     const lampMatOn = new THREE.MeshStandardMaterial({ color: 0xffffdd, emissive: 0xffffdd, emissiveIntensity: 2 });
 
+
     for (let i = 0; i < count; i++) {
         const streetlight = new THREE.Group();
+
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.y = 3;
         streetlight.add(pole);
+        
         const lamp = new THREE.Mesh(lampGeo, lampMatOff);
         lamp.position.y = 6;
         streetlight.add(lamp);
+        
         const light = new THREE.PointLight(0xffddaa, 0, 20, 2);
         light.position.y = 5.8;
         light.castShadow = true;
         light.shadow.mapSize.width = 256;
         light.shadow.mapSize.height = 256;
         streetlight.add(light);
+
         streetlight.position.set(
             (Math.random() - 0.5) * (worldBounds * 1.9),
             0,
             (Math.random() - 0.5) * (worldBounds * 1.9)
         );
+
         streetlight.userData = { lamp, light, lampMatOff, lampMatOn, isOn: false };
+        
         scene.add(streetlight);
         streetlights.push(streetlight);
     }
 }
+
 
 function createPlayer() {
     const playerGeo = new THREE.CapsuleGeometry(0.4, 0.8, 8, 16);
@@ -226,29 +247,37 @@ function createVehicles(count) {
 function createPedestrians(count) {
     const bodyGeo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
     const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
+
     for (let i = 0; i < count; i++) {
         const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
+        
         const pedestrian = new THREE.Group();
+        
         const body = new THREE.Mesh(bodyGeo, pedMat);
         body.castShadow = true;
         body.userData.part = 'body';
+        
         const head = new THREE.Mesh(headGeo, pedMat);
         head.castShadow = true;
         head.position.y = (1.0 / 2) + 0.3 + 0.25;
         head.userData.part = 'head';
+
         pedestrian.add(body);
         pedestrian.add(head);
+
         pedestrian.position.set(
             (Math.random() - 0.5) * 150,
             0.3 + 1.0 / 2,
             (Math.random() - 0.5) * 150
         );
+
         pedestrian.userData = {
             id: `ped_${i}`,
             health: 100,
             targetPosition: new THREE.Vector3().copy(pedestrian.position),
             isFleeing: false
         };
+
         pedestrians.push(pedestrian);
         scene.add(pedestrian);
     }
@@ -267,12 +296,14 @@ function createBloodPuddle(position) {
     bloodMat.polygonOffset = true;
     bloodMat.polygonOffsetFactor = -1.0;
     bloodMat.polygonOffsetUnits = -4.0;
+
     const puddle = new THREE.Mesh(bloodGeo, bloodMat);
     puddle.position.set(position.x, 0.01, position.z);
     puddle.rotation.x = -Math.PI / 2;
     puddle.receiveShadow = true;
     scene.add(puddle);
     bloodPuddles.push(puddle);
+
     setTimeout(() => {
         scene.remove(puddle);
         puddle.geometry.dispose();
@@ -280,6 +311,7 @@ function createBloodPuddle(position) {
         bloodPuddles = bloodPuddles.filter(p => p !== puddle);
     }, 20000);
 }
+
 
 // --- Lógica de Entradas ---
 function setupInputHandlers() {
@@ -323,76 +355,82 @@ function setupInputHandlers() {
 
 function setupMobileControls() { /* ... sin cambios ... */ }
 
-// --- Lógica de Juego (Actualizaciones) ---
 
-// CORREGIDO: Lógica de movimiento unificada y sin duplicaciones.
+// --- Lógica de Juego (Actualizaciones) ---
 function updatePlayer(deltaTime) {
     if (!player || currentVehicle || !player.visible) return;
 
-    // --- 1. Determinar la rotación del jugador ---
+    const currentSpeed = inputState.run ? playerRunSpeed : playerSpeed;
+    let isMoving = false;
+    
+    // Movimiento combinado para Freelook y Tercera Persona
     if (isFreelooking) {
-        // En primera persona, el ratón controla la rotación.
+        // En Freelook, el ratón controla la cámara, y la cámara controla la rotación del jugador
         player.rotation.y = pointerLockControls.getObject().rotation.y;
+
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+        cameraDirection.y = 0;
+        cameraDirection.normalize();
+
+        const rightDirection = new THREE.Vector3().crossVectors(camera.up, cameraDirection).normalize();
+        
+        const finalMove = new THREE.Vector3();
+        if (inputState.forward) finalMove.add(cameraDirection);
+        if (inputState.backward) finalMove.sub(cameraDirection);
+        if (inputState.left) finalMove.sub(rightDirection);
+        if (inputState.right) finalMove.add(rightDirection);
+
+        if(finalMove.lengthSq() > 0){
+            finalMove.normalize();
+            player.position.addScaledVector(finalMove, currentSpeed * deltaTime);
+            isMoving = true;
+        }
+
     } else {
-        // En tercera persona, A/D controlan la rotación (tipo "tanque").
+        // En tercera persona, A/D rotan al jugador
         if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
         if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
+
+        const moveDirection = new THREE.Vector3();
+        if (inputState.forward) moveDirection.z = -1;
+        if (inputState.backward) moveDirection.z = 1;
+
+        if (moveDirection.lengthSq() > 0) {
+            const worldMoveDirection = moveDirection.applyQuaternion(player.quaternion);
+            player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
+            isMoving = true;
+        }
     }
 
-    // --- 2. Determinar el vector de movimiento local ---
-    const currentSpeed = inputState.run ? playerRunSpeed : playerSpeed;
-    const localMoveDirection = new THREE.Vector3(0, 0, 0);
-    
-    // El significado de las teclas de movimiento cambia según el modo.
-    if (isFreelooking) {
-        // Movimiento tipo FPS: A/D es para moverse lateralmente (strafe).
-        if (inputState.forward) localMoveDirection.z = -1;
-        if (inputState.backward) localMoveDirection.z = 1;
-        if (inputState.left) localMoveDirection.x = -1;
-        if (inputState.right) localMoveDirection.x = 1;
-    } else {
-        // Movimiento tipo Tanque: A/D es para girar, no para strafe.
-        if (inputState.forward) localMoveDirection.z = -1;
-        if (inputState.backward) localMoveDirection.z = 1;
-    }
 
-    // --- 3. Aplicar el movimiento (si hay) ---
-    if (localMoveDirection.lengthSq() > 0) {
-        // Normalizamos para que la velocidad diagonal no sea mayor.
-        localMoveDirection.normalize();
-        
-        // Convertimos la dirección local en dirección global usando la rotación actual del jugador.
-        const worldMoveDirection = localMoveDirection.applyQuaternion(player.quaternion);
-        
-        // Aplicamos el movimiento.
-        player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
-    }
+    // Colisión jugador-edificio
+    if(isMoving) {
+        player.updateMatrixWorld();
+        const playerBox = new THREE.Box3().setFromObject(player);
+        buildings.forEach(building => {
+            const buildingBox = new THREE.Box3().setFromObject(building);
+            if (playerBox.intersectsBox(buildingBox)) {
+                const centerA = new THREE.Vector3(); playerBox.getCenter(centerA);
+                const centerB = new THREE.Vector3(); buildingBox.getCenter(centerB);
+                const sizeA = new THREE.Vector3(); playerBox.getSize(sizeA);
+                const sizeB = new THREE.Vector3(); buildingBox.getSize(sizeB);
 
-    // --- 4. Colisiones con edificios ---
-    player.updateMatrixWorld();
-    const playerBox = new THREE.Box3().setFromObject(player);
-    buildings.forEach(building => {
-        const buildingBox = new THREE.Box3().setFromObject(building);
-        if (playerBox.intersectsBox(buildingBox)) {
-            const centerA = new THREE.Vector3(); playerBox.getCenter(centerA);
-            const centerB = new THREE.Vector3(); buildingBox.getCenter(centerB);
-            const sizeA = new THREE.Vector3(); playerBox.getSize(sizeA);
-            const sizeB = new THREE.Vector3(); buildingBox.getSize(sizeB);
+                const overlapX = (sizeA.x / 2 + sizeB.x / 2) - Math.abs(centerA.x - centerB.x);
+                const overlapZ = (sizeA.z / 2 + sizeB.z / 2) - Math.abs(centerA.z - centerB.z);
 
-            const overlapX = (sizeA.x / 2 + sizeB.x / 2) - Math.abs(centerA.x - centerB.x);
-            const overlapZ = (sizeA.z / 2 + sizeB.z / 2) - Math.abs(centerA.z - centerB.z);
-
-            if (overlapX > 0 && overlapZ > 0) {
-                if (overlapX < overlapZ) {
-                    player.position.x += (centerA.x < centerB.x ? -overlapX : overlapX);
-                } else {
-                    player.position.z += (centerA.z < centerB.z ? -overlapZ : overlapZ);
+                if (overlapX > 0 && overlapZ > 0) {
+                    if (overlapX < overlapZ) {
+                        player.position.x += (centerA.x < centerB.x ? -overlapX : overlapX);
+                    } else {
+                        player.position.z += (centerA.z < centerB.z ? -overlapZ : overlapZ);
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
-    // --- 5. Acciones ---
+
     if (inputState.action) {
         toggleVehicleEntry();
         inputState.action = false;
@@ -449,21 +487,25 @@ function toggleVehicleEntry() {
         player.visible = true;
         const carWidth = currentVehicle.geometry.parameters.width;
         const carLength = currentVehicle.geometry.parameters.depth;
+
         const potentialExitLocalOffsets = [
             new THREE.Vector3(carWidth / 2 + 0.6, 0, 0),
             new THREE.Vector3(-carWidth / 2 - 0.6, 0, 0),
             new THREE.Vector3(0, 0, carLength / 2 + 0.6),
             new THREE.Vector3(0, 0, -carLength / 2 - 0.6),
         ];
+
         let foundClearSpot = false;
         for (const localOffset of potentialExitLocalOffsets) {
             const exitOffset = localOffset.clone().applyQuaternion(currentVehicle.quaternion);
             player.position.copy(currentVehicle.position).add(exitOffset);
             player.position.y = player.geometry.parameters.radius + player.geometry.parameters.height / 2;
             player.rotation.copy(currentVehicle.rotation);
+
             player.updateMatrixWorld();
             const playerExitBox = new THREE.Box3().setFromObject(player);
             let isColliding = false;
+
             for (const building of buildings) {
                 const buildingBox = new THREE.Box3().setFromObject(building);
                 if (playerExitBox.intersectsBox(buildingBox)) {
@@ -472,25 +514,31 @@ function toggleVehicleEntry() {
                 }
             }
             if (isColliding) continue;
+
             const carBox = new THREE.Box3().setFromObject(currentVehicle);
             if (playerExitBox.intersectsBox(carBox)) {
                 isColliding = true;
             }
+
             if (!isColliding) {
                 foundClearSpot = true;
                 break;
             }
         }
+
         if (!foundClearSpot) {
             console.warn("No se pudo encontrar un lugar de salida despejado.");
             const exitOffset = potentialExitLocalOffsets[0].clone().applyQuaternion(currentVehicle.quaternion);
             player.position.copy(currentVehicle.position).add(exitOffset);
             player.position.y = player.geometry.parameters.radius + player.geometry.parameters.height / 2;
         }
+
         player.position.x = THREE.MathUtils.clamp(player.position.x, -worldBounds + 2, worldBounds - 2);
         player.position.z = THREE.MathUtils.clamp(player.position.z, -worldBounds + 2, worldBounds - 2);
+
         currentVehicle = null;
         if (isFreelooking) pointerLockControls.unlock();
+        
     } else {
         let closestCar = null;
         let minDistance = 3.5;
@@ -502,6 +550,7 @@ function toggleVehicleEntry() {
                 closestCar = vehicle;
             }
         });
+
         if (closestCar) {
             currentVehicle = closestCar;
             player.visible = false;
@@ -518,16 +567,22 @@ function shoot() {
     const raycaster = new THREE.Raycaster();
     const shootOrigin = new THREE.Vector3();
     const shootDirection = new THREE.Vector3();
+
     camera.getWorldPosition(shootOrigin);
     camera.getWorldDirection(shootDirection);
+
     raycaster.set(shootOrigin, shootDirection);
+    
     const livingPedestrians = pedestrians.filter(p => p.userData.health > 0 && p.visible);
     const intersects = raycaster.intersectObjects(livingPedestrians, true);
+
     if (intersects.length > 0) {
         const hitMesh = intersects[0].object;
         const hitPedestrian = hitMesh.parent;
+
         if (hitPedestrian && hitPedestrian.userData.health > 0) {
             const hitPart = hitMesh.userData.part;
+            
             if (hitPart === 'head') {
                 console.log(`¡Disparo a la cabeza a ${hitPedestrian.userData.id}!`);
                 hitPedestrian.userData.health = 0;
@@ -535,6 +590,7 @@ function shoot() {
                 console.log(`Disparo al cuerpo de ${hitPedestrian.userData.id}!`);
                 hitPedestrian.userData.health -= 34;
             }
+
             if (hitPedestrian.userData.health <= 0) {
                 console.log(`Peatón ${hitPedestrian.userData.id} eliminado.`);
                 hitPedestrian.rotation.x = Math.PI / 2;
@@ -548,6 +604,7 @@ function shoot() {
         }
     }
 }
+
 
 function updatePedestrians(deltaTime) {
     pedestrians.forEach(ped => {
@@ -620,6 +677,7 @@ function updatePedestrians(deltaTime) {
     });
 }
 
+
 function updateCamera(deltaTime) {
     if (isFreelooking && player.visible && !currentVehicle) {
         const eyeHeightOffset = 0.6;
@@ -640,8 +698,10 @@ function updateCamera(deltaTime) {
         const offset = new THREE.Vector3(0, 2.5, 4.5);
         const cameraTargetPosition = new THREE.Vector3();
         player.getWorldPosition(cameraTargetPosition);
+
         const cameraOffset = offset.clone().applyQuaternion(player.quaternion);
         const cameraPosition = cameraTargetPosition.clone().add(cameraOffset);
+
         camera.position.lerp(cameraPosition, 0.1);
         const lookAtPosition = cameraTargetPosition.clone().add(cameraLookAtOffset);
         camera.lookAt(lookAtPosition);
@@ -669,6 +729,7 @@ function updateDayNightCycle(deltaTime) {
     scene.fog.color.lerpColors(nightFogColor, dayFogColor, sunIntensityFactor);
 
     const isNight = sunIntensityFactor < 0.2;
+
     buildings.forEach(building => {
         const currentIsNight = building.material === building.userData.nightMaterial;
         if (isNight && !currentIsNight) {
@@ -690,6 +751,7 @@ function updateDayNightCycle(deltaTime) {
         }
     });
 }
+
 
 // --- Bucle Principal de Animación ---
 function animate() {
