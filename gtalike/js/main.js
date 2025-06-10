@@ -7,13 +7,10 @@ let player, playerSpeed = 5, playerRunSpeed = 10, playerRotationSpeed = 2;
 let vehicles = [];
 let pedestrians = [];
 let bloodPuddles = [];
-let streetlights = [];
-let buildings = [];
 let currentVehicle = null;
 let ambientLight, sunLight;
-let dayDuration = 120;
+let dayDuration = 120; // Duración del día en segundos
 let timeOfDay = 0;
-
 let pointerLockControls;
 let isFreelooking = false;
 
@@ -27,14 +24,13 @@ const crosshair = document.getElementById('crosshair');
 const gameCanvas = document.getElementById('gameCanvas');
 const mobileControlsContainer = document.getElementById('mobileControls');
 
-const worldBounds = 250;
-
 // --- Configuración Inicial ---
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
     scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
     clock = new THREE.Clock();
+
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
     renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true });
@@ -51,29 +47,15 @@ function init() {
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 200;
-    const shadowSize = 150;
-    sunLight.shadow.camera.left = -shadowSize;
-    sunLight.shadow.camera.right = shadowSize;
-    sunLight.shadow.camera.top = shadowSize;
-    sunLight.shadow.camera.bottom = -shadowSize;
     scene.add(sunLight);
     scene.add(sunLight.target);
 
     createWorld();
     createPlayer();
-
-    // --- CORRECCIÓN APLICADA AQUÍ ---
-    // Posiciona la cámara inicialmente para que no empiece dentro del jugador.
-    // Usamos los mismos cálculos que en updateCamera para la vista en tercera persona.
-    const initialCameraOffset = new THREE.Vector3(0, 2.5, 4.5);
-    camera.position.copy(player.position).add(initialCameraOffset);
-    camera.lookAt(player.position);
-    // --- FIN DE LA CORRECCIÓN ---
-
     createVehicles(5);
     createPedestrians(15);
-    createStreetlights(40);
 
+    // Pointer Lock Controls
     pointerLockControls = new PointerLockControls(camera, renderer.domElement);
     pointerLockControls.addEventListener('lock', () => {
         isFreelooking = true;
@@ -93,128 +75,35 @@ function init() {
 }
 
 // --- Creación de Elementos del Juego ---
-
-function createBuildingTexture(isNight = false) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 128;
-    const context = canvas.getContext('2d');
-
-    context.fillStyle = '#6d6d6d';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const windowColor = isNight ? '#ffffaa' : '#334455';
-    context.fillStyle = windowColor;
-    const windowPadding = 8;
-    const windowWidth = 10;
-    const windowHeight = 15;
-
-    for (let y = windowPadding; y < canvas.height - windowHeight; y += windowHeight + windowPadding) {
-        for (let x = windowPadding; x < canvas.width - windowWidth; x += windowWidth + windowPadding) {
-            if (isNight && Math.random() < 0.3) {
-                 context.fillStyle = '#334455';
-            } else {
-                 context.fillStyle = windowColor;
-            }
-            context.fillRect(x, y, windowWidth, windowHeight);
-        }
-    }
-    return new THREE.CanvasTexture(canvas);
-}
-
 function createWorld() {
-    const groundGeo = new THREE.PlaneGeometry(worldBounds * 2, worldBounds * 2);
+    const groundGeo = new THREE.PlaneGeometry(500, 500);
     const groundMat = new THREE.MeshStandardMaterial({ color: 0x777777, side: THREE.DoubleSide });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const dayTexture = createBuildingTexture(false);
-    dayTexture.wrapS = dayTexture.wrapT = THREE.RepeatWrapping;
-    const nightTexture = createBuildingTexture(true);
-    nightTexture.wrapS = nightTexture.wrapT = THREE.RepeatWrapping;
-    
-    const dayMaterial = new THREE.MeshStandardMaterial({ map: dayTexture });
-    const nightMaterial = new THREE.MeshStandardMaterial({ map: nightTexture, emissive: 0x222200, emissiveMap: nightTexture, emissiveIntensity: 1 });
-
-
+    const buildingMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
     for (let i = 0; i < 30; i++) {
         const w = Math.random() * 10 + 5;
         const h = Math.random() * 40 + 10;
         const d = Math.random() * 10 + 5;
         const buildingGeo = new THREE.BoxGeometry(w, h, d);
-        
-        const bldDayMat = dayMaterial.clone();
-        bldDayMat.map.repeat.set(Math.ceil(w/8), Math.ceil(h/8));
-        bldDayMat.map.needsUpdate = true;
-        
-        const bldNightMat = nightMaterial.clone();
-        bldNightMat.map.repeat.set(Math.ceil(w/8), Math.ceil(h/8));
-        bldNightMat.emissiveMap.repeat.set(Math.ceil(w/8), Math.ceil(h/8));
-        bldNightMat.map.needsUpdate = true;
-        bldNightMat.emissiveMap.needsUpdate = true;
-
-        const building = new THREE.Mesh(buildingGeo, bldDayMat);
+        const building = new THREE.Mesh(buildingGeo, buildingMat);
         building.castShadow = true;
         building.receiveShadow = true;
         building.position.set(
-            (Math.random() - 0.5) * (worldBounds * 1.8),
+            (Math.random() - 0.5) * 400,
             h / 2,
-            (Math.random() - 0.5) * (worldBounds * 1.8)
+            (Math.random() - 0.5) * 400
         );
         if (building.position.length() < 30) {
             building.position.x += Math.sign(building.position.x || 1) * 30;
             building.position.z += Math.sign(building.position.z || 1) * 30;
         }
-
-        building.userData.dayMaterial = bldDayMat;
-        building.userData.nightMaterial = bldNightMat;
-
         scene.add(building);
-        buildings.push(building);
     }
 }
-
-function createStreetlights(count) {
-    const poleGeo = new THREE.CylinderGeometry(0.1, 0.15, 6, 8);
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
-    const lampGeo = new THREE.SphereGeometry(0.3, 8, 8);
-    const lampMatOff = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
-    const lampMatOn = new THREE.MeshStandardMaterial({ color: 0xffffdd, emissive: 0xffffdd, emissiveIntensity: 2 });
-
-
-    for (let i = 0; i < count; i++) {
-        const streetlight = new THREE.Group();
-
-        const pole = new THREE.Mesh(poleGeo, poleMat);
-        pole.position.y = 3;
-        streetlight.add(pole);
-        
-        const lamp = new THREE.Mesh(lampGeo, lampMatOff);
-        lamp.position.y = 6;
-        streetlight.add(lamp);
-        
-        const light = new THREE.PointLight(0xffddaa, 0, 20, 2);
-        light.position.y = 5.8;
-        light.castShadow = true;
-        light.shadow.mapSize.width = 256;
-        light.shadow.mapSize.height = 256;
-        streetlight.add(light);
-
-        streetlight.position.set(
-            (Math.random() - 0.5) * (worldBounds * 1.9),
-            0,
-            (Math.random() - 0.5) * (worldBounds * 1.9)
-        );
-
-        streetlight.userData = { lamp, light, lampMatOff, lampMatOn, isOn: false };
-        
-        scene.add(streetlight);
-        streetlights.push(streetlight);
-    }
-}
-
 
 function createPlayer() {
     const playerGeo = new THREE.CapsuleGeometry(0.4, 0.8, 8, 16);
@@ -245,39 +134,22 @@ function createVehicles(count) {
 }
 
 function createPedestrians(count) {
-    const bodyGeo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
-    const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
-
+    const pedGeo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
     for (let i = 0; i < count; i++) {
         const pedMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
-        
-        const pedestrian = new THREE.Group();
-        
-        const body = new THREE.Mesh(bodyGeo, pedMat);
-        body.castShadow = true;
-        body.userData.part = 'body';
-        
-        const head = new THREE.Mesh(headGeo, pedMat);
-        head.castShadow = true;
-        head.position.y = (1.0 / 2) + 0.3 + 0.25;
-        head.userData.part = 'head';
-
-        pedestrian.add(body);
-        pedestrian.add(head);
-
+        const pedestrian = new THREE.Mesh(pedGeo, pedMat);
+        pedestrian.castShadow = true;
         pedestrian.position.set(
             (Math.random() - 0.5) * 150,
             0.3 + 1.0 / 2,
             (Math.random() - 0.5) * 150
         );
-
         pedestrian.userData = {
             id: `ped_${i}`,
             health: 100,
             targetPosition: new THREE.Vector3().copy(pedestrian.position),
             isFleeing: false
         };
-
         pedestrians.push(pedestrian);
         scene.add(pedestrian);
     }
@@ -312,7 +184,6 @@ function createBloodPuddle(position) {
     }, 20000);
 }
 
-
 // --- Lógica de Entradas ---
 function setupInputHandlers() {
     document.addEventListener('keydown', (event) => {
@@ -324,12 +195,13 @@ function setupInputHandlers() {
             case 'f': inputState.action = true; break;
             case 'shift': inputState.run = true; break;
             case 'control':
-                 if (event.code === 'ControlLeft' && !currentVehicle && player.visible) {
+                if (event.code === 'ControlLeft' && !currentVehicle && player.visible) {
                     pointerLockControls.lock();
-                 }
-                 break;
+                }
+                break;
         }
     });
+
     document.addEventListener('keyup', (event) => {
         switch (event.key.toLowerCase()) {
             case 'w': inputState.forward = 0; break;
@@ -340,76 +212,84 @@ function setupInputHandlers() {
             case 'shift': inputState.run = false; break;
         }
     });
+
     document.addEventListener('mousedown', (event) => {
-        if (event.button === 0) {
+        if (event.button === 0) { // Left click
             if (!isFreelooking && !currentVehicle) {
                 pointerLockControls.lock();
             }
             inputState.shoot = true;
         }
     });
+
     document.addEventListener('mouseup', (event) => {
         if (event.button === 0) inputState.shoot = false;
     });
 }
 
-function setupMobileControls() { /* ... sin cambios ... */ }
+function setupMobileControls() {
+    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    if (!isTouchDevice || !mobileControlsContainer) return;
+    mobileControlsContainer.style.display = 'flex';
 
+    const controlsMap = {
+        'mc-forward': 'forward', 'mc-backward': 'backward', 'mc-left': 'left',
+        'mc-right': 'right', 'mc-action': 'action', 'mc-run': 'run', 'mc-shoot': 'shoot'
+    };
+
+    for (const id in controlsMap) {
+        const button = document.getElementById(id);
+        if (button) {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                inputState[controlsMap[id]] = true;
+            }, { passive: false });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (controlsMap[id] !== 'action') {
+                    inputState[controlsMap[id]] = false;
+                }
+            }, { passive: false });
+        }
+    }
+}
 
 // --- Lógica de Juego (Actualizaciones) ---
 function updatePlayer(deltaTime) {
     if (!player || currentVehicle || !player.visible) return;
 
     const currentSpeed = inputState.run ? playerRunSpeed : playerSpeed;
+    const moveDirection = new THREE.Vector3();
     let isMoving = false;
-    
-    // Movimiento combinado para Freelook y Tercera Persona
-    if (isFreelooking) {
-        // En Freelook, el ratón controla la cámara, y la cámara controla la rotación del jugador
-        player.rotation.y = pointerLockControls.getObject().rotation.y;
 
-        const cameraDirection = new THREE.Vector3();
-        camera.getWorldDirection(cameraDirection);
-        cameraDirection.y = 0;
-        cameraDirection.normalize();
-
-        const rightDirection = new THREE.Vector3().crossVectors(camera.up, cameraDirection).normalize();
-        
-        const finalMove = new THREE.Vector3();
-        if (inputState.forward) finalMove.add(cameraDirection);
-        if (inputState.backward) finalMove.sub(cameraDirection);
-        if (inputState.left) finalMove.sub(rightDirection);
-        if (inputState.right) finalMove.add(rightDirection);
-
-        if(finalMove.lengthSq() > 0){
-            finalMove.normalize();
-            player.position.addScaledVector(finalMove, currentSpeed * deltaTime);
-            isMoving = true;
-        }
-
-    } else {
-        // En tercera persona, A/D rotan al jugador
+    if (!isFreelooking) {
         if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
         if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
-
-        const moveDirection = new THREE.Vector3();
-        if (inputState.forward) moveDirection.z = -1;
-        if (inputState.backward) moveDirection.z = 1;
-
-        if (moveDirection.lengthSq() > 0) {
-            const worldMoveDirection = moveDirection.applyQuaternion(player.quaternion);
-            player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
-            isMoving = true;
-        }
+    } else {
+        player.rotation.y = pointerLockControls.getObject().rotation.y;
     }
 
+    if (inputState.forward) { moveDirection.z = -1; isMoving = true; }
+    if (inputState.backward) { moveDirection.z = 1; isMoving = true; }
 
-    // Colisión jugador-edificio
-    if(isMoving) {
-        player.updateMatrixWorld();
-        const playerBox = new THREE.Box3().setFromObject(player);
-        buildings.forEach(building => {
-            const buildingBox = new THREE.Box3().setFromObject(building);
+    if (isFreelooking) {
+        if (inputState.left) { moveDirection.x = -1; isMoving = true; }
+        if (inputState.right) { moveDirection.x = 1; isMoving = true; }
+    }
+
+    if (isMoving) {
+        const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(player.quaternion);
+        player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
+    }
+
+    // Player-Building Collision
+    player.updateMatrixWorld();
+    const playerBox = new THREE.Box3().setFromObject(player);
+    scene.children.forEach(obj => {
+        if (obj.geometry instanceof THREE.BoxGeometry && obj !== player) {
+            obj.updateMatrixWorld();
+            const buildingBox = new THREE.Box3().setFromObject(obj);
+
             if (playerBox.intersectsBox(buildingBox)) {
                 const centerA = new THREE.Vector3(); playerBox.getCenter(centerA);
                 const centerB = new THREE.Vector3(); buildingBox.getCenter(centerB);
@@ -425,27 +305,25 @@ function updatePlayer(deltaTime) {
                     } else {
                         player.position.z += (centerA.z < centerB.z ? -overlapZ : overlapZ);
                     }
+                    player.updateMatrixWorld();
+                    playerBox.setFromObject(player);
                 }
             }
-        });
-    }
-
+        }
+    });
 
     if (inputState.action) {
         toggleVehicleEntry();
         inputState.action = false;
     }
-
     if (inputState.shoot) {
         shoot();
         inputState.shoot = false;
     }
 }
 
-
 function updateVehicleControls(deltaTime) {
     if (!currentVehicle) return;
-
     const driveSpeed = 15;
     const turnSpeed = playerRotationSpeed * 0.7;
 
@@ -461,7 +339,7 @@ function updateVehicleControls(deltaTime) {
         forward.applyQuaternion(currentVehicle.quaternion);
         currentVehicle.position.addScaledVector(forward, actualSpeed * deltaTime);
     }
-    
+
     if (inputState.action) {
         toggleVehicleEntry();
         inputState.action = false;
@@ -475,7 +353,7 @@ function updateVehicleControls(deltaTime) {
                 console.log(`Peatón ${ped.userData.id} atropellado!`);
                 ped.userData.health = 0;
                 ped.rotation.x = Math.PI / 2;
-                ped.position.y = 0.3;
+                ped.position.y = ped.geometry.parameters.radius;
                 createBloodPuddle(ped.position);
             }
         }
@@ -483,18 +361,18 @@ function updateVehicleControls(deltaTime) {
 }
 
 function toggleVehicleEntry() {
-    if (currentVehicle) {
+    if (currentVehicle) { // Salir del vehículo
         player.visible = true;
         const carWidth = currentVehicle.geometry.parameters.width;
         const carLength = currentVehicle.geometry.parameters.depth;
 
         const potentialExitLocalOffsets = [
-            new THREE.Vector3(carWidth / 2 + 0.6, 0, 0),
-            new THREE.Vector3(-carWidth / 2 - 0.6, 0, 0),
-            new THREE.Vector3(0, 0, carLength / 2 + 0.6),
-            new THREE.Vector3(0, 0, -carLength / 2 - 0.6),
+            new THREE.Vector3(carWidth / 2 + 0.6, 0, 0),    // Lado derecho
+            new THREE.Vector3(-carWidth / 2 - 0.6, 0, 0),   // Lado izquierdo
+            new THREE.Vector3(0, 0, carLength / 2 + 0.6),   // Atrás
+            new THREE.Vector3(0, 0, -carLength / 2 - 0.6),  // Adelante
         ];
-
+        
         let foundClearSpot = false;
         for (const localOffset of potentialExitLocalOffsets) {
             const exitOffset = localOffset.clone().applyQuaternion(currentVehicle.quaternion);
@@ -506,11 +384,13 @@ function toggleVehicleEntry() {
             const playerExitBox = new THREE.Box3().setFromObject(player);
             let isColliding = false;
 
-            for (const building of buildings) {
-                const buildingBox = new THREE.Box3().setFromObject(building);
-                if (playerExitBox.intersectsBox(buildingBox)) {
-                    isColliding = true;
-                    break;
+            for (const child of scene.children) {
+                if (child.geometry instanceof THREE.BoxGeometry && child !== currentVehicle) {
+                    const buildingBox = new THREE.Box3().setFromObject(child);
+                    if (playerExitBox.intersectsBox(buildingBox)) {
+                        isColliding = true;
+                        break;
+                    }
                 }
             }
             if (isColliding) continue;
@@ -527,19 +407,16 @@ function toggleVehicleEntry() {
         }
 
         if (!foundClearSpot) {
-            console.warn("No se pudo encontrar un lugar de salida despejado.");
+            console.warn("No se pudo encontrar un lugar de salida despejado. El jugador puede estar atascado.");
             const exitOffset = potentialExitLocalOffsets[0].clone().applyQuaternion(currentVehicle.quaternion);
             player.position.copy(currentVehicle.position).add(exitOffset);
             player.position.y = player.geometry.parameters.radius + player.geometry.parameters.height / 2;
         }
 
-        player.position.x = THREE.MathUtils.clamp(player.position.x, -worldBounds + 2, worldBounds - 2);
-        player.position.z = THREE.MathUtils.clamp(player.position.z, -worldBounds + 2, worldBounds - 2);
-
         currentVehicle = null;
         if (isFreelooking) pointerLockControls.unlock();
-        
-    } else {
+
+    } else { // Entrar al vehículo
         let closestCar = null;
         let minDistance = 3.5;
         vehicles.forEach(vehicle => {
@@ -570,31 +447,21 @@ function shoot() {
 
     camera.getWorldPosition(shootOrigin);
     camera.getWorldDirection(shootDirection);
-
     raycaster.set(shootOrigin, shootDirection);
-    
+
     const livingPedestrians = pedestrians.filter(p => p.userData.health > 0 && p.visible);
-    const intersects = raycaster.intersectObjects(livingPedestrians, true);
+    const intersects = raycaster.intersectObjects(livingPedestrians, false);
 
     if (intersects.length > 0) {
-        const hitMesh = intersects[0].object;
-        const hitPedestrian = hitMesh.parent;
-
-        if (hitPedestrian && hitPedestrian.userData.health > 0) {
-            const hitPart = hitMesh.userData.part;
-            
-            if (hitPart === 'head') {
-                console.log(`¡Disparo a la cabeza a ${hitPedestrian.userData.id}!`);
-                hitPedestrian.userData.health = 0;
-            } else if (hitPart === 'body') {
-                console.log(`Disparo al cuerpo de ${hitPedestrian.userData.id}!`);
-                hitPedestrian.userData.health -= 34;
-            }
-
+        const hitObject = intersects[0].object;
+        const hitPedestrian = pedestrians.find(p => p === hitObject);
+        if (hitPedestrian) {
+            console.log(`Peatón ${hitPedestrian.userData.id} disparado! Distancia: ${intersects[0].distance.toFixed(2)}`);
+            hitPedestrian.userData.health -= 50;
             if (hitPedestrian.userData.health <= 0) {
                 console.log(`Peatón ${hitPedestrian.userData.id} eliminado.`);
                 hitPedestrian.rotation.x = Math.PI / 2;
-                hitPedestrian.position.y = 0.3;
+                hitPedestrian.position.y = hitPedestrian.geometry.parameters.radius;
                 createBloodPuddle(hitPedestrian.position);
             } else {
                 hitPedestrian.userData.isFleeing = true;
@@ -605,17 +472,9 @@ function shoot() {
     }
 }
 
-
 function updatePedestrians(deltaTime) {
     pedestrians.forEach(ped => {
-        if (!ped.visible) return;
-        if (ped.userData.health <= 0) {
-            if (ped.rotation.x !== Math.PI / 2) {
-                 ped.rotation.x = Math.PI / 2;
-                 ped.position.y = 0.3;
-            }
-            return;
-        }
+        if (!ped.visible || ped.userData.health <= 0) return;
 
         const pedSpeed = ped.userData.isFleeing ? 4 : 1.5;
         const playerDistance = player.visible ? player.position.distanceTo(ped.position) : Infinity;
@@ -625,6 +484,7 @@ function updatePedestrians(deltaTime) {
              const fleeDirection = new THREE.Vector3().subVectors(ped.position, player.position).normalize();
              ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 20 + 10));
         }
+
         if (!ped.userData.isFleeing && currentVehicle) {
             const vehicleDistance = currentVehicle.position.distanceTo(ped.position);
             const vehicleVelocity = new THREE.Vector3(0,0,-1).applyQuaternion(currentVehicle.quaternion);
@@ -636,19 +496,18 @@ function updatePedestrians(deltaTime) {
                 ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 15 + 10));
             }
         }
-        if (ped.userData.isFleeing) {
-            if (ped.position.distanceTo(ped.userData.targetPosition) < 2 || Math.random() < 0.01) {
+
+        if (ped.position.distanceTo(ped.userData.targetPosition) < (ped.userData.isFleeing ? 2 : 1) || Math.random() < 0.01) {
+            if (ped.userData.isFleeing) {
                  const sourceOfDanger = currentVehicle ? currentVehicle.position : (player.visible ? player.position : ped.position);
                  const fleeDirection = new THREE.Vector3().subVectors(ped.position, sourceOfDanger).normalize();
                  if (fleeDirection.lengthSq() < 0.001) fleeDirection.set(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
                  ped.userData.targetPosition.addVectors(ped.position, fleeDirection.multiplyScalar(Math.random() * 20 + 10));
-            }
-        } else {
-            if (ped.position.distanceTo(ped.userData.targetPosition) < 1 || Math.random() < 0.01) {
+            } else {
                 ped.userData.targetPosition.set(
-                    (Math.random() - 0.5) * (worldBounds * 1.8),
+                    (Math.random() - 0.5) * 200,
                     ped.position.y,
-                    (Math.random() - 0.5) * (worldBounds * 1.8)
+                    (Math.random() - 0.5) * 200
                 );
             }
         }
@@ -662,21 +521,23 @@ function updatePedestrians(deltaTime) {
             ped.lookAt(lookAtPos);
         }
 
+        // Pedestrian-Building Collision
         const pedBox = new THREE.Box3().setFromObject(ped);
-        buildings.forEach(building => {
-            const buildingBox = new THREE.Box3().setFromObject(building);
-            if(pedBox.intersectsBox(buildingBox)){
-                const centerPed = new THREE.Vector3(); pedBox.getCenter(centerPed);
-                const centerBuild = new THREE.Vector3(); buildingBox.getCenter(centerBuild);
-                const pushDirection = centerPed.sub(centerBuild).normalize();
-                pushDirection.y = 0;
-                ped.position.addScaledVector(pushDirection, pedSpeed * deltaTime * 0.5);
-                ped.userData.targetPosition.addScaledVector(pushDirection, 5);
+        scene.children.forEach(obj => {
+             if (obj.geometry instanceof THREE.BoxGeometry && obj !== ped) {
+                const buildingBox = new THREE.Box3().setFromObject(obj);
+                if (pedBox.intersectsBox(buildingBox)) {
+                    const centerPed = new THREE.Vector3(); pedBox.getCenter(centerPed);
+                    const centerBuild = new THREE.Vector3(); buildingBox.getCenter(centerBuild);
+                    const pushDirection = centerPed.sub(centerBuild).normalize();
+                    pushDirection.y = 0;
+                    ped.position.addScaledVector(pushDirection, pedSpeed * deltaTime * 0.5);
+                    ped.userData.targetPosition.addScaledVector(pushDirection, 5);
+                }
             }
         });
     });
 }
-
 
 function updateCamera(deltaTime) {
     if (isFreelooking && player.visible && !currentVehicle) {
@@ -686,6 +547,7 @@ function updateCamera(deltaTime) {
             player.position.y + eyeHeightOffset,
             player.position.z
         );
+        player.rotation.y = pointerLockControls.getObject().rotation.y;
     } else if (currentVehicle) {
         const cameraLookAtOffset = new THREE.Vector3(0, 1.0, 0);
         const offset = new THREE.Vector3(0, 4, 8);
@@ -720,6 +582,7 @@ function updateDayNightCycle(deltaTime) {
     const nightSkyColor = new THREE.Color(0x000022);
     const dayFogColor = new THREE.Color(0x87CEEB);
     const nightFogColor = new THREE.Color(0x000022);
+
     const sunIntensityFactor = Math.max(0, Math.sin(angle - Math.PI / 2) + 0.1);
 
     sunLight.intensity = 0.8 * sunIntensityFactor + 0.1;
@@ -727,31 +590,7 @@ function updateDayNightCycle(deltaTime) {
 
     scene.background.lerpColors(nightSkyColor, daySkyColor, sunIntensityFactor);
     scene.fog.color.lerpColors(nightFogColor, dayFogColor, sunIntensityFactor);
-
-    const isNight = sunIntensityFactor < 0.2;
-
-    buildings.forEach(building => {
-        const currentIsNight = building.material === building.userData.nightMaterial;
-        if (isNight && !currentIsNight) {
-            building.material = building.userData.nightMaterial;
-        } else if (!isNight && currentIsNight) {
-            building.material = building.userData.dayMaterial;
-        }
-    });
-
-    streetlights.forEach(sl => {
-        if (isNight && !sl.userData.isOn) {
-            sl.userData.light.intensity = 2.5;
-            sl.userData.lamp.material = sl.userData.lampMatOn;
-            sl.userData.isOn = true;
-        } else if (!isNight && sl.userData.isOn) {
-            sl.userData.light.intensity = 0;
-            sl.userData.lamp.material = sl.userData.lampMatOff;
-            sl.userData.isOn = false;
-        }
-    });
 }
-
 
 // --- Bucle Principal de Animación ---
 function animate() {
@@ -764,7 +603,7 @@ function animate() {
         if(isFreelooking) pointerLockControls.unlock();
     } else if (player.visible) {
         updatePlayer(deltaTime);
-        crosshair.style.display = isFreelooking ? 'block' : 'none';
+        crosshair.style.display = 'block'; // Mostrar siempre la mira al estar a pie
     } else {
         crosshair.style.display = 'none';
     }
