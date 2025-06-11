@@ -13,11 +13,28 @@ let dayDuration = 120; // Duración del día en segundos
 let timeOfDay = 0;
 let pointerLockControls;
 let isFreelooking = false;
+let isTouchDevice = false;
 
 const inputState = {
     forward: 0, backward: 0, left: 0, right: 0,
     action: false, shoot: false, run: false
 };
+
+// --- Variables para Joystick de Apuntado (Móvil) ---
+const aimJoystick = {
+    active: false,
+    area: document.getElementById('aim-joystick-area'),
+    knob: document.getElementById('aim-joystick-knob'),
+    center: new THREE.Vector2(),
+    current: new THREE.Vector2(),
+    delta: new THREE.Vector2(),
+    touchId: -1,
+    sensitivity: 0.002
+};
+let cameraPitch = 0;
+const MAX_PITCH = Math.PI / 2 - 0.1;
+const MIN_PITCH = -Math.PI / 2 + 0.1;
+
 
 const crosshair = document.getElementById('crosshair');
 const gameCanvas = document.getElementById('gameCanvas');
@@ -25,6 +42,8 @@ const mobileControlsContainer = document.getElementById('mobileControls');
 
 // --- Configuración Inicial ---
 function init() {
+    isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
     scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
@@ -54,7 +73,18 @@ function init() {
     createVehicles(5);
     createPedestrians(15);
 
-    // Pointer Lock Controls
+    // Pointer Lock Controls (solo para escritorio)
+    if (!isTouchDevice) {
+        setupPointerLock();
+    }
+    
+    setupInputHandlers();
+    setupMobileControls();
+
+    animate();
+}
+
+function setupPointerLock() {
     pointerLockControls = new PointerLockControls(camera, renderer.domElement);
     pointerLockControls.addEventListener('lock', () => {
         isFreelooking = true;
@@ -67,14 +97,10 @@ function init() {
         if (document.getElementById('info')) document.getElementById('info').style.display = 'block';
     });
     scene.add(pointerLockControls.getObject());
-
-    setupInputHandlers();
-    setupMobileControls();
-
-    animate();
 }
 
-// --- Creación de Elementos del Juego ---
+
+// --- Creación de Elementos del Juego (sin cambios) ---
 function createWorld() {
     const groundGeo = new THREE.PlaneGeometry(500, 500);
     const groundMat = new THREE.MeshStandardMaterial({ color: 0x777777, side: THREE.DoubleSide });
@@ -104,7 +130,6 @@ function createWorld() {
         scene.add(building);
     }
 }
-
 function createPlayer() {
     player = new THREE.Group();
     const bodyRadius = 0.4;
@@ -129,7 +154,6 @@ function createPlayer() {
     player.position.y = bodyRadius + bodyHeight / 2;
     scene.add(player);
 }
-
 function createVehicles(count) {
     const carColors = [0xff0000, 0x0000ff, 0xffff00, 0x00ffff, 0xff00ff, 0x888888];
     const carGeo = new THREE.BoxGeometry(2.2, 1.8, 4);
@@ -148,7 +172,6 @@ function createVehicles(count) {
         scene.add(vehicle);
     }
 }
-
 function createPedestrians(count) {
     const bodyRadius = 0.3;
     const bodyHeight = 1.0;
@@ -189,7 +212,6 @@ function createPedestrians(count) {
         scene.add(pedestrian);
     }
 }
-
 function createBloodPuddle(position) {
     const bloodGeo = new THREE.CircleGeometry(0.5 + Math.random() * 0.4, 16);
     const bloodMat = new THREE.MeshStandardMaterial({
@@ -219,6 +241,7 @@ function createBloodPuddle(position) {
     }, 20000);
 }
 
+
 // --- Lógica de Entradas ---
 function setupInputHandlers() {
     document.addEventListener('keydown', (event) => {
@@ -247,15 +270,10 @@ function setupInputHandlers() {
         if (currentVehicle || !player.visible) return;
         
         switch (event.button) {
-            case 0: // Left click
-                inputState.shoot = true;
-                break;
-            case 2: // Right click
-                if (pointerLockControls.isLocked) {
-                    pointerLockControls.unlock();
-                } else {
-                    pointerLockControls.lock();
-                }
+            case 0: inputState.shoot = true; break;
+            case 2:
+                if (pointerLockControls.isLocked) pointerLockControls.unlock();
+                else pointerLockControls.lock();
                 break;
         }
     });
@@ -266,9 +284,8 @@ function setupInputHandlers() {
 }
 
 function setupMobileControls() {
-    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
     if (!isTouchDevice || !mobileControlsContainer) return;
-    mobileControlsContainer.style.display = 'flex';
+    mobileControlsContainer.style.display = 'block';
 
     const controlsMap = {
         'mc-forward': 'forward', 'mc-backward': 'backward', 'mc-left': 'left',
@@ -284,7 +301,6 @@ function setupMobileControls() {
             }, { passive: false });
             button.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                // 'action' is a single press, not a hold
                 if (controlsMap[id] !== 'action') {
                     inputState[controlsMap[id]] = false;
                 }
@@ -292,19 +308,61 @@ function setupMobileControls() {
         }
     }
     
-    // Special handler for the new Aim button
-    const aimButton = document.getElementById('mc-aim');
-    if (aimButton) {
-        aimButton.addEventListener('touchstart', (e) => {
+    // Botón de pantalla completa
+    const fullscreenButton = document.getElementById('mc-fullscreen');
+    if (fullscreenButton) {
+        fullscreenButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (currentVehicle || !player.visible) return;
-            if (pointerLockControls.isLocked) {
-                pointerLockControls.unlock();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
             } else {
-                pointerLockControls.lock();
+                document.exitFullscreen();
             }
-        }, { passive: false });
+        });
     }
+
+    // Joystick de apuntado
+    const joystickArea = aimJoystick.area;
+    joystickArea.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (aimJoystick.touchId === -1) { // Capturar solo el primer toque
+            const touch = e.changedTouches[0];
+            aimJoystick.touchId = touch.identifier;
+            aimJoystick.active = true;
+            aimJoystick.center.set(touch.clientX, touch.clientY);
+            aimJoystick.current.copy(aimJoystick.center);
+            crosshair.style.display = 'block';
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (aimJoystick.active) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === aimJoystick.touchId) {
+                    e.preventDefault();
+                    aimJoystick.current.set(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                    break;
+                }
+            }
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+        if (aimJoystick.active) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === aimJoystick.touchId) {
+                    e.preventDefault();
+                    aimJoystick.active = false;
+                    aimJoystick.touchId = -1;
+                    aimJoystick.knob.style.transform = `translate(-50%, -50%)`;
+                    crosshair.style.display = 'none';
+                    break;
+                }
+            }
+        }
+    }, { passive: false });
 }
 
 // --- Lógica de Juego (Actualizaciones) ---
@@ -315,31 +373,62 @@ function updatePlayer(deltaTime) {
     const moveDirection = new THREE.Vector3();
     let isMoving = false;
 
-    // Movimiento
+    // Movimiento (Móvil y Escritorio)
     if (inputState.forward) { moveDirection.z = -1; isMoving = true; }
     if (inputState.backward) { moveDirection.z = 1; isMoving = true; }
+    
+    // En móvil, izquierda/derecha es strafing. En escritorio sin apuntar, es rotación.
     if (inputState.left) { moveDirection.x = -1; isMoving = true; }
     if (inputState.right) { moveDirection.x = 1; isMoving = true; }
 
-    if (isMoving) {
-        // La dirección del movimiento depende del modo de cámara
-        const moveQuaternion = isFreelooking ? camera.quaternion : player.quaternion;
-        const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(moveQuaternion);
-        player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
-    }
+    // Rotación y movimiento
+    if (isTouchDevice) {
+        // Rotación con Joystick
+        if (aimJoystick.active) {
+            aimJoystick.delta.subVectors(aimJoystick.current, aimJoystick.center);
+            
+            player.rotation.y -= aimJoystick.delta.x * aimJoystick.sensitivity;
+            cameraPitch -= aimJoystick.delta.y * aimJoystick.sensitivity;
+            cameraPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, cameraPitch));
+            
+            // Actualizar la posición visual del knob
+            const knobX = Math.max(-40, Math.min(40, aimJoystick.delta.x));
+            const knobY = Math.max(-40, Math.min(40, aimJoystick.delta.y));
+            aimJoystick.knob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
 
-    // Rotación
-    if (isFreelooking) {
-        // El jugador se alinea con la cámara
-        player.rotation.y = pointerLockControls.getObject().rotation.y;
-    } else {
-        // Rotación estilo "tanque" con A y D (o los botones izquiero/derecho en móvil)
-        if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
-        if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
+            // Reiniciar el centro para que el movimiento sea relativo
+            aimJoystick.center.copy(aimJoystick.current);
+        }
+        
+        // El movimiento siempre es relativo a la cámara
+        if (isMoving) {
+            const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(camera.quaternion);
+            player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
+        }
+
+    } else { // Lógica de Escritorio
+        if (isMoving) {
+            // Si está en modo freelook, el movimiento es relativo a la cámara.
+            // Si no, es relativo al jugador (movimiento tipo tanque).
+            const moveQuaternion = isFreelooking ? camera.quaternion : player.quaternion;
+            const worldMoveDirection = moveDirection.clone().normalize().applyQuaternion(moveQuaternion);
+            player.position.addScaledVector(worldMoveDirection, currentSpeed * deltaTime);
+        }
+
+        // Rotación
+        if (isFreelooking) {
+            player.rotation.y = pointerLockControls.getObject().rotation.y;
+        } else {
+            // Rotación estilo "tanque" con A y D (si no se está moviendo hacia los lados)
+            if (moveDirection.x === 0) {
+                 if (inputState.left) player.rotation.y += playerRotationSpeed * deltaTime;
+                 if (inputState.right) player.rotation.y -= playerRotationSpeed * deltaTime;
+            }
+        }
     }
     
-    // Player-Building Collision
-    const playerBody = player.children[0]; // Usar el cuerpo para la colisión
+    // Colisiones (sin cambios)...
+    const playerBody = player.children[0];
     playerBody.updateMatrixWorld();
     const playerBox = new THREE.Box3().setFromObject(playerBody);
     scene.children.forEach(obj => {
@@ -368,6 +457,7 @@ function updatePlayer(deltaTime) {
             }
         }
     });
+
 
     if (inputState.action) {
         toggleVehicleEntry();
@@ -454,7 +544,8 @@ function toggleVehicleEntry() {
 }
 
 function shoot() {
-    if (!player || currentVehicle || !player.visible || !isFreelooking) return;
+    // Permitir disparo en móvil si se está apuntando con el joystick
+    if (!player || currentVehicle || !player.visible || (!isFreelooking && !aimJoystick.active)) return;
 
     const raycaster = new THREE.Raycaster();
     const shootOrigin = new THREE.Vector3();
@@ -465,7 +556,7 @@ function shoot() {
     raycaster.set(shootOrigin, shootDirection);
 
     const livingPedestrians = pedestrians.filter(p => p.userData.health > 0 && p.visible);
-    const hittableMeshes = livingPedestrians.flatMap(p => p.children); // Obtener todas las mallas (cuerpo y cabeza)
+    const hittableMeshes = livingPedestrians.flatMap(p => p.children);
     const intersects = raycaster.intersectObjects(hittableMeshes, false);
 
     if (intersects.length > 0) {
@@ -474,14 +565,11 @@ function shoot() {
 
         if (hitPedestrian) {
             const damage = hitMesh.userData.type === 'head' ? 100 : 50;
-            console.log(`Disparo a ${hitPedestrian.userData.id} en ${hitMesh.userData.type}. Daño: ${damage}`);
-            
             hitPedestrian.userData.health -= damage;
 
             if (hitPedestrian.userData.health <= 0) {
-                console.log(`Peatón ${hitPedestrian.userData.id} eliminado.`);
                 hitPedestrian.rotation.x = Math.PI / 2;
-                hitPedestrian.position.y = hitPedestrian.children[0].geometry.parameters.radius; // Caer al suelo
+                hitPedestrian.position.y = hitPedestrian.children[0].geometry.parameters.radius;
                 createBloodPuddle(hitPedestrian.position);
             } else {
                 hitPedestrian.userData.isFleeing = true;
@@ -493,6 +581,7 @@ function shoot() {
 }
 
 function updatePedestrians(deltaTime) {
+    // Lógica sin cambios...
     pedestrians.forEach(ped => {
         if (!ped.visible || ped.userData.health <= 0) return;
 
@@ -541,7 +630,6 @@ function updatePedestrians(deltaTime) {
             ped.lookAt(lookAtPos);
         }
 
-        // Pedestrian-Building Collision
         const pedBody = ped.children[0];
         const pedBox = new THREE.Box3().setFromObject(pedBody);
         scene.children.forEach(obj => {
@@ -561,13 +649,7 @@ function updatePedestrians(deltaTime) {
 }
 
 function updateCamera(deltaTime) {
-    if (isFreelooking && player.visible && !currentVehicle) {
-        // La cámara está fija en la cabeza del jugador
-        const head = player.children[1];
-        const headPosition = new THREE.Vector3();
-        head.getWorldPosition(headPosition);
-        camera.position.copy(headPosition);
-    } else if (currentVehicle) {
+    if (currentVehicle) {
         const cameraLookAtOffset = new THREE.Vector3(0, 1.0, 0);
         const offset = new THREE.Vector3(0, 4, 8);
         const cameraPosition = offset.applyMatrix4(currentVehicle.matrixWorld);
@@ -575,21 +657,45 @@ function updateCamera(deltaTime) {
         const lookAtPosition = new THREE.Vector3().copy(currentVehicle.position).add(cameraLookAtOffset);
         camera.lookAt(lookAtPosition);
     } else if (player && player.visible) {
-        const cameraLookAtOffset = new THREE.Vector3(0, 1.0, 0);
-        const offset = new THREE.Vector3(0, 2.5, 4.5);
-        const cameraTargetPosition = new THREE.Vector3();
-        player.getWorldPosition(cameraTargetPosition);
+        if (isTouchDevice) {
+            // La cámara en móvil se controla directamente con el joystick de apuntado
+            const cameraLookAtOffset = new THREE.Vector3(0, 1.2, 0); // Mirar un poco más arriba
+            const offset = new THREE.Vector3(0, 2.5, 4.5);
+            
+            // Rotar el offset de la cámara con la rotación del jugador
+            const cameraOffset = offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0), player.rotation.y);
+            
+            const cameraTargetPosition = player.position.clone().add(cameraOffset);
+            camera.position.lerp(cameraTargetPosition, 0.5); // LERP más rápido para respuesta inmediata
+            
+            // Aplicar la inclinación vertical (pitch)
+            const lookAtTarget = player.position.clone().add(cameraLookAtOffset);
+            camera.lookAt(lookAtTarget);
+            camera.rotation.x += cameraPitch; // Añadir el pitch manualmente después de lookAt
 
-        const cameraOffset = offset.clone().applyQuaternion(player.quaternion);
-        const cameraPosition = cameraTargetPosition.clone().add(cameraOffset);
+        } else if (isFreelooking) { // Cámara en 1a persona para escritorio
+            const head = player.children[1];
+            const headPosition = new THREE.Vector3();
+            head.getWorldPosition(headPosition);
+            camera.position.copy(headPosition);
+        } else { // Cámara en 3a persona para escritorio
+            const cameraLookAtOffset = new THREE.Vector3(0, 1.0, 0);
+            const offset = new THREE.Vector3(0, 2.5, 4.5);
+            const cameraTargetPosition = new THREE.Vector3();
+            player.getWorldPosition(cameraTargetPosition);
 
-        camera.position.lerp(cameraPosition, 0.1);
-        const lookAtPosition = cameraTargetPosition.clone().add(cameraLookAtOffset);
-        camera.lookAt(lookAtPosition);
+            const cameraOffset = offset.clone().applyQuaternion(player.quaternion);
+            const cameraPosition = cameraTargetPosition.clone().add(cameraOffset);
+
+            camera.position.lerp(cameraPosition, 0.1);
+            const lookAtPosition = cameraTargetPosition.clone().add(cameraLookAtOffset);
+            camera.lookAt(lookAtPosition);
+        }
     }
 }
 
 function updateDayNightCycle(deltaTime) {
+    // Lógica sin cambios...
     timeOfDay += deltaTime / dayDuration;
     timeOfDay %= 1;
     const angle = timeOfDay * Math.PI * 2;
@@ -611,6 +717,16 @@ function updateDayNightCycle(deltaTime) {
     scene.fog.color.lerpColors(nightFogColor, dayFogColor, sunIntensityFactor);
 }
 
+function updateMobileUI() {
+    if (!isTouchDevice) return;
+    
+    // Mostrar/ocultar el joystick de apuntado
+    const showAimJoystick = !currentVehicle && player.visible;
+    if (aimJoystick.area) {
+        aimJoystick.area.style.display = showAimJoystick ? 'block' : 'none';
+    }
+}
+
 // --- Bucle Principal de Animación ---
 function animate() {
     requestAnimationFrame(animate);
@@ -618,13 +734,16 @@ function animate() {
 
     if (currentVehicle) {
         updateVehicleControls(deltaTime);
-        if(isFreelooking) pointerLockControls.unlock();
     } else if (player.visible) {
         updatePlayer(deltaTime);
     }
 
-    if (!isFreelooking && !currentVehicle) {
-        crosshair.style.display = 'none';
+    if(isTouchDevice) {
+        updateMobileUI();
+    } else {
+        if (!isFreelooking && !currentVehicle) {
+            crosshair.style.display = 'none';
+        }
     }
 
     updatePedestrians(deltaTime);

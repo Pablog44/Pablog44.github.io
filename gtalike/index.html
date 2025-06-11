@@ -18,7 +18,9 @@
     <div id="crosshair" style="display: none;"></div>
     <canvas id="gameCanvas"></canvas>
 
+    <!-- Controles Móviles Actualizados -->
     <div id="mobileControls" style="display: none;">
+        <!-- Joystick de Movimiento (Izquierda) -->
         <div class="joystick-area">
             <button id="mc-forward">▲</button>
             <div>
@@ -27,9 +29,16 @@
                 <button id="mc-right">►</button>
             </div>
         </div>
+
+        <!-- Joystick de Apuntado (Derecha) -->
+        <div id="aim-joystick-area" style="display: none;">
+            <div id="aim-joystick-knob"></div>
+        </div>
+
+        <!-- Botones de Acción (Derecha, arriba del joystick de apuntado) -->
         <div class="action-buttons-area">
+            <button id="mc-fullscreen">⛶</button> <!-- Botón nuevo para pantalla completa -->
             <button id="mc-run">Correr</button>
-            <button id="mc-aim">Apuntar</button> <!-- Botón nuevo para apuntar en móvil -->
             <button id="mc-action">Acción</button>
             <button id="mc-shoot">Disparar</button>
         </div>
