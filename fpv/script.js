@@ -141,6 +141,11 @@ function detectMobile() {
 // --- Inicialización ---
 function init() {
     isMobileDevice = detectMobile();
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (isMobileDevice && fullscreenBtn) {
+        fullscreenBtn.classList.add('mobile-visible'); // Hace el botón visible
+        fullscreenBtn.addEventListener('click', toggleFullscreen); // Asigna la función al click
+    }
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xADD8E6); // Light blue background
 
@@ -204,6 +209,27 @@ function init() {
 
     window.addEventListener('resize', onWindowResize, false);
 }
+
+function toggleFullscreen() {
+    const doc = window.document;
+    const docEl = doc.documentElement;
+
+    const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+    const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+    if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+        if (requestFullScreen) {
+            requestFullScreen.call(docEl);
+        } else {
+            console.warn("La API de pantalla completa no es compatible con este navegador.");
+        }
+    } else {
+        if (cancelFullScreen) {
+            cancelFullScreen.call(doc);
+        }
+    }
+}
+
 
 function findActiveGamepad() {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];

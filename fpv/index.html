@@ -2,95 +2,87 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> {/* Added user-scalable=no */}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>El 3d de Pablo González</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #000;
-            font-family: sans-serif; /* Added for potential debug text */
-            overscroll-behavior: none; /* Prevent pull-to-refresh or other overscroll actions */
+            font-family: sans-serif;
+            overscroll-behavior: none;
         }
         canvas {
             display: block;
-            touch-action: none; /* Important for preventing default touch behaviors on canvas */
+            touch-action: none;
+        }
+        
+        /* --- NUEVO: Estilos para el Botón de Pantalla Completa --- */
+        .fullscreen-button {
+            display: none; /* Oculto por defecto */
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 20; /* Asegura que esté por encima de otros elementos como el d-pad */
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
+        /* Clase que se añadirá con JS para mostrar el botón en móviles */
+        .fullscreen-button.mobile-visible {
+            display: block;
+        }
+        /* --- FIN DE NUEVOS ESTILOS --- */
+
+
         /* --- D-Pad Styles --- */
-        .d-pad-container { /* Container for D-Pads, only shown on mobile */
+        .d-pad-container {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Allows clicks/touches to pass through to canvas unless on a d-pad part */
+            pointer-events: none;
             z-index: 10;
         }
-
+        /* ... (el resto de tu CSS de D-Pad no cambia) ... */
         .d-pad {
-            position: absolute; /* Positioned relative to d-pad-container */
-            width: 130px; /* Increased size slightly */
+            position: absolute;
+            width: 130px;
             height: 130px;
             background-color: rgba(80, 80, 80, 0.4);
             border-radius: 50%;
-            pointer-events: auto; /* D-pad itself should capture touches */
+            pointer-events: auto;
             user-select: none;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
-            touch-action: none; /* Crucial for d-pad interaction */
+            touch-action: none;
             box-sizing: border-box;
             border: 2px solid rgba(200, 200, 200, 0.3);
         }
-
-        .d-pad-left {
-            bottom: 30px;
-            left: 30px;
-        }
-
-        .d-pad-right {
-            bottom: 30px;
-            right: 30px;
-        }
-
-        /* Visual cues for D-pad buttons (optional, but helpful) */
-        .d-pad-button-visual {
-            position: absolute;
-            background-color: rgba(150, 150, 150, 0.3);
-            border: 1px solid rgba(220, 220, 220, 0.4);
-            box-sizing: border-box;
-        }
-
-        .d-pad-left .d-pad-button-visual.up {
-            width: 40px; height: 45px; top: 5px; left: 50%; transform: translateX(-50%); border-radius: 10px 10px 0 0;
-        }
-        .d-pad-left .d-pad-button-visual.down {
-            width: 40px; height: 45px; bottom: 5px; left: 50%; transform: translateX(-50%); border-radius: 0 0 10px 10px;
-        }
-        .d-pad-left .d-pad-button-visual.left {
-            width: 45px; height: 40px; left: 5px; top: 50%; transform: translateY(-50%); border-radius: 10px 0 0 10px;
-        }
-        .d-pad-left .d-pad-button-visual.right {
-            width: 45px; height: 40px; right: 5px; top: 50%; transform: translateY(-50%); border-radius: 0 10px 10px 0;
-        }
-        
-        .d-pad-center-dot {
-            position: absolute;
-            width: 25px;
-            height: 25px;
-            background-color: rgba(150, 150, 150, 0.2);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        /* --- End D-Pad Styles --- */
-
+        .d-pad-left { bottom: 30px; left: 30px; }
+        .d-pad-right { bottom: 30px; right: 30px; }
+        .d-pad-button-visual { position: absolute; background-color: rgba(150, 150, 150, 0.3); border: 1px solid rgba(220, 220, 220, 0.4); box-sizing: border-box; }
+        .d-pad-left .d-pad-button-visual.up { width: 40px; height: 45px; top: 5px; left: 50%; transform: translateX(-50%); border-radius: 10px 10px 0 0; }
+        .d-pad-left .d-pad-button-visual.down { width: 40px; height: 45px; bottom: 5px; left: 50%; transform: translateX(-50%); border-radius: 0 0 10px 10px; }
+        .d-pad-left .d-pad-button-visual.left { width: 45px; height: 40px; left: 5px; top: 50%; transform: translateY(-50%); border-radius: 10px 0 0 10px; }
+        .d-pad-left .d-pad-button-visual.right { width: 45px; height: 40px; right: 5px; top: 50%; transform: translateY(-50%); border-radius: 0 10px 10px 0; }
+        .d-pad-center-dot { position: absolute; width: 25px; height: 25px; background-color: rgba(150, 150, 150, 0.2); border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
+    <!-- NUEVO: Botón para pantalla completa -->
+    <button id="fullscreenBtn" class="fullscreen-button">Pantalla Completa</button>
+
     <canvas id="gameCanvas"></canvas>
 
     <!-- Container for D-Pads -->
@@ -103,7 +95,7 @@
             <div class="d-pad-button-visual right"></div>
         </div>
         <div id="rightDPad" class="d-pad d-pad-right">
-            <div class="d-pad-center-dot"></div> <!-- Simple dot for look stick center -->
+            <div class="d-pad-center-dot"></div>
         </div>
     </div>
 
