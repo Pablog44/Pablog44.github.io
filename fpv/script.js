@@ -146,6 +146,10 @@ function init() {
         fullscreenBtn.classList.add('mobile-visible'); // Hace el botón visible
         fullscreenBtn.addEventListener('click', toggleFullscreen); // Asigna la función al click
     }
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xADD8E6); // Light blue background
 
@@ -226,6 +230,27 @@ function toggleFullscreen() {
     } else {
         if (cancelFullScreen) {
             cancelFullScreen.call(doc);
+        }
+    }
+}
+function handleFullscreenChange() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (!fullscreenBtn) return; // Medida de seguridad
+
+    // Comprueba si algún elemento está en modo de pantalla completa
+    const isFullscreen = document.fullscreenElement ||
+                         document.webkitFullscreenElement ||
+                         document.mozFullScreenElement ||
+                         document.msFullscreenElement;
+
+    if (isFullscreen) {
+        // Si estamos en pantalla completa, OCULTA el botón
+        fullscreenBtn.style.display = 'none';
+    } else {
+        // Si NO estamos en pantalla completa (porque salimos), lo VOLVEMOS A MOSTRAR
+        // solo si estamos en un dispositivo móvil
+        if (isMobileDevice) {
+            fullscreenBtn.style.display = 'block';
         }
     }
 }
