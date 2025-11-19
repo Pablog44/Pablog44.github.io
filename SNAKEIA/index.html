@@ -2,23 +2,35 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Snake AI 3D - Three.js & Neural Network</title>
+    <title>Snake AI 3D - Ultimate Version</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: #fff; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; color: #fff; }
         #ui {
             position: absolute; top: 10px; left: 10px; z-index: 10;
-            background: rgba(0, 20, 40, 0.8); padding: 20px; border: 1px solid #0ff;
-            border-radius: 8px; width: 300px;
+            background: rgba(0, 10, 20, 0.9); padding: 20px; border: 1px solid #0ff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            border-radius: 8px; width: 320px;
         }
-        h1 { margin: 0 0 10px 0; font-size: 20px; color: #0ff; text-shadow: 0 0 10px #0ff; }
-        .stat { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
+        h1 { margin: 0 0 15px 0; font-size: 22px; color: #0ff; text-shadow: 0 0 10px #0ff; text-align: center; letter-spacing: 2px; }
+        .stat { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .highlight { color: #ff0055; font-weight: bold; }
+        .highlight-green { color: #00ff55; font-weight: bold; }
+        
         select, button {
-            width: 100%; padding: 10px; margin-top: 10px;
+            width: 100%; padding: 12px; margin-top: 10px;
             background: #000; color: #0ff; border: 1px solid #0ff;
             cursor: pointer; font-weight: bold; text-transform: uppercase;
+            transition: all 0.3s;
         }
-        button:hover { background: #0ff; color: #000; }
-        button:disabled { border-color: #555; color: #555; cursor: not-allowed; background: #111; }
+        button:hover { background: #0ff; color: #000; box-shadow: 0 0 15px #0ff; }
+        button:disabled { border-color: #444; color: #444; cursor: not-allowed; background: #111; box-shadow: none; }
+        
+        #msg-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 40px; color: white; text-shadow: 0 0 20px red;
+            display: none; pointer-events: none; z-index: 20; font-weight: bold;
+        }
+
         #canvas-container { width: 100vw; height: 100vh; }
     </style>
     <!-- Importar Three.js -->
@@ -30,32 +42,36 @@
     <h1>NEURO SNAKE 3D</h1>
     
     <div class="stat"><span>Generación:</span> <span id="gen-display">0</span></div>
-    <div class="stat"><span>Mejor Fitness:</span> <span id="best-fitness-display">0</span></div>
+    <div class="stat"><span>Mejor Fitness (Actual):</span> <span id="best-fitness-display">0</span></div>
+    <div class="stat"><span class="highlight-green">Récord Histórico (Comida):</span> <span id="record-display">0</span></div>
     <div class="stat"><span>Estado:</span> <span id="status-display" style="color: yellow">Esperando...</span></div>
     
-    <label for="gridSize">Tamaño del Grid:</label>
+    <label for="gridSize" style="font-size: 12px; color: #aaa;">Tamaño del Tablero:</label>
     <select id="gridSize">
-        <option value="9">9x9</option>
-        <option value="10" selected>10x10</option>
-        <option value="12">12x12</option>
-        <option value="15">15x15</option>
+        <option value="10">Pequeño (10x10)</option>
+        <option value="15" selected>Mediano (15x15)</option>
+        <option value="20">Grande (20x20)</option>
     </select>
 
     <button id="btn-train" onclick="startTraining()">Entrenar IA (Rápido)</button>
     <button id="btn-play" onclick="startVersus()" disabled>Jugar vs IA</button>
-    <div style="font-size: 10px; margin-top: 10px; color: #aaa;">
-        * Entrena hasta que la serpiente coma bastante.<br>
-        * Luego pulsa "Jugar vs IA".<br>
-        * Tú eres la AZUL (Flechas). Ella es la ROJA.
+    
+    <div style="font-size: 11px; margin-top: 15px; color: #888; line-height: 1.4;">
+        1. Pulsa <b>ENTRENAR</b> y espera que el Récord suba.<br>
+        2. Pulsa <b>JUGAR VS IA</b>.<br>
+        3. Si mueres, mirarás a la IA jugar hasta que ella muera.
+        <br><br>
+        <span style="color: #0055ff">■ TÚ (Azul)</span> vs <span style="color: #ff0055">■ IA (Roja)</span>
     </div>
 </div>
 
+<div id="msg-overlay">MODO ESPECTADOR</div>
 <div id="canvas-container"></div>
 
 <script>
 /**
  * ------------------------------------------------------------------
- * 1. MATEMÁTICAS Y RED NEURONAL (Simple Implementation)
+ * 1. RED NEURONAL (Cerebro)
  * ------------------------------------------------------------------
  */
 class NeuralNetwork {
@@ -64,7 +80,7 @@ class NeuralNetwork {
         this.hiddenNodes = hiddenNodes;
         this.outputNodes = outputNodes;
 
-        // Pesos aleatorios entre -1 y 1
+        // Inicialización de pesos (Xavier/Glorot simplificado)
         this.weightsIH = new Float32Array(this.hiddenNodes * this.inputNodes).map(() => Math.random() * 2 - 1);
         this.weightsHO = new Float32Array(this.outputNodes * this.hiddenNodes).map(() => Math.random() * 2 - 1);
         
@@ -73,8 +89,7 @@ class NeuralNetwork {
     }
 
     predict(inputs) {
-        // Feedforward
-        // Input -> Hidden
+        // Capa Oculta
         let hidden = new Float32Array(this.hiddenNodes);
         for (let i = 0; i < this.hiddenNodes; i++) {
             let sum = 0;
@@ -82,10 +97,11 @@ class NeuralNetwork {
                 sum += inputs[j] * this.weightsIH[i * this.inputNodes + j];
             }
             sum += this.biasH[i];
-            hidden[i] = Math.max(0, sum); // ReLU Activation
+            // Función de activación ReLU
+            hidden[i] = Math.max(0, sum); 
         }
 
-        // Hidden -> Output
+        // Capa Salida
         let output = new Float32Array(this.outputNodes);
         for (let i = 0; i < this.outputNodes; i++) {
             let sum = 0;
@@ -93,12 +109,11 @@ class NeuralNetwork {
                 sum += hidden[j] * this.weightsHO[i * this.hiddenNodes + j];
             }
             sum += this.biasO[i];
-            output[i] = sum; // Linear output (usaremos argmax)
+            output[i] = sum; // Linear output (se usa argmax fuera)
         }
         return output;
     }
 
-    // Clonar con mutación para algoritmo genético
     clone() {
         let clone = new NeuralNetwork(this.inputNodes, this.hiddenNodes, this.outputNodes);
         clone.weightsIH.set(this.weightsIH);
@@ -111,7 +126,8 @@ class NeuralNetwork {
     mutate(rate) {
         const mutateVal = (val) => {
             if (Math.random() < rate) {
-                return val + (Math.random() * 0.4 - 0.2); // Pequeño ajuste
+                // Gaussian mutation (aprox)
+                return val + (Math.random() * 0.5 - 0.25); 
             }
             return val;
         };
@@ -124,7 +140,7 @@ class NeuralNetwork {
 
 /**
  * ------------------------------------------------------------------
- * 2. LÓGICA DEL JUEGO SNAKE
+ * 2. LÓGICA DE LA SERPIENTE
  * ------------------------------------------------------------------
  */
 const UP = 0, DOWN = 1, LEFT = 2, RIGHT = 3;
@@ -132,61 +148,49 @@ const UP = 0, DOWN = 1, LEFT = 2, RIGHT = 3;
 class Snake {
     constructor(gridSize, brain = null, isHuman = false) {
         this.gridSize = gridSize;
-        this.body = [{x: Math.floor(gridSize/2), y: Math.floor(gridSize/2)}];
-        this.direction = -1; // Quieto al inicio
+        this.body = []; 
+        this.direction = -1; 
         this.isDead = false;
         this.score = 0;
-        this.lifeLeft = 200; // Pasos antes de morir de hambre
+        this.lifeLeft = 200; 
         this.lifetime = 0;
         this.isHuman = isHuman;
         
-        // IA
-        this.brain = brain || new NeuralNetwork(12, 16, 4); 
+        // Input: 24 nodos (visión en 8 direcciones x 3 tipos de objeto)
+        // Hidden: 18 nodos
+        // Output: 4 nodos (Direcciones)
+        this.brain = brain || new NeuralNetwork(24, 18, 4); 
         this.fitness = 0;
+    }
+
+    resetPosition(x, y) {
+        this.body = [{x: x, y: y}];
+        this.direction = -1;
+        this.isDead = false;
+        this.lifeLeft = 200;
+        this.score = 0;
+        this.lifetime = 0;
     }
 
     think(food, obstacles) {
         if (this.isHuman) return;
 
         const head = this.body[0];
-        // Inputs para la red neuronal (Visión simplificada)
-        // 1. Distancia a comida (X, Y normalizado)
-        // 2. ¿Hay obstáculo inmediatamente en Up, Down, Left, Right?
-        // 3. Dirección actual (One-hot)
-        
         let inputs = [];
 
-        // Dirección Comida normalizada
-        inputs.push((food.x - head.x) / this.gridSize);
-        inputs.push((food.y - head.y) / this.gridSize);
+        // Visión en 8 direcciones: N, NE, E, SE, S, SW, W, NW
+        const dirs = [
+            {x:0, y:-1}, {x:1, y:-1}, {x:1, y:0}, {x:1, y:1},
+            {x:0, y:1}, {x:-1, y:1}, {x:-1, y:0}, {x:-1, y:-1}
+        ];
 
-        // Obstaculos alrededor (Paredes o Cuerpo propio/ajeno)
-        const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}]; // U, D, L, R
-        
-        dirs.forEach(d => {
-            let nx = head.x + d.x;
-            let ny = head.y + d.y;
-            let isObstacle = 0;
-            
-            // Paredes
-            if (nx < 0 || nx >= this.gridSize || ny < 0 || ny >= this.gridSize) isObstacle = 1;
-            // Cuerpos (pasamos lista de obstáculos completa)
-            else if (obstacles.some(o => o.x === nx && o.y === ny)) isObstacle = 1;
-
-            inputs.push(isObstacle);
-        });
-
-        // Dirección actual (para memoria) U, D, L, R
-        inputs.push(this.direction === UP ? 1 : 0);
-        inputs.push(this.direction === DOWN ? 1 : 0);
-        inputs.push(this.direction === LEFT ? 1 : 0);
-        inputs.push(this.direction === RIGHT ? 1 : 0);
-        // Dos inputs extra vacíos para llegar a 12 o agregar más features después
-        inputs.push(0); inputs.push(0);
+        for (let d of dirs) {
+            inputs = inputs.concat(this.lookInDirection(d, head, food, obstacles));
+        }
 
         const outputs = this.brain.predict(inputs);
         
-        // Argmax
+        // Argmax para decidir dirección
         let maxVal = -Infinity;
         let choice = 0;
         for(let i=0; i<4; i++){
@@ -196,59 +200,111 @@ class Snake {
             }
         }
         
-        // Evitar 180 grados
-        if (choice === UP && this.direction !== DOWN) this.direction = UP;
-        if (choice === DOWN && this.direction !== UP) this.direction = DOWN;
-        if (choice === LEFT && this.direction !== RIGHT) this.direction = LEFT;
-        if (choice === RIGHT && this.direction !== LEFT) this.direction = RIGHT;
+        // Prevenir giro de 180 grados suicida
+        const current = this.direction;
+        if (choice === UP && current !== DOWN) this.direction = UP;
+        else if (choice === DOWN && current !== UP) this.direction = DOWN;
+        else if (choice === LEFT && current !== RIGHT) this.direction = LEFT;
+        else if (choice === RIGHT && current !== LEFT) this.direction = RIGHT;
+        // Si intenta girar 180, mantiene la dirección actual
+    }
+
+    lookInDirection(dir, head, food, obstacles) {
+        let look = [0, 0, 0]; // [Distancia a Comida, Distancia a Cuerpo/Pared, Distancia a Pared Tablero]
+        let x = head.x;
+        let y = head.y;
+        let distance = 0;
+        let foundFood = false;
+        let foundBody = false;
+
+        // Raycasting
+        x += dir.x; 
+        y += dir.y;
+        distance += 1;
+
+        while (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
+            // Check comida
+            if (!foundFood && x === food.x && y === food.y) {
+                look[0] = 1; // Encontró comida en esta dirección
+                foundFood = true;
+            }
+            // Check cuerpo (propio o enemigo)
+            if (!foundBody) {
+                 // Comprobar obstáculos externos
+                 if (obstacles.some(o => o.x === x && o.y === y)) {
+                     look[1] = 1 / distance;
+                     foundBody = true;
+                 }
+                 // Comprobar cuerpo propio
+                 if (this.body.some(p => p.x === x && p.y === y)) {
+                    look[1] = 1 / distance;
+                    foundBody = true;
+                 }
+            }
+
+            x += dir.x;
+            y += dir.y;
+            distance += 1;
+        }
+        
+        // Distancia a la pared (inverso de la distancia)
+        look[2] = 1 / distance;
+        return look;
     }
 
     update(food, otherSnakesBodies = []) {
-        if (this.isDead) return;
+        if (this.isDead) return false;
         
         this.lifeLeft--;
         this.lifetime++;
+        
+        // Muerte por hambre (solo IA)
         if (this.lifeLeft <= 0 && !this.isHuman) {
             this.isDead = true;
-            return;
+            return false;
         }
 
         let head = { ...this.body[0] };
         
         if (this.direction === UP) head.y -= 1;
-        if (this.direction === DOWN) head.y += 1;
-        if (this.direction === LEFT) head.x -= 1;
-        if (this.direction === RIGHT) head.x += 1;
+        else if (this.direction === DOWN) head.y += 1;
+        else if (this.direction === LEFT) head.x -= 1;
+        else if (this.direction === RIGHT) head.x += 1;
+        else return false; // No se mueve al inicio
 
         // Colisiones Pared
         if (head.x < 0 || head.x >= this.gridSize || head.y < 0 || head.y >= this.gridSize) {
             this.isDead = true;
-            return;
+            return false;
         }
 
         // Colisiones consigo mismo
+        // Empezamos en 0 para choque inmediato, pero en snake clásico la cola se mueve. 
+        // Chequeamos colisión contra el cuerpo SIN la cola actual (porque se va a mover)
+        // Simplificación: chocamos contra todo el cuerpo actual.
         for (let part of this.body) {
             if (head.x === part.x && head.y === part.y) {
                 this.isDead = true;
-                return;
+                return false;
             }
         }
 
-        // Colisiones con otras serpientes (Modo Versus)
+        // Colisiones con obstáculos externos (la otra serpiente)
         for (let part of otherSnakesBodies) {
             if (head.x === part.x && head.y === part.y) {
                 this.isDead = true;
-                return;
+                return false;
             }
         }
 
         this.body.unshift(head);
 
-        // Comer Comida
+        // Comer
         if (head.x === food.x && head.y === food.y) {
             this.score++;
-            this.lifeLeft = Math.min(this.lifeLeft + 100, 500); // Recuperar energía
-            return true; // Comió
+            // Bonus de energía
+            this.lifeLeft = Math.min(this.lifeLeft + 150, 600); 
+            return true; 
         } else {
             this.body.pop();
             return false;
@@ -258,98 +314,121 @@ class Snake {
 
 /**
  * ------------------------------------------------------------------
- * 3. VISUALIZACIÓN THREE.JS
+ * 3. ENGINE GRÁFICO (Three.js)
  * ------------------------------------------------------------------
  */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050505);
+scene.background = new THREE.Color(0x020205);
+scene.fog = new THREE.Fog(0x020205, 10, 60);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
 // Luces
-const ambLight = new THREE.AmbientLight(0x404040);
+const ambLight = new THREE.AmbientLight(0x404040, 1.5);
 scene.add(ambLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-dirLight.position.set(10, 20, 10);
+const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+dirLight.position.set(10, 30, 20);
+dirLight.castShadow = true;
 scene.add(dirLight);
 
 // Materiales
-const materialGrid = new THREE.LineBasicMaterial({ color: 0x222222 });
-const materialSnakeAI = new THREE.MeshPhongMaterial({ color: 0xff0055, emissive: 0xaa0033, emissiveIntensity: 0.2 });
-const materialSnakeHuman = new THREE.MeshPhongMaterial({ color: 0x0055ff, emissive: 0x0033aa, emissiveIntensity: 0.2 });
-const materialFood = new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 0.5 });
-const geoCube = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+const matGrid = new THREE.LineBasicMaterial({ color: 0x333333, opacity: 0.3, transparent: true });
+const matSnakeAI = new THREE.MeshPhongMaterial({ color: 0xff0055, emissive: 0x550022, shininess: 100 });
+const matSnakeHuman = new THREE.MeshPhongMaterial({ color: 0x0088ff, emissive: 0x002288, shininess: 100 });
+const matDead = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Color piedra gris
+const matFood = new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x00aa00, emissiveIntensity: 0.8 });
+
+const geoCube = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+const geoFood = new THREE.SphereGeometry(0.5, 16, 16);
 
 let gridHelper;
 let meshes = [];
 let foodMesh;
 
 function setupScene(size) {
-    // Limpiar escena anterior
-    while(scene.children.length > 0){ 
-        scene.remove(scene.children[0]); 
-    }
+    while(scene.children.length > 0){ scene.remove(scene.children[0]); }
     scene.add(ambLight);
     scene.add(dirLight);
 
-    // Crear Grid visual
-    const gridSizeUnits = size;
-    gridHelper = new THREE.GridHelper(gridSizeUnits, gridSizeUnits, 0x00ffff, 0x222222);
-    gridHelper.position.set(gridSizeUnits/2 - 0.5, -0.5, gridSizeUnits/2 - 0.5);
+    // Grid Floor
+    const planeGeo = new THREE.PlaneGeometry(size, size);
+    const planeMat = new THREE.MeshLambertMaterial({color:0x111111});
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(size/2 - 0.5, -0.55, size/2 - 0.5);
+    plane.receiveShadow = true;
+    scene.add(plane);
+
+    gridHelper = new THREE.GridHelper(size, size, 0x00ffff, 0x222222);
+    gridHelper.position.set(size/2 - 0.5, -0.5, size/2 - 0.5);
     scene.add(gridHelper);
 
-    // Cámara
-    camera.position.set(size/2, size * 1.5, size * 1.2);
+    camera.position.set(size/2, size * 1.4, size * 1.2); // Cámara aérea
     camera.lookAt(size/2, 0, size/2);
 
-    // Inicializar Mesh de comida
-    foodMesh = new THREE.Mesh(geoCube, materialFood);
+    foodMesh = new THREE.Mesh(geoFood, matFood);
+    foodMesh.castShadow = true;
     scene.add(foodMesh);
 }
 
 function drawGame(snakes, food) {
-    // Eliminar meshes de cuerpos anteriores
     meshes.forEach(m => scene.remove(m));
     meshes = [];
 
     snakes.forEach(snake => {
-        if (snake.isDead) return;
+        let material;
+        if (snake.isDead) material = matDead; // Muerto = Gris
+        else material = snake.isHuman ? matSnakeHuman : matSnakeAI;
+
         snake.body.forEach(part => {
-            const mesh = new THREE.Mesh(geoCube, snake.isHuman ? materialSnakeHuman : materialSnakeAI);
+            const mesh = new THREE.Mesh(geoCube, material);
             mesh.position.set(part.x, 0, part.y);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
             scene.add(mesh);
             meshes.push(mesh);
         });
     });
 
     foodMesh.position.set(food.x, 0, food.y);
+    
+    // Animación suave de la comida
+    foodMesh.scale.setScalar(1 + Math.sin(Date.now() * 0.01) * 0.1);
+
     renderer.render(scene, camera);
 }
 
 /**
  * ------------------------------------------------------------------
- * 4. CONTROLADOR PRINCIPAL (Main Loop & GA)
+ * 4. LÓGICA PRINCIPAL (GA & GAME LOOP)
  * ------------------------------------------------------------------
  */
-let POPULATION_SIZE = 100;
+let POPULATION_SIZE = 150;
 let population = [];
 let bestBrain = null;
+let allTimeBestScore = 0; // RECORD HISTÓRICO
 let generation = 0;
-let gridSize = 10;
+let gridSize = 15;
 let food = {x: 0, y: 0};
 
-let mode = 'IDLE'; // IDLE, TRAINING, VERSUS
+let mode = 'IDLE'; 
 let humanSnake = null;
-let aiSnake = null; // Para el modo versus
+let aiSnake = null;
 let gameInterval;
 let fastTrainInterval;
+let spectatorMode = false;
 
-// Setup Inputs
+// Input Control
 document.addEventListener('keydown', (e) => {
-    if (!humanSnake) return;
+    if (!humanSnake || humanSnake.isDead) return;
+    // Prevenir scroll
+    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+        e.preventDefault();
+    }
     if (e.key === 'ArrowUp' && humanSnake.direction !== DOWN) humanSnake.direction = UP;
     if (e.key === 'ArrowDown' && humanSnake.direction !== UP) humanSnake.direction = DOWN;
     if (e.key === 'ArrowLeft' && humanSnake.direction !== RIGHT) humanSnake.direction = LEFT;
@@ -366,14 +445,16 @@ document.getElementById('gridSize').addEventListener('change', (e) => {
 function spawnFood() {
     let valid = false;
     let x, y;
+    // Intento simple de no spawnear sobre serpientes (en training es random puro por velocidad)
+    // En versus lo hacemos bien
+    let safeZone = mode === 'VERSUS';
+    
     while (!valid) {
         x = Math.floor(Math.random() * gridSize);
         y = Math.floor(Math.random() * gridSize);
         valid = true;
-        // Comprobar que no caiga en una serpiente viva
-        // (Simplificado: en entrenamiento masivo no comprobamos todos los cuerpos por performance, 
-        // solo en versus)
-        if (mode === 'VERSUS') {
+        
+        if (safeZone && humanSnake && aiSnake) {
             if (humanSnake.body.some(p => p.x === x && p.y === y)) valid = false;
             if (aiSnake.body.some(p => p.x === x && p.y === y)) valid = false;
         }
@@ -388,108 +469,94 @@ function resetPopulation() {
     }
     generation = 0;
     bestBrain = null;
+    // No reseteamos allTimeBestScore a propósito para mantener el récord de la sesión
     document.getElementById('gen-display').innerText = '0';
     document.getElementById('best-fitness-display').innerText = '0';
     document.getElementById('btn-play').disabled = true;
 }
 
-// ---------------- MODO ENTRENAMIENTO ----------------
+// --- ENTRENAMIENTO ---
 
 function startTraining() {
     stopGame();
     mode = 'TRAINING';
-    document.getElementById('status-display').innerText = "Entrenando (Acelerado)...";
+    document.getElementById('status-display').innerText = "ENTRENANDO (ACELERADO)...";
     document.getElementById('status-display').style.color = "#0ff";
     
     if (population.length === 0) resetPopulation();
     
-    // Ciclo de entrenamiento rápido
     fastTrainInterval = setInterval(() => {
-        // Correr una generación entera al instante
         runGeneration();
-        
-        // Visualizar el "Mejor" de la generación actual (solo el primer frame o estático)
-        // Para no bloquear, renderizamos un frame cada X generaciones o al final del step
-        // Aquí simplemente actualizamos stats
-    }, 100); // Una generación cada 100ms
+    }, 50); // Muy rápido
 }
 
 function runGeneration() {
-    // Reiniciar serpientes de esta gen
-    // Cada serpiente juega su propia partida aislada para calcular fitness
-    
-    // Crear una partida para cada serpiente
+    let genBestScore = 0;
+
     population.forEach(snake => {
-        snake.body = [{x: Math.floor(gridSize/2), y: Math.floor(gridSize/2)}];
-        snake.direction = -1; // random start
-        snake.lifeLeft = 200;
-        snake.score = 0;
-        snake.lifetime = 0;
-        snake.isDead = false;
-        
-        // Asignar una comida propia a esta simulación virtual
+        snake.resetPosition(Math.floor(gridSize/2), Math.floor(gridSize/2));
         let myFood = spawnFood();
         
-        // Simular pasos hasta que muera
         while (!snake.isDead) {
-            // La serpiente necesita decidir dirección inicial si está quieta
-            if (snake.direction === -1) {
-                snake.direction = Math.floor(Math.random()*4);
-            }
-
+            if (snake.direction === -1) snake.direction = Math.floor(Math.random()*4);
+            
             // Pensar
-            snake.think(myFood, []); // Sin otros obstaculos mas que su cuerpo
+            snake.think(myFood, []); // Sin obstáculos en training simple
 
             // Mover
             let ate = snake.update(myFood, []);
             if (ate) {
-                // Nueva comida (simple random, puede caer en cuerpo en training rápido por velocidad)
                 myFood.x = Math.floor(Math.random() * gridSize);
                 myFood.y = Math.floor(Math.random() * gridSize);
             }
         }
 
-        // Calcular Fitness
-        // Fitness = (tiempo vida) + (puntos^2 * 1000) -> Priorizar comer
-        snake.fitness = snake.lifetime + (snake.score * snake.score * 500);
-        if (snake.score >= 10) snake.fitness *= 2; // Bonus por comer mucho
+        // Fitness: Premia mucho comer, poco vivir sin comer
+        snake.fitness = (snake.lifetime * 0.5) + (Math.pow(2, snake.score) + (snake.score * 500));
+        
+        if (snake.score > genBestScore) genBestScore = snake.score;
+        
+        // Actualizar Récord Histórico
+        if (snake.score > allTimeBestScore) {
+            allTimeBestScore = snake.score;
+            document.getElementById('record-display').innerText = allTimeBestScore;
+        }
     });
 
     evolve();
 }
 
 function evolve() {
-    // Ordenar por fitness
+    // 1. Ordenar por fitness
     population.sort((a, b) => b.fitness - a.fitness);
     
-    let best = population[0];
+    let bestSnake = population[0];
+    
     document.getElementById('gen-display').innerText = generation;
-    document.getElementById('best-fitness-display').innerText = Math.floor(best.fitness) + ` (Max Comida: ${best.score})`;
+    document.getElementById('best-fitness-display').innerText = Math.floor(bestSnake.fitness);
     
-    // Guardar mejor cerebro
-    bestBrain = best.brain.clone();
+    // Guardar el mejor cerebro actual para jugar luego
+    bestBrain = bestSnake.brain.clone();
     
-    // Habilitar botón Play si ya es medio decente
-    if (generation > 5 || best.score > 2) {
+    if (generation > 3 || bestSnake.score > 1) {
         document.getElementById('btn-play').disabled = false;
     }
 
-    // Selección Natural y Cruce
+    // 2. Crear nueva generación
     let newPop = [];
     
-    // Elitismo: Mantener el top 5% sin cambios
-    let elitisimCount = Math.floor(POPULATION_SIZE * 0.05);
-    for(let i=0; i<elitisimCount; i++) {
-        newPop.push(new Snake(gridSize, population[i].brain.clone()));
-    }
+    // ELITISMO: Pasar el mejor DIRECTAMENTE sin mutar (El Rey sigue vivo)
+    newPop.push(new Snake(gridSize, bestBrain.clone()));
 
-    // Rellenar el resto
-    for(let i=elitisimCount; i<POPULATION_SIZE; i++) {
-        // Selección de padres (Torneo o ruleta, usaremos simple random de la mitad superior)
-        let parentA = population[Math.floor(Math.random() * (POPULATION_SIZE/2))];
+    // Rellenar el resto mutando a los mejores (Top 10%)
+    let topCount = Math.floor(POPULATION_SIZE * 0.1);
+    for(let i=1; i<POPULATION_SIZE; i++) {
+        // Elegir un padre del top
+        let parentIndex = Math.floor(Math.random() * topCount);
+        let parent = population[parentIndex];
         
-        let childBrain = parentA.brain.clone();
-        childBrain.mutate(0.1); // 10% chance de mutación
+        let childBrain = parent.brain.clone();
+        childBrain.mutate(0.15); // 15% de tasa de mutación
         
         newPop.push(new Snake(gridSize, childBrain));
     }
@@ -497,81 +564,86 @@ function evolve() {
     population = newPop;
     generation++;
     
-    // Visualizar "recreación" del mejor de la gen anterior para que el usuario vea algo
-    // Creamos una simulación visual rápida solo para renderizar
+    // Visualizar la mejor red de forma rápida (un frame random) para dar feedback visual
     let demoSnake = new Snake(gridSize, bestBrain);
-    demoSnake.body = [{x: Math.floor(gridSize/2), y: Math.floor(gridSize/2)}];
-    food = spawnFood();
-    drawGame([demoSnake], food);
+    demoSnake.resetPosition(Math.floor(gridSize/2), Math.floor(gridSize/2));
+    drawGame([demoSnake], {x:2, y:2});
 }
 
-
-// ---------------- MODO VERSUS ----------------
+// --- JUEGO VERSUS ---
 
 function startVersus() {
     if (!bestBrain) return;
     stopGame();
     mode = 'VERSUS';
-    document.getElementById('status-display').innerText = "TÚ VS IA";
+    spectatorMode = false;
+    document.getElementById('msg-overlay').style.display = 'none';
+    document.getElementById('status-display').innerText = "TÚ VS MEJOR IA";
     document.getElementById('status-display').style.color = "#f0f";
 
-    // Crear Humano y IA
     humanSnake = new Snake(gridSize, null, true);
-    humanSnake.body = [{x: 1, y: 1}]; // Esquina sup izq
-    humanSnake.direction = RIGHT; // Start moving
+    humanSnake.resetPosition(1, 1);
+    humanSnake.direction = RIGHT; 
 
     aiSnake = new Snake(gridSize, bestBrain.clone(), false);
-    aiSnake.body = [{x: gridSize-2, y: gridSize-2}]; // Esquina inf der
+    aiSnake.resetPosition(gridSize-2, gridSize-2);
     aiSnake.direction = LEFT;
 
     food = spawnFood();
+    drawGame([humanSnake, aiSnake], food);
 
-    // Loop visual lento (jugable)
-    gameInterval = setInterval(gameLoopVersus, 150); // Velocidad del juego
+    // Loop de juego visual (velocidad jugable)
+    gameInterval = setInterval(gameLoopVersus, 120);
 }
 
 function gameLoopVersus() {
-    if (humanSnake.isDead || aiSnake.isDead) {
-        let msg = "";
-        if (humanSnake.isDead && aiSnake.isDead) msg = "EMPATE (AMBOS MURIERON)";
-        else if (humanSnake.isDead) msg = "LA IA GANA";
-        else msg = "TÚ GANAS";
-        
-        alert("Game Over: " + msg);
+    // Si ambos mueren o la IA muere, fin del juego
+    if (aiSnake.isDead) {
+        let msg = spectatorMode ? "IA ELIMINADA TRAS TU MUERTE" : (humanSnake.isDead ? "EMPATE" : "¡GANASTE!");
+        alert("FIN DE LA PARTIDA: " + msg);
         stopGame();
         return;
     }
 
-    // 1. IA Piensa
-    // La IA debe considerar el cuerpo del humano como obstáculo
-    // Pasamos el cuerpo del humano como array de obstáculos
-    aiSnake.think(food, humanSnake.body);
+    // Si el humano muere, activar MODO ESPECTADOR
+    if (humanSnake.isDead && !spectatorMode) {
+        spectatorMode = true;
+        document.getElementById('msg-overlay').style.display = 'block';
+        document.getElementById('status-display').innerText = "ESPECTADOR";
+    }
 
-    // 2. Mover
-    let hAte = humanSnake.update(food, aiSnake.body);
+    // --- LÓGICA IA ---
+    // La IA ve el cuerpo del humano (vivo o muerto) como obstáculo
+    aiSnake.think(food, humanSnake.body);
     let aiAte = aiSnake.update(food, humanSnake.body);
 
-    // 3. Gestionar comida
-    if (hAte || aiAte) {
-        // Si ambos comieron la misma (raro pero posible), solo cuenta para uno o spawnea 1
+    // --- LÓGICA HUMANO ---
+    let hAte = false;
+    if (!humanSnake.isDead) {
+        // El humano debe evitar a la IA
+        hAte = humanSnake.update(food, aiSnake.body);
+    }
+
+    // Gestión de comida
+    if (aiAte || hAte) {
         food = spawnFood();
     }
 
-    // 4. Render
+    // Renderizar
     drawGame([humanSnake, aiSnake], food);
 }
 
 function stopGame() {
     clearInterval(gameInterval);
     clearInterval(fastTrainInterval);
+    document.getElementById('msg-overlay').style.display = 'none';
     mode = 'IDLE';
 }
 
-// Iniciar escena básica
+// Init
 setupScene(gridSize);
 resetPopulation();
 
-// Ajuste ventana
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
