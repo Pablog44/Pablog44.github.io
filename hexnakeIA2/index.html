@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Snake AI - Visualización Real</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1a1a1a;
+            color: #eee;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+        }
+
+        #game-wrapper {
+            position: relative;
+            border: 2px solid #444;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background-image: radial-gradient(#ddd 1px, transparent 1px);
+            background-size: 20px 20px; /* Efecto papel milimetrado */
+        }
+
+        #sidebar {
+            width: 300px;
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        h2 { margin: 0 0 10px 0; color: #4CAF50; font-size: 1.4rem; text-align: center; }
+        
+        .panel {
+            background: #383838;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+        .val { color: #64b5f6; font-weight: bold; }
+
+        /* Controles */
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa; }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        input[type="radio"] { margin-right: 10px; accent-color: #4CAF50; }
+
+        input[type=range] { width: 100%; cursor: pointer; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #d32f2f;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #b71c1c; }
+
+        .legend { display: flex; gap: 10px; font-size: 0.8rem; margin-top: 5px; justify-content: center;}
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 3px; }
+
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="game-wrapper">
+            <canvas id="gameCanvas" width="650" height="650"></canvas>
+        </div>
+
+        <div id="sidebar">
+            <h2>Panel de Control IA</h2>
+            
+            <div class="panel">
+                <div class="stat-row"><span>Generación:</span> <span id="gen-display" class="val">1</span></div>
+                <div class="stat-row"><span>Población Viva:</span> <span id="alive-display" class="val">0</span></div>
+                <div class="stat-row"><span>Mejor Actual:</span> <span id="best-score-display" class="val">0</span></div>
+                <div class="stat-row"><span>Récord Histórico:</span> <span id="high-score-display" class="val">0</span></div>
+            </div>
+
+            <div class="panel">
+                <label>Modo de Visualización:</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="viewMode" value="all" checked>
+                        Ver Todos (Entrenamiento)
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="viewMode" value="best">
+                        Ver Solo al Líder (Detalle)
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <label>Velocidad de Simulación:</label>
+                <input type="range" id="speedSlider" min="1" max="50" value="1">
+                <div style="text-align: center; color: #aaa;"><span id="speed-val">1x</span></div>
+                <p style="font-size: 0.75rem; color:#888; margin-top:5px;">
+                    Tip: Úsalo lento (1x-5x) para verla comer, rápido (50x) para entrenar generaciones.
+                </p>
+            </div>
+
+            <div class="legend">
+                <span><span class="dot" style="background:#2e7d32;"></span>Líder</span>
+                <span><span class="dot" style="background:#d32f2f;"></span>Comida</span>
+                <span><span class="dot" style="background:#ccc;"></span>Fantasmas</span>
+            </div>
+
+            <button onclick="resetTraining()">Reiniciar Cerebro (Reset)</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN GLOBAL ---
+        const HEX_SIZE = 20;
+        const MAP_RADIUS = 9; // Mapa un poco más grande
+        const POPULATION_SIZE = 200; // Más serpientes para mejor evolución
+        const MUTATION_RATE = 0.05; // 5% tasa de mutación
+
+        // --- RED NEURONAL (Lógica pura, sin librerías) ---
+        class NeuralNetwork {
+            constructor(inputNodes, hiddenNodes, outputNodes, model = null) {
+                if (model) {
+                    this.inputNodes = model.inputNodes;
+                    this.hiddenNodes = model.hiddenNodes;
+                    this.outputNodes = model.outputNodes;
+                    this.weightsIH = model.weightsIH.map(row => [...row]);
+                    this.weightsHO = model.weightsHO.map(row => [...row]);
+                    this.biasH = [...model.biasH];
+                    this.biasO = [...model.biasO];
+                } else {
+                    this.inputNodes = inputNodes;
+                    this.hiddenNodes = hiddenNodes;
+                    this.outputNodes = outputNodes;
+                    this.weightsIH = Array(this.hiddenNodes).fill(0).map(() => Array(this.inputNodes).fill(0).map(() => Math.random() * 2 - 1));
+                    this.weightsHO = Array(this.outputNodes).fill(0).map(() => Array(this.hiddenNodes).fill(0).map(() => Math.random() * 2 - 1));
+                    this.biasH = Array(this.hiddenNodes).fill(0).map(() => Math.random() * 2 - 1);
+                    this.biasO = Array(this.outputNodes).fill(0).map(() => Math.random() * 2 - 1);
+                }
+            }
+
+            predict(inputArray) {
+                // Capa Oculta
+                let hidden = [];
+                for (let i = 0; i < this.hiddenNodes; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < this.inputNodes; j++) {
+                        sum += inputArray[j] * this.weightsIH[i][j];
+                    }
+                    sum += this.biasH[i];
+                    hidden[i] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                }
+
+                // Capa Salida
+                let output = [];
+                for (let i = 0; i < this.outputNodes; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < this.hiddenNodes; j++) {
+                        sum += hidden[j] * this.weightsHO[i][j];
+                    }
+                    sum += this.biasO[i];
+                    output[i] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                }
+                return output;
+            }
+
+            mutate(rate) {
+                function mutateVal(val) {
+                    if (Math.random() < rate) return val + (Math.random() * 0.4 - 0.2); // Gaussian-ish tweak
+                    return val;
+                }
+                this.weightsIH = this.weightsIH.map(row => row.map(mutateVal));
+                this.weightsHO = this.weightsHO.map(row => row.map(mutateVal));
+                this.biasH = this.biasH.map(mutateVal);
+                this.biasO = this.biasO.map(mutateVal);
+            }
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+        const DIRECTIONS = [
+            { q: 0, r: -1 }, { q: 1, r: -1 }, { q: 1, r: 0 },
+            { q: 0, r: 1 }, { q: -1, r: 1 }, { q: -1, r: 0 }
+        ];
+
+        class Snake {
+            constructor(brain = null) {
+                this.body = [{ q: 0, r: 0 }, { q: -1, r: 0 }, { q: -2, r: 0 }]; // Longitud inicial 3
+                this.dirIndex = 2; // Este
+                this.alive = true;
+                this.food = this.getNewFoodPos();
+                this.score = 0; // Manzanas comidas
+                this.lifeTime = 0;
+                this.starvation = 0; // Contador para morir si no come
+                this.fitness = 0;
+
+                // Inputs: 18 (3 visiones en 6 direcciones)
+                // Hidden: 16
+                // Output: 6 (Direcciones)
+                if (brain) this.brain = new NeuralNetwork(0,0,0, brain);
+                else this.brain = new NeuralNetwork(18, 16, 6);
+            }
+
+            update() {
+                if (!this.alive) return;
+
+                this.lifeTime++;
+                this.starvation++;
+
+                // Morir de hambre (límite de movimientos sin comer)
+                if (this.starvation > 150) {
+                    this.alive = false;
+                    return;
+                }
+
+                this.think();
+
+                const head = this.body[0];
+                const dir = DIRECTIONS[this.dirIndex];
+                const newHead = { q: head.q + dir.q, r: head.r + dir.r };
+
+                // 1. Choque Muro o Cuerpo
+                if (this.checkCollision(newHead)) {
+                    this.alive = false;
+                    return;
+                }
+
+                // Mover cabeza
+                this.body.unshift(newHead);
+
+                // 2. Comer Manzana
+                if (newHead.q === this.food.q && newHead.r === this.food.r) {
+                    this.score++;
+                    this.starvation = 0; // Reset hambre
+                    // NO hacemos pop(), así que crece 1 unidad
+                    this.food = this.getNewFoodPos();
+                } else {
+                    // Si no come, quitamos la cola para mantener tamaño
+                    this.body.pop();
+                }
+            }
+
+            think() {
+                const inputs = [];
+                const head = this.body[0];
+
+                for (let i = 0; i < 6; i++) {
+                    let dir = DIRECTIONS[i];
+                    let distToWall = 0;
+                    let distToFood = 0;
+                    let bodyInWay = 0;
+
+                    let curr = { ...head };
+                    let foundWall = false;
+
+                    // Raycast en cada dirección
+                    for (let d = 1; d <= MAP_RADIUS * 2; d++) {
+                        curr.q += dir.q;
+                        curr.r += dir.r;
+
+                        if (!foundWall) {
+                            // Distancia al muro
+                            if (this.hexDist(curr.q, curr.r) > MAP_RADIUS) {
+                                distToWall = 1 / d;
+                                foundWall = true;
+                            }
+                            // Detectar cuerpo
+                            else if (this.isBodyPart(curr)) {
+                                if (bodyInWay === 0) bodyInWay = 1; 
+                            }
+                            // Detectar comida en linea recta
+                            if (curr.q === this.food.q && curr.r === this.food.r) {
+                                distToFood = 1;
+                            }
+                        }
+                    }
+                    inputs.push(distToWall);
+                    inputs.push(bodyInWay);
+                    inputs.push(distToFood); 
+                }
+
+                const outputs = this.brain.predict(inputs);
+                
+                // Elegir dirección con mayor probabilidad
+                let maxI = 0;
+                for(let i=1; i<outputs.length; i++) if(outputs[i] > outputs[maxI]) maxI = i;
+                
+                // Evitar 180 grados directos
+                let opposite = (this.dirIndex + 3) % 6;
+                if (maxI !== opposite) this.dirIndex = maxI;
+            }
+
+            checkCollision(pos) {
+                if (this.hexDist(pos.q, pos.r) > MAP_RADIUS) return true;
+                return this.isBodyPart(pos);
+            }
+
+            isBodyPart(pos) {
+                for (let part of this.body) {
+                    if (part.q === pos.q && part.r === pos.r) return true;
+                }
+                return false;
+            }
+
+            hexDist(q, r) {
+                return (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
+            }
+
+            getNewFoodPos() {
+                let pos;
+                while(true) {
+                    // Random hex logic
+                    const q = Math.floor(Math.random() * (MAP_RADIUS * 2 + 1)) - MAP_RADIUS;
+                    const r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+                    const r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+                    const r = Math.floor(Math.random() * (r2 - r1 + 1)) + r1;
+                    
+                    pos = { q, r };
+                    if (!this.isBodyPart(pos)) break;
+                }
+                return pos;
+            }
+
+            calculateFitness() {
+                // Fórmula: (Tiempo + (Manzanas^2 * 100))
+                // Prioriza enormemente comer sobre simplemente vivir
+                this.fitness = this.lifeTime + (this.score * this.score * 500);
+                if (this.score < 1) this.fitness *= 0.1; // Penalizar a los que no comen nada
+            }
+        }
+
+        // --- ALGORITMO GENÉTICO ---
+        let population = [];
+        let generation = 1;
+        let highScore = 0;
+        let bestSnakeCurrent = null; // El mejor de la ronda actual (para visualizar)
+
+        function initPopulation() {
+            population = [];
+            for(let i=0; i<POPULATION_SIZE; i++) population.push(new Snake());
+        }
+
+        function nextGeneration() {
+            // Calcular fitness
+            population.forEach(s => s.calculateFitness());
+            population.sort((a,b) => b.fitness - a.fitness);
+
+            // Guardar stats
+            const best = population[0];
+            if (best.score > highScore) highScore = best.score;
+            document.getElementById('high-score-display').innerText = highScore;
+
+            // Nueva población
+            const newPop = [];
+            
+            // 1. Elitismo: Guardar los 5 mejores tal cual
+            for(let i=0; i<5; i++) newPop.push(new Snake(population[i].brain));
+
+            // 2. Cruce y Mutación
+            for(let i=5; i<POPULATION_SIZE; i++) {
+                // Selección simple: Tomar uno de los mejores 50% al azar
+                const limit = Math.floor(POPULATION_SIZE / 2);
+                const parent = population[Math.floor(Math.random() * limit)];
+                
+                const child = new Snake(parent.brain);
+                child.brain.mutate(MUTATION_RATE);
+                newPop.push(child);
+            }
+
+            population = newPop;
+            generation++;
+            document.getElementById('gen-display').innerText = generation;
+        }
+
+        // --- RENDERIZADO Y CONTROL ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('speedSlider');
+        const speedDisplay = document.getElementById('speed-val');
+        
+        // Variables de estado UI
+        let simSpeed = 1;
+        let viewMode = 'all'; // 'all' o 'best'
+
+        // Event Listeners
+        slider.addEventListener('input', (e) => {
+            simSpeed = parseInt(e.target.value);
+            speedDisplay.innerText = simSpeed + "x";
+        });
+
+        document.querySelectorAll('input[name="viewMode"]').forEach(rb => {
+            rb.addEventListener('change', (e) => viewMode = e.target.value);
+        });
+
+        function hexToPixel(q, r) {
+            const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+            const y = HEX_SIZE * (3./2 * r);
+            return { x: x + canvas.width / 2, y: y + canvas.height / 2 };
+        }
+
+        function drawHexagon(x, y, size, color, stroke = false) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const rad = (Math.PI / 180) * (60 * i - 30);
+                ctx[i===0?'moveTo':'lineTo'](x + size * Math.cos(rad), y + size * Math.sin(rad));
+            }
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            if (stroke) {
+                ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Fondo Grid
+            for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
+                let r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+                let r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+                for (let r = r1; r <= r2; r++) {
+                    const p = hexToPixel(q, r);
+                    let col = '#ffffff';
+                    if (q===0 && r===0) col = '#eee'; // Centro
+                    drawHexagon(p.x, p.y, HEX_SIZE, col, true);
+                }
+            }
+
+            // Determinar el líder para esta frame
+            let currentLeader = null;
+            let maxScore = -1;
+            
+            // Buscar el mejor vivo para dibujarlo resaltado
+            for(let s of population) {
+                if(s.alive && s.score >= maxScore) {
+                    maxScore = s.score;
+                    currentLeader = s;
+                }
+            }
+            bestSnakeCurrent = currentLeader; // Actualizar global para referencia
+            document.getElementById('best-score-display').innerText = maxScore > -1 ? maxScore : 0;
+
+
+            // 2. Dibujar Serpientes según modo
+            
+            if (viewMode === 'all') {
+                // Dibujar fantasmas (muestras aleatorias para rendimiento)
+                let count = 0;
+                for (let s of population) {
+                    if (!s.alive) continue;
+                    if (s === currentLeader) continue;
+                    
+                    if (count < 50) { // Límite de dibujo
+                        drawSnake(s, 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.1)'); // Fantasma muy tenue
+                        count++;
+                    }
+                }
+            }
+
+            // 3. Dibujar Líder (Siempre visible si está vivo)
+            if (currentLeader && currentLeader.alive) {
+                // Dibujar comida del líder
+                const fPos = hexToPixel(currentLeader.food.q, currentLeader.food.r);
+                drawHexagon(fPos.x, fPos.y, HEX_SIZE * 0.8, '#d32f2f'); // Rojo brillante
+                
+                // Efecto brillo comida
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "red";
+                ctx.fillStyle = "rgba(255,255,255,0.5)";
+                ctx.beginPath(); ctx.arc(fPos.x, fPos.y, 3, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Dibujar cuerpo líder
+                drawSnake(currentLeader, '#4caf50', '#1b5e20');
+            }
+        }
+
+        function drawSnake(snake, bodyCol, headCol) {
+            for (let i = 0; i < snake.body.length; i++) {
+                const part = snake.body[i];
+                const p = hexToPixel(part.q, part.r);
+                // Cabeza un poco más grande
+                const size = i === 0 ? HEX_SIZE : HEX_SIZE * 0.9; 
+                drawHexagon(p.x, p.y, size, i===0 ? headCol : bodyCol);
+            }
+        }
+
+        // Bucle principal
+        function loop() {
+            // Lógica N veces por frame
+            for(let n=0; n<simSpeed; n++) {
+                let anyAlive = false;
+                for(let s of population) {
+                    if(s.alive) {
+                        s.update();
+                        anyAlive = true;
+                    }
+                }
+                if(!anyAlive) {
+                    nextGeneration();
+                    break; 
+                }
+            }
+
+            // Actualizar contadores UI
+            document.getElementById('alive-display').innerText = population.filter(s=>s.alive).length;
+
+            // Dibujar 1 vez por frame
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function resetTraining() {
+            generation = 1;
+            highScore = 0;
+            initPopulation();
+        }
+
+        // Start
+        initPopulation();
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
