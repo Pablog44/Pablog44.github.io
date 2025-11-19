@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Hexagonal</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border-radius: 10px;
+            background: #fff;
+            padding: 10px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #ffffff;
+            /* Patrón de fondo sutil para dar efecto de papel milimetrado como la imagen */
+            background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            pointer-events: none;
+        }
+
+        h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #333; }
+        p { margin: 2px 0; font-size: 0.9rem; color: #555; }
+        .key { font-weight: bold; color: #000; background: #ddd; padding: 1px 4px; border-radius: 3px; }
+
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 15px;
+            display: none;
+        }
+        
+        button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 16px;
+            margin-top: 15px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover { background: #45a049; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui">
+            <h1>Hex Snake</h1>
+            <p>Puntuación: <span id="score">0</span></p>
+            <hr>
+            <p>Controles:</p>
+            <p><span class="key">Q</span> / <span class="key">W</span> : Arriba (Izq/Der)</p>
+            <p><span class="key">A</span> / <span class="key">D</span> : Lados</p>
+            <p><span class="key">Z</span> / <span class="key">X</span> : Abajo (Izq/Der)</p>
+        </div>
+
+        <div id="game-over">
+            <h2 id="go-title">¡Juego Terminado!</h2>
+            <p>Puntuación Final: <span id="final-score">0</span></p>
+            <button onclick="resetGame()">Jugar de nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const finalScoreEl = document.getElementById('final-score');
+        const gameOverEl = document.getElementById('game-over');
+
+        // --- CONFIGURACIÓN ---
+        const HEX_SIZE = 25; // Radio del hexágono
+        const MAP_RADIUS = 7; // Cuántos anillos de hexágonos tiene el mapa (como en la imagen)
+        const SPEED = 150; // Milisegundos entre movimientos
+
+        // Colores basados en la imagen (Centro -> Afuera)
+        const COLORS = {
+            center: '#ffe0b2', // Amarillo/Naranja claro
+            ring1: '#ef9a9a',  // Rojo claro
+            ring2: '#90caf9',  // Azul claro
+            outer: '#a5d6a7',  // Verde
+            border: '#555',    // Color de las líneas
+            snakeHead: '#212121',
+            snakeBody: '#424242',
+            food: '#ffeb3b'    // Amarillo brillante
+        };
+
+        // Definición de las 6 direcciones en coordenadas axiales (q, r)
+        // Sistema "Pointy Top" (Punta hacia arriba)
+        const DIRECTIONS = {
+            NW: { q: 0, r: -1 }, // Q
+            NE: { q: 1, r: -1 }, // W
+            E:  { q: 1, r: 0 },  // D
+            SE: { q: 0, r: 1 },  // X
+            SW: { q: -1, r: 1 }, // Z
+            W:  { q: -1, r: 0 }  // A
+        };
+
+        // --- ESTADO DEL JUEGO ---
+        let snake = [];
+        let direction = DIRECTIONS.E;
+        let nextDirection = DIRECTIONS.E;
+        let food = null;
+        let gameRunning = false;
+        let gameLoopId;
+        let score = 0;
+        let hexGrid = []; // Almacena todas las coordenadas válidas del mapa
+
+        // --- MATEMÁTICAS HEXAGONALES ---
+        
+        // Convertir Axial (q,r) a Pixel (x,y)
+        function hexToPixel(q, r) {
+            const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+            const y = HEX_SIZE * (3./2 * r);
+            return { x: x + canvas.width / 2, y: y + canvas.height / 2 };
+        }
+
+        // Calcular distancia desde el centro (0,0) en una cuadrícula hex
+        function hexDistance(q, r) {
+            return (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
+        }
+
+        // Generar el mapa (cuadrícula en forma de hexágono grande)
+        function generateGrid() {
+            hexGrid = [];
+            for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
+                let r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+                let r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+                for (let r = r1; r <= r2; r++) {
+                    hexGrid.push({ q, r });
+                }
+            }
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+
+        function initGame() {
+            generateGrid();
+            // Serpiente empieza en el centro
+            snake = [
+                { q: 0, r: 0 },
+                { q: -1, r: 0 },
+                { q: -2, r: 0 }
+            ];
+            direction = DIRECTIONS.E;
+            nextDirection = DIRECTIONS.E;
+            score = 0;
+            scoreEl.innerText = score;
+            gameRunning = true;
+            gameOverEl.style.display = 'none';
+            spawnFood();
+            
+            if (gameLoopId) clearInterval(gameLoopId);
+            gameLoopId = setInterval(update, SPEED);
+            draw();
+        }
+
+        function spawnFood() {
+            // Buscar una celda libre que no sea la serpiente
+            let valid = false;
+            let pos;
+            while (!valid) {
+                // Elegir un hexágono aleatorio de la cuadrícula
+                const randomIndex = Math.floor(Math.random() * hexGrid.length);
+                pos = hexGrid[randomIndex];
+
+                // Verificar que no esté ocupado por la serpiente
+                let collision = false;
+                for (let segment of snake) {
+                    if (segment.q === pos.q && segment.r === pos.r) {
+                        collision = true;
+                        break;
+                    }
+                }
+                if (!collision) valid = true;
+            }
+            food = pos;
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            direction = nextDirection;
+
+            // Calcular nueva cabeza
+            const head = snake[0];
+            const newHead = {
+                q: head.q + direction.q,
+                r: head.r + direction.r
+            };
+
+            // 1. Choque con bordes del mapa
+            // En un mapa hexagonal de radio N, la distancia desde el centro no puede superar N
+            if (hexDistance(newHead.q, newHead.r) > MAP_RADIUS) {
+                endGame();
+                return;
+            }
+
+            // 2. Choque consigo misma
+            for (let segment of snake) {
+                if (segment.q === newHead.q && segment.r === newHead.r) {
+                    endGame();
+                    return;
+                }
+            }
+
+            // Mover serpiente
+            snake.unshift(newHead); // Añadir nueva cabeza
+
+            // 3. Comer manzana
+            if (food && newHead.q === food.q && newHead.r === food.r) {
+                score += 10;
+                scoreEl.innerText = score;
+                spawnFood();
+                // No hacemos pop(), así crece
+            } else {
+                snake.pop(); // Eliminar cola si no comió
+            }
+
+            draw();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameLoopId);
+            finalScoreEl.innerText = score;
+            gameOverEl.style.display = 'block';
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // --- DIBUJADO ---
+
+        function drawHexagon(ctx, x, y, size, color, stroke = true) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle_deg = 60 * i - 30; // -30 para Pointy Top
+                const angle_rad = Math.PI / 180 * angle_deg;
+                const px = x + size * Math.cos(angle_rad);
+                const py = y + size * Math.sin(angle_rad);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            if (stroke) {
+                ctx.strokeStyle = COLORS.border;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            
+            // Dibujar un pequeño punto en los vértices para simular la imagen
+            ctx.fillStyle = '#333';
+            for (let i = 0; i < 6; i++) {
+                const angle_deg = 60 * i - 30;
+                const angle_rad = Math.PI / 180 * angle_deg;
+                const px = x + size * Math.cos(angle_rad);
+                const py = y + size * Math.sin(angle_rad);
+                ctx.beginPath();
+                ctx.arc(px, py, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dibujar Cuadrícula (Fondo)
+            for (let hex of hexGrid) {
+                const pos = hexToPixel(hex.q, hex.r);
+                const dist = hexDistance(hex.q, hex.r);
+                
+                let color = COLORS.outer;
+                if (dist === 0) color = COLORS.center;
+                else if (dist <= 2) color = COLORS.ring1;
+                else if (dist <= 4) color = COLORS.ring2;
+
+                drawHexagon(ctx, pos.x, pos.y, HEX_SIZE, color);
+            }
+
+            // 2. Dibujar Comida
+            if (food) {
+                const fPos = hexToPixel(food.q, food.r);
+                // Dibujar hexágono de comida un poco más pequeño
+                drawHexagon(ctx, fPos.x, fPos.y, HEX_SIZE * 0.8, COLORS.food, false);
+                // Efecto de brillo
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "black";
+                ctx.fillStyle = "rgba(255,255,255,0.5)";
+                ctx.beginPath();
+                ctx.arc(fPos.x, fPos.y, HEX_SIZE/3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // 3. Dibujar Serpiente
+            for (let i = 0; i < snake.length; i++) {
+                const s = snake[i];
+                const sPos = hexToPixel(s.q, s.r);
+                const color = (i === 0) ? COLORS.snakeHead : COLORS.snakeBody;
+                
+                // Dibujar cuerpo
+                drawHexagon(ctx, sPos.x, sPos.y, HEX_SIZE * 0.9, color, false);
+                
+                // Ojos si es la cabeza
+                if (i === 0) {
+                    ctx.fillStyle = "white";
+                    ctx.beginPath();
+                    ctx.arc(sPos.x - 5, sPos.y - 5, 3, 0, Math.PI*2);
+                    ctx.arc(sPos.x + 5, sPos.y - 5, 3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // --- CONTROLES ---
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            
+            // Evitar moverse en la dirección opuesta exacta (suicidio inmediato)
+            const isOpposite = (d1, d2) => (d1.q + d2.q === 0) && (d1.r + d2.r === 0);
+
+            let newDir = null;
+
+            // Mapeo de teclas (Pointy Top)
+            // Q W
+            // A D
+            // Z X
+            switch(key) {
+                case 'q': case '7': newDir = DIRECTIONS.NW; break;
+                case 'w': case '9': newDir = DIRECTIONS.NE; break;
+                case 'd': case '6': case 'ArrowRight': newDir = DIRECTIONS.E; break;
+                case 'x': case '3': newDir = DIRECTIONS.SE; break;
+                case 'z': case '1': newDir = DIRECTIONS.SW; break;
+                case 'a': case '4': case 'ArrowLeft': newDir = DIRECTIONS.W; break;
+                
+                // Soporte parcial para flechas arriba/abajo (mapean a diagonales "inteligentes")
+                case 'arrowup': 
+                    // Si voy a la izquierda, ir NW, si voy a la derecha, ir NE
+                    newDir = (direction === DIRECTIONS.E || direction === DIRECTIONS.SE || direction === DIRECTIONS.NE) 
+                             ? DIRECTIONS.NE : DIRECTIONS.NW;
+                    break;
+                case 'arrowdown':
+                     newDir = (direction === DIRECTIONS.E || direction === DIRECTIONS.NE || direction === DIRECTIONS.SE) 
+                             ? DIRECTIONS.SE : DIRECTIONS.SW;
+                    break;
+            }
+
+            if (newDir && !isOpposite(direction, newDir)) {
+                nextDirection = newDir;
+            }
+        });
+
+        // Iniciar
+        initGame();
+
+    </script>
+</body>
+</html>
