@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Snake AI - Neuroevolución</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            color: #fff;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Segoe UI', monospace;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            gap: 20px;
+        }
+
+        #game-wrapper {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 10px;
+        }
+
+        #sidebar {
+            width: 250px;
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        h2 { margin-top: 0; color: #4CAF50; }
+        .stat { margin: 10px 0; display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding-bottom: 5px;}
+        .val { color: #64b5f6; font-weight: bold; }
+
+        input[type=range] { width: 100%; margin: 10px 0; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #d32f2f;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        button:hover { background: #b71c1c; }
+        
+        .legend { font-size: 0.8em; color: #aaa; margin-top: 20px; }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="game-wrapper">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+        </div>
+
+        <div id="sidebar">
+            <h2>Hex AI Training</h2>
+            
+            <div class="stat"><span>Generación:</span> <span id="gen-display" class="val">1</span></div>
+            <div class="stat"><span>Vivas:</span> <span id="alive-display" class="val">0</span></div>
+            <div class="stat"><span>Mejor Score:</span> <span id="best-score-display" class="val">0</span></div>
+            <div class="stat"><span>Récord Histórico:</span> <span id="high-score-display" class="val">0</span></div>
+
+            <label>Velocidad de Simulación:</label>
+            <input type="range" id="speedSlider" min="1" max="50" value="1">
+            <span id="speed-val">1x</span>
+
+            <div class="legend">
+                <p><span class="dot" style="background:green;"></span>Mejor Serpiente (Líder)</p>
+                <p><span class="dot" style="background:rgba(0,0,0,0.1); border:1px solid #ccc"></span>Población (Fantasmas)</p>
+                <p><span class="dot" style="background:red;"></span>Comida</p>
+            </div>
+
+            <button onclick="resetTraining()">Reiniciar Entrenamiento</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        const HEX_SIZE = 18;
+        const MAP_RADIUS = 8;
+        const POPULATION_SIZE = 150; // Cantidad de serpientes por generación
+        const MUTATION_RATE = 0.1; // 10% de probabilidad de mutar un gen
+
+        // Colores
+        const COLORS = {
+            bg: '#f9f9f9',
+            grid: '#e0e0e0',
+            food: '#d32f2f',
+            bestSnake: '#43a047',
+            bestHead: '#1b5e20',
+            ghostSnake: 'rgba(0,0,0,0.05)',
+            wall: '#333'
+        };
+
+        // Direcciones Hex
+        const DIRECTIONS = [
+            { q: 0, r: -1 }, // 0: NW
+            { q: 1, r: -1 }, // 1: NE
+            { q: 1, r: 0 },  // 2: E
+            { q: 0, r: 1 },  // 3: SE
+            { q: -1, r: 1 }, // 4: SW
+            { q: -1, r: 0 }  // 5: W
+        ];
+
+        // --- CLASE RED NEURONAL SIMPLE (Sin librerías) ---
+        class NeuralNetwork {
+            constructor(inputNodes, hiddenNodes, outputNodes, model = null) {
+                if (model) {
+                    // Copiar modelo existente
+                    this.inputNodes = model.inputNodes;
+                    this.hiddenNodes = model.hiddenNodes;
+                    this.outputNodes = model.outputNodes;
+                    this.weightsIH = model.weightsIH.map(row => [...row]); // Input -> Hidden
+                    this.weightsHO = model.weightsHO.map(row => [...row]); // Hidden -> Output
+                    this.biasH = [...model.biasH];
+                    this.biasO = [...model.biasO];
+                } else {
+                    // Inicializar aleatorio
+                    this.inputNodes = inputNodes;
+                    this.hiddenNodes = hiddenNodes;
+                    this.outputNodes = outputNodes;
+                    this.weightsIH = Array(this.hiddenNodes).fill(0).map(() => Array(this.inputNodes).fill(0).map(() => Math.random() * 2 - 1));
+                    this.weightsHO = Array(this.outputNodes).fill(0).map(() => Array(this.hiddenNodes).fill(0).map(() => Math.random() * 2 - 1));
+                    this.biasH = Array(this.hiddenNodes).fill(0).map(() => Math.random() * 2 - 1);
+                    this.biasO = Array(this.outputNodes).fill(0).map(() => Math.random() * 2 - 1);
+                }
+            }
+
+            predict(inputArray) {
+                // 1. Input -> Hidden
+                let hidden = [];
+                for (let i = 0; i < this.hiddenNodes; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < this.inputNodes; j++) {
+                        sum += inputArray[j] * this.weightsIH[i][j];
+                    }
+                    sum += this.biasH[i];
+                    hidden[i] = this.sigmoid(sum);
+                }
+
+                // 2. Hidden -> Output
+                let output = [];
+                for (let i = 0; i < this.outputNodes; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < this.hiddenNodes; j++) {
+                        sum += hidden[j] * this.weightsHO[i][j];
+                    }
+                    sum += this.biasO[i];
+                    output[i] = this.sigmoid(sum); // Usamos sigmoid para output también
+                }
+                return output;
+            }
+
+            // Mutación genética: cambiar pesos ligeramente
+            mutate(rate) {
+                function mutateValue(val) {
+                    if (Math.random() < rate) {
+                        return val + (Math.random() * 0.2 - 0.1); // Pequeño ajuste
+                    }
+                    return val;
+                }
+
+                this.weightsIH = this.weightsIH.map(row => row.map(mutateValue));
+                this.weightsHO = this.weightsHO.map(row => row.map(mutateValue));
+                this.biasH = this.biasH.map(mutateValue);
+                this.biasO = this.biasO.map(mutateValue);
+            }
+
+            sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+        }
+
+        // --- LÓGICA DE JUEGO DE LA SERPIENTE ---
+        class Snake {
+            constructor(brain = null) {
+                // Cuerpo inicial en el centro
+                this.body = [{ q: 0, r: 0 }, { q: -1, r: 0 }, { q: -2, r: 0 }];
+                this.dirIndex = 2; // Empezar mirando al Este
+                this.alive = true;
+                this.food = this.getNewFoodPos();
+                this.score = 0;
+                this.lifeTime = 0; // Cuántos frames vive
+                this.timeSinceLastMeal = 0; // Para matar serpientes que dan vueltas infinitas
+                this.fitness = 0;
+                
+                // Entradas: 6 direcciones * 3 visiones (distancia muro, distancia cuerpo, hay comida) = 18 inputs
+                // Hidden: 12 neuronas
+                // Salida: 6 direcciones (elegimos la de valor más alto)
+                if (brain) {
+                    this.brain = new NeuralNetwork(0,0,0, brain);
+                } else {
+                    this.brain = new NeuralNetwork(18, 12, 6);
+                }
+            }
+
+            update() {
+                if (!this.alive) return;
+
+                this.lifeTime++;
+                this.timeSinceLastMeal++;
+
+                // Morir por hambre (si da vueltas sin comer por 100 turnos)
+                if (this.timeSinceLastMeal > 100) {
+                    this.alive = false;
+                    return;
+                }
+
+                this.think();
+
+                const head = this.body[0];
+                const dir = DIRECTIONS[this.dirIndex];
+                const newHead = { q: head.q + dir.q, r: head.r + dir.r };
+
+                // Colisiones
+                if (this.checkCollision(newHead)) {
+                    this.alive = false;
+                    return;
+                }
+
+                this.body.unshift(newHead);
+
+                // Comer
+                if (newHead.q === this.food.q && newHead.r === this.food.r) {
+                    this.score++;
+                    this.timeSinceLastMeal = 0; // Reset hambre
+                    this.food = this.getNewFoodPos();
+                    // Al comer, extendemos el límite de hambre un poco más si es necesario,
+                    // pero el reset suele ser suficiente.
+                } else {
+                    this.body.pop();
+                }
+            }
+
+            // La IA "mira" el entorno y decide
+            think() {
+                const inputs = [];
+                const head = this.body[0];
+
+                // Miramos en las 6 direcciones
+                for (let i = 0; i < 6; i++) {
+                    let dir = DIRECTIONS[i];
+                    
+                    // 1. Visión: ¿Qué tan lejos está el muro o mi cola en esta dirección?
+                    let dist = 0;
+                    let foundBody = 0; // 0 no, 1 si
+                    let foundWall = 0; // No necesario explícitamente si usamos distancia inversa, pero útil.
+                    
+                    // Raycasting simple
+                    let currentPos = { q: head.q, r: head.r };
+                    for (let d = 1; d <= MAP_RADIUS * 2; d++) {
+                        currentPos.q += dir.q;
+                        currentPos.r += dir.r;
+                        
+                        // Muro
+                        if (this.hexDist(currentPos.q, currentPos.r) > MAP_RADIUS) {
+                            dist = d;
+                            break;
+                        }
+                        // Cuerpo
+                        if (this.isBodyPart(currentPos)) {
+                            if (foundBody === 0) {
+                                dist = d;
+                                foundBody = 1;
+                            }
+                            // Continuamos para encontrar el muro, pero para la IA la primera colisión importa
+                            break; 
+                        }
+                    }
+
+                    // Input 1: Distancia al obstáculo (invertida, para que cerca sea 1 y lejos 0)
+                    inputs.push(1 / dist);
+
+                    // Input 2: ¿Es parte de mi cuerpo lo que vi? (1 si es cuerpo, 0 si es muro)
+                    inputs.push(foundBody);
+
+                    // Input 3: ¿Hay comida en esta dirección general?
+                    // Esto es una simplificación. Si la comida está en el cono de visión de esta dirección.
+                    inputs.push(this.isFoodInDirection(dir) ? 1 : 0);
+                }
+
+                const outputs = this.brain.predict(inputs);
+                
+                // Obtener el índice con el valor más alto
+                let maxVal = -Infinity;
+                let maxIndex = -1;
+                for (let i = 0; i < outputs.length; i++) {
+                    if (outputs[i] > maxVal) {
+                        maxVal = outputs[i];
+                        maxIndex = i;
+                    }
+                }
+
+                // Evitar giro de 180 grados (suicidio inmediato)
+                // Aunque la IA debería aprenderlo, forzamos para acelerar aprendizaje temprano
+                let opposite = (this.dirIndex + 3) % 6;
+                if (maxIndex !== opposite) {
+                    this.dirIndex = maxIndex;
+                }
+            }
+
+            isFoodInDirection(dir) {
+                const head = this.body[0];
+                // Vector hacia la comida
+                const fx = this.food.q - head.q;
+                const fy = this.food.r - head.r;
+                
+                // Si el vector dirección coincide aproximadamente
+                // Normalizamos y hacemos producto punto o simplemente comparamos signos
+                // Hexagonal simple: Si avanzar en 'dir' reduce la distancia a la comida
+                const currentDist = this.hexDist(this.food.q, this.food.r, head.q, head.r);
+                const nextDist = this.hexDist(this.food.q, this.food.r, head.q + dir.q, head.r + dir.r);
+                return nextDist < currentDist;
+            }
+
+            checkCollision(pos) {
+                if (this.hexDist(pos.q, pos.r) > MAP_RADIUS) return true;
+                return this.isBodyPart(pos);
+            }
+
+            isBodyPart(pos) {
+                for (let part of this.body) {
+                    if (part.q === pos.q && part.r === pos.r) return true;
+                }
+                return false;
+            }
+
+            hexDist(q1, r1, q2 = 0, r2 = 0) {
+                return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
+            }
+
+            getNewFoodPos() {
+                // Generar posición aleatoria válida
+                let pos;
+                while (true) {
+                    const q = Math.floor(Math.random() * (MAP_RADIUS * 2 + 1)) - MAP_RADIUS;
+                    const rStart = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+                    const rEnd = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+                    const r = Math.floor(Math.random() * (rEnd - rStart + 1)) + rStart;
+                    
+                    pos = {q, r};
+                    // Chequear si cae en el cuerpo
+                    if (!this.isBodyPart(pos)) break;
+                }
+                return pos;
+            }
+
+            calculateFitness() {
+                // Fitness = Tiempo sobrevivido + (Manzanas * premio grande)
+                // Premiamos mucho las manzanas para que no aprenda solo a dar vueltas
+                this.fitness = this.lifeTime + (this.score * 1000);
+                
+                // Penalización extra si muere de hambre con 0 puntos (incentivar exploración)
+                if (this.score === 0) this.fitness = Math.max(1, this.fitness * 0.1);
+                
+                // Elevar al cuadrado para destacar aún más a los mejores
+                this.fitness = Math.pow(this.fitness, 2);
+            }
+        }
+
+
+        // --- GESTIÓN DE POBLACIÓN (ALGORITMO GENÉTICO) ---
+        let population = [];
+        let generation = 1;
+        let highScore = 0;
+        let bestSnakeCurrent = null;
+
+        function initPopulation() {
+            population = [];
+            for (let i = 0; i < POPULATION_SIZE; i++) {
+                population.push(new Snake());
+            }
+        }
+
+        function nextGeneration() {
+            calculatePopulationFitness();
+            
+            // Ordenar por fitness
+            population.sort((a, b) => b.fitness - a.fitness);
+
+            // Estadísticas
+            const currentBest = population[0];
+            highScore = Math.max(highScore, currentBest.score);
+            document.getElementById('high-score-display').innerText = highScore;
+            document.getElementById('best-score-display').innerText = currentBest.score;
+            
+            // Crear nueva población
+            const newPop = [];
+            
+            // Elitismo: El mejor pasa directamente sin mutar (para no perder progreso)
+            newPop.push(new Snake(currentBest.brain));
+
+            // El resto se genera por cruce/selección natural
+            for (let i = 1; i < POPULATION_SIZE; i++) {
+                const parent = selectOne(); // Selección simple
+                const child = new Snake(parent.brain);
+                child.brain.mutate(MUTATION_RATE);
+                newPop.push(child);
+            }
+
+            population = newPop;
+            generation++;
+            document.getElementById('gen-display').innerText = generation;
+        }
+
+        function calculatePopulationFitness() {
+            let sum = 0;
+            for (let s of population) {
+                s.calculateFitness();
+                sum += s.fitness;
+            }
+        }
+
+        function selectOne() {
+            // Selección por ruleta
+            // Sumar total fitness
+            let totalFitness = 0;
+            for (let s of population) totalFitness += s.fitness;
+
+            let r = Math.random() * totalFitness;
+            let index = 0;
+            while (r > 0 && index < population.length) {
+                r -= population[index].fitness;
+                index++;
+            }
+            index--;
+            if (index < 0) index = 0;
+            return population[index];
+        }
+
+
+        // --- BUCLE PRINCIPAL Y RENDERIZADO ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speed-val');
+
+        let cyclesPerFrame = 1;
+
+        slider.addEventListener('input', () => {
+            cyclesPerFrame = parseInt(slider.value);
+            speedVal.innerText = cyclesPerFrame + "x";
+        });
+
+        function hexToPixel(q, r) {
+            const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+            const y = HEX_SIZE * (3./2 * r);
+            return { x: x + canvas.width / 2, y: y + canvas.height / 2 };
+        }
+
+        function drawHexagon(x, y, size, color, stroke = false) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle_rad = (Math.PI / 180) * (60 * i - 30);
+                const px = x + size * Math.cos(angle_rad);
+                const py = y + size * Math.sin(angle_rad);
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            if (stroke) {
+                ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                ctx.stroke();
+            }
+        }
+
+        function drawBackground() {
+            // Dibujar grid estático
+            for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
+                let r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+                let r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+                for (let r = r1; r <= r2; r++) {
+                    const pos = hexToPixel(q, r);
+                    drawHexagon(pos.x, pos.y, HEX_SIZE, COLORS.grid, true);
+                }
+            }
+            // Borde exterior
+             // Opcional: dibujar límite
+        }
+
+        function loop() {
+            // Lógica: Ejecutar N veces por frame de dibujo
+            for (let n = 0; n < cyclesPerFrame; n++) {
+                let allDead = true;
+                let currentMaxScore = -1;
+
+                // Actualizar todas las serpientes
+                for (let s of population) {
+                    if (s.alive) {
+                        s.update();
+                        allDead = false;
+                        if (s.score > currentMaxScore) {
+                            currentMaxScore = s.score;
+                            bestSnakeCurrent = s;
+                        }
+                    }
+                }
+
+                if (allDead) {
+                    nextGeneration();
+                    // Salir del bucle n para empezar a dibujar la nueva gen inmediatamente
+                    break; 
+                }
+            }
+
+            document.getElementById('alive-display').innerText = population.filter(s => s.alive).length;
+
+            // Dibujado (Solo una vez por frame)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+
+            // Dibujar serpientes
+            // Primero las muertas o "malas" como fantasmas (limitado para performance)
+            let drawLimit = 0;
+            for (let s of population) {
+                if (!s.alive) continue;
+                if (s === bestSnakeCurrent) continue; // Dibujar la mejor al final
+                
+                if (drawLimit < 20) { // Solo dibujar algunas para no saturar
+                   // drawSnake(s, COLORS.ghostSnake);
+                   // Optimizacion: Dibujar solo cabezas de fantasmas
+                   const head = hexToPixel(s.body[0].q, s.body[0].r);
+                   ctx.fillStyle = COLORS.ghostSnake;
+                   ctx.beginPath(); ctx.arc(head.x, head.y, 5, 0, Math.PI*2); ctx.fill();
+                   drawLimit++;
+                }
+            }
+
+            // Dibujar la mejor serpiente (Líder)
+            if (bestSnakeCurrent && bestSnakeCurrent.alive) {
+                drawSnake(bestSnakeCurrent, COLORS.bestSnake, COLORS.bestHead);
+                // Dibujar su comida
+                const fPos = hexToPixel(bestSnakeCurrent.food.q, bestSnakeCurrent.food.r);
+                drawHexagon(fPos.x, fPos.y, HEX_SIZE * 0.8, COLORS.food);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function drawSnake(snake, bodyColor, headColor = null) {
+            for (let i = 0; i < snake.body.length; i++) {
+                const part = snake.body[i];
+                const p = hexToPixel(part.q, part.r);
+                const color = (i === 0 && headColor) ? headColor : bodyColor;
+                drawHexagon(p.x, p.y, HEX_SIZE * 0.9, color);
+            }
+        }
+
+        function resetTraining() {
+            generation = 1;
+            highScore = 0;
+            initPopulation();
+        }
+
+        // Inicio
+        initPopulation();
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
