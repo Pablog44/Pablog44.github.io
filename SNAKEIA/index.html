@@ -2,186 +2,196 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Snake AI 3D - Ultimate Version</title>
+    <!-- Viewport para móviles: evita zoom y ajusta escala -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Neuro Snake 3D - Mobile Battle</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; color: #fff; user-select: none; }
+        /* ESTILOS GENERALES */
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; color: #fff; user-select: none; -webkit-user-select: none; touch-action: none; }
         
-        /* PANEL DE CONTROL IZQUIERDO */
+        /* PANEL DE CONTROL (UI) */
         #ui {
             position: absolute; top: 10px; left: 10px; z-index: 10;
-            background: rgba(0, 10, 20, 0.95); padding: 20px; border: 1px solid #0ff;
+            background: rgba(0, 10, 20, 0.9); padding: 15px; border: 1px solid #0ff;
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
             border-radius: 8px; width: 300px;
+            transition: transform 0.3s ease;
         }
-        h1 { margin: 0 0 15px 0; font-size: 22px; color: #0ff; text-shadow: 0 0 10px #0ff; text-align: center; letter-spacing: 2px; }
-        .stat { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        /* Botón para minimizar UI en móvil */
+        #toggle-ui { display: none; position: absolute; top: 5px; right: 5px; background: transparent; border: 1px solid #0ff; color: #0ff; font-size: 10px; width: 30px; padding: 5px; }
+
+        h1 { margin: 0 0 10px 0; font-size: 20px; color: #0ff; text-shadow: 0 0 10px #0ff; text-align: center; letter-spacing: 2px; }
+        .stat { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; border-bottom: 1px solid #333; padding-bottom: 2px; }
         .highlight-green { color: #00ff55; font-weight: bold; }
         
         select, button {
-            width: 100%; padding: 10px; margin-top: 8px;
+            width: 100%; padding: 10px; margin-top: 5px;
             background: #000; color: #0ff; border: 1px solid #0ff;
             cursor: pointer; font-weight: bold; text-transform: uppercase;
-            transition: all 0.3s; font-size: 12px;
+            transition: all 0.2s; font-size: 12px;
         }
-        button:hover { background: #0ff; color: #000; box-shadow: 0 0 15px #0ff; }
+        button:hover { background: #0ff; color: #000; box-shadow: 0 0 10px #0ff; }
+        button:active { background: #fff; }
         button:disabled { border-color: #444; color: #444; cursor: not-allowed; background: #111; box-shadow: none; }
-        
-        /* MARCADOR EN TIEMPO REAL (ARRIBA) */
+
+        /* CONTROLES MÓVILES (D-PAD) */
+        #mobile-controls {
+            display: none; /* Se activa con media query */
+            position: absolute; bottom: 20px; right: 20px; z-index: 20;
+            width: 150px; height: 150px;
+        }
+        .d-btn {
+            position: absolute; width: 50px; height: 50px;
+            background: rgba(0, 255, 255, 0.1); border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 10px; pointer-events: auto;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: rgba(0, 255, 255, 0.8); user-select: none;
+        }
+        .d-btn:active { background: rgba(0, 255, 255, 0.4); color: #fff; }
+        #btn-up { top: 0; left: 50px; }
+        #btn-down { bottom: 0; left: 50px; }
+        #btn-left { top: 50px; left: 0; }
+        #btn-right { top: 50px; right: 0; }
+
+        /* MARCADOR */
         #scoreboard {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
-            background: rgba(0, 0, 0, 0.8); border: 2px solid #fff;
-            padding: 10px 30px; border-radius: 30px;
-            display: none; gap: 40px; font-size: 20px; font-weight: bold;
-            box-shadow: 0 0 15px rgba(255,255,255,0.2);
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9;
+            background: rgba(0, 0, 0, 0.6); border: 1px solid #fff;
+            padding: 5px 20px; border-radius: 20px;
+            display: none; gap: 20px; font-size: 16px; font-weight: bold;
         }
-        .score-h { color: #0088ff; text-shadow: 0 0 10px #0088ff; }
-        .score-ai { color: #ff0055; text-shadow: 0 0 10px #ff0055; }
+        .score-h { color: #0088ff; }
+        .score-ai { color: #ff0055; }
 
-        /* MENSAJE FLOTANTE (ESPECTADOR) */
+        /* PANTALLAS MENSAJE */
         #msg-overlay {
-            position: absolute; top: 80%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 24px; color: white; text-shadow: 0 0 10px red;
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20px; color: white; text-shadow: 0 0 10px red;
             display: none; pointer-events: none; z-index: 20; font-weight: bold;
-            background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;
+            background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; text-align: center;
         }
 
-        /* PANTALLA GAME OVER */
         #game-over-modal {
-            display: none;
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(0, 5, 10, 0.95); border: 2px solid #ff0055;
-            padding: 40px; text-align: center; z-index: 100;
+            padding: 20px; text-align: center; z-index: 100;
             box-shadow: 0 0 50px rgba(255, 0, 85, 0.3);
-            border-radius: 10px; min-width: 300px;
+            border-radius: 10px; width: 80%; max-width: 300px;
         }
-        #game-over-modal h2 { color: #fff; margin-top: 0; font-size: 30px; text-shadow: 0 0 10px #fff; }
-        .final-score { font-size: 18px; margin: 10px 0; color: #aaa; }
-        .final-val { font-size: 24px; font-weight: bold; color: #fff; }
-        #winner-text { font-size: 20px; margin-top: 20px; color: #ff0055; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;}
+        #game-over-modal h2 { margin-top: 0; color: #fff; }
 
         #canvas-container { width: 100vw; height: 100vh; }
+
+        /* RESPONSIVE MEDIA QUERIES */
+        @media (max-width: 768px) {
+            #mobile-controls { display: block; } /* Mostrar botones en móvil */
+            #ui { width: 90%; max-width: 300px; padding: 10px; transform-origin: top left; }
+            #ui.minimized { transform: scale(0.0); opacity: 0; pointer-events: none; }
+            #toggle-ui { display: block; }
+            h1 { font-size: 18px; }
+            #scoreboard { top: 60px; font-size: 14px; width: 100%; justify-content: center; border: none; background: transparent; text-shadow: 0 0 2px black;}
+        }
     </style>
-    <!-- Importar Three.js -->
+    <!-- Three.js -->
     <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 </head>
 <body>
 
+<!-- UI PANEL -->
 <div id="ui">
-    <h1>NEURO SNAKE 3D</h1>
+    <button id="toggle-ui" onclick="toggleUI()">X</button>
+    <h1>NEURO BATTLE AI</h1>
     
-    <div class="stat"><span>Generación:</span> <span id="gen-display">0</span></div>
-    <div class="stat"><span>Mejor Fitness:</span> <span id="best-fitness-display">0</span></div>
-    <div class="stat"><span class="highlight-green">Récord IA (Comida):</span> <span id="record-display">0</span></div>
+    <div class="stat"><span>Gen:</span> <span id="gen-display">0</span></div>
+    <div class="stat"><span>Max Fitness:</span> <span id="best-fitness-display">0</span></div>
+    <div class="stat"><span class="highlight-green">Récord:</span> <span id="record-display">0</span></div>
     <div class="stat"><span>Estado:</span> <span id="status-display" style="color: yellow">Esperando...</span></div>
     
-    <label for="gridSize" style="font-size: 12px; color: #aaa;">Tamaño del Tablero:</label>
     <select id="gridSize">
-        <option value="10">Pequeño (10x10)</option>
-        <option value="15" selected>Mediano (15x15)</option>
-        <option value="20">Grande (20x20)</option>
+        <option value="10">Mapa Pequeño (10x10)</option>
+        <option value="15" selected>Mapa Mediano (15x15)</option>
+        <option value="20">Mapa Grande (20x20)</option>
     </select>
 
-    <button id="btn-train" onclick="startTraining()">1. Entrenar IA (Rápido)</button>
+    <button id="btn-train" onclick="startTraining()">1. Entrenar (Battle Mode)</button>
     <button id="btn-watch" onclick="startWatch()" disabled>2. Ver IA Sola</button>
     <button id="btn-play" onclick="startVersus()" disabled>3. Jugar vs IA</button>
-    
-    <div style="font-size: 10px; margin-top: 15px; color: #666; line-height: 1.3;">
-        Entrena primero para desbloquear los modos de juego.
-    </div>
 </div>
 
-<!-- MARCADOR EN JUEGO -->
+<!-- BOTÓN FLOTANTE PARA MOSTRAR MENÚ SI ESTÁ OCULTO -->
+<button id="show-menu-btn" onclick="toggleUI()" style="position:absolute; top:10px; left:10px; width:40px; height:40px; z-index:5; display:none;">☰</button>
+
+<!-- CONTROLES MÓVIL -->
+<div id="mobile-controls">
+    <div class="d-btn" id="btn-up" onclick="handleMobileInput(0)">▲</div>
+    <div class="d-btn" id="btn-left" onclick="handleMobileInput(2)">◀</div>
+    <div class="d-btn" id="btn-right" onclick="handleMobileInput(3)">▶</div>
+    <div class="d-btn" id="btn-down" onclick="handleMobileInput(1)">▼</div>
+</div>
+
 <div id="scoreboard">
-    <span class="score-h">HUMANO: <span id="score-h-val">0</span></span>
+    <span class="score-h">TÚ: <span id="score-h-val">0</span></span>
     <span class="score-ai">IA: <span id="score-ai-val">0</span></span>
 </div>
 
-<!-- AVISO ESPECTADOR -->
-<div id="msg-overlay">MODO ESPECTADOR (Has muerto)</div>
+<div id="msg-overlay">ESPECTADOR<br><span style="font-size:14px">(Has muerto)</span></div>
 
-<!-- PANTALLA FINAL -->
 <div id="game-over-modal">
-    <h2>FIN DE PARTIDA</h2>
-    <div class="final-score">TU PUNTUACIÓN: <br><span class="final-val" id="final-h" style="color:#0088ff">0</span></div>
-    <div class="final-score">PUNTUACIÓN IA: <br><span class="final-val" id="final-ai" style="color:#ff0055">0</span></div>
-    <div id="winner-text">GANADOR: IA</div>
-    <button onclick="closeModal()" style="margin-top: 20px; border-color: #fff; color: #fff;">Cerrar</button>
+    <h2>FIN PARTIDA</h2>
+    <div class="final-score">TU SCORE: <span class="final-val" id="final-h" style="color:#0088ff">0</span></div>
+    <div class="final-score">IA SCORE: <span class="final-val" id="final-ai" style="color:#ff0055">0</span></div>
+    <div id="winner-text" style="margin:15px 0; font-weight:bold; font-size:18px;"></div>
+    <button onclick="closeModal()">Cerrar</button>
 </div>
 
 <div id="canvas-container"></div>
 
 <script>
-/**
- * ------------------------------------------------------------------
- * 1. RED NEURONAL (Cerebro)
- * ------------------------------------------------------------------
- */
+// --------------------------------------------------------------------
+// 1. RED NEURONAL & SERPIENTE
+// --------------------------------------------------------------------
 class NeuralNetwork {
     constructor(inputNodes, hiddenNodes, outputNodes) {
         this.inputNodes = inputNodes;
         this.hiddenNodes = hiddenNodes;
         this.outputNodes = outputNodes;
-
-        this.weightsIH = new Float32Array(this.hiddenNodes * this.inputNodes).map(() => Math.random() * 2 - 1);
-        this.weightsHO = new Float32Array(this.outputNodes * this.hiddenNodes).map(() => Math.random() * 2 - 1);
-        
-        this.biasH = new Float32Array(this.hiddenNodes).map(() => Math.random() * 2 - 1);
-        this.biasO = new Float32Array(this.outputNodes).map(() => Math.random() * 2 - 1);
+        this.weightsIH = new Float32Array(hiddenNodes * inputNodes).map(() => Math.random() * 2 - 1);
+        this.weightsHO = new Float32Array(outputNodes * hiddenNodes).map(() => Math.random() * 2 - 1);
+        this.biasH = new Float32Array(hiddenNodes).map(() => Math.random() * 2 - 1);
+        this.biasO = new Float32Array(outputNodes).map(() => Math.random() * 2 - 1);
     }
-
     predict(inputs) {
         let hidden = new Float32Array(this.hiddenNodes);
         for (let i = 0; i < this.hiddenNodes; i++) {
             let sum = 0;
-            for (let j = 0; j < this.inputNodes; j++) {
-                sum += inputs[j] * this.weightsIH[i * this.inputNodes + j];
-            }
-            sum += this.biasH[i];
-            hidden[i] = Math.max(0, sum); // ReLU
+            for (let j = 0; j < this.inputNodes; j++) sum += inputs[j] * this.weightsIH[i * this.inputNodes + j];
+            hidden[i] = Math.max(0, sum + this.biasH[i]); // ReLU
         }
-
         let output = new Float32Array(this.outputNodes);
         for (let i = 0; i < this.outputNodes; i++) {
             let sum = 0;
-            for (let j = 0; j < this.hiddenNodes; j++) {
-                sum += hidden[j] * this.weightsHO[i * this.hiddenNodes + j];
-            }
-            sum += this.biasO[i];
-            output[i] = sum;
+            for (let j = 0; j < this.hiddenNodes; j++) sum += hidden[j] * this.weightsHO[i * this.hiddenNodes + j];
+            output[i] = sum + this.biasO[i];
         }
         return output;
     }
-
     clone() {
-        let clone = new NeuralNetwork(this.inputNodes, this.hiddenNodes, this.outputNodes);
-        clone.weightsIH.set(this.weightsIH);
-        clone.weightsHO.set(this.weightsHO);
-        clone.biasH.set(this.biasH);
-        clone.biasO.set(this.biasO);
-        return clone;
+        let c = new NeuralNetwork(this.inputNodes, this.hiddenNodes, this.outputNodes);
+        c.weightsIH.set(this.weightsIH); c.weightsHO.set(this.weightsHO);
+        c.biasH.set(this.biasH); c.biasO.set(this.biasO);
+        return c;
     }
-
     mutate(rate) {
-        const mutateVal = (val) => {
-            if (Math.random() < rate) return val + (Math.random() * 0.5 - 0.25);
-            return val;
-        };
-        this.weightsIH = this.weightsIH.map(mutateVal);
-        this.weightsHO = this.weightsHO.map(mutateVal);
-        this.biasH = this.biasH.map(mutateVal);
-        this.biasO = this.biasO.map(mutateVal);
+        const mut = v => (Math.random() < rate) ? v + (Math.random() * 0.5 - 0.25) : v;
+        this.weightsIH = this.weightsIH.map(mut); this.weightsHO = this.weightsHO.map(mut);
+        this.biasH = this.biasH.map(mut); this.biasO = this.biasO.map(mut);
     }
 }
 
-/**
- * ------------------------------------------------------------------
- * 2. LÓGICA DE LA SERPIENTE
- * ------------------------------------------------------------------
- */
-const UP = 0, DOWN = 1, LEFT = 2, RIGHT = 3;
+const UP=0, DOWN=1, LEFT=2, RIGHT=3;
 
 class Snake {
-    constructor(gridSize, brain = null, isHuman = false) {
+    constructor(gridSize, brain=null, isHuman=false) {
         this.gridSize = gridSize;
         this.body = []; 
         this.direction = -1; 
@@ -190,131 +200,77 @@ class Snake {
         this.lifeLeft = 200; 
         this.lifetime = 0;
         this.isHuman = isHuman;
-        this.brain = brain || new NeuralNetwork(24, 18, 4); 
+        this.brain = brain || new NeuralNetwork(24, 16, 4); 
         this.fitness = 0;
     }
-
-    resetPosition(x, y) {
-        this.body = [{x: x, y: y}];
+    reset(x, y) {
+        this.body = [{x, y}];
         this.direction = -1;
         this.isDead = false;
         this.lifeLeft = 200;
         this.score = 0;
         this.lifetime = 0;
     }
-
-    think(food, obstacles) {
-        if (this.isHuman) return;
-
-        const head = this.body[0];
+    think(food, enemies=[]) {
+        if(this.isHuman) return;
+        let head = this.body[0];
         let inputs = [];
-
-        const dirs = [
-            {x:0, y:-1}, {x:1, y:-1}, {x:1, y:0}, {x:1, y:1},
-            {x:0, y:1}, {x:-1, y:1}, {x:-1, y:0}, {x:-1, y:-1}
-        ];
-
-        for (let d of dirs) {
-            inputs = inputs.concat(this.lookInDirection(d, head, food, obstacles));
-        }
-
-        const outputs = this.brain.predict(inputs);
+        let dirs = [{x:0,y:-1},{x:1,y:-1},{x:1,y:0},{x:1,y:1},{x:0,y:1},{x:-1,y:1},{x:-1,y:0},{x:-1,y:-1}];
+        for(let d of dirs) inputs = inputs.concat(this.look(d, head, food, enemies));
         
-        let maxVal = -Infinity;
-        let choice = 0;
-        for(let i=0; i<4; i++){
-            if(outputs[i] > maxVal){
-                maxVal = outputs[i];
-                choice = i;
-            }
-        }
-        
-        const current = this.direction;
-        if (choice === UP && current !== DOWN) this.direction = UP;
-        else if (choice === DOWN && current !== UP) this.direction = DOWN;
-        else if (choice === LEFT && current !== RIGHT) this.direction = LEFT;
-        else if (choice === RIGHT && current !== LEFT) this.direction = RIGHT;
+        let out = this.brain.predict(inputs);
+        let max = -Infinity, choice = 0;
+        for(let i=0; i<4; i++) if(out[i]>max){ max=out[i]; choice=i; }
+
+        const cur = this.direction;
+        // Evitar giro de 180
+        if(choice===UP && cur!==DOWN) this.direction=UP;
+        else if(choice===DOWN && cur!==UP) this.direction=DOWN;
+        else if(choice===LEFT && cur!==RIGHT) this.direction=LEFT;
+        else if(choice===RIGHT && cur!==LEFT) this.direction=RIGHT;
     }
-
-    lookInDirection(dir, head, food, obstacles) {
-        let look = [0, 0, 0]; 
-        let x = head.x;
-        let y = head.y;
-        let distance = 0;
-        let foundFood = false;
-        let foundBody = false;
-
-        x += dir.x; 
-        y += dir.y;
-        distance += 1;
-
-        while (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
-            if (!foundFood && x === food.x && y === food.y) {
-                look[0] = 1; 
-                foundFood = true;
+    look(dir, head, food, enemies) {
+        let res = [0,0,0]; // Food, Body/Enemy, Wall
+        let x = head.x, y = head.y, dist = 0;
+        x += dir.x; y += dir.y; dist++;
+        let foundFood=false, foundBody=false;
+        while(x>=0 && x<this.gridSize && y>=0 && y<this.gridSize) {
+            if(!foundFood && x===food.x && y===food.y) { res[0]=1; foundFood=true; }
+            if(!foundBody) {
+                // Cuerpo propio
+                if(this.body.some(p=>p.x===x && p.y===y)) { res[1]=1/dist; foundBody=true; }
+                // Enemigos
+                else if(enemies.some(e=>e.x===x && e.y===y)) { res[1]=1/dist; foundBody=true; }
             }
-            if (!foundBody) {
-                 if (obstacles.some(o => o.x === x && o.y === y)) {
-                     look[1] = 1 / distance;
-                     foundBody = true;
-                 }
-                 if (this.body.some(p => p.x === x && p.y === y)) {
-                    look[1] = 1 / distance;
-                    foundBody = true;
-                 }
-            }
-            x += dir.x;
-            y += dir.y;
-            distance += 1;
+            x+=dir.x; y+=dir.y; dist++;
         }
-        look[2] = 1 / distance;
-        return look;
+        res[2] = 1/dist; // Wall
+        return res;
     }
+    update(food, enemies=[]) {
+        if(this.isDead) return false;
+        this.lifeLeft--; this.lifetime++;
+        if(this.lifeLeft<=0 && !this.isHuman) { this.isDead=true; return false; }
 
-    update(food, otherSnakesBodies = []) {
-        if (this.isDead) return false;
-        
-        this.lifeLeft--;
-        this.lifetime++;
-        
-        if (this.lifeLeft <= 0 && !this.isHuman) {
-            this.isDead = true;
-            return false;
-        }
+        let head = {...this.body[0]};
+        if(this.direction===UP) head.y--;
+        else if(this.direction===DOWN) head.y++;
+        else if(this.direction===LEFT) head.x--;
+        else if(this.direction===RIGHT) head.x++;
+        else return false;
 
-        let head = { ...this.body[0] };
-        
-        if (this.direction === UP) head.y -= 1;
-        else if (this.direction === DOWN) head.y += 1;
-        else if (this.direction === LEFT) head.x -= 1;
-        else if (this.direction === RIGHT) head.x += 1;
-        else return false; 
-
-        if (head.x < 0 || head.x >= this.gridSize || head.y < 0 || head.y >= this.gridSize) {
-            this.isDead = true;
-            return false;
-        }
-
-        for (let part of this.body) {
-            if (head.x === part.x && head.y === part.y) {
-                this.isDead = true;
-                return false;
-            }
-        }
-
-        for (let part of otherSnakesBodies) {
-            if (head.x === part.x && head.y === part.y) {
-                this.isDead = true;
-                return false;
-            }
-        }
+        // Choque pared
+        if(head.x<0 || head.x>=this.gridSize || head.y<0 || head.y>=this.gridSize) { this.isDead=true; return false; }
+        // Choque propio
+        for(let p of this.body) if(head.x===p.x && head.y===p.y){ this.isDead=true; return false; }
+        // Choque enemigos (Colisión = Muerte)
+        for(let p of enemies) if(head.x===p.x && head.y===p.y){ this.isDead=true; return false; }
 
         this.body.unshift(head);
-
-        if (head.x === food.x && head.y === food.y) {
+        if(head.x===food.x && head.y===food.y) {
             this.score++;
-            this.lifeLeft = Math.min(this.lifeLeft + 150, 600); 
-            return true; 
+            this.lifeLeft = Math.min(this.lifeLeft+100, 500);
+            return true;
         } else {
             this.body.pop();
             return false;
@@ -322,398 +278,357 @@ class Snake {
     }
 }
 
-/**
- * ------------------------------------------------------------------
- * 3. ENGINE GRÁFICO (Three.js)
- * ------------------------------------------------------------------
- */
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020205);
-scene.fog = new THREE.Fog(0x020205, 10, 60);
-
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// --------------------------------------------------------------------
+// 2. ESCENA 3D (Three.js)
+// --------------------------------------------------------------------
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x020205);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-const ambLight = new THREE.AmbientLight(0x404040, 1.5);
-scene.add(ambLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-dirLight.position.set(10, 30, 20);
-dirLight.castShadow = true;
-scene.add(dirLight);
+const light = new THREE.DirectionalLight(0xffffff, 1.5); light.position.set(10,30,20); light.castShadow=true; scene.add(light);
+scene.add(new THREE.AmbientLight(0x404040, 1.5));
 
-const matGrid = new THREE.LineBasicMaterial({ color: 0x333333, opacity: 0.3, transparent: true });
-const matSnakeAI = new THREE.MeshPhongMaterial({ color: 0xff0055, emissive: 0x550022, shininess: 100 });
-const matSnakeHuman = new THREE.MeshPhongMaterial({ color: 0x0088ff, emissive: 0x002288, shininess: 100 });
-const matDead = new THREE.MeshLambertMaterial({ color: 0x555555 }); 
-const matFood = new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x00aa00, emissiveIntensity: 0.8 });
+const matAI = new THREE.MeshPhongMaterial({color:0xff0055, emissive:0x440022});
+const matHuman = new THREE.MeshPhongMaterial({color:0x0088ff, emissive:0x002288});
+const matEnemy = new THREE.MeshPhongMaterial({color:0xffaa00, emissive:0x884400}); // Color segunda IA entrenando
+const matDead = new THREE.MeshLambertMaterial({color:0x555555});
+const matFood = new THREE.MeshPhongMaterial({color:0x00ff55, emissive:0x004400});
+const geoCube = new THREE.BoxGeometry(0.9,0.9,0.9);
+const geoFood = new THREE.SphereGeometry(0.45,12,12);
 
-const geoCube = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-const geoFood = new THREE.SphereGeometry(0.5, 16, 16);
-
-let gridHelper;
+let foodMesh = new THREE.Mesh(geoFood, matFood); scene.add(foodMesh);
 let meshes = [];
-let foodMesh;
+let gridSize = 15;
 
 function setupScene(size) {
-    while(scene.children.length > 0){ scene.remove(scene.children[0]); }
-    scene.add(ambLight);
-    scene.add(dirLight);
+    // Limpiar
+    while(scene.children.length>0) scene.remove(scene.children[0]);
+    scene.add(light); scene.add(new THREE.AmbientLight(0x404040)); scene.add(foodMesh);
 
-    const planeGeo = new THREE.PlaneGeometry(size, size);
-    const planeMat = new THREE.MeshLambertMaterial({color:0x111111});
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.set(size/2 - 0.5, -0.55, size/2 - 0.5);
-    plane.receiveShadow = true;
-    scene.add(plane);
+    // Grid Piso
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(size,size), new THREE.MeshLambertMaterial({color:0x111111}));
+    plane.rotation.x = -Math.PI/2; plane.position.set(size/2-0.5, -0.55, size/2-0.5); scene.add(plane);
+    
+    const grid = new THREE.GridHelper(size, size, 0x00ffff, 0x222222);
+    grid.position.set(size/2-0.5, -0.5, size/2-0.5); scene.add(grid);
 
-    gridHelper = new THREE.GridHelper(size, size, 0x00ffff, 0x222222);
-    gridHelper.position.set(size/2 - 0.5, -0.5, size/2 - 0.5);
-    scene.add(gridHelper);
-
-    camera.position.set(size/2, size * 1.4, size * 1.2);
+    // Ajustar cámara para móvil: un poco más lejos
+    let camDist = size * 1.5;
+    if(window.innerWidth < 768) camDist = size * 2.2; // Más lejos en móvil
+    camera.position.set(size/2, camDist, size*1.1);
     camera.lookAt(size/2, 0, size/2);
-
-    foodMesh = new THREE.Mesh(geoFood, matFood);
-    foodMesh.castShadow = true;
-    scene.add(foodMesh);
 }
 
-function drawGame(snakes, food) {
-    meshes.forEach(m => scene.remove(m));
-    meshes = [];
-
-    snakes.forEach(snake => {
-        if (!snake) return; 
-        let material;
-        if (snake.isDead) material = matDead; 
-        else material = snake.isHuman ? matSnakeHuman : matSnakeAI;
-
-        snake.body.forEach(part => {
-            const mesh = new THREE.Mesh(geoCube, material);
-            mesh.position.set(part.x, 0, part.y);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            scene.add(mesh);
-            meshes.push(mesh);
+function draw(snakes, food) {
+    meshes.forEach(m=>scene.remove(m)); meshes = [];
+    snakes.forEach((s, index) => {
+        if(!s) return;
+        let mat;
+        if(s.isDead) mat = matDead;
+        else if(s.isHuman) mat = matHuman;
+        else mat = (index === 0 && mode==='TRAINING') ? matAI : (index===1 && mode==='TRAINING' ? matEnemy : matAI); // Diferenciar AIs en training (opcional, pero útil visualmente)
+        
+        s.body.forEach(p => {
+            let m = new THREE.Mesh(geoCube, mat);
+            m.position.set(p.x, 0, p.y);
+            scene.add(m); meshes.push(m);
         });
     });
-
     foodMesh.position.set(food.x, 0, food.y);
-    foodMesh.scale.setScalar(1 + Math.sin(Date.now() * 0.01) * 0.1);
     renderer.render(scene, camera);
 }
 
-/**
- * ------------------------------------------------------------------
- * 4. LÓGICA PRINCIPAL (GA & GAME LOOP)
- * ------------------------------------------------------------------
- */
-let POPULATION_SIZE = 150;
-let population = [];
+// --------------------------------------------------------------------
+// 3. LÓGICA JUEGO & ENTRENAMIENTO ADVERSARIO
+// --------------------------------------------------------------------
+let POP_SIZE = 100; // Par para 1vs1
+let pop = [];
 let bestBrain = null;
-let allTimeBestScore = 0; 
+let record = 0;
 let generation = 0;
-let gridSize = 15;
-let food = {x: 0, y: 0};
+let mode = 'IDLE';
+let gameTimer, trainTimer;
 
-let mode = 'IDLE'; // IDLE, TRAINING, VERSUS, WATCH
-let humanSnake = null;
-let aiSnake = null;
-let gameInterval;
-let fastTrainInterval;
-let spectatorMode = false;
+let human = null, ai = null, food = {x:0,y:0};
+let isSpectator = false;
 
-document.addEventListener('keydown', (e) => {
-    if (!humanSnake || humanSnake.isDead || mode === 'WATCH') return;
-    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
-        e.preventDefault();
-    }
-    if (e.key === 'ArrowUp' && humanSnake.direction !== DOWN) humanSnake.direction = UP;
-    if (e.key === 'ArrowDown' && humanSnake.direction !== UP) humanSnake.direction = DOWN;
-    if (e.key === 'ArrowLeft' && humanSnake.direction !== RIGHT) humanSnake.direction = LEFT;
-    if (e.key === 'ArrowRight' && humanSnake.direction !== LEFT) humanSnake.direction = RIGHT;
-});
-
-document.getElementById('gridSize').addEventListener('change', (e) => {
-    gridSize = parseInt(e.target.value);
-    stopGame();
-    setupScene(gridSize);
-    resetPopulation();
-});
-
-function spawnFood() {
-    let valid = false;
-    let x, y;
-    let safeZone = (mode === 'VERSUS' || mode === 'WATCH');
-    
-    while (!valid) {
-        x = Math.floor(Math.random() * gridSize);
-        y = Math.floor(Math.random() * gridSize);
-        valid = true;
-        
-        if (safeZone) {
-            if (humanSnake && humanSnake.body.some(p => p.x === x && p.y === y)) valid = false;
-            if (aiSnake && aiSnake.body.some(p => p.x === x && p.y === y)) valid = false;
-        }
-    }
-    return {x, y};
-}
-
-function resetPopulation() {
-    population = [];
-    for(let i=0; i<POPULATION_SIZE; i++) {
-        population.push(new Snake(gridSize));
-    }
-    generation = 0;
-    bestBrain = null;
-    document.getElementById('gen-display').innerText = '0';
-    document.getElementById('best-fitness-display').innerText = '0';
+function initPop() {
+    pop = [];
+    for(let i=0; i<POP_SIZE; i++) pop.push(new Snake(gridSize));
+    generation = 0; record = 0; bestBrain = null;
+    document.getElementById('gen-display').innerText = 0;
+    document.getElementById('record-display').innerText = 0;
+    document.getElementById('best-fitness-display').innerText = 0;
     document.getElementById('btn-play').disabled = true;
     document.getElementById('btn-watch').disabled = true;
 }
 
-// --- ENTRENAMIENTO ---
-
-function startTraining() {
-    stopGame();
-    mode = 'TRAINING';
-    document.getElementById('status-display').innerText = "ENTRENANDO (ACELERADO)...";
-    document.getElementById('status-display').style.color = "#0ff";
-    
-    if (population.length === 0) resetPopulation();
-    
-    fastTrainInterval = setInterval(() => {
-        runGeneration();
-    }, 20); 
+function spawnFood(snakes) {
+    let valid=false, x, y;
+    while(!valid) {
+        x = Math.floor(Math.random()*gridSize);
+        y = Math.floor(Math.random()*gridSize);
+        valid = true;
+        for(let s of snakes) if(s && s.body.some(p=>p.x===x && p.y===y)) valid=false;
+    }
+    return {x,y};
 }
 
-function runGeneration() {
-    let genBestScore = 0;
-    population.forEach(snake => {
-        snake.resetPosition(Math.floor(gridSize/2), Math.floor(gridSize/2));
-        let myFood = spawnFood();
+// --- ENTRENAMIENTO 1vs1 (BATTLE) ---
+function startTraining() {
+    stopAll();
+    mode = 'TRAINING';
+    document.getElementById('status-display').innerText = "ENTRENANDO 1 vs 1...";
+    document.getElementById('status-display').style.color = "#0ff";
+    if(pop.length===0) initPop();
+    
+    trainTimer = setInterval(runGenerationBattle, 15); // Muy rápido
+}
+
+function runGenerationBattle() {
+    let maxFit = 0;
+    
+    // Mezclar población para emparejamientos aleatorios
+    pop.sort(() => Math.random() - 0.5);
+
+    // Batallas por pares
+    for(let i=0; i<POP_SIZE; i+=2) {
+        let s1 = pop[i];
+        let s2 = pop[i+1]; // Si POP_SIZE es impar, el último jugará solo o se ignora. Asumimos par.
+        if(!s2) break;
+
+        s1.reset(1,1); s1.direction = RIGHT; // Esquina superior
+        s2.reset(gridSize-2, gridSize-2); s2.direction = LEFT; // Esquina inferior
+
+        let battleFood = spawnFood([s1, s2]);
+        let steps = 0;
         
-        while (!snake.isDead) {
-            if (snake.direction === -1) snake.direction = Math.floor(Math.random()*4);
-            snake.think(myFood, []); 
-            let ate = snake.update(myFood, []);
-            if (ate) {
-                myFood.x = Math.floor(Math.random() * gridSize);
-                myFood.y = Math.floor(Math.random() * gridSize);
+        // Loop de batalla simulada
+        while(!s1.isDead || !s2.isDead) {
+            steps++;
+            if(steps > 800) break; // Timeout para evitar loops infinitos
+
+            // 1. Pensar
+            if(!s1.isDead) {
+                if(s1.direction === -1) s1.direction = Math.floor(Math.random()*4);
+                s1.think(battleFood, s2.isDead ? [] : s2.body);
             }
+            if(!s2.isDead) {
+                if(s2.direction === -1) s2.direction = Math.floor(Math.random()*4);
+                s2.think(battleFood, s1.isDead ? [] : s1.body);
+            }
+
+            // 2. Mover
+            let e1 = false, e2 = false;
+            if(!s1.isDead) e1 = s1.update(battleFood, s2.isDead ? [] : s2.body);
+            if(!s2.isDead) e2 = s2.update(battleFood, s1.isDead ? [] : s1.body);
+
+            // 3. Comida (Solo 1 la come)
+            if(e1 || e2) {
+                battleFood = spawnFood([s1, s2]);
+            }
+            // Si chocan cabeza con cabeza, mueren ambos (ya manejado en update por colisión cuerpo enemigo)
         }
 
-        snake.fitness = (snake.lifetime * 0.5) + (Math.pow(2, snake.score) + (snake.score * 500));
-        if (snake.score > genBestScore) genBestScore = snake.score;
-        
-        if (snake.score > allTimeBestScore) {
-            allTimeBestScore = snake.score;
-            document.getElementById('record-display').innerText = allTimeBestScore;
-        }
-    });
+        // Calcular Fitness
+        calcFitness(s1);
+        calcFitness(s2);
+
+        if(s1.fitness > maxFit) maxFit = s1.fitness;
+        if(s2.fitness > maxFit) maxFit = s2.fitness;
+        if(s1.score > record) { record = s1.score; document.getElementById('record-display').innerText = record; }
+        if(s2.score > record) { record = s2.score; document.getElementById('record-display').innerText = record; }
+    }
 
     evolve();
+    document.getElementById('best-fitness-display').innerText = Math.floor(maxFit);
+}
+
+function calcFitness(snake) {
+    // Fitness prioriza comer sobre vivir sin hacer nada
+    snake.fitness = (snake.lifetime * 0.2) + (snake.score * snake.score * 1000);
+    if(snake.score > 0) snake.fitness += 500;
 }
 
 function evolve() {
-    population.sort((a, b) => b.fitness - a.fitness);
-    let bestSnake = population[0];
+    pop.sort((a,b) => b.fitness - a.fitness);
+    bestBrain = pop[0].brain.clone();
     
     document.getElementById('gen-display').innerText = generation;
-    document.getElementById('best-fitness-display').innerText = Math.floor(bestSnake.fitness);
-    
-    bestBrain = bestSnake.brain.clone();
-    
-    if (generation > 2 || bestSnake.score > 0) {
+    if(generation>1 || record>0) {
         document.getElementById('btn-play').disabled = false;
         document.getElementById('btn-watch').disabled = false;
     }
 
     let newPop = [];
-    newPop.push(new Snake(gridSize, bestBrain.clone())); // Elitismo
-
-    let topCount = Math.floor(POPULATION_SIZE * 0.1);
-    for(let i=1; i<POPULATION_SIZE; i++) {
-        let parentIndex = Math.floor(Math.random() * topCount);
-        let parent = population[parentIndex];
+    // Elitismo: El mejor pasa directo
+    newPop.push(new Snake(gridSize, bestBrain.clone()));
+    
+    // Cruce y mutación
+    for(let i=1; i<POP_SIZE; i++) {
+        let parent = pop[Math.floor(Math.random() * (POP_SIZE/5))]; // Elegir del top 20%
         let childBrain = parent.brain.clone();
-        childBrain.mutate(0.15); 
+        childBrain.mutate(0.1);
         newPop.push(new Snake(gridSize, childBrain));
     }
-
-    population = newPop;
+    pop = newPop;
     generation++;
-    
-    // Preview rápido
-    let demoSnake = new Snake(gridSize, bestBrain);
-    demoSnake.resetPosition(Math.floor(gridSize/2), Math.floor(gridSize/2));
-    drawGame([demoSnake], {x:2, y:2});
+
+    // Visualización rápida (1 frame)
+    let demo = new Snake(gridSize, bestBrain); demo.reset(Math.floor(gridSize/2), Math.floor(gridSize/2));
+    draw([demo], {x:2,y:2});
 }
 
-// --- MODOS DE JUEGO (WATCH & VERSUS) ---
+// --- JUEGO REAL ---
+function startVersus() { if(bestBrain) initGame('VERSUS'); }
+function startWatch() { if(bestBrain) initGame('WATCH'); }
 
-function startWatch() {
-    if (!bestBrain) return;
-    initGameMode('WATCH');
-}
-
-function startVersus() {
-    if (!bestBrain) return;
-    initGameMode('VERSUS');
-}
-
-function initGameMode(selectedMode) {
-    stopGame();
-    mode = selectedMode;
-    spectatorMode = false;
-    
-    // UI Reset
-    document.getElementById('msg-overlay').style.display = 'none';
+function initGame(m) {
+    stopAll();
+    mode = m;
+    isSpectator = false;
     document.getElementById('scoreboard').style.display = 'flex';
     document.getElementById('game-over-modal').style.display = 'none';
+    document.getElementById('msg-overlay').style.display = 'none';
+    
+    // UI Móvil: Minimizar menú para ver juego
+    if(window.innerWidth < 768) {
+        document.getElementById('ui').classList.add('minimized');
+        document.getElementById('show-menu-btn').style.display='block';
+    }
 
-    // Setup Serpientes
-    aiSnake = new Snake(gridSize, bestBrain.clone(), false);
-    aiSnake.resetPosition(gridSize-2, gridSize-2);
-    aiSnake.direction = LEFT;
+    ai = new Snake(gridSize, bestBrain.clone(), false);
+    ai.reset(gridSize-2, gridSize-2); ai.direction = LEFT;
 
-    if (mode === 'VERSUS') {
-        humanSnake = new Snake(gridSize, null, true);
-        humanSnake.resetPosition(1, 1);
-        humanSnake.direction = RIGHT;
-        document.getElementById('status-display').innerText = "TÚ VS IA";
-        document.getElementById('status-display').style.color = "#f0f";
+    if(mode === 'VERSUS') {
+        human = new Snake(gridSize, null, true);
+        human.reset(1,1); human.direction = RIGHT;
+        document.getElementById('status-display').innerText = "TÚ vs IA";
         document.getElementById('score-h-val').parentElement.style.display = 'inline';
     } else {
-        // Modo Watch: No hay humano (o está oculto)
-        humanSnake = null; 
-        document.getElementById('status-display').innerText = "OBSERVANDO IA";
-        document.getElementById('status-display').style.color = "#0f0";
-        // Ocultar puntuación humana en el scoreboard si solo es Watch
+        human = null;
+        document.getElementById('status-display').innerText = "MODO CINE";
         document.getElementById('score-h-val').parentElement.style.display = 'none';
     }
 
-    food = spawnFood();
-    updateScoreboard();
-    
-    // Loop visual
-    gameInterval = setInterval(gameLoop, 120);
+    food = spawnFood([ai, human].filter(x=>x));
+    updateScore();
+    gameTimer = setInterval(gameLoop, 110); // Velocidad jugable
 }
 
 function gameLoop() {
-    let snakesToDraw = [aiSnake];
-    if (humanSnake) snakesToDraw.push(humanSnake);
+    let actors = [ai];
+    if(human) actors.push(human);
 
-    // 1. Verificar fin de juego para la IA
-    if (aiSnake.isDead) {
-        endGame(true); // IA murió
-        return;
-    }
-
-    // 2. Verificar fin de juego para humano (si existe)
-    if (humanSnake && humanSnake.isDead && !spectatorMode) {
-        spectatorMode = true;
+    // 1. Muerte IA
+    if(ai.isDead) { showGameOver(true); return; }
+    
+    // 2. Espectador
+    if(human && human.isDead && !isSpectator) {
+        isSpectator = true;
         document.getElementById('msg-overlay').style.display = 'block';
-        document.getElementById('status-display').innerText = "ESPECTADOR";
     }
 
-    // 3. Obstáculos para la IA
-    let obstaclesForAI = [];
-    if (humanSnake) obstaclesForAI = humanSnake.body;
-
-    // 4. Pensar y Mover IA
-    aiSnake.think(food, obstaclesForAI);
-    let aiAte = aiSnake.update(food, obstaclesForAI);
-
-    // 5. Mover Humano (si está vivo)
-    let hAte = false;
-    if (humanSnake && !humanSnake.isDead) {
-        hAte = humanSnake.update(food, aiSnake.body);
+    // 3. Updates
+    let bodies = human ? human.body : [];
+    ai.think(food, bodies);
+    let ate1 = ai.update(food, bodies);
+    
+    let ate2 = false;
+    if(human && !human.isDead) {
+        ate2 = human.update(food, ai.body);
     }
 
-    // 6. Comida y Puntuación
-    if (aiAte || hAte) {
-        food = spawnFood();
-        updateScoreboard();
+    if(ate1 || ate2) {
+        food = spawnFood(actors);
+        updateScore();
     }
 
-    drawGame(snakesToDraw, food);
+    draw(actors, food);
 }
 
-function updateScoreboard() {
-    document.getElementById('score-ai-val').innerText = aiSnake.score;
-    if (humanSnake) {
-        document.getElementById('score-h-val').innerText = humanSnake.score;
-    }
+function updateScore() {
+    document.getElementById('score-ai-val').innerText = ai.score;
+    if(human) document.getElementById('score-h-val').innerText = human.score;
 }
 
-function endGame(aiDied) {
-    stopGame();
+function showGameOver(aiDied) {
+    stopAll();
+    let hScore = human ? human.score : 0;
+    let aiScore = ai.score;
+    let txt = document.getElementById('winner-text');
     
-    const hScore = humanSnake ? humanSnake.score : 0;
-    const aiScore = aiSnake.score;
-    
-    let winner = "EMPATE";
-    let color = "#fff";
-    
-    if (mode === 'WATCH') {
-        winner = "IA FINALIZADA";
-        color = "#ff0055";
+    if(mode === 'WATCH') {
+        txt.innerText = "IA TERMINADA"; txt.style.color = "#fff";
+        document.getElementById('final-h').parentElement.style.display = 'none';
     } else {
-        if (humanSnake && !humanSnake.isDead && aiDied) {
-            winner = "¡GANASTE TÚ!";
-            color = "#00ff55";
-        } else if (hScore > aiScore) {
-            winner = "¡GANASTE POR PUNTOS!";
-            color = "#00ff55";
-        } else if (aiScore > hScore) {
-            winner = "GANADOR: IA";
-            color = "#ff0055";
-        }
-    }
+        document.getElementById('final-h').parentElement.style.display = 'block';
+        document.getElementById('final-h').innerText = hScore;
+        document.getElementById('final-ai').innerText = aiScore;
 
-    // Rellenar Modal
-    document.getElementById('final-h').innerText = hScore;
-    document.getElementById('final-ai').innerText = aiScore;
-    
-    if (mode === 'WATCH') {
-         // Ocultar score humano en el modal si estamos en modo watch
-         document.getElementById('final-h').parentElement.style.display = 'none';
-    } else {
-         document.getElementById('final-h').parentElement.style.display = 'block';
+        if(!human.isDead && aiDied) { txt.innerText = "¡HAS GANADO!"; txt.style.color = "#0f0"; }
+        else if(hScore > aiScore) { txt.innerText = "VICTORIA POR PUNTOS"; txt.style.color = "#0f0"; }
+        else { txt.innerText = "LA IA GANA"; txt.style.color = "#f05"; }
     }
-
-    const wText = document.getElementById('winner-text');
-    wText.innerText = winner;
-    wText.style.color = color;
-    
     document.getElementById('game-over-modal').style.display = 'block';
 }
 
-function closeModal() {
-    document.getElementById('game-over-modal').style.display = 'none';
-}
-
-function stopGame() {
-    clearInterval(gameInterval);
-    clearInterval(fastTrainInterval);
-    document.getElementById('msg-overlay').style.display = 'none';
+// --------------------------------------------------------------------
+// 4. UTILS & INPUTS
+// --------------------------------------------------------------------
+function stopAll() {
+    clearInterval(gameTimer); clearInterval(trainTimer);
     document.getElementById('scoreboard').style.display = 'none';
+    document.getElementById('msg-overlay').style.display = 'none';
     mode = 'IDLE';
 }
 
-// Init
+function toggleUI() {
+    let ui = document.getElementById('ui');
+    let btn = document.getElementById('show-menu-btn');
+    ui.classList.toggle('minimized');
+    btn.style.display = ui.classList.contains('minimized') ? 'block' : 'none';
+}
+function closeModal() { document.getElementById('game-over-modal').style.display = 'none'; }
+
+// Inputs Teclado
+document.addEventListener('keydown', e => {
+    if(!human || human.isDead || mode==='WATCH') return;
+    if(e.key==='ArrowUp' && human.direction!==DOWN) human.direction=UP;
+    if(e.key==='ArrowDown' && human.direction!==UP) human.direction=DOWN;
+    if(e.key==='ArrowLeft' && human.direction!==RIGHT) human.direction=LEFT;
+    if(e.key==='ArrowRight' && human.direction!==LEFT) human.direction=RIGHT;
+});
+
+// Inputs Móvil (D-Pad)
+function handleMobileInput(dir) {
+    if(!human || human.isDead || mode==='WATCH') return;
+    // Vibración háptica simple si es compatible
+    if(navigator.vibrate) navigator.vibrate(10);
+    
+    if(dir===UP && human.direction!==DOWN) human.direction=UP;
+    if(dir===DOWN && human.direction!==UP) human.direction=DOWN;
+    if(dir===LEFT && human.direction!==RIGHT) human.direction=LEFT;
+    if(dir===RIGHT && human.direction!==LEFT) human.direction=RIGHT;
+}
+
+document.getElementById('gridSize').addEventListener('change', (e) => {
+    gridSize = parseInt(e.target.value);
+    stopAll(); setupScene(gridSize); initPop();
+});
+
+// Inicializar
 setupScene(gridSize);
-resetPopulation();
+initPop();
 
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if(window.innerWidth < 768) setupScene(gridSize); // Reajustar cámara para móvil
 });
 
 </script>
