@@ -32,7 +32,7 @@ const wallMap = [
   [1, 0, 0, 0, -5, 0, 1, 1, 0, 1],
   [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 2, 0, 0, -3, 0, -4, 0, 1],
-  [1, 0, 0, 0, -9, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, -9, 0, 0, 0, -12, 1],
   [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
 ];
 const floorMap = [
@@ -72,7 +72,7 @@ const modelUrls = [
     'models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 
     'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 
     'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 
-    'models/a.glb', 'models/dodeestre.glb' 
+    'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb' 
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
