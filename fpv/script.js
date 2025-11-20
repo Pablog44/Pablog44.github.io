@@ -21,16 +21,14 @@ const TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de
 const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
 
 
-// --- Datos del Mapa (¡Aquí defines tus mapas!) ---
-// 0 = Espacio vacío
-// wallMap: 1+ = Índice de textura en wallTextures (1 usa wallTextures[1] que es wallTextureUrls[0])
-// wallMap: -1, -2, ... = Índice de modelo en modelUrls (-1 usa loadedModels[0] que es modelUrls[0])
+// --- Datos del Mapa ---
+// wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
 const wallMap = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, -7, 0, -8, 0, 0, 0, 0, -6, 1],
-  [1, 0, 0, 0, 0, -1, 2, 0, 0, 1], // -1 para el primer modelo
-  [1, 0, 3, -10, 0, 0, 2, 0, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0,-2, 0, 1],  // -2 para el segundo modelo
+  [1, 0, 0, 0, 0, -1, 2, 0, 0, 1], 
+  [1, 0, 3, -10, 0, 0, 2, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
+  [1, 0, 0, 0, 0, 0, -11,-2, 0, 1],  
   [1, 0, 0, 0, -5, 0, 1, 1, 0, 1],
   [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 2, 0, 0, -3, 0, -4, 0, 1],
@@ -69,13 +67,20 @@ const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Rutas de Modelos GLB ---
-const modelUrls = ['models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 'models/a.glb']; // Rutas a tus modelos GLB
-const placeholderModelUrl = 'models/placeholder_cube.glb'; // Un GLB simple como fallback
+// <--- NUEVO: He añadido 'models/dodecaedro.glb' al final. Es el índice 10.
+const modelUrls = [
+    'models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 
+    'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 
+    'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 
+    'models/a.glb', 'models/dodeestre.glb' 
+]; 
+const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
 // --- Variables Globales ---
 let scene, camera, renderer;
 let clock = new THREE.Clock();
 let textureLoader = new THREE.TextureLoader();
+let mixers = []; // <--- NUEVO: Array para gestionar las animaciones
 
 // Loaders para GLB
 let gltfLoader = new GLTFLoader();
@@ -146,7 +151,7 @@ function init() {
         fullscreenBtn.classList.add('mobile-visible'); // Hace el botón visible
         fullscreenBtn.addEventListener('click', toggleFullscreen); // Asigna la función al click
     }
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('msfullscreenchange', handleFullscreenChange);
@@ -360,6 +365,9 @@ async function preloadAssets() {
 // --- Construcción de la Geometría del Mapa ---
 function buildMapGeometry() {
     modelCollisionCapsules.length = 0;
+    // Limpiar mixers antiguos si se regenera el mapa
+    mixers.forEach(m => m.stopAllAction());
+    mixers.length = 0;
 
     while (mapMeshesGroup.children.length > 0) {
         const object = mapMeshesGroup.children[0];
@@ -445,6 +453,17 @@ function buildMapGeometry() {
                     const modelInstance = SkeletonUtils.clone(modelGltf.scene);
                     modelInstance.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
                     
+                    // --- <NUEVO> ACTIVAR ANIMACIONES SI EXISTEN ---
+                    // Si el modelo original tiene animaciones, las configuramos en la copia
+                    if (modelGltf.animations && modelGltf.animations.length > 0) {
+                        const mixer = new THREE.AnimationMixer(modelInstance);
+                        modelGltf.animations.forEach((clip) => {
+                            mixer.clipAction(clip).play();
+                        });
+                        mixers.push(mixer);
+                    }
+                    // -------------------------------------------------
+
                     modelInstance.updateMatrixWorld(true);
                     const box = new THREE.Box3().setFromObject(modelInstance);
                     const size = box.getSize(new THREE.Vector3());
@@ -956,6 +975,14 @@ function isActualWallAt(gridX, gridZ) {
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
+
+    // --- <NUEVO> ACTUALIZAR ANIMACIONES ---
+    if (mixers.length > 0) {
+        for (const mixer of mixers) {
+            mixer.update(delta);
+        }
+    }
+    // --------------------------------------
 
     if (stats) stats.begin();
 
