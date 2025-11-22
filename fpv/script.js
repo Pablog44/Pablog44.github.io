@@ -23,6 +23,7 @@ const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista c
 
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
+// <--- NUEVO: He puesto -16 en la posición [6][6] para el ROBOT --->
 const wallMap = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, -7, 0, -8, 0, 0, 0, 0, -6, 1],
@@ -30,7 +31,7 @@ const wallMap = [
   [1, 0, 3, -10, 0, 0, 2, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
   [1, 0, 0, 0, 0, 0, -11,-2, 0, 1],  
   [1, 0, -14, 0, -5, 0, 1, 1, 0, 1],
-  [1, 0, 2, 0, 0, 0, -15, 0, 0, 1],
+  [1, 0, 2, -16, 0, 0, -15, 0, 0, 1], // <--- AQUÍ ESTÁ EL ROBOT (-16)
   [1, 0, 2, 0, 0, -3, 0, -4, 0, 1],
   [1, 0, 0, 0, -9, 0, -13, 0, -12, 1],
   [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
@@ -67,12 +68,13 @@ const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Rutas de Modelos GLB ---
-// <--- NUEVO: He añadido 'models/dodecaedro.glb' al final. Es el índice 10.
+// <--- NUEVO: He añadido 'models/robot.glb' al final. Es el índice 15.
 const modelUrls = [
     'models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 
     'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 
     'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 
-    'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb' 
+    'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
+    'models/robot.glb' // <--- Índice 15: El robot aspiradora
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
@@ -80,7 +82,8 @@ const placeholderModelUrl = 'models/placeholder_cube.glb';
 let scene, camera, renderer;
 let clock = new THREE.Clock();
 let textureLoader = new THREE.TextureLoader();
-let mixers = []; // <--- NUEVO: Array para gestionar las animaciones
+let mixers = []; // <--- Array para gestionar las animaciones generales
+let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los robots
 
 // Loaders para GLB
 let gltfLoader = new GLTFLoader();
@@ -132,6 +135,125 @@ let touchControls = { // Object to store touch control state
         deadZone: 0            // Zona muerta para el joystick de vista
     }
 };
+
+// --- NUEVO: CLASE PARA CONTROLAR EL ROBOT ---
+class RoamingRobot {
+    constructor(mesh, animations) {
+        this.mesh = mesh;
+        this.mixer = new THREE.AnimationMixer(mesh);
+        
+        // Buscar animaciones por nombre parcial (Walk, Idle) del script de Python
+        this.walkClip = animations.find(a => a.name.toLowerCase().includes('walk'));
+        this.idleClip = animations.find(a => a.name.toLowerCase().includes('idle'));
+
+        this.actions = {};
+        if (this.walkClip) {
+            this.actions['walk'] = this.mixer.clipAction(this.walkClip);
+            this.actions['walk'].setEffectiveWeight(1);
+        }
+        if (this.idleClip) {
+            this.actions['idle'] = this.mixer.clipAction(this.idleClip);
+            this.actions['idle'].setEffectiveWeight(1);
+        }
+
+        this.currentState = 'idle'; // 'idle' or 'walk'
+        this.timer = 0;
+        
+        // Tiempos configurables
+        this.walkDuration = 4.0;
+        this.idleDuration = 2.0;
+        this.moveSpeed = 3.0; // Velocidad del robot
+
+        // Dirección aleatoria inicial
+        const randomAngle = Math.random() * Math.PI * 2;
+        this.direction = new THREE.Vector3(Math.sin(randomAngle), 0, Math.cos(randomAngle));
+        this.mesh.rotation.y = randomAngle;
+
+        // Iniciar animación idle
+        if (this.actions['idle']) this.actions['idle'].play();
+    }
+
+    update(delta) {
+        // Actualizar mixer de animación
+        if (this.mixer) this.mixer.update(delta);
+
+        this.timer += delta;
+
+        if (this.currentState === 'idle') {
+            if (this.timer >= this.idleDuration) {
+                this.switchState('walk');
+            }
+        } else if (this.currentState === 'walk') {
+            if (this.timer >= this.walkDuration) {
+                this.switchState('idle');
+            } else {
+                // Lógica de movimiento "Roomba"
+                this.move(delta);
+            }
+        }
+    }
+
+    switchState(newState) {
+        if (this.currentState === newState) return;
+
+        const prevAction = this.actions[this.currentState];
+        const nextAction = this.actions[newState];
+
+        if (prevAction && nextAction) {
+            prevAction.fadeOut(0.5);
+            nextAction.reset().fadeIn(0.5).play();
+        } else if (nextAction) {
+            nextAction.reset().play();
+        }
+
+        this.currentState = newState;
+        this.timer = 0;
+
+        // Si empezamos a andar, podemos ajustar la dirección ligeramente o mantenerla
+        if (newState === 'walk') {
+           // Opcional: Cambiar dirección al empezar a andar
+           // this.pickRandomDirection(); 
+        }
+    }
+
+    move(delta) {
+        const moveDist = this.moveSpeed * delta;
+        const potentialPos = this.mesh.position.clone().add(this.direction.clone().multiplyScalar(moveDist));
+
+        // Comprobar colisión con el mapa (Grid)
+        // Usamos una caja de colisión simple basada en el centro del robot
+        const buffer = TILE_SIZE * 0.3; // Distancia de seguridad
+        
+        // Verificar límites del grid
+        const gridX = Math.floor((potentialPos.x + this.direction.x * buffer) / TILE_SIZE);
+        const gridZ = Math.floor((potentialPos.z + this.direction.z * buffer) / TILE_SIZE);
+
+        // Detectar colisión usando la función global isActualWallAt
+        if (isActualWallAt(gridX, gridZ)) {
+            // ¡CHOQUE! Girar aleatoriamente
+            this.pickRandomDirection();
+        } else {
+            // Camino libre, mover
+            this.mesh.position.copy(potentialPos);
+        }
+    }
+
+    pickRandomDirection() {
+        // Girar entre 90 y 270 grados
+        const turnAngle = (Math.PI / 2) + (Math.random() * Math.PI);
+        
+        // Aplicar rotación al vector dirección
+        this.direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), turnAngle);
+        this.direction.normalize();
+
+        // Rotar visualmente la malla para mirar hacia donde va
+        // Nota: El modelo original mira hacia +Y o +Z dependiendo del export.
+        // Asumimos que el frente es +Z (estándar GLB) o ajustamos aquí.
+        // Blender exporta Z-up, Threejs es Y-up. Normalmente lookAt funciona bien.
+        const target = this.mesh.position.clone().add(this.direction);
+        this.mesh.lookAt(target);
+    }
+}
 
 
 // --- Detección de Móvil ---
@@ -368,6 +490,7 @@ function buildMapGeometry() {
     // Limpiar mixers antiguos si se regenera el mapa
     mixers.forEach(m => m.stopAllAction());
     mixers.length = 0;
+    activeRobots.length = 0; // Limpiar robots antiguos
 
     while (mapMeshesGroup.children.length > 0) {
         const object = mapMeshesGroup.children[0];
@@ -453,14 +576,25 @@ function buildMapGeometry() {
                     const modelInstance = SkeletonUtils.clone(modelGltf.scene);
                     modelInstance.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
                     
-                    // --- <NUEVO> ACTIVAR ANIMACIONES SI EXISTEN ---
-                    // Si el modelo original tiene animaciones, las configuramos en la copia
-                    if (modelGltf.animations && modelGltf.animations.length > 0) {
-                        const mixer = new THREE.AnimationMixer(modelInstance);
-                        modelGltf.animations.forEach((clip) => {
-                            mixer.clipAction(clip).play();
-                        });
-                        mixers.push(mixer);
+                    // <--- NUEVO: LÓGICA PARA EL ROBOT (ID 15 -> wallMap -16) --->
+                    // Si es el Robot (índice 15), lo tratamos especial con RoamingRobot
+                    // Si tienes más modelos, asegúrate de que el índice coincida
+                    const IS_ROBOT = (modelIndex === 15); 
+
+                    if (IS_ROBOT && modelGltf.animations && modelGltf.animations.length > 0) {
+                        const robotController = new RoamingRobot(modelInstance, modelGltf.animations);
+                        activeRobots.push(robotController);
+                        // No añadimos el mixer a la lista global 'mixers' porque el controlador
+                        // lo gestiona internamente en su método update()
+                    } else {
+                        // --- LÓGICA ESTÁNDAR PARA OBJETOS ESTÁTICOS CON O SIN ANIMACIÓN ---
+                        if (modelGltf.animations && modelGltf.animations.length > 0) {
+                            const mixer = new THREE.AnimationMixer(modelInstance);
+                            modelGltf.animations.forEach((clip) => {
+                                mixer.clipAction(clip).play();
+                            });
+                            mixers.push(mixer);
+                        }
                     }
                     // -------------------------------------------------
 
@@ -489,7 +623,13 @@ function buildMapGeometry() {
                         worldPosition: modelInstance.position.clone(),
                         radius: capsuleRadius,
                         height: capsuleHeight,
+                        // Si quieres que el robot se mueva también en colisiones, tendrías que actualizar esto en tiempo real
+                        // Por ahora las colisiones son estáticas en posición inicial para modelos normales
                     });
+                    
+                    // Para que el jugador colisione con el robot en movimiento, 
+                    // necesitariamos actualizar la cápsula en animate(). 
+                    // Esta implementación deja la colisión del robot en su punto de spawn (simplificación).
 
                     modelInstance.traverse(child => {
                         if (child.isMesh) {
@@ -976,10 +1116,18 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
-    // --- <NUEVO> ACTUALIZAR ANIMACIONES ---
+    // --- <NUEVO> ACTUALIZAR ANIMACIONES GENERALES ---
     if (mixers.length > 0) {
         for (const mixer of mixers) {
             mixer.update(delta);
+        }
+    }
+    // --------------------------------------
+
+    // --- <NUEVO> ACTUALIZAR ROBOTS ---
+    if (activeRobots.length > 0) {
+        for (const robot of activeRobots) {
+            robot.update(delta);
         }
     }
     // --------------------------------------
