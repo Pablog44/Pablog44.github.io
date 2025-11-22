@@ -228,8 +228,34 @@ class RoamingRobot {
         const gridX = Math.floor((potentialPos.x + this.direction.x * buffer) / TILE_SIZE);
         const gridZ = Math.floor((potentialPos.z + this.direction.z * buffer) / TILE_SIZE);
 
-        // Detectar colisión usando la función global isActualWallAt
+        let collision = false;
+
+        // 1. Colisión con Paredes
         if (isActualWallAt(gridX, gridZ)) {
+            collision = true;
+        }
+
+        // 2. Colisión con Otros Modelos (si no chocó con pared)
+        // Usamos el mismo array que el jugador: modelCollisionCapsules
+        if (!collision) {
+            for (const capsule of modelCollisionCapsules) {
+                // Calcular distancia cuadrada (más rápido que sqrt)
+                const dx = potentialPos.x - capsule.worldPosition.x;
+                const dz = potentialPos.z - capsule.worldPosition.z;
+                const distSq = dx * dx + dz * dz;
+                
+                // Radio combinado: el "buffer" del robot + el radio del modelo
+                const minSeparation = buffer + capsule.radius; 
+
+                if (distSq < minSeparation * minSeparation) {
+                    collision = true;
+                    break; // Ya chocó, no hace falta mirar más
+                }
+            }
+        }
+
+        // Detectar colisión global
+        if (collision) {
             // ¡CHOQUE! Girar aleatoriamente
             this.pickRandomDirection();
         } else {
@@ -619,13 +645,17 @@ function buildMapGeometry() {
                     const capsuleRadius = Math.max(finalSize.x, finalSize.z) / 2 * 0.85;
                     const capsuleHeight = finalSize.y;
                     
-                    modelCollisionCapsules.push({
-                        worldPosition: modelInstance.position.clone(),
-                        radius: capsuleRadius,
-                        height: capsuleHeight,
-                        // Si quieres que el robot se mueva también en colisiones, tendrías que actualizar esto en tiempo real
-                        // Por ahora las colisiones son estáticas en posición inicial para modelos normales
-                    });
+                    // Si el objeto es un ROBOT, NO agregamos su cápsula estática al mapa
+                    // porque el robot se moverá. Si la añadimos, se chocaría con su propia posición inicial.
+                    if (!IS_ROBOT) {
+                        modelCollisionCapsules.push({
+                            worldPosition: modelInstance.position.clone(),
+                            radius: capsuleRadius,
+                            height: capsuleHeight,
+                            // Si quieres que el robot se mueva también en colisiones, tendrías que actualizar esto en tiempo real
+                            // Por ahora las colisiones son estáticas en posición inicial para modelos normales
+                        });
+                    }
                     
                     // Para que el jugador colisione con el robot en movimiento, 
                     // necesitariamos actualizar la cápsula en animate(). 
