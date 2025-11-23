@@ -160,8 +160,8 @@ class RoamingRobot {
         this.timer = 0;
         
         // Tiempos configurables
-        this.walkDuration = 4.0;
-        this.idleDuration = 2.0;
+        this.walkDuration = 5.0;
+        this.idleDuration = 3.0;
         this.moveSpeed = 3.0; // Velocidad del robot
 
         // Dirección aleatoria inicial
