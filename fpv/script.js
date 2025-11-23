@@ -20,6 +20,12 @@ const TOUCH_DPAD_DEADZONE_RATIO = 0.15; // 15% del radio del D-Pad como zona mue
 const TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de vista (ajusta según sea necesario)
 const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
 
+// --- NUEVO: CONFIGURACIÓN DE DISPARO ---
+const BULLET_SPEED = 30.0;
+const BULLET_RADIUS = 0.2;
+const BULLET_COLOR = 0xffff00; // Amarillo
+const EXPLOSION_PARTICLE_COUNT = 15; // Cantidad de partículas al desintegrarse
+const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
 
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
@@ -87,6 +93,10 @@ let clock = new THREE.Clock();
 let textureLoader = new THREE.TextureLoader();
 let mixers = []; // <--- Array para gestionar las animaciones generales
 let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los robots
+
+// --- NUEVO: VARIABLES PARA PROYECTILES ---
+let bullets = []; // Array para almacenar balas activas
+let activeExplosions = []; // Array para partículas de explosión
 
 // Loaders para GLB
 let gltfLoader = new GLTFLoader();
@@ -726,10 +736,153 @@ function findStartPosition() {
     camera.position.y = WALL_HEIGHT / 2;
 }
 
+// --- NUEVO: FUNCIONALIDAD DE DISPARO ---
+function shootBullet() {
+    const bulletGeometry = new THREE.SphereGeometry(BULLET_RADIUS, 8, 8);
+    const bulletMaterial = new THREE.MeshBasicMaterial({ color: BULLET_COLOR });
+    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+
+    // Posición inicial: donde está la cámara, ligeramente adelante
+    bullet.position.copy(camera.position);
+    
+    // Obtener la dirección hacia donde mira la cámara
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    
+    // Mover un poco la bala al frente para que no colisione con el jugador inmediatamente
+    bullet.position.add(direction.clone().multiplyScalar(1.0));
+
+    // Velocidad
+    const velocity = direction.multiplyScalar(BULLET_SPEED);
+
+    scene.add(bullet);
+    bullets.push({ mesh: bullet, velocity: velocity, alive: true });
+}
+
+function createExplosion(position) {
+    const particleGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const particleMaterial = new THREE.MeshBasicMaterial({ color: BULLET_COLOR });
+
+    const particles = [];
+    for (let i = 0; i < EXPLOSION_PARTICLE_COUNT; i++) {
+        const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+        particle.position.copy(position);
+        
+        // Velocidad aleatoria para dispersión
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 5,
+            (Math.random() - 0.5) * 5,
+            (Math.random() - 0.5) * 5
+        );
+        
+        scene.add(particle);
+        particles.push({ mesh: particle, velocity: velocity });
+    }
+
+    activeExplosions.push({ particles: particles, age: 0 });
+}
+
+function updateProjectiles(delta) {
+    // --- Actualizar Balas ---
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        
+        // Mover
+        const moveStep = bullet.velocity.clone().multiplyScalar(delta);
+        const nextPos = bullet.mesh.position.clone().add(moveStep);
+        
+        // Detección de colisión (simple)
+        let collision = false;
+
+        // 1. Colisión con Paredes del Mapa (Grid)
+        const gridX = Math.floor(nextPos.x / TILE_SIZE);
+        const gridZ = Math.floor(nextPos.z / TILE_SIZE);
+        
+        if (isActualWallAt(gridX, gridZ)) {
+            collision = true;
+        }
+
+        // 2. Colisión con Objetos Estáticos (Capsulas)
+        if (!collision) {
+            for (const capsule of modelCollisionCapsules) {
+                const distSq = nextPos.distanceToSquared(capsule.worldPosition);
+                // Aproximación simple: radio de la cápsula + radio bala
+                const threshold = (capsule.radius + BULLET_RADIUS);
+                if (distSq < threshold * threshold) {
+                    collision = true;
+                    break;
+                }
+            }
+        }
+
+        // 3. Colisión con Robots Activos (comprobar distancia con los robots móviles)
+        if (!collision) {
+            for (const robot of activeRobots) {
+                const distSq = nextPos.distanceToSquared(robot.mesh.position);
+                const threshold = (TILE_SIZE * 0.4); // Radio aproximado del robot
+                if (distSq < threshold * threshold) {
+                    collision = true;
+                    break;
+                }
+            }
+        }
+        
+        // 4. Colisión con Suelo/Techo (límites verticales)
+        if (!collision && (nextPos.y < 0 || nextPos.y > WALL_HEIGHT)) {
+            collision = true;
+        }
+
+        if (collision) {
+            // Impacto
+            createExplosion(nextPos);
+            scene.remove(bullet.mesh);
+            bullet.mesh.geometry.dispose();
+            bullet.mesh.material.dispose();
+            bullets.splice(i, 1);
+        } else {
+            // Avanzar
+            bullet.mesh.position.add(moveStep);
+            
+            // Limpieza si se va muy lejos (fuera del mapa seguro)
+            if (gridX < -5 || gridX > mapWidth + 5 || gridZ < -5 || gridZ > mapHeight + 5) {
+                scene.remove(bullet.mesh);
+                bullets.splice(i, 1);
+            }
+        }
+    }
+
+    // --- Actualizar Explosiones ---
+    for (let i = activeExplosions.length - 1; i >= 0; i--) {
+        const explosion = activeExplosions[i];
+        explosion.age += delta;
+
+        if (explosion.age > EXPLOSION_DURATION) {
+            // Eliminar explosión
+            explosion.particles.forEach(p => {
+                scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+            });
+            activeExplosions.splice(i, 1);
+        } else {
+            // Animar partículas
+            const progress = explosion.age / EXPLOSION_DURATION;
+            explosion.particles.forEach(p => {
+                p.mesh.position.add(p.velocity.clone().multiplyScalar(delta));
+                // Efecto de desvanecimiento (reducir escala)
+                const scale = 1 - progress;
+                p.mesh.scale.setScalar(scale);
+            });
+        }
+    }
+}
+
 // --- Controles ---
 function setupControls() {
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
+    // NUEVO: Listener para disparar con el ratón
+    document.addEventListener('mousedown', onMouseDown, false);
 
     if (isMobileDevice) {
         console.log("Mobile device detected, setting up touch controls.");
@@ -775,6 +928,13 @@ function onMouseMove(event) {
     rotateCamera(movementX * lookSpeed, movementY * lookSpeed);
 }
 
+// NUEVO: Manejador de click del ratón para disparar
+function onMouseDown(event) {
+    if (isPointerLocked && event.button === 0) { // Click izquierdo
+        shootBullet();
+    }
+}
+
 function onKeyDown(event) {
     if (event.repeat) return;
     // On desktop, try to lock pointer if not locked and movement key is pressed
@@ -787,6 +947,7 @@ function onKeyDown(event) {
         case 's': case 'arrowdown':  moveState.back = 1; break;
         case 'd': case 'arrowleft':  moveState.left = 1; break;
         case 'a': case 'arrowright': moveState.right = 1; break;
+        case ' ': shootBullet(); break; // NUEVO: Espacio para disparar
     }
 }
 
@@ -844,6 +1005,19 @@ function handleGamepadInput(delta) {
         const deltaLookX = lookX * gamepadLookSpeed * delta;
         const deltaLookY = lookY * gamepadLookSpeed * delta;
         rotateCamera(deltaLookX, deltaLookY);
+    }
+
+    // NUEVO: Disparo con Gamepad (Botón 0 -> 'X' o 'A', Botón 5 -> R1/RB, Botón 7 -> R2/RT)
+    // Usaremos un sistema simple para evitar disparo continuo ametralladora si se mantiene presionado
+    // (o dejamos ametralladora por diversión, aquí lo dejo continuo pero depende de animate rate)
+    // Para simplificar, si se pulsa el botón 7 (Gatillo derecho) o botón 0 (Acción)
+    if (gp.buttons[7] && gp.buttons[7].pressed) {
+        // Podrías añadir un cooldown aquí si es demasiado rápido
+        // Por ahora disparo simple por frame es demasiado, así que añadimos una pequeña probabilidad o timer
+        // Simplemente llamamos shootBullet() pero el usuario debe pulsar rápido o añadimos un timer global
+        // Para este ejemplo, requerimos soltar el botón, pero en animate es complejo.
+        // Haremos que dispare solo si Math.random es bajo para simular cadencia si se mantiene presionado
+        if (Math.random() < 0.1) shootBullet(); 
     }
 }
 
@@ -929,6 +1103,12 @@ function handleTouchStart(event) {
             // Si usabas startPos para swipe, ya no es necesario para el joystick:
             // touchControls.right.startPos.x = touch.clientX;
             // touchControls.right.startPos.y = touch.clientY;
+        } else {
+            // NUEVO: Si tocas la pantalla fuera de los controles (ej: centro), dispara
+            // Evitamos disparar si se toca muy cerca de los controles
+            if (!isTouchOnElement(touch, touchControls.left) && !isTouchOnElement(touch, touchControls.right)) {
+                 shootBullet();
+            }
         }
     }
 }
@@ -1164,6 +1344,10 @@ function animate() {
         }
     }
     // --------------------------------------
+
+    // --- <NUEVO> ACTUALIZAR PROYECTILES Y EFECTOS ---
+    updateProjectiles(delta);
+    // ------------------------------------------------
 
     if (stats) stats.begin();
 
