@@ -268,7 +268,8 @@ class GameEnemy {
         }
 
         if (validSpot) {
-            this.mesh.position.set(newX, (this.type === 'VACUUM' ? this.radius : 0), newZ);
+            // <--- CORRECCIÓN AQUÍ: Usamos la altura 'y' que ya tiene el modelo, calculada al inicio --->
+            this.mesh.position.set(newX, this.mesh.position.y, newZ);
             this.mesh.visible = true;
             this.isDead = false;
             this.hp = this.maxHp;
