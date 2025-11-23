@@ -27,6 +27,12 @@ const BULLET_COLOR = 0xffff00; // Amarillo
 const EXPLOSION_PARTICLE_COUNT = 15; // Cantidad de partículas al desintegrarse
 const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
 
+// --- NUEVO: CONFIGURACIÓN DE SERPIENTES ---
+const SNAKE_CUBE_SIZE = TILE_SIZE / 10;
+const SNAKE_SPEED = 4.0;
+const MAX_SNAKES = 3;
+const SNAKE_RESPAWN_DELAY = 1.0; // Segundos entre intentos de spawn si hay hueco
+
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
 // <--- NUEVO: He puesto -16 en la posición [6][6] para el ROBOT --->
@@ -97,9 +103,13 @@ let textureLoader = new THREE.TextureLoader();
 let mixers = []; // <--- Array para gestionar las animaciones generales
 let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los robots
 
-// --- NUEVO: VARIABLES PARA PROYECTILES ---
+// --- NUEVO: VARIABLES PARA PROYECTILES, SCORE Y SERPIENTES ---
 let bullets = []; // Array para almacenar balas activas
 let activeExplosions = []; // Array para partículas de explosión
+let activeSnakes = []; // Array para las serpientes
+let snakeSpawnTimer = 0;
+let score = 0;
+let scoreElement; // Referencia al elemento DOM del score
 
 // Loaders para GLB
 let gltfLoader = new GLTFLoader();
@@ -152,13 +162,131 @@ let touchControls = { // Object to store touch control state
     }
 };
 
-// --- NUEVO: CLASE PARA CONTROLAR EL ROBOT ---
+// --- NUEVO: Función para actualizar puntuación ---
+function updateScore(points) {
+    score += points;
+    if (scoreElement) {
+        scoreElement.innerText = "SCORE: " + score;
+    }
+}
+
+// --- NUEVO: CLASE PARA SERPIENTE 3D ---
+class SnakeEnemy {
+    constructor(startX, startZ) {
+        this.mesh = new THREE.Group();
+        this.segments = [];
+        this.isDead = false;
+
+        // Crear 4 cubos
+        const geometry = new THREE.BoxGeometry(SNAKE_CUBE_SIZE, SNAKE_CUBE_SIZE, SNAKE_CUBE_SIZE);
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Verde serpiente
+
+        // Crear la cabeza
+        const head = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x00aa00 })); // Cabeza un poco más oscura
+        head.castShadow = true;
+        head.receiveShadow = true;
+        this.mesh.add(head);
+        this.segments.push(head);
+
+        // Crear cuerpo (3 segmentos)
+        for (let i = 1; i < 4; i++) {
+            const bodyPart = new THREE.Mesh(geometry, material);
+            bodyPart.position.z = -i * (SNAKE_CUBE_SIZE * 1.1); // Colocados detrás
+            bodyPart.castShadow = true;
+            bodyPart.receiveShadow = true;
+            this.mesh.add(bodyPart);
+            this.segments.push(bodyPart);
+        }
+
+        // Posición inicial en el suelo
+        this.mesh.position.set(startX * TILE_SIZE + TILE_SIZE/2, SNAKE_CUBE_SIZE/2, startZ * TILE_SIZE + TILE_SIZE/2);
+        
+        // Dirección inicial aleatoria (Norte, Sur, Este, Oeste)
+        this.chooseRandomDirection();
+
+        scene.add(this.mesh);
+    }
+
+    chooseRandomDirection() {
+        const dirs = [
+            new THREE.Vector3(1, 0, 0),
+            new THREE.Vector3(-1, 0, 0),
+            new THREE.Vector3(0, 0, 1),
+            new THREE.Vector3(0, 0, -1)
+        ];
+        // Filtrar para no elegir la dirección opuesta inmediata (opcional, pero mejora realismo)
+        this.direction = dirs[Math.floor(Math.random() * dirs.length)];
+        
+        // Rotar la malla para mirar a la dirección
+        const target = this.mesh.position.clone().add(this.direction);
+        this.mesh.lookAt(target);
+    }
+
+    update(delta) {
+        if (this.isDead) return;
+
+        // Calcular siguiente posición
+        const moveDist = SNAKE_SPEED * delta;
+        const nextPos = this.mesh.position.clone().add(this.direction.clone().multiplyScalar(moveDist));
+
+        // Comprobar grid actual y futuro
+        const gridX = Math.floor(nextPos.x / TILE_SIZE);
+        const gridZ = Math.floor(nextPos.z / TILE_SIZE);
+
+        // Si choca con pared
+        if (isActualWallAt(gridX, gridZ)) {
+            // Girar
+            this.chooseRandomDirection();
+            // Intentar salir un poco de la pared si se atascó
+            return;
+        }
+
+        // Mover
+        this.mesh.position.copy(nextPos);
+
+        // Comportamiento "Snake": Cambiar de dirección a veces cuando se está en el centro de un tile
+        // para simular el movimiento de grilla
+        const centerX = gridX * TILE_SIZE + TILE_SIZE / 2;
+        const centerZ = gridZ * TILE_SIZE + TILE_SIZE / 2;
+        const distToCenter = Math.sqrt(Math.pow(this.mesh.position.x - centerX, 2) + Math.pow(this.mesh.position.z - centerZ, 2));
+        
+        if (distToCenter < moveDist * 1.5) { // Si pasamos cerca del centro
+            if (Math.random() < 0.1) { // 10% probabilidad de giro en intersección
+                this.chooseRandomDirection();
+            }
+        }
+    }
+
+    takeDamage() {
+        if (this.isDead) return;
+        this.isDead = true;
+        createExplosion(this.mesh.position);
+        scene.remove(this.mesh);
+        
+        // Limpiar memoria
+        this.segments.forEach(seg => {
+            seg.geometry.dispose();
+            seg.material.dispose();
+        });
+        
+        // Dar punto
+        updateScore(1);
+    }
+}
+
+// --- CLASE PARA CONTROLAR EL ROBOT ---
 class RoamingRobot {
     constructor(mesh, animations) {
         this.mesh = mesh;
         this.mixer = new THREE.AnimationMixer(mesh);
         
-        // Buscar animaciones por nombre parcial (Walk, Idle) del script de Python
+        // Datos de juego
+        this.hp = 3;
+        this.isDead = false;
+        this.respawnTimer = 0;
+        this.originalPosition = mesh.position.clone();
+
+        // Buscar animaciones por nombre parcial (Walk, Idle)
         this.walkClip = animations.find(a => a.name.toLowerCase().includes('walk'));
         this.idleClip = animations.find(a => a.name.toLowerCase().includes('idle'));
 
@@ -189,7 +317,47 @@ class RoamingRobot {
         if (this.actions['idle']) this.actions['idle'].play();
     }
 
+    takeDamage() {
+        if (this.isDead) return;
+        this.hp--;
+        if (this.hp <= 0) {
+            this.die();
+        } else {
+            // Efecto visual de daño (parpadeo o pequeño salto)
+            this.mesh.position.y += 0.5; // Salto pequeño
+            setTimeout(() => { if(!this.isDead) this.mesh.position.y = 0; }, 100);
+        }
+    }
+
+    die() {
+        this.isDead = true;
+        createExplosion(this.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
+        this.mesh.visible = false;
+        // Moverlo lejos para evitar colisiones fantasma
+        this.mesh.position.set(0, -100, 0); 
+        this.respawnTimer = 0;
+        updateScore(1);
+    }
+
+    respawn() {
+        this.isDead = false;
+        this.hp = 3;
+        this.mesh.visible = true;
+        this.mesh.position.copy(this.originalPosition);
+        this.currentState = 'idle';
+        this.switchState('idle'); // Reiniciar estado
+    }
+
     update(delta) {
+        // Lógica de Respawn
+        if (this.isDead) {
+            this.respawnTimer += delta;
+            if (this.respawnTimer >= 2.0) {
+                this.respawn();
+            }
+            return;
+        }
+
         // Actualizar mixer de animación
         if (this.mixer) this.mixer.update(delta);
 
@@ -319,6 +487,20 @@ function init() {
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('msfullscreenchange', handleFullscreenChange);
+    
+    // --- NUEVO: CREAR UI DE SCORE ---
+    scoreElement = document.createElement('div');
+    scoreElement.style.position = 'absolute';
+    scoreElement.style.top = '20px';
+    scoreElement.style.left = '20px';
+    scoreElement.style.color = '#fff';
+    scoreElement.style.fontSize = '24px';
+    scoreElement.style.fontFamily = 'monospace';
+    scoreElement.style.fontWeight = 'bold';
+    scoreElement.style.textShadow = '2px 2px 0 #000';
+    scoreElement.innerText = 'SCORE: 0';
+    document.body.appendChild(scoreElement);
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xADD8E6); // Light blue background
 
@@ -533,6 +715,9 @@ function buildMapGeometry() {
     mixers.forEach(m => m.stopAllAction());
     mixers.length = 0;
     activeRobots.length = 0; // Limpiar robots antiguos
+    // Limpiar serpientes antiguas
+    activeSnakes.forEach(s => scene.remove(s.mesh));
+    activeSnakes = [];
 
     while (mapMeshesGroup.children.length > 0) {
         const object = mapMeshesGroup.children[0];
@@ -821,16 +1006,31 @@ function updateProjectiles(delta) {
         // 3. Colisión con Robots Activos (comprobar distancia con los robots móviles)
         if (!collision) {
             for (const robot of activeRobots) {
+                if (robot.isDead) continue;
                 const distSq = nextPos.distanceToSquared(robot.mesh.position);
                 const threshold = (TILE_SIZE * 0.4); // Radio aproximado del robot
                 if (distSq < threshold * threshold) {
                     collision = true;
+                    robot.takeDamage(); // <--- EL ROBOT RECIBE DAÑO
+                    break;
+                }
+            }
+        }
+
+        // 4. Colisión con Serpientes
+        if (!collision) {
+            for (const snake of activeSnakes) {
+                const distSq = nextPos.distanceToSquared(snake.mesh.position);
+                const threshold = SNAKE_CUBE_SIZE * 2; 
+                if (distSq < threshold * threshold) {
+                    collision = true;
+                    snake.takeDamage(); // <--- LA SERPIENTE MUERE
                     break;
                 }
             }
         }
         
-        // 4. Colisión con Suelo/Techo (límites verticales)
+        // 5. Colisión con Suelo/Techo (límites verticales)
         if (!collision && (nextPos.y < 0 || nextPos.y > WALL_HEIGHT)) {
             collision = true;
         }
@@ -1345,6 +1545,38 @@ function animate() {
         for (const robot of activeRobots) {
             robot.update(delta);
         }
+    }
+
+    // --- <NUEVO> GESTIÓN DE SERPIENTES ---
+    // Limpiar serpientes muertas
+    for (let i = activeSnakes.length - 1; i >= 0; i--) {
+        if (activeSnakes[i].isDead) {
+            activeSnakes.splice(i, 1);
+        }
+    }
+    
+    // Intentar spawnear serpientes si faltan
+    if (activeSnakes.length < MAX_SNAKES) {
+        snakeSpawnTimer += delta;
+        if (snakeSpawnTimer > SNAKE_RESPAWN_DELAY) {
+            snakeSpawnTimer = 0;
+            // Buscar un tile 0 aleatorio
+            let attempts = 10;
+            while(attempts > 0) {
+                const randX = Math.floor(Math.random() * mapWidth);
+                const randY = Math.floor(Math.random() * mapHeight);
+                if (wallMap[randY] && wallMap[randY][randX] === 0) {
+                    activeSnakes.push(new SnakeEnemy(randX, randY));
+                    break;
+                }
+                attempts--;
+            }
+        }
+    }
+
+    // Actualizar serpientes
+    for (const snake of activeSnakes) {
+        snake.update(delta);
     }
     // --------------------------------------
 
