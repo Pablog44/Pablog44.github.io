@@ -30,6 +30,7 @@ const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
 // <--- NUEVO: He puesto -16 en la posición [6][6] para el ROBOT --->
+// <--- NUEVO: He puesto -17 en la posición [8][5] para el ROBOT ASPIRADORA --->
 const wallMap = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -37,8 +38,8 @@ const wallMap = [
   [1, 0, 0, 0, 0, 0, -1, 2, 0, 0, 0, 1], 
   [1, 0, 0, 3, -10, 0, 0, 2, 0, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
   [1, 0, 0, 0, 0, 0, 0, -11,-2, 0, 0, 1],  
-  [1, 0, 0, -14, 0, -5, -17, 1, 1, 0, 0, 1],
-  [1, 0, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // <--- AQUÍ ESTÁ EL ROBOT (-16)
+  [1, 0, 0, -14, 0, -5, -17, 1, 1, 0, 0, 1], // -17 es la aspiradora (Index 16)
+  [1, 0, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // -16 es el Robot Tanque (Index 15)
   [1, 0, 0, 2, 0, 0, -3, 0, -4, 0, 0, 1],
   [1, 0, 0, 0, 0, -9, 0, -13, 0, -12, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -80,13 +81,14 @@ const ceilingTextureUrls = ['textures/ceiling1.png', 'textures/ceiling2.png'];
 const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Rutas de Modelos GLB ---
-// <--- NUEVO: He añadido 'models/robot.glb' al final. Es el índice 15.
+// <--- NUEVO: He añadido 'models/vacuum.glb' al final para la aspiradora (Index 16).
 const modelUrls = [
     'models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 
     'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 
     'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 
     'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
-    'models/robot.glb', 'models/d.glb' // <--- Índice 15: El robot aspiradora
+    'models/robot.glb', // Index 15: El robot tanque
+    'models/vacuum.glb' // Index 16: El robot aspiradora (usará placeholder si no existe el archivo)
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
@@ -95,7 +97,8 @@ let scene, camera, renderer;
 let clock = new THREE.Clock();
 let textureLoader = new THREE.TextureLoader();
 let mixers = []; // <--- Array para gestionar las animaciones generales
-let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los robots
+let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los enemigos
+let gameScore = 0; // Puntuación
 
 // --- NUEVO: VARIABLES PARA PROYECTILES ---
 let bullets = []; // Array para almacenar balas activas
@@ -152,17 +155,39 @@ let touchControls = { // Object to store touch control state
     }
 };
 
-// --- NUEVO: CLASE PARA CONTROLAR EL ROBOT ---
-class RoamingRobot {
-    constructor(mesh, animations) {
+// --- NUEVO: CLASE PARA CONTROLAR LOS ENEMIGOS ---
+class GameEnemy {
+    constructor(mesh, animations, type) {
         this.mesh = mesh;
+        this.type = type; // 'HEAVY' (Tanque) o 'VACUUM' (Aspiradora)
         this.mixer = new THREE.AnimationMixer(mesh);
         
-        // Buscar animaciones por nombre parcial (Walk, Idle) del script de Python
+        // Propiedades según tipo
+        if (this.type === 'HEAVY') {
+            this.maxHp = 3;
+            this.moveSpeed = 3.0;
+            this.walkDuration = 5.0;
+            this.idleDuration = 3.0;
+            this.radius = TILE_SIZE * 0.4;
+        } else { // VACUUM
+            this.maxHp = 1;
+            this.moveSpeed = 6.0; // Más rápido
+            this.walkDuration = 9999.0; // Siempre moviéndose
+            this.idleDuration = 0.0;
+            this.radius = (TILE_SIZE / 5) / 2;
+        }
+        
+        this.hp = this.maxHp;
+        this.isDead = false;
+        this.respawnTimer = 0;
+        this.respawnDelay = 2.0;
+
+        // Configuración de animaciones
         this.walkClip = animations.find(a => a.name.toLowerCase().includes('walk'));
         this.idleClip = animations.find(a => a.name.toLowerCase().includes('idle'));
 
         this.actions = {};
+
         if (this.walkClip) {
             this.actions['walk'] = this.mixer.clipAction(this.walkClip);
             this.actions['walk'].setEffectiveWeight(1);
@@ -172,7 +197,7 @@ class RoamingRobot {
             this.actions['idle'].setEffectiveWeight(1);
         }
 
-        this.currentState = 'idle'; // 'idle' or 'walk'
+        this.currentState = 'idle'; 
         this.timer = 0;
         
         // Tiempos configurables
@@ -185,27 +210,109 @@ class RoamingRobot {
         this.direction = new THREE.Vector3(Math.sin(randomAngle), 0, Math.cos(randomAngle));
         this.mesh.rotation.y = randomAngle;
 
-        // Iniciar animación idle
-        if (this.actions['idle']) this.actions['idle'].play();
+        // Iniciar en movimiento para vacuum, idle para heavy
+        if (this.type === 'VACUUM') {
+             this.switchState('walk');
+        } else {
+             if (this.actions['idle']) this.actions['idle'].play();
+        }
+    }
+
+    takeDamage() {
+        if (this.isDead) return;
+
+        this.hp--;
+        console.log(`Enemigo ${this.type} dañado. HP: ${this.hp}`);
+
+        if (this.hp <= 0) {
+            this.die();
+        } else {
+            // Efecto visual simple de daño (parpadeo rojo)
+            this.mesh.traverse(child => {
+                if (child.isMesh && child.material) {
+                    child.material.emissive.setHex(0xff0000);
+                    setTimeout(() => {
+                         if (!this.isDead) child.material.emissive.setHex(0x000000);
+                    }, 100);
+                }
+            });
+        }
+    }
+
+    die() {
+        this.isDead = true;
+        this.mesh.visible = false;
+        this.respawnTimer = this.respawnDelay;
+        gameScore++;
+        console.log(`Enemigo eliminado! Puntuación: ${gameScore}`);
+        createExplosion(this.mesh.position);
+    }
+
+    respawn() {
+        // Buscar una posición aleatoria donde el mapa sea 0
+        let validSpot = false;
+        let attempts = 0;
+        let newX, newZ;
+
+        while (!validSpot && attempts < 100) {
+            const rx = Math.floor(Math.random() * mapWidth);
+            const rz = Math.floor(Math.random() * mapHeight);
+            
+            // Comprobar si es un espacio vacío (0)
+            if (wallMap[rz] && wallMap[rz][rx] === 0) {
+                newX = rx * TILE_SIZE + TILE_SIZE / 2;
+                newZ = rz * TILE_SIZE + TILE_SIZE / 2;
+                validSpot = true;
+            }
+            attempts++;
+        }
+
+        if (validSpot) {
+            this.mesh.position.set(newX, (this.type === 'VACUUM' ? this.radius : 0), newZ);
+            this.mesh.visible = true;
+            this.isDead = false;
+            this.hp = this.maxHp;
+            // Resetear color emissivo por si acaso
+            this.mesh.traverse(child => {
+                if (child.isMesh && child.material) child.material.emissive.setHex(0x000000);
+            });
+            console.log(`Enemigo respawneado en ${newX}, ${newZ}`);
+        } else {
+            // Si falla, reintentar en el siguiente frame
+            this.respawnTimer = 0.1;
+        }
     }
 
     update(delta) {
+        if (this.isDead) {
+            this.respawnTimer -= delta;
+            if (this.respawnTimer <= 0) {
+                this.respawn();
+            }
+            return;
+        }
+
         // Actualizar mixer de animación
         if (this.mixer) this.mixer.update(delta);
 
         this.timer += delta;
 
-        if (this.currentState === 'idle') {
-            if (this.timer >= this.idleDuration) {
-                this.switchState('walk');
+        // Lógica de estados para el HEAVY (El vacuum siempre está en 'walk')
+        if (this.type === 'HEAVY') {
+            if (this.currentState === 'idle') {
+                if (this.timer >= this.idleDuration) {
+                    this.switchState('walk');
+                }
+            } else if (this.currentState === 'walk') {
+                if (this.timer >= this.walkDuration) {
+                    this.switchState('idle');
+                } else {
+                    this.move(delta);
+                }
             }
-        } else if (this.currentState === 'walk') {
-            if (this.timer >= this.walkDuration) {
-                this.switchState('idle');
-            } else {
-                // Lógica de movimiento "Roomba"
-                this.move(delta);
-            }
+        } else {
+            // VACUUM logic: Siempre mueve
+            this.move(delta);
         }
     }
 
@@ -236,11 +343,10 @@ class RoamingRobot {
         const moveDist = this.moveSpeed * delta;
         const potentialPos = this.mesh.position.clone().add(this.direction.clone().multiplyScalar(moveDist));
 
-        // Comprobar colisión con el mapa (Grid)
-        // Usamos una caja de colisión simple basada en el centro del robot
-        const buffer = TILE_SIZE * 0.3; // Distancia de seguridad
+        // Buffer de colisión
+        const buffer = this.radius + 0.5; 
         
-        // Verificar límites del grid
+        // Verificar límites del grid y colisión con paredes
         const gridX = Math.floor((potentialPos.x + this.direction.x * buffer) / TILE_SIZE);
         const gridZ = Math.floor((potentialPos.z + this.direction.z * buffer) / TILE_SIZE);
 
@@ -251,8 +357,7 @@ class RoamingRobot {
             collision = true;
         }
 
-        // 2. Colisión con Otros Modelos (si no chocó con pared)
-        // Usamos el mismo array que el jugador: modelCollisionCapsules
+        // Colisión con otros modelos estáticos
         if (!collision) {
             for (const capsule of modelCollisionCapsules) {
                 // Calcular distancia cuadrada (más rápido que sqrt)
@@ -265,7 +370,7 @@ class RoamingRobot {
 
                 if (distSq < minSeparation * minSeparation) {
                     collision = true;
-                    break; // Ya chocó, no hace falta mirar más
+                    break;
                 }
             }
         }
@@ -319,6 +424,34 @@ function init() {
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('msfullscreenchange', handleFullscreenChange);
+    
+    // --- NUEVO: CREAR LA CRUCETA (CROSSHAIR) ---
+    const crosshair = document.createElement('div');
+    crosshair.style.position = 'absolute';
+    crosshair.style.top = '50%';
+    crosshair.style.left = '50%';
+    crosshair.style.width = '10px';
+    crosshair.style.height = '10px';
+    crosshair.style.border = '2px solid rgba(255, 255, 255, 0.8)'; // Borde blanco semi-transparente
+    crosshair.style.borderRadius = '50%'; // Redondo
+    crosshair.style.transform = 'translate(-50%, -50%)';
+    crosshair.style.pointerEvents = 'none'; // Permitir clicks a través
+    crosshair.style.boxSizing = 'border-box';
+    
+    // Un punto central rojo
+    const dot = document.createElement('div');
+    dot.style.position = 'absolute';
+    dot.style.top = '50%';
+    dot.style.left = '50%';
+    dot.style.width = '2px';
+    dot.style.height = '2px';
+    dot.style.backgroundColor = 'red';
+    dot.style.transform = 'translate(-50%, -50%)';
+    crosshair.appendChild(dot);
+
+    document.body.appendChild(crosshair);
+    // ------------------------------------------
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xADD8E6); // Light blue background
 
@@ -618,18 +751,45 @@ function buildMapGeometry() {
                     const modelInstance = SkeletonUtils.clone(modelGltf.scene);
                     modelInstance.position.set(worldX + TILE_SIZE / 2, 0, worldZ + TILE_SIZE / 2);
                     
-                    // <--- NUEVO: LÓGICA PARA EL ROBOT (ID 15 -> wallMap -16) --->
-                    // Si es el Robot (índice 15), lo tratamos especial con RoamingRobot
-                    // Si tienes más modelos, asegúrate de que el índice coincida
-                    const IS_ROBOT = (modelIndex === 15); 
+                    // Identificar enemigos
+                    const IS_HEAVY_ROBOT = (modelIndex === 15); // El original
+                    const IS_VACUUM_ROBOT = (modelIndex === 16); // El nuevo aspirador
 
-                    if (IS_ROBOT && modelGltf.animations && modelGltf.animations.length > 0) {
-                        const robotController = new RoamingRobot(modelInstance, modelGltf.animations);
-                        activeRobots.push(robotController);
-                        // No añadimos el mixer a la lista global 'mixers' porque el controlador
-                        // lo gestiona internamente en su método update()
+                    if (IS_HEAVY_ROBOT || IS_VACUUM_ROBOT) {
+                        const type = IS_VACUUM_ROBOT ? 'VACUUM' : 'HEAVY';
+                        const enemy = new GameEnemy(modelInstance, modelGltf.animations, type);
+                        
+                        // Escalar el robot vacuum a 1/5 del tile
+                        if (type === 'VACUUM') {
+                            // Resetear escala primero para calcular bien la caja
+                            modelInstance.scale.set(1,1,1);
+                            const box = new THREE.Box3().setFromObject(modelInstance);
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            
+                            const targetSize = TILE_SIZE / 5;
+                            const scaleFactor = targetSize / maxDim;
+                            modelInstance.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                        } else {
+                            // Escalado normal para el heavy
+                            const box = new THREE.Box3().setFromObject(modelInstance);
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            const desiredMaxDim = TILE_SIZE * 0.6;
+                            const scale = desiredMaxDim / maxDim;
+                            modelInstance.scale.set(scale, scale, scale);
+                        }
+                        
+                        // Ajustar altura Y
+                        const finalBox = new THREE.Box3().setFromObject(modelInstance);
+                        modelInstance.position.y = -finalBox.min.y;
+
+                        activeRobots.push(enemy);
+                        // Añadir al grupo principal para renderizado
+                        mapMeshesGroup.add(modelInstance);
+
                     } else {
-                        // --- LÓGICA ESTÁNDAR PARA OBJETOS ESTÁTICOS CON O SIN ANIMACIÓN ---
+                        // --- LÓGICA ESTÁNDAR PARA OBJETOS ESTÁTICOS ---
                         if (modelGltf.animations && modelGltf.animations.length > 0) {
                             const mixer = new THREE.AnimationMixer(modelInstance);
                             modelGltf.animations.forEach((clip) => {
@@ -637,53 +797,44 @@ function buildMapGeometry() {
                             });
                             mixers.push(mixer);
                         }
-                    }
+                    
                     // -------------------------------------------------
 
-                    modelInstance.updateMatrixWorld(true);
-                    const box = new THREE.Box3().setFromObject(modelInstance);
-                    const size = box.getSize(new THREE.Vector3());
-                    const currentMaxDim = Math.max(size.x, size.y, size.z);
-                    if (currentMaxDim > 0) {
-                        const desiredMaxDim = TILE_SIZE * 0.6;
-                        const scale = desiredMaxDim / currentMaxDim;
-                        modelInstance.scale.set(scale, scale, scale);
-                        
                         modelInstance.updateMatrixWorld(true);
-                        const scaledBox = new THREE.Box3().setFromObject(modelInstance);
-                        modelInstance.position.y = -scaledBox.min.y; 
-                    }
+                        const box = new THREE.Box3().setFromObject(modelInstance);
+                        const size = box.getSize(new THREE.Vector3());
+                        const currentMaxDim = Math.max(size.x, size.y, size.z);
+                        if (currentMaxDim > 0) {
+                            const desiredMaxDim = TILE_SIZE * 0.6;
+                            const scale = desiredMaxDim / currentMaxDim;
+                            modelInstance.scale.set(scale, scale, scale);
+                            
+                            modelInstance.updateMatrixWorld(true);
+                            const scaledBox = new THREE.Box3().setFromObject(modelInstance);
+                            modelInstance.position.y = -scaledBox.min.y; 
+                        }
 
-                    modelInstance.updateMatrixWorld(true);
-                    const finalBox = new THREE.Box3().setFromObject(modelInstance);
-                    const finalSize = finalBox.getSize(new THREE.Vector3());
+                        modelInstance.updateMatrixWorld(true);
+                        const finalBox = new THREE.Box3().setFromObject(modelInstance);
+                        const finalSize = finalBox.getSize(new THREE.Vector3());
 
-                    const capsuleRadius = Math.max(finalSize.x, finalSize.z) / 2 * 0.85;
-                    const capsuleHeight = finalSize.y;
-                    
-                    // Si el objeto es un ROBOT, NO agregamos su cápsula estática al mapa
-                    // porque el robot se moverá. Si la añadimos, se chocaría con su propia posición inicial.
-                    if (!IS_ROBOT) {
+                        const capsuleRadius = Math.max(finalSize.x, finalSize.z) / 2 * 0.85;
+                        const capsuleHeight = finalSize.y;
+                        
                         modelCollisionCapsules.push({
                             worldPosition: modelInstance.position.clone(),
                             radius: capsuleRadius,
-                            height: capsuleHeight,
-                            // Si quieres que el robot se mueva también en colisiones, tendrías que actualizar esto en tiempo real
-                            // Por ahora las colisiones son estáticas en posición inicial para modelos normales
+                            height: capsuleHeight
                         });
+                        
+                        modelInstance.traverse(child => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+                        mapMeshesGroup.add(modelInstance);
                     }
-                    
-                    // Para que el jugador colisione con el robot en movimiento, 
-                    // necesitariamos actualizar la cápsula en animate(). 
-                    // Esta implementación deja la colisión del robot en su punto de spawn (simplificación).
-
-                    modelInstance.traverse(child => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                        }
-                    });
-                    mapMeshesGroup.add(modelInstance);
                 } else {
                     console.error(`Fallo: No hay modelo GLTF para el índice ${modelIndex} (${x},${y}) ni placeholder.`);
                 }
@@ -796,6 +947,7 @@ function updateProjectiles(delta) {
         
         // Detección de colisión (simple)
         let collision = false;
+        let hitEnemy = null;
 
         // 1. Colisión con Paredes del Mapa (Grid)
         const gridX = Math.floor(nextPos.x / TILE_SIZE);
@@ -818,13 +970,18 @@ function updateProjectiles(delta) {
             }
         }
 
-        // 3. Colisión con Robots Activos (comprobar distancia con los robots móviles)
+        // 3. Colisión con Enemigos Activos (con lógica de daño)
         if (!collision) {
             for (const robot of activeRobots) {
+                if (robot.isDead) continue;
+                
+                // Usar caja de colisión simple basada en posición y un radio estimado
                 const distSq = nextPos.distanceToSquared(robot.mesh.position);
-                const threshold = (TILE_SIZE * 0.4); // Radio aproximado del robot
-                if (distSq < threshold * threshold) {
+                const hitRadius = robot.radius + BULLET_RADIUS; 
+                
+                if (distSq < hitRadius * hitRadius) {
                     collision = true;
+                    hitEnemy = robot;
                     break;
                 }
             }
@@ -838,6 +995,11 @@ function updateProjectiles(delta) {
         if (collision) {
             // Impacto
             createExplosion(nextPos);
+            
+            if (hitEnemy) {
+                hitEnemy.takeDamage();
+            }
+
             scene.remove(bullet.mesh);
             bullet.mesh.geometry.dispose();
             bullet.mesh.material.dispose();
@@ -1340,7 +1502,7 @@ function animate() {
     }
     // --------------------------------------
 
-    // --- <NUEVO> ACTUALIZAR ROBOTS ---
+    // --- <NUEVO> ACTUALIZAR ENEMIGOS ---
     if (activeRobots.length > 0) {
         for (const robot of activeRobots) {
             robot.update(delta);
