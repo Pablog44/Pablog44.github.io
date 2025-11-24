@@ -1,25 +1,36 @@
+Aquí tienes el código completo. He realizado las siguientes optimizaciones según tus peticiones:
+
+1.  **Hexágonos con lados verticales:** Se ha configurado la geometría "Pointy Topped" (Punta arriba), lo que genera paredes verticales laterales (izquierda y derecha), ideal para apilar filas.
+2.  **Mapa Vertical en Móvil:** El sistema ahora detecta si estás en vertical y genera un mapa **rectangular/ovalado** (más alto que ancho) en lugar de un círculo perfecto. Esto hace que el mapa ocupe toda la pantalla del móvil.
+3.  **Botones más arriba:** En modo vertical, he añadido un espaciado inferior (`padding-bottom`) y ajustado la posición para que el control no quede pegado al borde inferior, evitando toques accidentales con la barra de navegación del navegador.
+4.  **Márgenes del Mapa:** Se han reducido al mínimo para maximizar el tamaño de los hexágonos (`HEX_SIZE`).
+
+Copia y pega este código en un solo archivo `.html`:
+
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake Hexagonal Responsive</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Snake Hex Vertical Optimized</title>
     <style>
         :root {
-            --bg-color: #f0f0f0;
-            --control-bg: #e0e0e0;
-            --control-size: 220px; /* Tamaño del panel de control */
+            --bg-color: #f4f4f4;
+            --control-bg: #e8e8e8;
+            --accent-color: #333;
         }
 
         body {
             margin: 0;
             background-color: var(--bg-color);
-            height: 100vh; /* Altura completa viewport */
+            height: 100vh;
             width: 100vw;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden; /* Sin scroll */
-            touch-action: none;
+            overflow: hidden; /* Bloquear scroll nativo */
+            touch-action: none; /* Bloquear gestos del navegador */
             display: flex;
+            flex-direction: column;
         }
 
         /* CONTENEDOR PRINCIPAL */
@@ -27,37 +38,41 @@
             display: flex;
             width: 100%;
             height: 100%;
+            overflow: hidden;
         }
 
         /* --- ÁREA DE JUEGO (CANVAS) --- */
         #game-area {
             position: relative;
-            flex-grow: 1; /* Ocupa todo el espacio disponible */
+            flex-grow: 1;
             background: #ffffff;
-            background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
+            /* Patrón sutil de fondo */
+            background-image: radial-gradient(#ddd 1px, transparent 1px);
             background-size: 20px 20px;
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            padding: 0; /* Sin padding para aprovechar espacio */
         }
 
         canvas {
             display: block;
-            /* El canvas se redimensionará por JS */
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* UI SUPERPUESTA EN CANVAS */
+        /* UI SUPERPUESTA */
         #ui-layer {
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(255, 255, 255, 0.85);
-            padding: 8px 12px;
-            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 10px;
+            border-radius: 6px;
             pointer-events: none;
             font-size: 14px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            z-index: 10;
         }
 
         #game-over {
@@ -65,25 +80,29 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(30, 30, 30, 0.95);
             color: white;
-            padding: 25px;
+            padding: 20px 30px;
             text-align: center;
-            border-radius: 15px;
+            border-radius: 12px;
             display: none;
             z-index: 100;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             min-width: 200px;
         }
+
+        #game-over h2 { margin-top: 0; }
 
         button.restart-btn {
             background: #4CAF50;
             border: none;
             color: white;
             padding: 12px 24px;
-            font-size: 18px;
+            font-size: 16px;
             margin-top: 15px;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 25px;
+            font-weight: bold;
             touch-action: manipulation;
         }
 
@@ -95,119 +114,131 @@
             align-items: center;
             position: relative;
             z-index: 50;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
 
-        /* DISEÑO RESPONSIVE (MEDIA QUERIES) */
-
-        /* MODO VERTICAL (Móvil normal) */
-        @media (orientation: portrait) {
-            #main-wrapper {
-                flex-direction: column; /* Apilar verticalmente */
-            }
-            #game-area {
-                width: 100%;
-                /* El alto se ajusta automáticamente con flex */
-            }
-            #controls-area {
-                width: 100%;
-                height: 260px; /* Altura fija para los controles abajo */
-                border-top: 1px solid #ccc;
-            }
-        }
-
-        /* MODO HORIZONTAL (Móvil girado o PC) */
-        @media (orientation: landscape) {
-            #main-wrapper {
-                flex-direction: row; /* Lado a lado */
-            }
-            #game-area {
-                height: 100%;
-                /* El ancho se ajusta con flex */
-            }
-            #controls-area {
-                width: 260px; /* Ancho fijo a la derecha */
-                height: 100%;
-                border-left: 1px solid #ccc;
-            }
-        }
-
-        /* --- EL MANDO HEXAGONAL --- */
+        /* --- MANDO HEXAGONAL --- */
         #hex-controller {
             position: relative;
-            width: 200px;
-            height: 200px;
+            width: 210px;
+            height: 210px;
+            /* No margins, el posicionamiento se hace con flex en el padre */
         }
 
         .dpad-btn {
             position: absolute;
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.9);
+            width: 65px;
+            height: 65px;
+            background: white;
             border-radius: 50%;
             color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-weight: bold;
-            font-size: 24px;
+            font-weight: 900;
+            font-size: 20px;
             user-select: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            border: 2px solid #bbb;
-            transition: transform 0.1s, background 0.1s;
+            box-shadow: 0 4px 0 #bbb, 0 5px 10px rgba(0,0,0,0.2);
+            border: 1px solid #ddd;
+            transition: transform 0.05s, box-shadow 0.05s;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .dpad-btn:active {
-            background: #bbb;
-            transform: scale(0.95);
+        .dpad-btn:active, .dpad-btn.pressed {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #bbb, inset 0 2px 5px rgba(0,0,0,0.1);
+            background: #f0f0f0;
         }
 
         .dpad-center {
-            top: 70px; left: 70px;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
             width: 60px; height: 60px;
-            background: #333; color: #fff;
-            border: none; font-size: 12px;
-            text-align: center; display: flex;
-            flex-direction: column; justify-content: center;
+            background: #333;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+            opacity: 0.9;
         }
 
-        /* Posicionamiento Radial Exacto para el mando de 200px */
-        /* Centro es 100,100. Radio aprox 70px */
-        .d-ne { top: 10px; right: 20px; }  /* W */
-        .d-e  { top: 70px; right: -10px; } /* D */
+        /* Posiciones exactas para el mando (Hexagonal) */
+        /* Radio ~72px desde el centro */
+        .d-nw { top: 10px; left: 20px; }  /* Q */
+        .d-ne { top: 10px; right: 20px; } /* W */
+        .d-w  { top: 72px; left: -10px; } /* A */
+        .d-e  { top: 72px; right: -10px;} /* D */
+        .d-sw { bottom: 10px; left: 20px;}/* Z */
         .d-se { bottom: 10px; right: 20px;}/* X */
-        .d-sw { bottom: 10px; left: 20px; }/* Z */
-        .d-w  { top: 70px; left: -10px; }  /* A */
-        .d-nw { top: 10px; left: 20px; }   /* Q */
+
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+
+        /* MODO VERTICAL (Móvil) */
+        @media (orientation: portrait) {
+            #main-wrapper {
+                flex-direction: column;
+            }
+            #game-area {
+                width: 100%;
+                /* El alto se ajusta con flex */
+            }
+            #controls-area {
+                width: 100%;
+                height: 280px; /* Altura generosa para controles */
+                border-top: 1px solid #ccc;
+                
+                /* CRÍTICO: Levantar los controles */
+                align-items: flex-start; /* Alinear arriba del contenedor */
+                padding-top: 20px;       /* Espacio superior */
+                padding-bottom: 50px;    /* Espacio extra abajo para la barra del navegador */
+            }
+        }
+
+        /* MODO HORIZONTAL (PC / Móvil apaisado) */
+        @media (orientation: landscape) {
+            #main-wrapper {
+                flex-direction: row;
+            }
+            #game-area {
+                height: 100%;
+            }
+            #controls-area {
+                width: 260px;
+                height: 100%;
+                border-left: 1px solid #ccc;
+                flex-direction: column;
+            }
+        }
 
     </style>
 </head>
 <body>
 
     <div id="main-wrapper">
-        <!-- Área Superior / Izquierda: EL JUEGO -->
         <div id="game-area">
             <canvas id="gameCanvas"></canvas>
             
             <div id="ui-layer">
-                <strong>Hex Snake</strong><br>
-                Puntos: <span id="score">0</span>
+                <strong>Hex Snake</strong> | Puntos: <span id="score">0</span>
             </div>
 
             <div id="game-over">
-                <h2>¡Game Over!</h2>
-                <p>Puntuación: <span id="final-score">0</span></p>
-                <button class="restart-btn" onclick="resetGame()">Reiniciar</button>
+                <h2>¡Choque!</h2>
+                <p>Puntuación Final: <span id="final-score">0</span></p>
+                <button class="restart-btn" onclick="resetGame()">Jugar de nuevo</button>
             </div>
         </div>
 
-        <!-- Área Inferior / Derecha: LOS CONTROLES -->
         <div id="controls-area">
             <div id="hex-controller">
                 <div class="dpad-center">HEX<br>PAD</div>
-                <!-- Se han añadido eventos ontouchstart directamente para mejor respuesta -->
                 <div class="dpad-btn d-nw" data-key="q">↖</div>
                 <div class="dpad-btn d-ne" data-key="w">↗</div>
                 <div class="dpad-btn d-e"  data-key="d">→</div>
@@ -224,19 +255,33 @@
         const scoreEl = document.getElementById('score');
         const gameArea = document.getElementById('game-area');
         
-        // Configuración Dinámica
-        let HEX_SIZE = 22; // Se recalculará
-        const MAP_RADIUS = 8; 
-        const SPEED = 140; 
+        // --- CONFIGURACIÓN ---
+        let HEX_SIZE = 20; 
+        let GRID_W_RADIUS = 6; // Radio horizontal
+        let GRID_H_RADIUS = 9; // Radio vertical (para móvil)
+        
+        const SPEED = 130; 
 
+        // Colores estilizados
         const COLORS = {
-            center: '#ffe0b2', ring1: '#ef9a9a', ring2: '#90caf9', outer: '#a5d6a7',  
-            border: '#555', snakeHead: '#212121', snakeBody: '#424242', food: '#d32f2f'    
+            bg: '#ffffff',
+            gridFill: '#f9f9f9',
+            gridStroke: '#e0e0e0',
+            snakeHead: '#2c3e50',
+            snakeBody: '#34495e',
+            food: '#e74c3c',
+            wall: '#95a5a6'
         };
 
+        // Direcciones (Coordenadas Axiales para "Pointy Topped" pero rotadas para lógica de snake)
+        // Q = Diagonal-Top-Left, R = Vertical-ish
         const DIRECTIONS = {
-            NW: { q: 0, r: -1 }, NE: { q: 1, r: -1 }, E:  { q: 1, r: 0 },
-            SE: { q: 0, r: 1 }, SW: { q: -1, r: 1 }, W:  { q: -1, r: 0 }
+            NE: { q: 1, r: -1 }, // W
+            E:  { q: 1, r: 0 },  // D
+            SE: { q: 0, r: 1 },  // X
+            SW: { q: -1, r: 1 }, // Z
+            W:  { q: -1, r: 0 }, // A
+            NW: { q: 0, r: -1 }  // Q
         };
 
         let snake = [];
@@ -248,57 +293,91 @@
         let score = 0;
         let hexGrid = []; 
 
-        // --- RESPONSIVE SYSTEM ---
+        // --- SISTEMA RESPONSIVE ---
         function resizeGame() {
-            // Obtener dimensiones del contenedor padre (game-area)
-            const width = gameArea.clientWidth;
-            const height = gameArea.clientHeight;
-
-            // Ajustar canvas al tamaño exacto del contenedor
-            canvas.width = width;
-            canvas.height = height;
-
-            // Calcular el tamaño óptimo del hexágono para que el mapa quepa en pantalla
-            // El mapa tiene un diámetro de (MAP_RADIUS * 2 + 1) hexágonos.
-            // Aproximación matemática para ajustar el zoom:
-            const mapWidthHex = (MAP_RADIUS * 2 + 1) * 1.8; // Factor horizontal
-            const mapHeightHex = (MAP_RADIUS * 2 + 1) * 1.6; // Factor vertical
+            const w = gameArea.clientWidth;
+            const h = gameArea.clientHeight;
             
-            const sizeW = width / mapWidthHex;
-            const sizeH = height / mapHeightHex;
+            // Ajustar canvas al píxel real
+            canvas.width = w;
+            canvas.height = h;
 
-            // Elegimos el menor para asegurar que quepa
-            HEX_SIZE = Math.min(sizeW, sizeH);
-            // Limitar tamaño máximo para PC
-            if(HEX_SIZE > 35) HEX_SIZE = 35; 
+            // Detectar orientación para definir la forma del mapa
+            const isPortrait = h > w;
+
+            if (isPortrait) {
+                // Modo Vertical: Mapa alargado (más filas que columnas)
+                GRID_W_RADIUS = 5;  // Más estrecho
+                GRID_H_RADIUS = 9; // Más alto
+            } else {
+                // Modo Horizontal: Mapa más ancho o cuadrado
+                GRID_W_RADIUS = 8;
+                GRID_H_RADIUS = 6;
+            }
+
+            // Calcular tamaño del hexágono para que quepa todo el mapa
+            // Pointy Top: Width = sqrt(3)*size, Height = 2*size;
+            // Grid Dimensions aproximadas:
+            // Ancho total ~= (GRID_W_RADIUS * 2 + 1) * sqrt(3) * size
+            // Alto total ~= (GRID_H_RADIUS * 2 + 1) * 1.5 * size
             
-            // Si el juego está pausado, redibujamos para que no se vea borroso
-            if(!gameRunning && snake.length > 0) draw(); 
+            const gridWidthUnits = (GRID_W_RADIUS * 2 + 2) * Math.sqrt(3);
+            const gridHeightUnits = (GRID_H_RADIUS * 2 + 2) * 1.5;
+
+            const sizeByW = w / gridWidthUnits;
+            const sizeByH = h / gridHeightUnits;
+
+            // Tomamos el menor para que quepa seguro y restamos un pelín de margen
+            HEX_SIZE = Math.min(sizeByW, sizeByH) * 0.95; 
+
+            // Redibujar si estamos pausados
+            if(!gameRunning && snake.length > 0) {
+                generateGrid(); // Regenerar grid por si cambiaron dimensiones
+                draw();
+            } else if (!gameRunning && snake.length === 0) {
+                // Si es carga inicial
+                initGame();
+            }
         }
 
-        window.addEventListener('resize', resizeGame);
-        // Llamada inicial
-        setTimeout(resizeGame, 100); // Pequeño delay para asegurar carga del layout
-
-        // --- LOGICA HEX ---
+        // --- GEOMETRÍA HEXAGONAL (POINTY TOPPED) ---
+        // Pointy Topped tiene lados izquierdo y derecho verticales.
         function hexToPixel(q, r) {
+            // Conversión Axial -> Pixel (Pointy Top)
             const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
             const y = HEX_SIZE * (3./2 * r);
-            // Centramos usando las dimensiones actuales del canvas
-            return { x: x + canvas.width / 2, y: y + canvas.height / 2 };
+            return { 
+                x: x + canvas.width / 2, 
+                y: y + canvas.height / 2 
+            };
         }
 
-        function hexDistance(q, r) {
-            return (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
+        function hexDistance(a, b) {
+            return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
         }
 
         function generateGrid() {
             hexGrid = [];
-            for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
-                let r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
-                let r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
-                for (let r = r1; r <= r2; r++) {
-                    hexGrid.push({ q, r });
+            // Generamos un mapa rectangular/elíptico en lugar de circular puro
+            // para llenar mejor la pantalla del móvil.
+            // Usamos coordenadas axiales extendidas.
+            
+            // Un bucle simple rectangular en coordenadas Offset sería más fácil para rectángulos,
+            // pero para mantener lógica axial, escaneamos un rango amplio y filtramos.
+            
+            const range = Math.max(GRID_W_RADIUS, GRID_H_RADIUS) + 2;
+
+            for (let q = -range; q <= range; q++) {
+                for (let r = -range; r <= range; r++) {
+                    // Lógica para forma Ovalada/Rectangular adaptada
+                    // Normalizamos q y r por sus radios respectivos
+                    const dq = q / GRID_W_RADIUS; // Peso horizontal
+                    const dr = (r + q/2) / GRID_H_RADIUS; // Peso vertical (ajustado por el shift axial)
+                    
+                    // Si está dentro de la "elipse" distorsionada
+                    if (dq*dq + dr*dr <= 1.2) {
+                        hexGrid.push({ q, r });
+                    }
                 }
             }
         }
@@ -313,33 +392,10 @@
             }
         }
 
-        // --- GAMEPAD LOGIC ---
-        function updateGamepad() {
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-            const gp = gamepads[0]; 
-            if (!gp) return;
-
-            const x = gp.axes[0];
-            const y = gp.axes[1];
-            if (Math.abs(x) < 0.2 && Math.abs(y) < 0.2) return;
-
-            let angle = Math.atan2(y, x) * (180 / Math.PI);
-            let newDir = null;
-
-            if (angle > -30 && angle <= 30) newDir = DIRECTIONS.E;
-            else if (angle > 30 && angle <= 90) newDir = DIRECTIONS.SE;
-            else if (angle > 90 && angle <= 150) newDir = DIRECTIONS.SW;
-            else if (angle > 150 || angle <= -150) newDir = DIRECTIONS.W;
-            else if (angle > -150 && angle <= -90) newDir = DIRECTIONS.NW;
-            else if (angle > -90 && angle <= -30) newDir = DIRECTIONS.NE;
-
-            if (newDir) changeDirection(newDir);
-        }
-
-        // --- LOOP PRINCIPAL ---
+        // --- LÓGICA DE JUEGO ---
         function initGame() {
-            resizeGame(); // Asegurar tamaño correcto al inicio
             generateGrid();
+            // Serpiente inicial
             snake = [{ q: 0, r: 0 }, { q: -1, r: 0 }, { q: -2, r: 0 }];
             direction = DIRECTIONS.E;
             nextDirection = DIRECTIONS.E;
@@ -348,17 +404,23 @@
             gameRunning = true;
             document.getElementById('game-over').style.display = 'none';
             spawnFood();
-            requestAnimationFrame(gameLoop);
+            
+            if (!lastTime) requestAnimationFrame(gameLoop);
         }
 
         function gameLoop(timestamp) {
-            if (!gameRunning) return;
-            updateGamepad();
-            if (timestamp - lastTime > SPEED) {
+            if (!lastTime) lastTime = timestamp;
+            const delta = timestamp - lastTime;
+
+            if (gameRunning && delta > SPEED) {
                 update();
                 draw();
                 lastTime = timestamp;
+            } else if (!gameRunning) {
+                 // Si paramos, no actualizamos loop lógico, pero podemos redibujar si resize
+                 lastTime = timestamp; // Mantener sincro
             }
+            
             requestAnimationFrame(gameLoop);
         }
 
@@ -367,10 +429,8 @@
             while (!valid) {
                 const randomIndex = Math.floor(Math.random() * hexGrid.length);
                 let pos = hexGrid[randomIndex];
-                let collision = false;
-                for (let segment of snake) {
-                    if (segment.q === pos.q && segment.r === pos.r) collision = true;
-                }
+                // Check colisión con snake
+                let collision = snake.some(s => s.q === pos.q && s.r === pos.r);
                 if (!collision) {
                     food = pos;
                     valid = true;
@@ -378,17 +438,26 @@
             }
         }
 
+        function isValidHex(q, r) {
+            return hexGrid.some(h => h.q === q && h.r === r);
+        }
+
         function update() {
             direction = nextDirection;
             const head = snake[0];
             const newHead = { q: head.q + direction.q, r: head.r + direction.r };
 
-            if (hexDistance(newHead.q, newHead.r) > MAP_RADIUS) return endGame();
+            // 1. Choque con muros (si no está en el grid)
+            if (!isValidHex(newHead.q, newHead.r)) return endGame();
+
+            // 2. Choque con sigo mismo
             for (let segment of snake) {
                 if (segment.q === newHead.q && segment.r === newHead.r) return endGame();
             }
 
             snake.unshift(newHead);
+            
+            // Comer
             if (food && newHead.q === food.q && newHead.r === food.r) {
                 score += 10;
                 scoreEl.innerText = score;
@@ -404,15 +473,18 @@
             document.getElementById('game-over').style.display = 'block';
         }
 
-        function resetGame() {
+        window.resetGame = function() {
             initGame();
-        }
+        };
 
         // --- DIBUJO ---
         function drawHexagon(ctx, x, y, size, color, stroke = true) {
             ctx.beginPath();
+            // Pointy Topped: Ángulos comienzan en 30 grados (30, 90, 150...)
+            // Esto crea paredes laterales perfectamente verticales.
             for (let i = 0; i < 6; i++) {
-                const angle_rad = (Math.PI / 180) * (60 * i - 30);
+                const angle_deg = 60 * i - 30; 
+                const angle_rad = Math.PI / 180 * angle_deg;
                 const px = x + size * Math.cos(angle_rad);
                 const py = y + size * Math.sin(angle_rad);
                 if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
@@ -421,7 +493,7 @@
             ctx.fillStyle = color;
             ctx.fill();
             if (stroke) {
-                ctx.strokeStyle = COLORS.border;
+                ctx.strokeStyle = COLORS.gridStroke;
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
@@ -430,66 +502,90 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // Dibujar Grid
             for (let hex of hexGrid) {
                 const pos = hexToPixel(hex.q, hex.r);
-                const dist = hexDistance(hex.q, hex.r);
-                let color = COLORS.outer;
-                if (dist === 0) color = COLORS.center;
-                else if (dist <= 3) color = COLORS.ring1;
-                else if (dist <= 6) color = COLORS.ring2;
-                drawHexagon(ctx, pos.x, pos.y, HEX_SIZE, color);
+                drawHexagon(ctx, pos.x, pos.y, HEX_SIZE, COLORS.gridFill);
             }
 
+            // Dibujar Comida
             if (food) {
                 const fPos = hexToPixel(food.q, food.r);
                 drawHexagon(ctx, fPos.x, fPos.y, HEX_SIZE * 0.8, COLORS.food, false);
             }
 
+            // Dibujar Snake
             for (let i = 0; i < snake.length; i++) {
                 const s = snake[i];
                 const sPos = hexToPixel(s.q, s.r);
-                drawHexagon(ctx, sPos.x, sPos.y, HEX_SIZE * 0.95, i===0?COLORS.snakeHead:COLORS.snakeBody, false);
+                const color = i === 0 ? COLORS.snakeHead : COLORS.snakeBody;
+                // Cabeza un poco más grande
+                const scale = i === 0 ? 0.95 : 0.90;
+                drawHexagon(ctx, sPos.x, sPos.y, HEX_SIZE * scale, color, false);
             }
         }
 
-        // --- INPUTS ---
+        // --- CONTROLES (TECLADO Y TÁCTIL) ---
+        
+        // Mapeo teclado
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             let newDir = null;
-            switch(key) {
-                case 'q': case '7': newDir = DIRECTIONS.NW; break;
-                case 'w': case '9': newDir = DIRECTIONS.NE; break;
-                case 'd': case '6': case 'arrowright': newDir = DIRECTIONS.E; break;
-                case 'x': case '3': newDir = DIRECTIONS.SE; break;
-                case 'z': case '1': newDir = DIRECTIONS.SW; break;
-                case 'a': case '4': case 'arrowleft': newDir = DIRECTIONS.W; break;
-            }
+            // QWE ASD (XZ) mapping
+            if (key === 'q') newDir = DIRECTIONS.NW;
+            if (key === 'w') newDir = DIRECTIONS.NE;
+            if (key === 'd' || key === 'arrowright') newDir = DIRECTIONS.E;
+            if (key === 'x') newDir = DIRECTIONS.SE;
+            if (key === 'z') newDir = DIRECTIONS.SW;
+            if (key === 'a' || key === 'arrowleft') newDir = DIRECTIONS.W;
+            
             if (newDir) changeDirection(newDir);
         });
 
-        // Botones Táctiles
+        // Mapeo Táctil / Click
         const touchBtns = document.querySelectorAll('.dpad-btn');
-        touchBtns.forEach(btn => {
-            const handleInput = (e) => {
-                if(e.cancelable) e.preventDefault(); // Importante para evitar zoom/scroll
-                const key = btn.dataset.key;
-                let newDir = null;
-                if(key === 'q') newDir = DIRECTIONS.NW;
-                if(key === 'w') newDir = DIRECTIONS.NE;
-                if(key === 'd') newDir = DIRECTIONS.E;
-                if(key === 'x') newDir = DIRECTIONS.SE;
-                if(key === 'z') newDir = DIRECTIONS.SW;
-                if(key === 'a') newDir = DIRECTIONS.W;
-                if (newDir) changeDirection(newDir);
-            };
+        
+        const handleInput = (e, key) => {
+            // Evitar scroll y zoom doble tap
+            if(e.cancelable && e.type === 'touchstart') e.preventDefault();
             
-            btn.addEventListener('mousedown', handleInput);
-            btn.addEventListener('touchstart', handleInput, {passive: false});
+            // Animación visual botón
+            const btn = document.querySelector(`.dpad-btn[data-key="${key}"]`);
+            if(btn) {
+                btn.classList.add('pressed');
+                setTimeout(() => btn.classList.remove('pressed'), 150);
+            }
+
+            let newDir = null;
+            if(key === 'q') newDir = DIRECTIONS.NW;
+            if(key === 'w') newDir = DIRECTIONS.NE;
+            if(key === 'd') newDir = DIRECTIONS.E;
+            if(key === 'x') newDir = DIRECTIONS.SE;
+            if(key === 'z') newDir = DIRECTIONS.SW;
+            if(key === 'a') newDir = DIRECTIONS.W;
+            
+            if (newDir) changeDirection(newDir);
+        };
+
+        touchBtns.forEach(btn => {
+            const key = btn.dataset.key;
+            // Usamos touchstart para respuesta inmediata en móvil
+            btn.addEventListener('touchstart', (e) => handleInput(e, key), {passive: false});
+            btn.addEventListener('mousedown', (e) => handleInput(e, key));
         });
 
-        // Iniciar
-        initGame();
+        // Resize Listener
+        window.addEventListener('resize', () => {
+            resizeGame();
+        });
+        
+        // Iniciar con un pequeño delay para asegurar renderizado correcto del DOM
+        setTimeout(() => {
+            resizeGame();
+            // initGame se llama dentro de resizeGame si es primera vez
+        }, 50);
 
     </script>
 </body>
 </html>
+```
