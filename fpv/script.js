@@ -352,8 +352,8 @@ class GameEnemy {
             const dirX = Math.sin(angle);
             const dirZ = Math.cos(angle);
             
-            // Vector dirección con ligera inclinación hacia arriba (y = 0.3)
-            const direction = new THREE.Vector3(dirX, 0.3, dirZ).normalize();
+            // Vector dirección con ligera inclinación hacia arriba (y = 0.1)
+            const direction = new THREE.Vector3(dirX, 0.1, dirZ).normalize();
             
             // Usar una posición de salida ligeramente desplazada para que no colisione con el propio vacuum
             const spawnPos = origin.clone().add(direction.clone().multiplyScalar(this.radius + 0.5));
