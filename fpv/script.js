@@ -24,6 +24,7 @@ const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista c
 const BULLET_SPEED = 30.0;
 const BULLET_RADIUS = 0.2;
 const BULLET_COLOR = 0xffff00; // Amarillo
+const ENEMY_BULLET_COLOR = 0xff0000; // Rojo para enemigos
 const EXPLOSION_PARTICLE_COUNT = 15; // Cantidad de partículas al desintegrarse
 const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
 
@@ -99,6 +100,11 @@ let textureLoader = new THREE.TextureLoader();
 let mixers = []; // <--- Array para gestionar las animaciones generales
 let activeRobots = []; // <--- NUEVO: Array para controlar la lógica de los enemigos
 let gameScore = 0; // Puntuación
+let playerHp = 5; // <--- NUEVO: Vida del jugador
+
+// Elementos UI
+let scoreElement;
+let hpElement;
 
 // --- NUEVO: VARIABLES PARA PROYECTILES ---
 let bullets = []; // Array para almacenar balas activas
@@ -147,6 +153,7 @@ let touchControls = { // Object to store touch control state
         touchId: null,
         center: { x: 0, y: 0 },
         radius: 0,
+        deadZone: 0,
         // startPos: { x: 0, y: 0 }, // No se usará para el joystick de vista, pero se puede dejar si se alterna
         isActive: false,       // Para saber si el joystick de vista está activo
         currentRelX: 0,        // Posición X relativa del dedo (-1 a 1)
@@ -182,6 +189,9 @@ class GameEnemy {
         this.respawnTimer = 0;
         this.respawnDelay = 2.0;
 
+        // --- NUEVO: Temporizador para disparar ---
+        this.shootTimer = 0; 
+
         // Configuración de animaciones
         this.walkClip = animations.find(a => a.name.toLowerCase().includes('walk'));
         this.idleClip = animations.find(a => a.name.toLowerCase().includes('idle'));
@@ -213,6 +223,7 @@ class GameEnemy {
         // Iniciar en movimiento para vacuum, idle para heavy
         if (this.type === 'VACUUM') {
              this.switchState('walk');
+             this.moveSpeed = 6.0; // Reafirmar velocidad
         } else {
              if (this.actions['idle']) this.actions['idle'].play();
         }
@@ -243,7 +254,8 @@ class GameEnemy {
         this.isDead = true;
         this.mesh.visible = false;
         this.respawnTimer = this.respawnDelay;
-        gameScore++;
+        gameScore++; // <--- NUEVO: Sumar punto
+        updateUI();  // <--- NUEVO: Actualizar UI
         console.log(`Enemigo eliminado! Puntuación: ${gameScore}`);
         createExplosion(this.mesh.position);
     }
@@ -273,6 +285,7 @@ class GameEnemy {
             this.mesh.visible = true;
             this.isDead = false;
             this.hp = this.maxHp;
+            this.shootTimer = 0; // Resetear timer de disparo
             // Resetear color emissivo por si acaso
             this.mesh.traverse(child => {
                 if (child.isMesh && child.material) child.material.emissive.setHex(0x000000);
@@ -298,6 +311,15 @@ class GameEnemy {
 
         this.timer += delta;
 
+        // --- LÓGICA DE DISPARO DEL VACUUM ---
+        if (this.type === 'VACUUM') {
+            this.shootTimer += delta;
+            if (this.shootTimer >= 2.0) { // Cada 2 segundos
+                this.shootHexagon();
+                this.shootTimer = 0;
+            }
+        }
+
         // Lógica de estados para el HEAVY (El vacuum siempre está en 'walk')
         if (this.type === 'HEAVY') {
             if (this.currentState === 'idle') {
@@ -314,6 +336,30 @@ class GameEnemy {
         } else {
             // VACUUM logic: Siempre mueve
             this.move(delta);
+        }
+    }
+
+    // --- NUEVO: Función para disparar en hexágono ---
+    shootHexagon() {
+        const startY = this.mesh.position.y + 0.5; // Un poco arriba del suelo
+        const origin = new THREE.Vector3(this.mesh.position.x, startY, this.mesh.position.z);
+        
+        for (let i = 0; i < 6; i++) {
+            // Calcular ángulo para cada punta del hexágono (60 grados = PI/3)
+            const angle = (i / 6) * Math.PI * 2;
+            
+            // Dirección horizontal base
+            const dirX = Math.sin(angle);
+            const dirZ = Math.cos(angle);
+            
+            // Vector dirección con ligera inclinación hacia arriba (y = 0.3)
+            const direction = new THREE.Vector3(dirX, 0.3, dirZ).normalize();
+            
+            // Usar una posición de salida ligeramente desplazada para que no colisione con el propio vacuum
+            const spawnPos = origin.clone().add(direction.clone().multiplyScalar(this.radius + 0.5));
+            
+            // Disparar bala como enemigo (isEnemy = true)
+            shootBullet(spawnPos, direction, true);
         }
     }
 
@@ -426,6 +472,10 @@ function init() {
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('msfullscreenchange', handleFullscreenChange);
     
+    // --- NUEVO: UI DE PUNTOS Y VIDA ---
+    createGameUI();
+    // ----------------------------------
+
     // --- NUEVO: CREAR LA CRUCETA (CROSSHAIR) ---
     const crosshair = document.createElement('div');
     crosshair.style.position = 'absolute';
@@ -515,6 +565,41 @@ function init() {
     });
 
     window.addEventListener('resize', onWindowResize, false);
+}
+
+// --- NUEVO: Función para crear UI de Score y HP ---
+function createGameUI() {
+    // Contenedor Score
+    scoreElement = document.createElement('div');
+    scoreElement.style.position = 'absolute';
+    scoreElement.style.top = '20px';
+    scoreElement.style.left = '20px';
+    scoreElement.style.color = 'yellow';
+    scoreElement.style.fontFamily = 'Arial, sans-serif';
+    scoreElement.style.fontSize = '24px';
+    scoreElement.style.fontWeight = 'bold';
+    scoreElement.style.textShadow = '2px 2px 2px #000';
+    scoreElement.innerHTML = `PUNTOS: ${gameScore}`;
+    document.body.appendChild(scoreElement);
+
+    // Contenedor HP
+    hpElement = document.createElement('div');
+    hpElement.style.position = 'absolute';
+    hpElement.style.top = '20px';
+    hpElement.style.right = '20px';
+    hpElement.style.color = 'red';
+    hpElement.style.fontFamily = 'Arial, sans-serif';
+    hpElement.style.fontSize = '24px';
+    hpElement.style.fontWeight = 'bold';
+    hpElement.style.textShadow = '2px 2px 2px #000';
+    hpElement.innerHTML = `VIDA: ${playerHp}`;
+    document.body.appendChild(hpElement);
+}
+
+// --- NUEVO: Función para actualizar UI ---
+function updateUI() {
+    if(scoreElement) scoreElement.innerHTML = `PUNTOS: ${gameScore}`;
+    if(hpElement) hpElement.innerHTML = `VIDA: ${playerHp}`;
 }
 
 function toggleFullscreen() {
@@ -891,27 +976,36 @@ function findStartPosition() {
     camera.position.y = WALL_HEIGHT / 2;
 }
 
-// --- NUEVO: FUNCIONALIDAD DE DISPARO ---
-function shootBullet() {
+// --- NUEVO: FUNCIONALIDAD DE DISPARO (ACTUALIZADA) ---
+// Ahora acepta origen, dirección y si es enemiga o no
+function shootBullet(origin, direction, isEnemy = false) {
     const bulletGeometry = new THREE.SphereGeometry(BULLET_RADIUS, 8, 8);
-    const bulletMaterial = new THREE.MeshBasicMaterial({ color: BULLET_COLOR });
+    const color = isEnemy ? ENEMY_BULLET_COLOR : BULLET_COLOR;
+    const bulletMaterial = new THREE.MeshBasicMaterial({ color: color });
     const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
 
-    // Posición inicial: donde está la cámara, ligeramente adelante
-    bullet.position.copy(camera.position);
+    // Posición inicial
+    if (origin) {
+        bullet.position.copy(origin);
+    } else {
+        // Por defecto dispara el jugador desde la cámara
+        bullet.position.copy(camera.position);
+        
+        // Obtener la dirección hacia donde mira la cámara si no se pasa dirección
+        if (!direction) {
+            direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+        }
+        
+        // Mover un poco la bala al frente para que no colisione con el jugador inmediatamente
+        bullet.position.add(direction.clone().multiplyScalar(1.0));
+    }
     
-    // Obtener la dirección hacia donde mira la cámara
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    
-    // Mover un poco la bala al frente para que no colisione con el jugador inmediatamente
-    bullet.position.add(direction.clone().multiplyScalar(1.0));
-
     // Velocidad
-    const velocity = direction.multiplyScalar(BULLET_SPEED);
+    const velocity = direction.clone().normalize().multiplyScalar(BULLET_SPEED);
 
     scene.add(bullet);
-    bullets.push({ mesh: bullet, velocity: velocity, alive: true });
+    bullets.push({ mesh: bullet, velocity: velocity, alive: true, isEnemy: isEnemy });
 }
 
 function createExplosion(position) {
@@ -949,6 +1043,7 @@ function updateProjectiles(delta) {
         // Detección de colisión (simple)
         let collision = false;
         let hitEnemy = null;
+        let hitPlayer = false;
 
         // 1. Colisión con Paredes del Mapa (Grid)
         const gridX = Math.floor(nextPos.x / TILE_SIZE);
@@ -971,19 +1066,31 @@ function updateProjectiles(delta) {
             }
         }
 
-        // 3. Colisión con Enemigos Activos (con lógica de daño)
+        // 3. Colisión Específica (Jugador vs Enemigos o Enemigos vs Jugador)
         if (!collision) {
-            for (const robot of activeRobots) {
-                if (robot.isDead) continue;
-                
-                // Usar caja de colisión simple basada en posición y un radio estimado
-                const distSq = nextPos.distanceToSquared(robot.mesh.position);
-                const hitRadius = robot.radius + BULLET_RADIUS; 
-                
+            if (bullet.isEnemy) {
+                // Bala de Enemigo -> Chequear colisión con Jugador
+                // Usamos la posición de la cámara como posición del jugador
+                const distSq = nextPos.distanceToSquared(camera.position);
+                const hitRadius = PLAYER_RADIUS + BULLET_RADIUS;
                 if (distSq < hitRadius * hitRadius) {
                     collision = true;
-                    hitEnemy = robot;
-                    break;
+                    hitPlayer = true;
+                }
+            } else {
+                // Bala de Jugador -> Chequear colisión con Enemigos
+                for (const robot of activeRobots) {
+                    if (robot.isDead) continue;
+                    
+                    // Usar caja de colisión simple basada en posición y un radio estimado
+                    const distSq = nextPos.distanceToSquared(robot.mesh.position);
+                    const hitRadius = robot.radius + BULLET_RADIUS; 
+                    
+                    if (distSq < hitRadius * hitRadius) {
+                        collision = true;
+                        hitEnemy = robot;
+                        break;
+                    }
                 }
             }
         }
@@ -999,6 +1106,20 @@ function updateProjectiles(delta) {
             
             if (hitEnemy) {
                 hitEnemy.takeDamage();
+            }
+
+            if (hitPlayer) {
+                playerHp--;
+                updateUI();
+                console.log("¡Jugador golpeado! HP restante: " + playerHp);
+                if (playerHp <= 0) {
+                    // Lógica simple de muerte
+                    alert("¡HAS MUERTO! Puntuación final: " + gameScore);
+                    playerHp = 5;
+                    gameScore = 0;
+                    updateUI();
+                    findStartPosition(); // Respawn
+                }
             }
 
             scene.remove(bullet.mesh);
@@ -1097,7 +1218,7 @@ function onMouseMove(event) {
 // NUEVO: Manejador de click del ratón para disparar
 function onMouseDown(event) {
     if (isPointerLocked && event.button === 0) { // Click izquierdo
-        shootBullet();
+        shootBullet(); // Sin argumentos = jugador
     }
 }
 
