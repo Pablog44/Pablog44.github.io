@@ -915,7 +915,7 @@ function buildMapGeometry() {
                              const height = finalBox.max.y - finalBox.min.y;
                              // Colocar en WALL_HEIGHT y bajar mitad de su altura (el origen suele estar centrado o en base)
                              // Asumimos origen en base al exportar:
-                             modelInstance.position.y = WALL_HEIGHT; 
+                             modelInstance.position.y = WALL_HEIGHT -0.5; 
                         } else {
                             // Suelo
                             const finalBox = new THREE.Box3().setFromObject(modelInstance);
