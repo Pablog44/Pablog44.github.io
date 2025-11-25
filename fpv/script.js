@@ -31,12 +31,14 @@ const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
 // <--- NUEVO: He puesto -16 en la posición [6][6] para el ROBOT --->
-// <--- NUEVO: He puesto -17 en la posición [8][5] para el ROBOT ASPIRADORA --->
+// <--- NUEVO: He puesto -17 en la posición [8][5] para el ROBOT ASPIRADORA 1 --->
+// <--- MODIFICADO: Añadido otro -17 en [2][2] para el ROBOT ASPIRADORA 2 --->
+// <--- MODIFICADO: Añadido -18 en [3][8] para el ROBOT ASPIRADORA TECHO --->
 const wallMap = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, -7, 0, -8, 0, 0, 0, 0, -6, 0, 1],
-  [1, 0, 0, 0, 0, 0, -1, 2, 0, 0, 0, 1], 
+  [1, -17, -7, 0, -8, 0, 0, 0, 0, -6, 0, 1], // Añadido -17 aquí (2 vacuuums suelo total)
+  [1, 0, 0, 0, 0, 0, -1, 2, -18, 0, 0, 1],  // Añadido -18 aquí (vacuum techo)
   [1, 0, 0, 3, -10, 0, 0, 2, 0, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
   [1, 0, 0, 0, 0, 0, 0, -11,-2, 0, 0, 1],  
   [1, 0, 0, -14, 0, -5, -17, 1, 1, 0, 0, 1], // -17 es la aspiradora (Index 16)
@@ -83,13 +85,15 @@ const placeholderTextureUrl = 'textures/placeholder.png';
 
 // --- Rutas de Modelos GLB ---
 // <--- NUEVO: He añadido 'models/vacuum.glb' al final para la aspiradora (Index 16).
+// <--- MODIFICADO: He añadido otra vez 'models/vacuum.glb' (Index 17) para el modelo de techo.
 const modelUrls = [
     'models/barrel3.glb','models/barrel2.glb','models/barrel.glb', 
     'models/statue.glb', 'models/cruz.glb', 'models/geomag.glb', 
     'models/geomag1.glb', 'models/geomag12.glb', 'models/b.glb', 
     'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
     'models/robot.glb', // Index 15: El robot tanque
-    'models/vacuum.glb' // Index 16: El robot aspiradora (usará placeholder si no existe el archivo)
+    'models/vacuum.glb', // Index 16: El robot aspiradora SUELO
+    'models/vacuum.glb'  // Index 17: El robot aspiradora TECHO (mismo modelo)
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
@@ -155,10 +159,10 @@ let touchControls = { // Object to store touch control state
         radius: 0,
         deadZone: 0,
         // startPos: { x: 0, y: 0 }, // No se usará para el joystick de vista, pero se puede dejar si se alterna
-        isActive: false,       // Para saber si el joystick de vista está activo
-        currentRelX: 0,        // Posición X relativa del dedo (-1 a 1)
-        currentRelY: 0,        // Posición Y relativa del dedo (-1 a 1)
-        deadZone: 0            // Zona muerta para el joystick de vista
+        isActive: false,        // Para saber si el joystick de vista está activo
+        currentRelX: 0,         // Posición X relativa del dedo (-1 a 1)
+        currentRelY: 0,         // Posición Y relativa del dedo (-1 a 1)
+        deadZone: 0             // Zona muerta para el joystick de vista
     }
 };
 
@@ -166,7 +170,7 @@ let touchControls = { // Object to store touch control state
 class GameEnemy {
     constructor(mesh, animations, type) {
         this.mesh = mesh;
-        this.type = type; // 'HEAVY' (Tanque) o 'VACUUM' (Aspiradora)
+        this.type = type; // 'HEAVY' (Tanque), 'VACUUM' (Aspiradora), 'CEILING_VACUUM' (Techo)
         this.mixer = new THREE.AnimationMixer(mesh);
         
         // Propiedades según tipo
@@ -176,7 +180,7 @@ class GameEnemy {
             this.walkDuration = 5.0;
             this.idleDuration = 3.0;
             this.radius = TILE_SIZE * 0.4;
-        } else { // VACUUM
+        } else if (this.type === 'VACUUM' || this.type === 'CEILING_VACUUM') { // VACUUM Y TECHO
             this.maxHp = 1;
             this.moveSpeed = 6.0; // Más rápido
             this.walkDuration = 9999.0; // Siempre moviéndose
@@ -211,17 +215,27 @@ class GameEnemy {
         this.timer = 0;
         
         // Tiempos configurables
-        this.walkDuration = 5.0;
-        this.idleDuration = 3.0;
-        this.moveSpeed = 3.0; // Velocidad del robot
+        // Si no se sobreescribieron arriba
+        if (!this.walkDuration) this.walkDuration = 5.0;
+        if (!this.idleDuration) this.idleDuration = 3.0;
+        if (!this.moveSpeed) this.moveSpeed = 3.0; 
 
         // Dirección aleatoria inicial
         const randomAngle = Math.random() * Math.PI * 2;
         this.direction = new THREE.Vector3(Math.sin(randomAngle), 0, Math.cos(randomAngle));
-        this.mesh.rotation.y = randomAngle;
+        // Si es techo, la rotación visual base es diferente (está invertida), pero la dirección lógica en X/Z es igual.
+        // La rotación inicial se maneja en el movimiento.
+        if (this.type !== 'CEILING_VACUUM') {
+             this.mesh.rotation.y = randomAngle;
+        } else {
+             // Para el techo, mantenemos Z invertido (PI) y rotamos sobre Y.
+             // Al estar invertido en Z, la rotación en Y funciona al revés visualmente o requiere ajuste de eje.
+             // Usaremos rotateOnAxis para seguridad o ajuste manual en update.
+             this.mesh.rotation.y = randomAngle;
+        }
 
         // Iniciar en movimiento para vacuum, idle para heavy
-        if (this.type === 'VACUUM') {
+        if (this.type === 'VACUUM' || this.type === 'CEILING_VACUUM') {
              this.switchState('walk');
              this.moveSpeed = 6.0; // Reafirmar velocidad
         } else {
@@ -312,7 +326,7 @@ class GameEnemy {
         this.timer += delta;
 
         // --- LÓGICA DE DISPARO DEL VACUUM ---
-        if (this.type === 'VACUUM') {
+        if (this.type === 'VACUUM' || this.type === 'CEILING_VACUUM') {
             this.shootTimer += delta;
             if (this.shootTimer >= 2.0) { // Cada 2 segundos
                 this.shootHexagon();
@@ -341,7 +355,19 @@ class GameEnemy {
 
     // --- NUEVO: Función para disparar en hexágono ---
     shootHexagon() {
-        const startY = this.mesh.position.y + 0.5; // Un poco arriba del suelo
+        let startY;
+        let verticalBias;
+
+        if (this.type === 'CEILING_VACUUM') {
+            // Disparar desde el techo hacia abajo
+            startY = this.mesh.position.y - 0.5; 
+            verticalBias = -0.2; // Disparo hacia abajo
+        } else {
+            // Disparar desde el suelo hacia arriba/centro
+            startY = this.mesh.position.y + 0.5;
+            verticalBias = 0.06; // Ligera inclinación hacia arriba
+        }
+
         const origin = new THREE.Vector3(this.mesh.position.x, startY, this.mesh.position.z);
         
         for (let i = 0; i < 6; i++) {
@@ -352,8 +378,8 @@ class GameEnemy {
             const dirX = Math.sin(angle);
             const dirZ = Math.cos(angle);
             
-            // Vector dirección con ligera inclinación hacia arriba (y = 0.06)
-            const direction = new THREE.Vector3(dirX, 0.06, dirZ).normalize();
+            // Vector dirección
+            const direction = new THREE.Vector3(dirX, verticalBias, dirZ).normalize();
             
             // Usar una posición de salida ligeramente desplazada para que no colisione con el propio vacuum
             const spawnPos = origin.clone().add(direction.clone().multiplyScalar(this.radius + 0.5));
@@ -441,11 +467,21 @@ class GameEnemy {
         this.direction.normalize();
 
         // Rotar visualmente la malla para mirar hacia donde va
-        // Nota: El modelo original mira hacia +Y o +Z dependiendo del export.
-        // Asumimos que el frente es +Z (estándar GLB) o ajustamos aquí.
-        // Blender exporta Z-up, Threejs es Y-up. Normalmente lookAt funciona bien.
-        const target = this.mesh.position.clone().add(this.direction);
-        this.mesh.lookAt(target);
+        if (this.type === 'CEILING_VACUUM') {
+            // Para el techo, como está invertido en Z, hay que tener cuidado con lookAt
+            // Una opción simple es rotar manualmente
+             const target = this.mesh.position.clone().add(this.direction);
+             this.mesh.lookAt(target);
+             // lookAt resetea la rotación, así que hay que volver a invertir Z si se pierde
+             // Pero lookAt orienta el eje Z local hacia el target.
+             // Si el modelo está boca abajo, lookAt puede voltearlo.
+             // Truco: Rotar el objeto padre o ajustar rotation.z post lookAt no siempre funciona por el orden Euler.
+             // Mejor solución: Usar lookAt normal y luego rotar 180 en Z local.
+             this.mesh.rotateZ(Math.PI);
+        } else {
+            const target = this.mesh.position.clone().add(this.direction);
+            this.mesh.lookAt(target);
+        }
     }
 }
 
@@ -839,14 +875,18 @@ function buildMapGeometry() {
                     
                     // Identificar enemigos
                     const IS_HEAVY_ROBOT = (modelIndex === 15); // El original
-                    const IS_VACUUM_ROBOT = (modelIndex === 16); // El nuevo aspirador
+                    const IS_VACUUM_ROBOT = (modelIndex === 16); // El nuevo aspirador de suelo
+                    const IS_CEILING_VACUUM = (modelIndex === 17); // El aspirador de techo
 
-                    if (IS_HEAVY_ROBOT || IS_VACUUM_ROBOT) {
-                        const type = IS_VACUUM_ROBOT ? 'VACUUM' : 'HEAVY';
+                    if (IS_HEAVY_ROBOT || IS_VACUUM_ROBOT || IS_CEILING_VACUUM) {
+                        let type = 'HEAVY';
+                        if (IS_VACUUM_ROBOT) type = 'VACUUM';
+                        if (IS_CEILING_VACUUM) type = 'CEILING_VACUUM';
+
                         const enemy = new GameEnemy(modelInstance, modelGltf.animations, type);
                         
-                        // Escalar el robot vacuum a 1/5 del tile
-                        if (type === 'VACUUM') {
+                        // Escalar el robot vacuum (y ceiling) a 1/5 del tile
+                        if (type === 'VACUUM' || type === 'CEILING_VACUUM') {
                             // Resetear escala primero para calcular bien la caja
                             modelInstance.scale.set(1,1,1);
                             const box = new THREE.Box3().setFromObject(modelInstance);
@@ -866,9 +906,21 @@ function buildMapGeometry() {
                             modelInstance.scale.set(scale, scale, scale);
                         }
                         
-                        // Ajustar altura Y
-                        const finalBox = new THREE.Box3().setFromObject(modelInstance);
-                        modelInstance.position.y = -finalBox.min.y;
+                        // Ajustar altura Y y Rotación especial para Techo
+                        if (type === 'CEILING_VACUUM') {
+                            // Invertir modelo y colocar en el techo
+                             modelInstance.rotation.z = Math.PI; // Flip upside down
+                             // Ajuste de altura aproximado para que "cuelgue" del techo
+                             const finalBox = new THREE.Box3().setFromObject(modelInstance);
+                             const height = finalBox.max.y - finalBox.min.y;
+                             // Colocar en WALL_HEIGHT y bajar mitad de su altura (el origen suele estar centrado o en base)
+                             // Asumimos origen en base al exportar:
+                             modelInstance.position.y = WALL_HEIGHT; 
+                        } else {
+                            // Suelo
+                            const finalBox = new THREE.Box3().setFromObject(modelInstance);
+                            modelInstance.position.y = -finalBox.min.y;
+                        }
 
                         activeRobots.push(enemy);
                         // Añadir al grupo principal para renderizado
