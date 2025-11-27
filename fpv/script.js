@@ -40,11 +40,11 @@ const wallMap = [
   [1, -17, -7, 0, -8, 0, 0, 0, 0, -6, 0, 1], // Añadido -17 aquí (2 vacuuums suelo total)
   [1, 0, 0, 0, 0, 0, -1, 2, -18, 0, 0, 1],  // Añadido -18 aquí (vacuum techo)
   [1, 0, 0, 3, -10, 0, 0, 2, 0, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
-  [1, 0, 0, 0, 0, 0, 0, -11,-2, 0, 0, 1],  
+  [1, -20, 0, 0, 0, 0, 0, -11,-2, 0, 0, 1],  
   [1, 0, 0, -14, 0, -5, -17, 1, 1, 0, 0, 1], // -17 es la aspiradora (Index 16)
   [1, 0, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // -16 es el Robot Tanque (Index 15)
   [1, 0, 0, 2, 0, 0, -3, 0, -4, 0, 0, 1],
-  [1, 0, 0, 0, 0, -9, 0, -13, 0, -12, 0, 1],
+  [1, 0, -19, 0, 0, -9, 0, -13, 0, -12, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1],
 ];
@@ -93,7 +93,8 @@ const modelUrls = [
     'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
     'models/robot.glb', // Index 15: El robot tanque
     'models/vacuum.glb', // Index 16: El robot aspiradora SUELO
-    'models/vacuum.glb'  // Index 17: El robot aspiradora TECHO (mismo modelo)
+    'models/vacuum.glb','models/d.glb',// Index 17: El robot aspiradora TECHO (mismo modelo)
+    'models/x.glb'  
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
 
