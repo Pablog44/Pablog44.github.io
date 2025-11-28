@@ -45,7 +45,7 @@ const wallMap = [
   [1, 0, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // -16 es el Robot Tanque (Index 15)
   [1, 0, 0, 2, 0, 0, -3, 0, -4, 0, 0, 1],
   [1, 0, -19, 0, 0, -9, 0, -13, 0, -12, 0, 1],
-  [1, 0, 0, 0, -21, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1],
 ];
 const floorMap = [
@@ -93,7 +93,7 @@ const modelUrls = [
     'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
     'models/robot.glb', // Index 15: El robot tanque
     'models/vacuum.glb', // Index 16: El robot aspiradora SUELO
-    'models/vacuum.glb','models/d.glb','models/f.glb',// Index 17: El robot aspiradora TECHO (mismo modelo)
+    'models/vacuum.glb','models/d.glb',// Index 17: El robot aspiradora TECHO (mismo modelo)
     'models/x.glb'  
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
