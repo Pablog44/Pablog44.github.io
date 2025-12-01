@@ -25,8 +25,8 @@ const BULLET_SPEED = 30.0;
 const BULLET_RADIUS = 0.2;
 const BULLET_COLOR = 0xffff00; // Amarillo
 const ENEMY_BULLET_COLOR = 0xff0000; // Rojo para enemigos
-const EXPLOSION_PARTICLE_COUNT = 15; // Cantidad de partículas al desintegrarse
-const EXPLOSION_DURATION = 0.8; // Segundos que dura la explosión
+const EXPLOSION_PARTICLE_COUNT = 18; // Cantidad de partículas al desintegrarse
+const EXPLOSION_DURATION = 0.9; // Segundos que dura la explosión
 
 // --- Datos del Mapa ---
 // wallMap: -11 cargará el modelo índice 10 (dodecaedro.glb)
@@ -42,7 +42,7 @@ const wallMap = [
   [1, 0, 0, 3, -10, 0, 0, 2, 0, 0, 0, 1], // <--- NUEVO: He puesto -11 aquí (el dodecaedro)
   [1, -20, 0, 0, 0, 0, 0, -11,-2, 0, 0, 1],  
   [1, 0, 0, -14, 0, -5, -17, 1, 1, 0, 0, 1], // -17 es la aspiradora (Index 16)
-  [1, 0, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // -16 es el Robot Tanque (Index 15)
+  [1, -21, 0, 2, -16, 0, 0, -15, 0, 0, 0, 1], // -16 es el Robot Tanque (Index 15)
   [1, 0, 0, 2, 0, 0, -3, 0, -4, 0, 0, 1],
   [1, 0, -19, 0, 0, -9, 0, -13, 0, -12, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -93,7 +93,7 @@ const modelUrls = [
     'models/a.glb', 'models/dodeestre.glb', 'models/dodeestre1.glb', 'models/t.glb', 'models/op.glb', 'models/s.glb',
     'models/robot.glb', // Index 15: El robot tanque
     'models/vacuum.glb', // Index 16: El robot aspiradora SUELO
-    'models/vacuum.glb','models/d.glb',// Index 17: El robot aspiradora TECHO (mismo modelo)
+    'models/vacuum.glb','models/d.glb', 'models/r.glb',// Index 17: El robot aspiradora TECHO (mismo modelo)
     'models/x.glb'  
 ]; 
 const placeholderModelUrl = 'models/placeholder_cube.glb'; 
