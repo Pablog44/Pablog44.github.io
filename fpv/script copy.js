@@ -7,9 +7,9 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 const TILE_SIZE = 5;      // Tamaño de cada cuadrado en el mundo 3D
 const WALL_HEIGHT = 5;    // Altura de las paredes
 const moveSpeed = 8.0;    // Velocidad de movimiento del jugador (teclado)
-let lookSpeed = 0.003;  // Sensibilidad del ratón
-let gamepadLookSpeed = 1.5; // Sensibilidad de la vista con gamepad (ajusta según sea necesario)
-let gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad
+const lookSpeed = 0.003;  // Sensibilidad del ratón
+const gamepadLookSpeed = 1.5; // Sensibilidad de la vista con gamepad (ajusta según sea necesario)
+const gamepadDeadZone = 0.15; // Zona muerta para los sticks del gamepad
 const PLAYER_RADIUS = TILE_SIZE * 0.2; // Radio de colisión del jugador
 const PLAYER_COLLISION_HEIGHT_FACTOR = 0.9; // Factor para la altura de colisión del jugador (0.9 = 90% de WALL_HEIGHT)
 
@@ -17,8 +17,8 @@ const PLAYER_COLLISION_HEIGHT_FACTOR = 0.9; // Factor para la altura de colisió
 const TOUCH_LOOK_SENSITIVITY = 0.004; // Sensibilidad para la vista táctil (swipe original)
 const TOUCH_DPAD_DEADZONE_RATIO = 0.15; // 15% del radio del D-Pad como zona muerta
 // NUEVAS CONSTANTES PARA EL JOYSTICK DE VISTA
-let TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de vista (ajusta según sea necesario)
-let TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
+const TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de vista (ajusta según sea necesario)
+const TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
 
 // --- NUEVO: CONFIGURACIÓN DE DISPARO ---
 const BULLET_SPEED = 30.0;
@@ -511,7 +511,6 @@ function init() {
     
     // --- NUEVO: UI DE PUNTOS Y VIDA ---
     createGameUI();
-    createSettingsUI(); // <--- NUEVO: Menú de ajustes
     // ----------------------------------
 
     // --- NUEVO: CREAR LA CRUCETA (CROSSHAIR) ---
@@ -1271,9 +1270,6 @@ function onMouseMove(event) {
 
 // NUEVO: Manejador de click del ratón para disparar
 function onMouseDown(event) {
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
-
     if (isPointerLocked && event.button === 0) { // Click izquierdo
         shootBullet(); // Sin argumentos = jugador
     }
@@ -1432,9 +1428,6 @@ function updateRightJoystickState(touch) {
 
 function handleTouchStart(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
-
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
@@ -1462,9 +1455,6 @@ function handleTouchStart(event) {
 
 function handleTouchMove(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
-
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
@@ -1488,9 +1478,6 @@ function handleTouchMove(event) {
 
 function handleTouchEnd(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
-
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
 
@@ -1739,92 +1726,6 @@ function onWindowResize() {
             }
         }, 100); 
     }
-}
-
-// --- NUEVO: Función para menú de ajustes ---
-function createSettingsUI() {
-    const style = document.createElement('style');
-    style.innerHTML = `
-        #settings-btn {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            font-size: 24px; color: white; cursor: pointer; z-index: 1000;
-            text-shadow: 2px 2px 2px #000; user-select: none; background: rgba(0,0,0,0.5); 
-            padding: 5px 15px; border-radius: 8px; font-family: Arial, sans-serif;
-            border: 1px solid rgba(255,255,255,0.3); pointer-events: auto;
-        }
-        #settings-modal {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px;
-            z-index: 1001; font-family: Arial, sans-serif; width: 90%; max-width: 350px;
-            box-sizing: border-box; border: 2px solid #555; pointer-events: auto;
-        }
-        .setting-group { margin-bottom: 15px; }
-        .setting-group label { display: block; margin-bottom: 5px; font-size: 14px; font-weight: bold; }
-        .setting-group input[type="range"] { width: 100%; cursor: pointer; }
-        .setting-group span { float: right; color: #ffcc00; }
-        #close-settings {
-            display: block; width: 100%; padding: 10px; margin-top: 20px;
-            background: #ff4444; color: white; border: none; border-radius: 5px; 
-            cursor: pointer; font-size: 16px; font-weight: bold;
-        }
-    `;
-    document.head.appendChild(style);
-
-    const btn = document.createElement('div');
-    btn.id = 'settings-btn';
-    btn.innerHTML = '&#9881; Ajustes';
-    document.body.appendChild(btn);
-
-    const modal = document.createElement('div');
-    modal.id = 'settings-modal';
-
-    function createSlider(label, min, max, step, value, onChange) {
-        const group = document.createElement('div');
-        group.className = 'setting-group';
-        const lbl = document.createElement('label');
-        lbl.innerHTML = `${label} <span class="val-display">${value}</span>`;
-        const inp = document.createElement('input');
-        inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
-        inp.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value);
-            lbl.querySelector('.val-display').innerText = val;
-            onChange(val);
-        });
-        group.appendChild(lbl);
-        group.appendChild(inp);
-        modal.appendChild(group);
-    }
-
-    createSlider('Sensibilidad Ratón', 0.001, 0.015, 0.001, lookSpeed, v => lookSpeed = v);
-    createSlider('Sensibilidad Mando', 0.1, 5.0, 0.1, gamepadLookSpeed, v => gamepadLookSpeed = v);
-    createSlider('Zona Muerta Mando', 0.0, 0.5, 0.01, gamepadDeadZone, v => gamepadDeadZone = v);
-    createSlider('Sensibilidad Táctil', 0.1, 5.0, 0.1, TOUCH_JOYSTICK_LOOK_SENSITIVITY, v => TOUCH_JOYSTICK_LOOK_SENSITIVITY = v);
-    createSlider('Zona Muerta Táctil', 0.0, 0.5, 0.01, TOUCH_LOOK_DEADZONE_RATIO, v => {
-        TOUCH_LOOK_DEADZONE_RATIO = v;
-        if(touchControls.right.radius) touchControls.right.deadZone = touchControls.right.radius * TOUCH_LOOK_DEADZONE_RATIO;
-    });
-
-    const closeBtn = document.createElement('button');
-    closeBtn.id = 'close-settings';
-    closeBtn.innerText = 'Cerrar Ajustes';
-    closeBtn.onclick = () => modal.style.display = 'none';
-    modal.appendChild(closeBtn);
-
-    document.body.appendChild(modal);
-
-    btn.onclick = (e) => {
-        e.stopPropagation(); 
-        modal.style.display = modal.style.display === 'none' ? 'block' : 'none';
-        if (modal.style.display === 'block' && isPointerLocked) {
-            document.exitPointerLock();
-        }
-    };
-    
-    // Evitar interacciones fantasma
-    modal.addEventListener('mousedown', e => e.stopPropagation());
-    modal.addEventListener('touchstart', e => e.stopPropagation());
-    btn.addEventListener('mousedown', e => e.stopPropagation());
-    btn.addEventListener('touchstart', e => e.stopPropagation());
 }
 
 // --- ¡Empezar! ---
