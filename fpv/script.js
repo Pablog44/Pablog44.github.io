@@ -512,6 +512,7 @@ function init() {
     // --- NUEVO: UI DE PUNTOS Y VIDA ---
     createGameUI();
     createSettingsUI(); // <--- NUEVO: Menú de ajustes
+    createDeathModalUI(); // <--- NUEVO: Modal chulo de muerte
     // ----------------------------------
 
     // --- NUEVO: CREAR LA CRUCETA (CROSSHAIR) ---
@@ -547,6 +548,7 @@ function init() {
     if (typeof Stats !== 'undefined') {
         stats = new Stats();
         stats.showPanel(0);
+        stats.dom.style.display = 'none'; // <--- MODIFICADO: Oculto por defecto
         document.body.appendChild(stats.dom);
     } else {
         console.warn("Stats.js no está cargado. El contador FPS no funcionará.");
@@ -603,6 +605,77 @@ function init() {
     });
 
     window.addEventListener('resize', onWindowResize, false);
+}
+
+// --- NUEVO: MODAL CHULO DE MUERTE ---
+function createDeathModalUI() {
+    const deathModal = document.createElement('div');
+    deathModal.id = 'death-modal';
+    deathModal.style.display = 'none';
+    deathModal.style.position = 'absolute';
+    deathModal.style.top = '50%';
+    deathModal.style.left = '50%';
+    deathModal.style.transform = 'translate(-50%, -50%)';
+    deathModal.style.background = 'rgba(150, 0, 0, 0.95)';
+    deathModal.style.color = 'white';
+    deathModal.style.padding = '30px';
+    deathModal.style.borderRadius = '10px';
+    deathModal.style.zIndex = '2000';
+    deathModal.style.fontFamily = 'Arial, sans-serif';
+    deathModal.style.textAlign = 'center';
+    deathModal.style.border = '2px solid #ff4444';
+    deathModal.style.boxShadow = '0 0 20px rgba(255,0,0,0.8)';
+    
+    const title = document.createElement('h2');
+    title.innerText = '¡HAS MUERTO!';
+    title.style.margin = '0 0 15px 0';
+    deathModal.appendChild(title);
+    
+    const scoreText = document.createElement('p');
+    scoreText.id = 'death-score-text';
+    scoreText.style.fontSize = '20px';
+    scoreText.style.margin = '0 0 20px 0';
+    deathModal.appendChild(scoreText);
+    
+    const restartBtn = document.createElement('button');
+    restartBtn.innerText = 'Reaparecer';
+    restartBtn.style.padding = '10px 20px';
+    restartBtn.style.background = 'white';
+    restartBtn.style.color = 'red';
+    restartBtn.style.border = 'none';
+    restartBtn.style.borderRadius = '5px';
+    restartBtn.style.fontSize = '18px';
+    restartBtn.style.fontWeight = 'bold';
+    restartBtn.style.cursor = 'pointer';
+    
+    restartBtn.onclick = () => {
+        deathModal.style.display = 'none';
+        
+        // Reiniciar estado
+        playerHp = 5;
+        gameScore = 0;
+        updateUI();
+        
+        // --- MODIFICADO: Resetear movimiento para evitar quedarse atascado ---
+        moveState.forward = 0;
+        moveState.back = 0;
+        moveState.left = 0;
+        moveState.right = 0;
+        
+        // Reset joystick estado táctil si aplica
+        if (isMobileDevice) {
+            if(touchControls.left.touchId) touchControls.left.touchId = null;
+            if(touchControls.right.touchId) touchControls.right.touchId = null;
+            touchControls.right.isActive = false;
+            touchControls.right.currentRelX = 0;
+            touchControls.right.currentRelY = 0;
+        }
+        
+        findStartPosition(); // Respawn
+    };
+    deathModal.appendChild(restartBtn);
+    
+    document.body.appendChild(deathModal);
 }
 
 // --- NUEVO: Función para crear UI de Score y HP ---
@@ -1166,14 +1239,18 @@ function updateProjectiles(delta) {
                 playerHp--;
                 updateUI();
                 console.log("¡Jugador golpeado! HP restante: " + playerHp);
-                if (playerHp <= 0) {
-                    // Lógica simple de muerte
-                    alert("¡HAS MUERTO! Puntuación final: " + gameScore);
-                    playerHp = 5;
-                    gameScore = 0;
-                    updateUI();
-                    findStartPosition(); // Respawn
+                
+                // --- MODIFICADO: Usar modal en lugar de alert() ---
+                if (playerHp === 0) { // Disparar solo la primera vez que la vida toca 0
+                    if (document.pointerLockElement) document.exitPointerLock();
+                    
+                    const scoreText = document.getElementById('death-score-text');
+                    if(scoreText) scoreText.innerText = "Puntuación final: " + gameScore;
+                    
+                    const modalMuerte = document.getElementById('death-modal');
+                    if(modalMuerte) modalMuerte.style.display = 'block';
                 }
+                // ---------------------------------------------------
             }
 
             scene.remove(bullet.mesh);
@@ -1271,8 +1348,8 @@ function onMouseMove(event) {
 
 // NUEVO: Manejador de click del ratón para disparar
 function onMouseDown(event) {
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
+    // NUEVO: Evitar interacción si se toca el menú o el pop-up de muerte
+    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn') || event.target.closest('#death-modal')) return;
 
     if (isPointerLocked && event.button === 0) { // Click izquierdo
         shootBullet(); // Sin argumentos = jugador
@@ -1432,8 +1509,8 @@ function updateRightJoystickState(touch) {
 
 function handleTouchStart(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
+    // NUEVO: Evitar interacción si se toca el menú o el pop up de muerte
+    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn') || event.target.closest('#death-modal')) return;
 
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
@@ -1462,8 +1539,8 @@ function handleTouchStart(event) {
 
 function handleTouchMove(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
+    // NUEVO: Evitar interacción si se toca el menú o el pop up de muerte
+    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn') || event.target.closest('#death-modal')) return;
 
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
@@ -1488,8 +1565,8 @@ function handleTouchMove(event) {
 
 function handleTouchEnd(event) {
     if (!isMobileDevice) return;
-    // NUEVO: Evitar interacción si se toca el menú
-    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn')) return;
+    // NUEVO: Evitar interacción si se toca el menú o el modal de muerte
+    if (event.target.closest('#settings-modal') || event.target.closest('#settings-btn') || event.target.closest('#death-modal')) return;
 
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
@@ -1794,6 +1871,26 @@ function createSettingsUI() {
         group.appendChild(inp);
         modal.appendChild(group);
     }
+    
+    // --- MODIFICADO: Añadido función de checkbox para las stats ---
+    function createCheckbox(label, isChecked, onChange) {
+        const group = document.createElement('div');
+        group.className = 'setting-group';
+        const lbl = document.createElement('label');
+        lbl.style.display = 'flex';
+        lbl.style.justifyContent = 'space-between';
+        lbl.style.alignItems = 'center';
+        lbl.innerHTML = `${label}`;
+        const inp = document.createElement('input');
+        inp.type = 'checkbox'; 
+        inp.checked = isChecked;
+        inp.style.transform = 'scale(1.5)';
+        inp.style.cursor = 'pointer';
+        inp.addEventListener('change', (e) => onChange(e.target.checked));
+        lbl.appendChild(inp);
+        group.appendChild(lbl);
+        modal.appendChild(group);
+    }
 
     createSlider('Sensibilidad Ratón', 0.001, 0.015, 0.001, lookSpeed, v => lookSpeed = v);
     createSlider('Sensibilidad Mando', 0.1, 5.0, 0.1, gamepadLookSpeed, v => gamepadLookSpeed = v);
@@ -1802,6 +1899,13 @@ function createSettingsUI() {
     createSlider('Zona Muerta Táctil', 0.0, 0.5, 0.01, TOUCH_LOOK_DEADZONE_RATIO, v => {
         TOUCH_LOOK_DEADZONE_RATIO = v;
         if(touchControls.right.radius) touchControls.right.deadZone = touchControls.right.radius * TOUCH_LOOK_DEADZONE_RATIO;
+    });
+
+    // --- MODIFICADO: Llamada al checkbox ---
+    createCheckbox('Mostrar FPS / Stats', false, (checked) => {
+        if (stats && stats.dom) {
+            stats.dom.style.display = checked ? 'block' : 'none';
+        }
     });
 
     const closeBtn = document.createElement('button');
