@@ -1772,7 +1772,7 @@ function createSettingsUI() {
 
     const btn = document.createElement('div');
     btn.id = 'settings-btn';
-    btn.innerHTML = '&#9881; Ajustes';
+    btn.innerHTML = '&#9881';
     document.body.appendChild(btn);
 
     const modal = document.createElement('div');
