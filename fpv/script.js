@@ -21,7 +21,7 @@ let TOUCH_JOYSTICK_LOOK_SENSITIVITY = 1.8; // Sensibilidad para el joystick de v
 let TOUCH_LOOK_DEADZONE_RATIO = 0.1;   // 10% del radio del control de vista como zona muerta
 
 // --- NUEVO: CONFIGURACIÓN DE DISPARO ---
-const BULLET_SPEED = 30.0;
+const BULLET_SPEED = 130.0;
 const BULLET_RADIUS = 0.2;
 const BULLET_COLOR = 0xffff00; // Amarillo
 const ENEMY_BULLET_COLOR = 0xff0000; // Rojo para enemigos
