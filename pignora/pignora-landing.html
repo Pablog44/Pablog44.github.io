@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIGNORA — Formación Intensiva</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --btc: #F7931A;
+    --btc-dim: #C4730F;
+    --gold: #D4AF37;
+    --ink: #0A0A0A;
+    --ink-2: #111111;
+    --ink-3: #1A1A1A;
+    --surface: #141414;
+    --border: rgba(247,147,26,0.15);
+    --text: #E8E4DC;
+    --muted: #888580;
+    --ff-display: 'Space Mono', monospace;
+    --ff-body: 'Space Grotesk', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--ff-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── UTILITIES ── */
+  .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  .tag {
+    display: inline-block;
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--btc);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 2px;
+  }
+  .divider {
+    width: 48px; height: 2px;
+    background: var(--btc);
+    margin: 20px 0;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .nav-logo {
+    font-family: var(--ff-display);
+    font-size: 13px;
+    color: var(--btc);
+    letter-spacing: 0.1em;
+    text-decoration: none;
+  }
+  .nav-cta {
+    background: var(--btc);
+    color: var(--ink);
+    font-family: var(--ff-body);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 20px;
+    border-radius: 3px;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  .nav-cta:hover { background: #FFa030; }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 100px 0 80px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '₿';
+    position: absolute;
+    right: -60px; top: -40px;
+    font-size: 420px;
+    color: rgba(247,147,26,0.04);
+    font-family: var(--ff-display);
+    pointer-events: none;
+    line-height: 1;
+    user-select: none;
+  }
+  .hero-eyebrow {
+    font-family: var(--ff-display);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .hero-title {
+    font-family: var(--ff-display);
+    font-size: clamp(52px, 9vw, 90px);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .hero-title .accent { color: var(--btc); }
+  .hero-subtitle {
+    font-size: clamp(18px, 2.5vw, 22px);
+    color: var(--text);
+    max-width: 560px;
+    line-height: 1.5;
+    margin-bottom: 40px;
+    font-weight: 300;
+  }
+  .hero-meta {
+    display: flex; gap: 32px; flex-wrap: wrap;
+    margin-bottom: 44px;
+  }
+  .hero-meta-item {
+    display: flex; flex-direction: column;
+  }
+  .hero-meta-label {
+    font-family: var(--ff-display);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .hero-meta-value {
+    font-family: var(--ff-display);
+    font-size: 16px;
+    color: var(--btc);
+    font-weight: 700;
+  }
+  .hero-meta-value.placeholder {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 13px;
+  }
+  .hero-cta-group { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .btn-primary {
+    background: var(--btc);
+    color: var(--ink);
+    font-family: var(--ff-body);
+    font-weight: 700;
+    font-size: 15px;
+    padding: 16px 36px;
+    border-radius: 3px;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn-primary:hover { background: #FFa030; transform: translateY(-1px); }
+  .btn-ghost {
+    color: var(--text);
+    font-size: 14px;
+    text-decoration: none;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-ghost:hover { color: var(--btc); border-color: var(--btc); }
+
+  /* ── HOOK BAR ── */
+  .hook-bar {
+    background: var(--ink-3);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 32px 0;
+  }
+  .hook-bar .container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 24px;
+    text-align: center;
+  }
+  .hook-item-label {
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .hook-item-value {
+    font-family: var(--ff-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--btc);
+  }
+
+  /* ── SECTION SHARED ── */
+  section { padding: 88px 0; }
+  .section-label {
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--btc);
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .section-body {
+    color: var(--muted);
+    max-width: 620px;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* ── WHAT IS ── */
+  .what-is { background: var(--ink-2); }
+  .what-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    margin-top: 52px;
+    align-items: start;
+  }
+  .what-text p { color: var(--muted); line-height: 1.8; margin-bottom: 16px; }
+  .what-text p strong { color: var(--text); }
+  .what-callout {
+    background: var(--ink-3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--btc);
+    padding: 28px;
+    border-radius: 2px;
+  }
+  .what-callout-title {
+    font-family: var(--ff-display);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--btc);
+    margin-bottom: 16px;
+  }
+  .what-callout ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .what-callout li {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: var(--text); font-size: 15px;
+  }
+  .what-callout li::before {
+    content: '→';
+    color: var(--btc);
+    font-family: var(--ff-display);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── STRATEGIES ── */
+  .strategies { background: var(--ink); }
+  .strategies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-top: 52px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .strategy-card {
+    background: var(--ink-2);
+    padding: 32px 28px;
+    transition: background 0.2s;
+    position: relative;
+  }
+  .strategy-card:hover { background: var(--ink-3); }
+  .strategy-num {
+    font-family: var(--ff-display);
+    font-size: 11px;
+    color: var(--btc);
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .strategy-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  .strategy-desc { color: var(--muted); font-size: 14px; line-height: 1.65; }
+  .strategy-card.bonus { background: rgba(247,147,26,0.06); border-left: 2px solid var(--btc); }
+  .strategy-card.bonus .strategy-num { color: var(--gold); }
+
+  /* ── FOR WHOM ── */
+  .for-whom { background: var(--ink-2); }
+  .for-whom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 48px;
+  }
+  .profile-card {
+    background: var(--ink-3);
+    border: 1px solid var(--border);
+    padding: 28px;
+    border-radius: 3px;
+  }
+  .profile-icon {
+    width: 40px; height: 40px;
+    background: rgba(247,147,26,0.1);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+    font-size: 18px;
+  }
+  .profile-title { font-weight: 700; color: #fff; margin-bottom: 8px; font-size: 16px; }
+  .profile-body { color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+  /* ── PILLARS ── */
+  .pillars { background: var(--ink); }
+  .pillars-list {
+    display: flex; flex-direction: column; gap: 0;
+    margin-top: 52px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .pillar-row {
+    display: flex; align-items: flex-start; gap: 24px;
+    padding: 28px 32px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .pillar-row:last-child { border-bottom: none; }
+  .pillar-row:hover { background: var(--ink-3); }
+  .pillar-icon {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    background: rgba(247,147,26,0.08);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    margin-top: 2px;
+  }
+  .pillar-content-title { font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .pillar-content-body { color: var(--muted); font-size: 15px; line-height: 1.65; }
+
+  /* ── GUARANTEES ── */
+  .guarantees { background: var(--ink-2); }
+  .guarantee-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-top: 48px;
+  }
+  .guarantee-card {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    padding: 28px 24px;
+    border-radius: 3px;
+    text-align: center;
+  }
+  .guarantee-card .gicon {
+    font-size: 28px;
+    margin-bottom: 14px;
+    display: block;
+  }
+  .guarantee-card .gtitle {
+    font-weight: 700; color: #fff;
+    margin-bottom: 8px; font-size: 16px;
+  }
+  .guarantee-card .gbody { color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+  /* ── CTA FINAL ── */
+  .cta-final {
+    background: var(--ink-3);
+    border-top: 1px solid var(--border);
+    padding: 100px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-final::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--btc), transparent);
+  }
+  .cta-final-title {
+    font-family: var(--ff-display);
+    font-size: clamp(30px, 5vw, 50px);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .cta-final-title .accent { color: var(--btc); }
+  .cta-final-sub { color: var(--muted); margin-bottom: 40px; font-size: 16px; }
+  .price-block { margin-bottom: 36px; }
+  .price-label {
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .price-value {
+    font-family: var(--ff-display);
+    font-size: 52px;
+    font-weight: 700;
+    color: var(--btc);
+    line-height: 1;
+  }
+  .price-value.placeholder-price {
+    font-size: 24px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .cta-disclaimer {
+    margin-top: 20px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--ink);
+    border-top: 1px solid var(--border);
+    padding: 28px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--ff-display);
+    letter-spacing: 0.06em;
+  }
+  footer a { color: var(--btc); text-decoration: none; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 680px) {
+    .what-grid, .for-whom-grid { grid-template-columns: 1fr; }
+    .pillar-row { flex-direction: column; gap: 12px; }
+    .hero-meta { gap: 20px; }
+    .hero::before { font-size: 220px; right: -20px; top: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <a class="nav-logo" href="https://bitcoinismo.com">BITCOINISMO.COM</a>
+  <a class="nav-cta" href="#inscripcion">Reservar plaza →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-eyebrow">Formación intensiva online · Fin de semana</p>
+    <h1 class="hero-title">PIGNORA<span class="accent">.</span></h1>
+    <p class="hero-subtitle">Pon tu patrimonio en Bitcoin a trabajar para ti. Aprende las 5 estrategias de pignoración para ganar liquidez, generar cashflow y vivir de tus activos sin vender.</p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Fecha</span>
+        <span class="hero-meta-value placeholder">Por confirmar</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Formato</span>
+        <span class="hero-meta-value">Online · En vivo</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Precio</span>
+        <span class="hero-meta-value placeholder">Por confirmar</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Plazas</span>
+        <span class="hero-meta-value">Limitadas</span>
+      </div>
+    </div>
+    <div class="hero-cta-group">
+      <a href="#inscripcion" class="btn-primary">Quiero apuntarme</a>
+      <a href="#estrategias" class="btn-ghost">Ver las estrategias</a>
+    </div>
+  </div>
+</section>
+
+<!-- HOOK BAR -->
+<div class="hook-bar">
+  <div class="container">
+    <div>
+      <div class="hook-item-value">5+1</div>
+      <div class="hook-item-label">Estrategias</div>
+    </div>
+    <div>
+      <div class="hook-item-value">+50%</div>
+      <div class="hook-item-label">Rentabilidad posible en bear</div>
+    </div>
+    <div>
+      <div class="hook-item-value">0 venta</div>
+      <div class="hook-item-label">Sin descapitalizarte</div>
+    </div>
+    <div>
+      <div class="hook-item-value">Legal</div>
+      <div class="hook-item-label">Sin impuestos por venta</div>
+    </div>
+  </div>
+</div>
+
+<!-- QUÉ ES -->
+<section class="what-is">
+  <div class="container">
+    <div class="section-label">Qué es PIGNORA</div>
+    <h2 class="section-title">Una formación intensiva de fin de semana. Sin relleno.</h2>
+    <div class="what-grid">
+      <div class="what-text">
+        <p>PIGNORA es una <strong>formación online intensiva</strong>, concentrada en un fin de semana, donde aprenderás el paso a paso exacto para poner tu patrimonio a trabajar a tu favor mediante la <strong>pignoración de Bitcoin</strong>.</p>
+        <p>La pignoración te permite usar tu BTC como garantía para obtener liquidez, generar rendimientos y vivir de tus activos, <strong>sin vender, sin pagar impuestos por venta y sin depender de un banco</strong>.</p>
+        <p>No necesitas scoring crediticio, nóminas ni papeleos. Operas de forma soberana, global y sin dar explicaciones.</p>
+      </div>
+      <div class="what-callout">
+        <div class="what-callout-title">Lo que consigues</div>
+        <ul>
+          <li>Liquidez sin vender tu BTC</li>
+          <li>Cashflow mensual pasivo</li>
+          <li>Rentabilidad incluso en mercados bajistas</li>
+          <li>Préstamos perpetuos en USD legalmente</li>
+          <li>Control total del riesgo (LTV)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ESTRATEGIAS -->
+<section class="strategies" id="estrategias">
+  <div class="container">
+    <div class="section-label">Contenido de la formación</div>
+    <h2 class="section-title">5 estrategias (+1 bonus)<br>para cualquier fase del mercado</h2>
+    <p class="section-body">Cada estrategia está calibrada para una situación de mercado distinta. Juntas forman un sistema que funciona tanto en bull como en bear.</p>
+    <div class="strategies-grid">
+
+      <div class="strategy-card">
+        <span class="strategy-num">ESTRATEGIA 01</span>
+        <div class="strategy-name">Rentabilizar Bull Markets</div>
+        <div class="strategy-desc">Pignora tu Bitcoin en la zona baja del mercado para obtener liquidez y acumular más activos sin descapitalizarte.</div>
+      </div>
+
+      <div class="strategy-card">
+        <span class="strategy-num">ESTRATEGIA 02</span>
+        <div class="strategy-name">Rentabilizar Bear Markets</div>
+        <div class="strategy-desc">Actúa como prestamista cuando el mercado cae, obteniendo rentabilidades de hasta el 50% o más y protegiendo tu patrimonio.</div>
+      </div>
+
+      <div class="strategy-card">
+        <span class="strategy-num">ESTRATEGIA 03</span>
+        <div class="strategy-name">El Círculo Soberano</div>
+        <div class="strategy-desc">Conecta las dos estrategias anteriores para ganar en cualquier momento del mercado, suba o baje.</div>
+      </div>
+
+      <div class="strategy-card">
+        <span class="strategy-num">ESTRATEGIA 04</span>
+        <div class="strategy-name">Cashflow / Autosueldo Conservador</div>
+        <div class="strategy-desc">Genera un auto-sueldo mensual pasivo y de bajo riesgo dividiendo tu capital en 12 meses rotativos que te pagan intereses mes a mes.</div>
+      </div>
+
+      <div class="strategy-card">
+        <span class="strategy-num">ESTRATEGIA 05</span>
+        <div class="strategy-name">Préstamos Perpetuos</div>
+        <div class="strategy-desc">Vive de tu patrimonio en Bitcoin obteniendo USD frecuentemente, sin vender y sin pagar impuestos por venta, legalmente.</div>
+      </div>
+
+      <div class="strategy-card bonus">
+        <span class="strategy-num">ESTRATEGIA BONUS</span>
+        <div class="strategy-name">Estrategia Avanzada</div>
+        <div class="strategy-desc">Combina una línea de crédito con BTC como garantía con técnicas de mercados financieros tradicionales para generar rentabilidad pasiva cobrada directamente en Bitcoin.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PARA QUIÉN -->
+<section class="for-whom">
+  <div class="container">
+    <div class="section-label">¿Es para ti?</div>
+    <h2 class="section-title">Para quienes piensan en largo plazo</h2>
+    <p class="section-body">No importa si ya tienes BTC o si operas en fiat. Lo importante es la mentalidad.</p>
+    <div class="for-whom-grid">
+      <div class="profile-card">
+        <div class="profile-icon">₿</div>
+        <div class="profile-title">Tienes Bitcoin y necesitas liquidez</div>
+        <div class="profile-body">Quieres vivir, invertir en otros activos o acumular más BTC sin tener que vender y sin pagar impuestos innecesarios.</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-icon">💶</div>
+        <div class="profile-title">Tienes liquidez en fiat</div>
+        <div class="profile-body">Buscas obtener rendimientos de capital con el menor riesgo posible y quieres entender cómo operar en el ecosistema cripto de forma segura.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PILARES -->
+<section class="pillars">
+  <div class="container">
+    <div class="section-label">Por qué funciona</div>
+    <h2 class="section-title">Sin scoring. Sin papeleos. Sin vender.</h2>
+    <div class="pillars-list">
+      <div class="pillar-row">
+        <div class="pillar-icon">🔒</div>
+        <div>
+          <div class="pillar-content-title">Gana sin vender</div>
+          <div class="pillar-content-body">Obtén dinero sin necesidad de vender tu BTC y sin pagar impuestos por venta. Legalmente.</div>
+        </div>
+      </div>
+      <div class="pillar-row">
+        <div class="pillar-icon">🌐</div>
+        <div>
+          <div class="pillar-content-title">Independencia y soberanía</div>
+          <div class="pillar-content-body">Opera de forma soberana, global y sin dar explicaciones. Sin scoring crediticio ni nóminas.</div>
+        </div>
+      </div>
+      <div class="pillar-row">
+        <div class="pillar-icon">⚖️</div>
+        <div>
+          <div class="pillar-content-title">Control del riesgo (LTV)</div>
+          <div class="pillar-content-body">Aprende a protegerte ante la volatilidad mediante una gestión correcta del Loan To Value.</div>
+        </div>
+      </div>
+      <div class="pillar-row">
+        <div class="pillar-icon">🔄</div>
+        <div>
+          <div class="pillar-content-title">Flexibilidad absoluta</div>
+          <div class="pillar-content-body">Obtén capital sin obligación de cuotas mensuales fijas. Usa el dinero de forma íntegra.</div>
+        </div>
+      </div>
+      <div class="pillar-row">
+        <div class="pillar-icon">📈</div>
+        <div>
+          <div class="pillar-content-title">Rentabilidad en crisis</div>
+          <div class="pillar-content-body">Gana dinero y cobra intereses altos incluso cuando el mercado general está en pánico o cayendo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GARANTÍAS -->
+<section class="guarantees">
+  <div class="container">
+    <div class="section-label">Lo que incluye</div>
+    <h2 class="section-title">No te quedas solo cuando termina el fin de semana</h2>
+    <div class="guarantee-cards">
+      <div class="guarantee-card">
+        <span class="gicon">🎯</span>
+        <div class="gtitle">Paso a paso sin tecnicismos</div>
+        <div class="gbody">Diseñado para que puedas aplicarlo aunque no sepas leer gráficos ni tengas experiencia previa.</div>
+      </div>
+      <div class="guarantee-card">
+        <span class="gicon">📞</span>
+        <div class="gtitle">Sesión de seguimiento en vivo</div>
+        <div class="gbody">Aprox. 15 días después de la formación. Para resolver dudas técnicas, revisar casos reales y solucionar bloqueos.</div>
+      </div>
+      <div class="guarantee-card">
+        <span class="gicon">🧰</span>
+        <div class="gtitle">Kit de herramientas "llave en mano"</div>
+        <div class="gbody">Checklist paso a paso, herramientas antifraude, grabaciones de la formación y Excel de tracking para gestión de riesgos sin matemáticas complejas.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final" id="inscripcion">
+  <div class="container">
+    <h2 class="cta-final-title">Tu Bitcoin puede<br>trabajar para ti<span class="accent">.</span></h2>
+    <p class="cta-final-sub">Reserva tu plaza para la próxima edición de PIGNORA.</p>
+    <div class="price-block">
+      <div class="price-label">Precio de la formación</div>
+      <div class="price-value placeholder-price">Por confirmar</div>
+    </div>
+    <a href="#" class="btn-primary">Reservar mi plaza →</a>
+    <p class="cta-disclaimer">Plazas limitadas · Formación online en directo · Incluye grabaciones</p>
+  </div>
+</section>
+
+<footer>
+  <a href="https://bitcoinismo.com">bitcoinismo.com</a> · "Freedom is not defined by safety" — Ron Paul
+</footer>
+
+</body>
+</html>
