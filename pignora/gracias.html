@@ -1,0 +1,668 @@
+<!-- PIGNORA: Página de gracias / confirmación -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --red: #D11919;
+    --red-bright: #FF2A2A;
+    --red-deep: #8B0F0F;
+    --orange: #F7931A;
+    --gold: #C9960E;
+    --ink: #0A0A0A;
+    --ink-2: #111111;
+    --ink-3: #1A1A1A;
+    --surface: #141414;
+    --border: rgba(209, 25, 25, 0.18);
+    --border-soft: rgba(255, 255, 255, 0.07);
+    --text: #E8E4DC;
+    --muted: #8E8A83;
+    --ff-display: 'Space Mono', monospace;
+    --ff-body: 'Space Grotesk', sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body,
+  .elementor,
+  .elementor-section,
+  .elementor-container,
+  .elementor-column,
+  .elementor-widget-wrap,
+  .elementor-widget-container {
+    background: var(--ink) !important;
+  }
+
+  .pignora-thanks {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 50% 18%, rgba(209, 25, 25, 0.16) 0%, rgba(10, 10, 10, 0) 34%),
+      radial-gradient(circle at 18% 78%, rgba(247, 147, 26, 0.08) 0%, rgba(10, 10, 10, 0) 32%),
+      linear-gradient(180deg, #0A0A0A 0%, #0A0A0A 100%);
+    color: var(--text);
+    font-family: var(--ff-body);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .thanks-nav {
+    width: 100%;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10, 10, 10, 0.92);
+    backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .thanks-logo {
+    font-family: var(--ff-display);
+    font-size: 13px;
+    color: var(--red-bright);
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .thanks-nav-meta {
+    font-family: var(--ff-display);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .thanks-nav-meta strong {
+    color: var(--text);
+  }
+
+  .thanks-main {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 72px 24px;
+  }
+
+  .thanks-shell {
+    width: 100%;
+    max-width: 980px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .thanks-card {
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(20, 20, 20, 0.96) 0%, rgba(10, 10, 10, 0.98) 100%);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--red-bright);
+    border-radius: 6px;
+    padding: 58px 48px;
+    text-align: center;
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .thanks-card::before {
+    content: '';
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    top: -250px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(255, 42, 42, 0.22) 0%, rgba(255, 42, 42, 0) 68%);
+    pointer-events: none;
+  }
+
+  .success-icon {
+    position: relative;
+    z-index: 2;
+    width: 78px;
+    height: 78px;
+    margin: 0 auto 28px;
+    border-radius: 50%;
+    background: rgba(209, 25, 25, 0.13);
+    border: 1px solid rgba(255, 42, 42, 0.26);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 34px rgba(209, 25, 25, 0.22);
+  }
+
+  .success-icon svg {
+    display: block;
+  }
+
+  .thanks-kicker {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    margin-bottom: 16px;
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--red-bright);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 2px;
+    background: rgba(209, 25, 25, 0.06);
+  }
+
+  .thanks-title {
+    position: relative;
+    z-index: 2;
+    font-family: var(--ff-display);
+    color: #FFFFFF;
+    font-size: clamp(32px, 6vw, 62px);
+    line-height: 0.98;
+    letter-spacing: -0.06em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+  }
+
+  .thanks-title span {
+    color: var(--red-bright);
+  }
+
+  .thanks-body {
+    position: relative;
+    z-index: 2;
+    max-width: 670px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: 19px;
+    line-height: 1.7;
+  }
+
+  .thanks-body strong {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .thanks-next {
+    position: relative;
+    z-index: 2;
+    max-width: 720px;
+    margin: 36px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .next-item {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 18px 14px;
+    text-align: center;
+  }
+
+  .next-number {
+    font-family: var(--ff-display);
+    color: var(--red-bright);
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .next-text {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .thanks-actions {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 38px;
+  }
+
+  .thanks-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 14px 24px;
+    border-radius: 4px;
+    font-family: var(--ff-body);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .thanks-button-primary {
+    background: var(--red);
+    color: #FFFFFF;
+    border: 1px solid var(--red);
+  }
+
+  .thanks-button-primary:hover {
+    background: var(--red-bright);
+    border-color: var(--red-bright);
+    transform: translateY(-1px);
+    color: #FFFFFF;
+  }
+
+  .thanks-button-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border-soft);
+  }
+
+  .thanks-button-secondary:hover {
+    border-color: rgba(255, 42, 42, 0.45);
+    color: #FFFFFF;
+    transform: translateY(-1px);
+  }
+
+  .thanks-trust {
+    position: relative;
+    z-index: 2;
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .thanks-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .thanks-trust svg {
+    flex-shrink: 0;
+  }
+
+  .thanks-footer {
+    width: 100%;
+    padding: 28px 24px 36px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--ff-display);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+
+  .thanks-footer a {
+    color: var(--red-bright);
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .thanks-footer a:hover {
+    color: #FFFFFF;
+  }
+
+  /* ── BLOQUE PAGO WOOCOMMERCE ── */
+  .thanks-payment {
+    position: relative;
+    z-index: 2;
+    max-width: 760px;
+    margin: 38px auto 0;
+    padding: 30px 28px;
+    background:
+      linear-gradient(180deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%);
+    border: 1px solid rgba(255, 42, 42, 0.22);
+    border-radius: 6px;
+    text-align: left;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .payment-kicker {
+    display: inline-block;
+    font-family: var(--ff-display);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--orange);
+    border: 1px solid rgba(247, 147, 26, 0.32);
+    background: rgba(247, 147, 26, 0.08);
+    padding: 4px 10px;
+    border-radius: 2px;
+    margin-bottom: 14px;
+  }
+
+  .payment-title {
+    margin: 0 0 12px;
+    font-family: var(--ff-display);
+    color: #FFFFFF;
+    font-size: clamp(24px, 4vw, 36px);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+  }
+
+  .payment-body {
+    margin: 0;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .payment-body strong {
+    color: var(--text);
+  }
+
+  .payment-price {
+    margin: 22px 0 18px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.025);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .payment-price span {
+    color: var(--muted);
+    font-family: var(--ff-display);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .payment-price strong {
+    color: #FFFFFF;
+    font-family: var(--ff-display);
+    font-size: 30px;
+    letter-spacing: -0.04em;
+  }
+
+  .payment-methods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 22px;
+  }
+
+  .payment-method {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    color: var(--text);
+    background: rgba(255,255,255,0.035);
+    border: 1px solid var(--border-soft);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .payment-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .payment-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 14px 20px;
+    border-radius: 4px;
+    font-family: var(--ff-body);
+    font-size: 15px;
+    font-weight: 800;
+    text-decoration: none;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .payment-button-primary {
+    flex: 1 1 290px;
+    color: #FFFFFF;
+    background: var(--red);
+    border: 1px solid var(--red);
+  }
+
+  .payment-button-primary:hover {
+    color: #FFFFFF;
+    background: var(--red-bright);
+    border-color: var(--red-bright);
+    transform: translateY(-1px);
+  }
+
+  .payment-button-secondary {
+    flex: 1 1 230px;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border-soft);
+  }
+
+  .payment-button-secondary:hover {
+    color: #FFFFFF;
+    border-color: rgba(255, 42, 42, 0.45);
+    transform: translateY(-1px);
+  }
+
+  .payment-note {
+    margin: 16px 0 0;
+    color: #77716A;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  @media (max-width: 768px) {
+    .thanks-nav {
+      padding: 16px 20px;
+      align-items: flex-start;
+      gap: 10px;
+      flex-direction: column;
+    }
+
+    .thanks-main {
+      padding: 48px 16px;
+      align-items: flex-start;
+    }
+
+    .thanks-card {
+      padding: 44px 24px;
+    }
+
+    .thanks-body {
+      font-size: 17px;
+    }
+
+    .thanks-next {
+      grid-template-columns: 1fr;
+      margin-top: 30px;
+    }
+
+    .thanks-actions {
+      flex-direction: column;
+    }
+
+    .thanks-button {
+      width: 100%;
+    }
+
+    .thanks-payment {
+      padding: 24px 18px;
+      margin-top: 30px;
+    }
+
+    .payment-price {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .payment-actions {
+      flex-direction: column;
+    }
+
+    .payment-button {
+      width: 100%;
+    }
+
+
+    .thanks-trust {
+      gap: 14px;
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+</style>
+
+<div class="pignora-thanks">
+  <header class="thanks-nav">
+    <a class="thanks-logo" href="https://bitcoinismo.com">BITCOINISMO.COM</a>
+
+    <div class="thanks-nav-meta">
+      5ª Edición · <strong>11–12 Julio 2026</strong>
+    </div>
+  </header>
+
+  <main class="thanks-main">
+    <div class="thanks-shell">
+      <section class="thanks-card">
+        <div class="success-icon">
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#FF2A2A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="7,17 14,24 27,10"></polyline>
+          </svg>
+        </div>
+
+        <div class="thanks-kicker">
+          Solicitud recibida
+        </div>
+
+        <h1 class="thanks-title">
+          <span>¡</span>PLAZA<br>SOLICITADA<span>!</span>
+        </h1>
+
+        <p class="thanks-body">
+          Tu solicitud para la <strong>5ª edición de PIGNORA</strong> se ha enviado correctamente.
+          Te contactaremos por email con los detalles para <strong>confirmar tu plaza</strong>,
+          resolver cualquier duda y explicarte los siguientes pasos.
+        </p>
+
+        <div class="thanks-next">
+          <div class="next-item">
+            <div class="next-number">01</div>
+            <div class="next-text">Revisaremos tu solicitud de reserva.</div>
+          </div>
+
+          <div class="next-item">
+            <div class="next-number">02</div>
+            <div class="next-text">Recibirás la información para confirmar tu plaza.</div>
+          </div>
+
+          <div class="next-item">
+            <div class="next-number">03</div>
+            <div class="next-text">Te indicaremos cómo acceder a la formación online.</div>
+          </div>
+        </div>
+
+
+        <div class="thanks-payment" id="confirmar-plaza">
+          <div class="payment-kicker">Confirmación inmediata</div>
+
+          <h2 class="payment-title">
+            ¿Quieres confirmar tu plaza ahora?
+          </h2>
+
+          <p class="payment-body">
+            Tu solicitud ya está recibida. Si quieres asegurar la plaza sin esperar respuesta manual,
+            puedes completar el pago ahora mediante el checkout de <strong>WooCommerce</strong>.
+          </p>
+
+          <div class="payment-price">
+            <span>Inversión PIGNORA</span>
+            <strong>397 €</strong>
+          </div>
+
+          <div class="payment-methods" aria-label="Métodos de pago disponibles">
+            <span class="payment-method">Bitcoin</span>
+            <span class="payment-method">USDT / USDC</span>
+            <span class="payment-method">Transferencia bancaria</span>
+            <span class="payment-method">Tarjeta, si está activada</span>
+          </div>
+
+          <div class="payment-actions">
+            <!-- IMPORTANTE:
+                 Sustituye 1234 por el ID real del producto PIGNORA en WooCommerce.
+                 Ejemplo final: /checkout/?add-to-cart=2875
+            -->
+            <a class="payment-button payment-button-primary" href="/checkout/?add-to-cart=2845">
+              Confirmar plaza y pagar ahora →
+            </a>
+
+          </div>
+
+          <p class="payment-note">
+            El pago ahora es opcional: si prefieres esperar, no tienes que hacer nada más.
+            Ya hemos recibido tu solicitud y te responderemos por email. Si pagas ahora, WooCommerce registrará tu pedido y podrás elegir el método de pago disponible.
+            Si eliges transferencia, la plaza se confirmará cuando el pago sea revisado manualmente.
+          </p>
+        </div>
+
+        <div class="thanks-actions">
+          <a class="thanks-button thanks-button-primary" href="/pignora/">
+            Volver a PIGNORA →
+          </a>
+
+          <a class="thanks-button thanks-button-secondary" href="https://bitcoinismo.com">
+            Ir a Bitcoinismo
+          </a>
+        </div>
+
+        <div class="thanks-trust">
+          <div class="thanks-trust-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#8E8A83" stroke-width="1.4">
+              <path d="M7 1l1.6 4H13L9.5 8l1.4 4L7 9.5 3.1 12l1.4-4L1 5h4.4z"/>
+            </svg>
+            Plazas limitadas
+          </div>
+
+          <div class="thanks-trust-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#8E8A83" stroke-width="1.4">
+              <rect x="3" y="6" width="8" height="7" rx="1"/>
+              <path d="M5 6V4a2 2 0 0 1 4 0v2"/>
+            </svg>
+            100% privado
+          </div>
+
+          <div class="thanks-trust-item">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#8E8A83" stroke-width="1.4">
+              <circle cx="7" cy="7" r="6"/>
+              <polyline points="7,4 7,7 9,9"/>
+            </svg>
+            Email o confirmación de pedido
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="thanks-footer">
+    <a href="https://bitcoinismo.com">bitcoinismo.com</a>
+    · "Freedom is not defined by safety" — Ron Paul
+  </footer>
+</div>
