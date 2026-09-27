@@ -601,7 +601,7 @@ function box(x0, y0, z0, x1, y1, z1, mat, o) {
     scene.add(m);
     if (!o.dynamic) staticMeshes.push(m);
   }
-  if (o.collide !== false) colliders.push({ minX: x0, minY: y0, minZ: z0, maxX: x1, maxY: y1, maxZ: z1, glass: !!o.glass });
+  if (o.collide !== false) colliders.push({ minX: x0, minY: y0, minZ: z0, maxX: x1, maxY: y1, maxZ: z1, glass: !!o.glass, win: !!o.win, mesh: o.win ? m : null });
   return m;
 }
 const solid = (x0, y0, z0, x1, y1, z1) => box(x0, y0, z0, x1, y1, z1, null);
@@ -660,7 +660,7 @@ function wall(axis, f, a0, a1, y0, y1, t, mat, openings, o) {
     } else if (op.win) {
       const s = y0 + (op.sill === undefined ? 0.9 : op.sill), top = Math.min(y1, y0 + (op.top || 3.1));
       put(op.a, op.b, y0, s); put(op.a, op.b, top, y1);
-      put(op.a, op.b, s, top, M.glass, { glass: true }, 0.06);
+      put(op.a, op.b, s, top, M.glass, { glass: true, win: true, dynamic: true }, 0.06);
       if (axis === 'x') { vis(op.a, s - 0.03, f - t / 2 - 0.02, op.b, s, f + t / 2 + 0.02, NEON[op.color || 'c'], 0); }
       else { vis(f - t / 2 - 0.02, s - 0.03, op.a, f + t / 2 + 0.02, s, op.b, NEON[op.color || 'c'], 0); }
     }
@@ -1280,7 +1280,7 @@ function query(minX, minZ, maxX, maxZ, out, noDyn) {
   return out;
 }
 const _q = [], _q2 = [];
-function pushOut(e, feet, h) {
+function pushOut(e, feet, h, hits) {
   const r = e.r; let hit = false;
   query(e.x - r - 0.05, e.z - r - 0.05, e.x + r + 0.05, e.z + r + 0.05, _q);
   for (const c of _q) {
@@ -1293,14 +1293,14 @@ function pushOut(e, feet, h) {
       const l = e.x - c.minX, rt = c.maxX - e.x, b = e.z - c.minZ, f = c.maxZ - e.z, m = Math.min(l, rt, b, f);
       if (m === l) e.x = c.minX - r; else if (m === rt) e.x = c.maxX + r; else if (m === b) e.z = c.minZ - r; else e.z = c.maxZ + r;
     }
-    hit = true;
+    hit = true; if (hits) hits.push(c);
   }
   return hit;
 }
-function moveXZ(e, dx, dz, feet, h) {
+function moveXZ(e, dx, dz, feet, h, hits) {
   const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.2));
   let hit = false;
-  for (let i = 0; i < n; i++) { e.x += dx / n; e.z += dz / n; if (pushOut(e, feet, h)) hit = true; pushOut(e, feet, h); }
+  for (let i = 0; i < n; i++) { e.x += dx / n; e.z += dz / n; if (pushOut(e, feet, h, hits)) hit = true; pushOut(e, feet, h, hits); }
   return hit;
 }
 function groundAt(x, z, r, maxY, noDyn) {
@@ -1686,7 +1686,7 @@ function tryFire(now) {
     if (k < 5) tracer(mx, my, mzz, hx, hy, hz, w.color, w.pellets > 1 ? 0.01 : 0.016, w.pellets > 1 ? 0.06 : 0.08);
   }
   if (hitAny) showHit(killed);
-  P.recoil += w.kick; P.pitch += w.kick * 0.25; P.yaw += (R() - 0.5) * w.kick * 0.4;
+  P.recoil = Math.min(0.1, P.recoil + w.kick * 0.6);   // retroceso solo visual: la mira vuelve a donde apuntabas
   VM.kick = Math.min(1, VM.kick + (w.pellets > 1 ? 1 : w.id === 'rifle' ? 0.35 : 0.6));
   if (w.bloom) VM.bloom = Math.min(0.045, VM.bloom + 0.0045);
   if (w.id === 'shotgun') VM.pump = 1;
@@ -1722,7 +1722,7 @@ function hurtPlayer(dmg, sx, sz) {
   if (!P.alive || game.state !== 'play') return;
   let d = dmg * (game.dmgMul || 1);
   if (P.shield > 0) { const a = Math.min(P.shield, d * 0.7); P.shield -= a; d -= a; }
-  P.hp -= d; P.shieldT = 4; P.dmgT = Math.min(1, P.dmgT + 0.45 + dmg * 0.02); P.shake = Math.min(0.35, P.shake + dmg * 0.012);
+  P.hp -= d; P.shieldT = 4; P.dmgT = Math.min(1, P.dmgT + 0.45 + dmg * 0.02);
   hudDirty = true; sfx('hurt');
   if (sx !== undefined) showDamageDir(sx, sz);
   if (P.hp <= 0) { P.hp = 0; playerDie(); }
@@ -1738,31 +1738,20 @@ function surfaceAt() {
   if (Math.abs(P.x) < 1.6 && P.z > -4 && P.z < 32) return 'tile';
   return 'grass';
 }
-/* asistencia de apuntado suave para pantallas táctiles */
-let aaT = 0, aaTarget = null;
-function aimAssist(dt) {
-  if (!(CTRL.fire || zoom) || !P.alive) { aaTarget = null; return; }
-  const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-  const angTo = (e) => {
-    const T = ETYPE[e.type], dx = e.x - cx, dz = e.z - cz, hd = Math.hypot(dx, dz), ty = e.y + (T.hb0 + T.hb1) / 2;
-    const dyaw = ((Math.atan2(-dx, -dz) - P.yaw + PI) % TAU + TAU) % TAU - PI;
-    return { dyaw, dp: Math.atan2(ty - cy, hd) - P.pitch, hd, ty };
-  };
-  aaT -= dt;
-  if (aaT <= 0) {
-    aaT = 0.12; aaTarget = null; let best = 0.09;
-    for (const e of enemies) {
-      if (e.dead) continue;
-      const a = angTo(e); if (a.hd > 45 || a.hd < 0.6) continue;
-      const ang = Math.hypot(a.dyaw, a.dp);
-      if (ang < best && clearLine(cx, cy, cz, e.x, a.ty, e.z)) { best = ang; aaTarget = e; }
-    }
+/* ---- ventanas: se rompen al chocar con el cristal desde encima del alféizar (saltando) ---- */
+const _pHits = [];
+function breakWindow(c) {
+  c.broken = true; c.y0 = c.minY; c.y1 = c.maxY; c.minY = c.maxY = 999;
+  if (c.mesh) c.mesh.visible = false;
+  const x0 = c.minX, x1 = c.maxX, z0 = c.minZ, z1 = c.maxZ, n = 7;
+  for (let i = 0; i <= n; i++) {
+    const k = i / n, x = x0 + (x1 - x0) * k, z = z0 + (z1 - z0) * k;
+    spark(x, c.y0 + (c.y1 - c.y0) * (0.3 + R() * 0.5), z, 9, i % 2 ? 0xbfefff : 0x7fdcff, 3.5, 1.1, 12, [P.vx * 0.1, 0.2, P.vz * 0.1]);
   }
-  const e = aaTarget; if (!e || e.dead) return;
-  const a = angTo(e), k = Math.min(1, dt * 4.5);
-  if (CTRL.mode === 'gyro' && GYRO.ok) { GYRO.yawOff += a.dyaw * k; GYRO.pitchOff += a.dp * k; }
-  else { P.yaw += a.dyaw * k; P.pitch = clamp(P.pitch + a.dp * k, -1.5, 1.5); }
+  flash((x0 + x1) / 2, (c.y0 + c.y1) / 2, (z0 + z1) / 2, 0xbfefff, 2.2, 0.15);
+  sfx('glass'); alertNoise(P.x, P.y, P.z, 16);
 }
+function restoreWindows() { for (const c of colliders) if (c.win && c.broken) { c.broken = false; c.minY = c.y0; c.maxY = c.y1; if (c.mesh) c.mesh.visible = true; } }
 function updPlayer(dt) {
   const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), tilt = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
   P.yaw += turn * 2.4 * dt; P.pitch = clamp(P.pitch + tilt * 1.6 * dt, -1.5, 1.5);
@@ -1773,22 +1762,26 @@ function updPlayer(dt) {
     P.pitch += (clamp(GYRO.pitch + GYRO.pitchOff, -1.45, 1.45) - P.pitch) * gk;
     P.roll += (clamp(GYRO.roll, -0.7, 0.7) - P.roll) * gk;
   } else P.roll *= Math.exp(-dt * 6);
-  if (tm) aimAssist(dt);
   let f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), mag = 1;
   if (tm) { f = clamp(f - CTRL.my, -1, 1); s = clamp(s + CTRL.mx, -1, 1); mag = Math.min(1, Math.hypot(f, s)); }
   if (keys.KeyC || CTRL.crouch) { if (!P.crouch) sfx('crouch'); P.crouch = true; }
   else if (P.crouch && !blockedAt(P.x, P.z, P.r, P.y, H_STAND)) { P.crouch = false; sfx('crouch'); }
-  const running = !!(keys.ShiftLeft || keys.ShiftRight || CTRL.run) && f > 0.3 && !P.crouch && !zoom;
+  const crouchSlow = P.crouch && P.onGround;   // en el aire se conserva el impulso aunque te agaches
+  const running = !!(keys.ShiftLeft || keys.ShiftRight || CTRL.run) && f > 0.3 && !crouchSlow && !zoom;
   P.running = running;
-  const spd = (P.crouch ? 2.6 : running ? 8.6 : 5.2) * mag;
+  const spd = (crouchSlow ? 2.6 : running ? 8.6 : 5.2) * mag;
   const sn = Math.sin(P.yaw), cs = Math.cos(P.yaw);
   let wx = -sn * f + cs * s, wz = -cs * f - sn * s; const wl = Math.hypot(wx, wz); if (wl > 0) { wx /= wl; wz /= wl; }
-  const k = 1 - Math.exp(-(P.onGround ? 11 : 2.5) * dt);
+  const k = 1 - Math.exp(-(P.onGround ? 11 : 4.5) * dt);
   P.vx += (wx * spd - P.vx) * k; P.vz += (wz * spd - P.vz) * k;
-  const th = P.crouch ? H_CROUCH : H_STAND; P.h += (th - P.h) * (1 - Math.exp(-dt * 16));
-  moveXZ(P, P.vx * dt, P.vz * dt, P.y, P.h);
+  const th = P.crouch ? H_CROUCH : H_STAND, hPrev = P.h; P.h += (th - P.h) * (1 - Math.exp(-dt * 16));
+  // salto agachado: al agacharte en el aire encoges las piernas (la cabeza no se mueve y los pies suben)
+  if (!P.onGround && hPrev > P.h) P.y += hPrev - P.h;
+  _pHits.length = 0;
+  moveXZ(P, P.vx * dt, P.vz * dt, P.y, P.h, _pHits);
+  for (const c of _pHits) if (c.win && !c.broken) breakWindow(c);
   const jumpKey = keys.Space || CTRL.jump;
-  if (jumpKey && P.onGround && P.jumpOK) { P.vy = 5.6; P.onGround = false; P.jumpOK = false; sfx('jump'); }
+  if (jumpKey && P.onGround && P.jumpOK) { P.vy = P.crouch ? 6.9 : 5.6; P.onGround = false; P.jumpOK = false; sfx('jump'); }
   if (!jumpKey) P.jumpOK = true;
   vertical(P, dt, P.h);
   if (P.landV < -5) { sfx('land', Math.min(1, -P.landV / 12)); P.camY -= Math.min(0.25, -P.landV * 0.02); }
@@ -1801,16 +1794,17 @@ function updPlayer(dt) {
     P.stepT -= dt * hs;
     if (P.stepT <= 0) { P.stepT = running ? 2.9 : P.crouch ? 1.6 : 2.3; sfx('step', surfaceAt(), running ? 1 : P.crouch ? 0.35 : 0.7); if (running && R() < 0.5) alertNoise(P.x, P.y, P.z, 9); }
   }
-  P.dmgT = Math.max(0, P.dmgT - dt * 1.4); P.shake = Math.max(0, P.shake - dt * 1.5);
+  P.dmgT = Math.max(0, P.dmgT - dt * 1.4);
   P.recoil *= Math.exp(-dt * 11);
   const eye = P.y + P.h - 0.12;
   if (Math.abs(eye - P.camY) > 1.2) P.camY = eye; else P.camY += (eye - P.camY) * (1 - Math.exp(-dt * 16));
   const bx = Math.cos(P.bobP) * 0.035 * P.bobA, by = Math.abs(Math.sin(P.bobP)) * 0.05 * P.bobA;
-  const shx = (R() - 0.5) * P.shake * 0.25, shy = (R() - 0.5) * P.shake * 0.25;
-  camera.position.set(P.x + cs * bx + shx, P.camY + by + shy, P.z - sn * bx);
-  camera.rotation.set(P.pitch + P.recoil, P.yaw, -bx * 0.15 + (keys.KeyA ? 0.012 : 0) - (keys.KeyD ? 0.012 : 0) + P.roll);
-  const fov = zoom ? baseFov * 0.64 : running && hs > 6 ? baseFov + 8 : baseFov;
-  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * (1 - Math.exp(-dt * 10)); camera.updateProjectionMatrix(); }
+  camera.position.set(P.x + cs * bx, P.camY + by, P.z - sn * bx);
+  // la rotación solo depende de tu entrada (ratón, dedo o móvil); nada de balanceos por choques
+  camera.rotation.set(P.pitch + P.recoil, P.yaw, P.roll);
+  // el FOV depende de lo que pulsas, no de la velocidad real: chocar con paredes o enemigos no lo hace saltar
+  const fov = zoom ? baseFov * 0.64 : running ? baseFov + 5 : baseFov;
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * (1 - Math.exp(-dt * (zoom ? 12 : 5))); camera.updateProjectionMatrix(); }
 }
 
 /* =================== ENEMIGOS =================== */
@@ -2292,6 +2286,8 @@ function sfx(name, a, b) {
     case 'pickup': [0, 1, 2].forEach((i) => tone('triangle', mtof(76 + i * 4), null, 0.12, 0.12, t + i * 0.06)); break;
     case 'win': [0, 4, 7, 12, 16].forEach((n, i) => tone('square', mtof(64 + n), null, 0.3, 0.08, t + i * 0.12, null, 0.005, 3000)); break;
     case 'toast': tone('sine', 1320, 1320, 0.06, 0.04, t); break;
+    case 'glass': nburst(0.55, 0.5, 'highpass', 3200, 1400, t); nburst(0.18, 0.35, 'bandpass', 5200, 2600, t, null, 2);
+      for (let i = 0; i < 8; i++) tone('sine', 2400 + Math.random() * 3200, null, 0.07 + Math.random() * 0.16, 0.05, t + 0.02 + Math.random() * 0.4); break;
   }
 }
 function sfxAt(name, x, y, z) {
@@ -2432,8 +2428,11 @@ function onTMove(e) {
   if (e.cancelable) e.preventDefault();
   if (p.role === 'stick') stickMove(e);
   else if (p.role === 'look' || p.role === 'fire') {
-    const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-    if (game.state === 'play') touchLook(clamp(dx, -120, 120), clamp(dy, -120, 120));
+    const dx = e.clientX - p.x, dy = e.clientY - p.y, mag = Math.hypot(dx, dy); p.x = e.clientX; p.y = e.clientY;
+    // descarta saltos espurios del navegador (un solo evento enorme tras movimientos pequeños)
+    if (mag > 250 || (p.n > 0 && mag > 120 && mag > 6 * ((p.avg || 0) + 10))) return;
+    p.n = (p.n || 0) + 1; p.avg = (p.avg || 0) * 0.7 + mag * 0.3;
+    if (game.state === 'play') touchLook(dx, dy);
   }
 }
 function onTUp(e) {
@@ -2462,10 +2461,15 @@ function devEuler(al, be, ga, or) {
   const mul = (bx, by, bz, bw) => { const ax = qx, ay = qy, az = qz, aw = qw; qx = ax * bw + aw * bx + ay * bz - az * by; qy = ay * bw + aw * by + az * bx - ax * bz; qz = az * bw + aw * bz + ax * by - ay * bx; qw = aw * bw - ax * bx - ay * by - az * bz; };
   mul(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
   mul(0, 0, Math.sin(-or / 2), Math.cos(-or / 2));
-  const m11 = 1 - 2 * (qy * qy + qz * qz), m13 = 2 * (qx * qz + qw * qy), m21 = 2 * (qx * qy + qw * qz), m22 = 1 - 2 * (qx * qx + qz * qz);
-  const m23 = 2 * (qy * qz - qw * qx), m31 = 2 * (qx * qz - qw * qy), m33 = 1 - 2 * (qx * qx + qy * qy);
-  const x = Math.asin(-clamp(m23, -1, 1));
-  return Math.abs(m23) < 0.9999 ? { x, y: Math.atan2(m13, m33), z: Math.atan2(m21, m22) } : { x, y: Math.atan2(-m31, m11), z: 0 };
+  // columnas de la matriz de rotación: derecha (r), arriba (u) y adelante (f = -columna z)
+  const r = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qw * qz), 2 * (qx * qz - qw * qy)];
+  const u = [2 * (qx * qy - qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qw * qx)];
+  const f = [-2 * (qx * qz + qw * qy), -2 * (qy * qz - qw * qx), -(1 - 2 * (qx * qx + qy * qy))];
+  const sy = clamp(f[1], -1, 1), cy = Math.sqrt(Math.max(0, 1 - sy * sy));
+  // rumbo estable aunque mires al suelo o al cielo: mezcla la dirección de la vista con la del borde superior del móvil
+  const hx = f[0] * cy - u[0] * sy, hz = f[2] * cy - u[2] * sy;
+  const roll = Math.atan2(r[1], u[1]) * clamp((cy - 0.25) / 0.35, 0, 1);
+  return { x: Math.asin(sy), y: Math.atan2(-hx, -hz), z: roll };
 }
 function screenAngle() {
   const so = window.screen && window.screen.orientation;
@@ -2685,8 +2689,12 @@ let everLocked = false;
 function requestLock() {
   if (CTRL.mode !== 'kb') return;
   if (fallback || !canvas.requestPointerLock) { if (!canvas.requestPointerLock) enableFallback(); return; }
-  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => { if (!everLocked) enableFallback(); }); } catch (e) { if (!everLocked) enableFallback(); }
+  const plain = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => lockFailed()); } catch (e) { lockFailed(); } };
+  // entrada en bruto (sin aceleración del sistema) donde el navegador lo permite
+  try { const r = canvas.requestPointerLock({ unadjustedMovement: true }); if (r && r.catch) r.catch((err) => { if (err && err.name === 'NotSupportedError') plain(); else lockFailed(); }); }
+  catch (e) { plain(); }
 }
+function lockFailed() { setTimeout(() => { if (!locked && !everLocked && CTRL.mode === 'kb' && game.state === 'play') enableFallback(); else if (!locked && game.state === 'play' && CTRL.mode === 'kb') H.clickMsg.classList.add('show'); }, 350); }
 function enableFallback() {
   if (fallback) return; fallback = true; H.clickMsg.classList.remove('show');
   toast('Ratón sin captura: mantén pulsado un botón y arrastra para mirar · flechas para girar', 'info');
@@ -2712,7 +2720,7 @@ function placeAtSpawn() {
 function beginRound(n) {
   placeAtSpawn();
   game.round = n; game.roundTime = 0; game.rkills = zeroKills();
-  spawnEnemies(roundSpawnList(n)); spawnRoundPickups(n); resetDoors();
+  spawnEnemies(roundSpawnList(n)); spawnRoundPickups(n); resetDoors(); restoreWindows();
   for (const o of orbs) killOrb(o);
   const pool = shuffle(enemies.filter((e) => e.type !== 'boss')), na = Math.round(pool.length * Math.min(0.6, 0.12 + 0.04 * n));
   for (let i = 0; i < na; i++) { pool[i].alert = true; pool[i].thinkT = R() * 1.5; }
@@ -2792,12 +2800,18 @@ window.addEventListener('mouseup', (e) => { if (e.button === 0) mouse.l = false;
 window.addEventListener('mousemove', (e) => {
   if (game.state !== 'play') return;
   if (locked || (fallback && mouse.any)) {
-    const s = 0.0022 * SET.mouseSens * (zoom ? 0.55 : 1), mx = clamp(e.movementX || 0, -300, 300), my = clamp(e.movementY || 0, -300, 300);
+    const mx = e.movementX || 0, my = e.movementY || 0, mag = Math.hypot(mx, my);
+    // al capturar el ratón algunos navegadores envían un salto del cursor: se ignora
+    if (locked && performance.now() - lockT < 160) return;
+    // pico espurio (fallo conocido del pointer lock): un evento enorme tras movimientos normales
+    if (mag > 120 && mag > 6 * (mAvg + 12)) return;
+    mAvg = mAvg * 0.75 + mag * 0.25;
+    const s = 0.0022 * SET.mouseSens * (zoom ? 0.55 : 1);
     P.yaw -= mx * s; P.pitch = clamp(P.pitch - my * s, -1.5, 1.5);
     VM.swayX = clamp(VM.swayX - mx * 0.00006, -0.04, 0.04); VM.swayY = clamp(VM.swayY + my * 0.00006, -0.03, 0.03);
   }
 });
-let wheelT = 0;
+let wheelT = 0, lockT = 0, mAvg = 0;
 window.addEventListener('wheel', (e) => {
   if (game.state !== 'play') return;
   const now = performance.now(); if (now - wheelT < 140) return; wheelT = now;
@@ -2805,10 +2819,10 @@ window.addEventListener('wheel', (e) => {
 }, { passive: true });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (locked) { everLocked = true; H.clickMsg.classList.remove('show'); }
+  if (locked) { everLocked = true; lockT = performance.now(); mAvg = 0; H.clickMsg.classList.remove('show'); }
   else if (CTRL.mode === 'kb') { zoom = false; mouse.l = mouse.r = mouse.any = false; if (game.state === 'play' && !fallback) pauseGame(); }
 });
-document.addEventListener('pointerlockerror', () => { if (CTRL.mode !== 'kb') return; if (!everLocked) enableFallback(); else if (game.state === 'play') H.clickMsg.classList.add('show'); });
+document.addEventListener('pointerlockerror', () => { if (CTRL.mode !== 'kb') return; lockFailed(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.state === 'play') pauseGame(); });
 H.btnResume.addEventListener('click', resumeGame);
 H.btnRestart.addEventListener('click', newRun);
