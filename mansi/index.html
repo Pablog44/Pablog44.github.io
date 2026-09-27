@@ -200,6 +200,27 @@ body.touch-mode #clickMsg { display: none; }
   body.touch-mode #toasts { top: 24%; width: 50vw; }
   body.touch-mode #banner { top: 26%; }
 }
+
+/* ---- estadísticas de rondas ---- */
+.killgrid { display: grid; grid-template-columns: 1fr auto; gap: 6px 18px; max-width: 360px; margin: 6px 0 14px; font-size: 15px; }
+.killgrid .kt { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.killgrid .kt::before { content: ""; width: 8px; height: 8px; background: var(--ice); }
+.killgrid .kt-drone::before { background: var(--cyan); } .killgrid .kt-soldier::before { background: var(--red); }
+.killgrid .kt-crawler::before { background: var(--green); } .killgrid .kt-boss::before { background: var(--magenta); }
+.killgrid b { text-align: right; color: var(--ice); font-variant-numeric: tabular-nums; }
+.killgrid .kt:last-of-type { border-top: 1px solid var(--line); padding-top: 6px; }
+.killgrid b:last-of-type { border-top: 1px solid var(--line); padding-top: 6px; color: var(--amber); }
+.roundsBig { color: var(--ice) !important; font-size: 18px !important; margin-bottom: 8px !important; }
+.roundsBig b { font-size: 34px; color: var(--amber); margin-left: 8px; vertical-align: middle; }
+#nextInfo { color: var(--muted); }
+
+/* ---- sensibilidad ---- */
+.sensRow { margin-top: 20px; }
+.sensRow label { display: block; color: var(--ice); font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.sensCtl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#sens { flex: 1 1 200px; min-width: 160px; accent-color: var(--cyan); height: 30px; cursor: pointer; margin: 0; }
+#sens:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+#sensVal { min-width: 54px; font-variant-numeric: tabular-nums; color: var(--amber); font-weight: 700; font-size: 16px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   #banner.show { animation: none; opacity: 0; }
@@ -209,7 +230,7 @@ body.touch-mode #clickMsg { display: none; }
 <body>
 <canvas id="game" aria-label="Vista del juego"></canvas>
 <div id="hud" aria-hidden="true">
-  <div id="tl" class="box chamfer"><div id="zone">Zona de aterrizaje</div><div id="objective">Hostiles restantes: 33</div><div id="timer">0:00</div></div>
+  <div id="tl" class="box chamfer"><div id="zone">Zona de aterrizaje</div><div id="objective">Ronda 1</div><div id="timer">0:00</div></div>
   <div id="radarWrap"><canvas id="radar" width="170" height="170"></canvas></div>
   <div id="bossWrap"><span>Coloso · unidad de asedio</span><div class="bar"><i id="bossFill"></i></div></div>
   <div id="vign"></div><div id="dmgDir"></div>
@@ -220,7 +241,7 @@ body.touch-mode #clickMsg { display: none; }
   <div id="clickMsg">Haz clic en la pantalla para capturar el ratón</div>
   <div id="toasts"></div>
   <div id="vitals" class="box chamfer">
-    <div class="vrow"><span>Escudo</span><b id="shieldNum">50</b></div><div class="bar"><i id="shieldBar"></i></div>
+    <div class="vrow"><span>Chaleco</span><b id="shieldNum">50</b></div><div class="bar"><i id="shieldBar"></i></div>
     <div class="vrow"><span>Salud</span><b id="hpNum">100</b></div><div class="bar"><i id="hpBar"></i></div>
     <div id="stance">De pie</div>
   </div>
@@ -241,7 +262,7 @@ body.touch-mode #clickMsg { display: none; }
   <section id="pStart" class="panel chamfer" aria-labelledby="t1">
     <div class="kicker">Operación de asalto · año 2089</div>
     <h1 id="t1">Nexus <span>Villa</span></h1>
-    <p class="intro">Una mansión futurista tomada por drones, soldados y rastreadores. Entra por el jardín o baja al túnel de servicio B-7, que cruza bajo el jardín hasta el sótano del reactor. Limpia la casa entera y acaba con el Coloso.</p>
+    <p class="intro">Una mansión futurista tomada por drones, soldados y arañas mecánicas. Sobrevive ronda tras ronda: cada una trae más hostiles y tu salud no se recupera entre rondas, así que depende de los botiquines y chalecos del mapa. En las rondas 5 y 10 despiertan los Colosos del sótano.</p>
     <div class="modes-title" id="modesT">Elige cómo quieres jugar</div>
     <div class="modes" role="group" aria-labelledby="modesT">
       <button class="mode" type="button" data-mode="gyro"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="15" y="6" width="18" height="34" rx="3"/><path d="M22 35h4"/><path d="M6 18a20 20 0 0 1 4-8M42 18a20 20 0 0 0-4-8M4 12l2 6 6-2M44 12l-2 6-6-2"/></svg><span><b>Mirar moviendo el móvil</b><small>Giroscopio, como en las fotos 360°. Joystick para andar.</small></span><em>Recomendado</em></button>
@@ -283,17 +304,22 @@ body.touch-mode #clickMsg { display: none; }
     <div class="kicker">Operación en pausa</div><h2 id="t2">Pausa</h2>
     <p>Tómate un respiro. Los hostiles siguen donde los dejaste.</p>
     <div class="btns"><button id="btnResume" type="button">Continuar</button><button id="btnRestart" class="ghost" type="button">Reiniciar</button></div>
+    <div class="sensRow">
+      <label id="sensLabel" for="sens">Sensibilidad del ratón</label>
+      <div class="sensCtl"><input id="sens" type="range" min="0.2" max="3" step="0.05" value="1"><output id="sensVal" for="sens">1.00×</output><button id="sensReset" type="button" class="ghost sm">Por defecto</button></div>
+    </div>
     <div class="modeSwitch" role="group" aria-label="Controles"><span>Controles:</span><button type="button" class="ghost sm" data-setmode="touch" aria-pressed="false">Táctil</button><button type="button" class="ghost sm" data-setmode="gyro" aria-pressed="false">Giroscopio</button><button type="button" class="ghost sm" data-setmode="kb" aria-pressed="false">Teclado y ratón</button></div>
   </section>
-  <section id="pDead" class="panel chamfer" hidden aria-labelledby="t3">
-    <div class="kicker">Señal perdida</div><h2 id="t3">Has caído</h2>
-    <p id="deadStats" class="stats"></p>
-    <div class="btns"><button id="btnRetry" type="button">Reintentar · R</button></div>
+  <section id="pDead" class="panel chamfer" hidden aria-labelledby="endTitle">
+    <div class="kicker" id="endKicker">Señal perdida</div><h2 id="endTitle">Has caído</h2>
+    <div id="deadStats"></div>
+    <div class="btns"><button id="btnRetry" type="button">Nueva partida<span class="only-desk"> · R</span></button></div>
   </section>
-  <section id="pWin" class="panel chamfer" hidden aria-labelledby="t4">
-    <div class="kicker">Operación completada</div><h2 id="t4">Mansión despejada</h2>
-    <p id="winStats" class="stats"></p>
-    <div class="btns"><button id="btnAgain" type="button">Jugar otra vez · R</button></div>
+  <section id="pWin" class="panel chamfer" hidden aria-labelledby="winTitle">
+    <div class="kicker">Ronda completada</div><h2 id="winTitle">Ronda superada</h2>
+    <div id="winStats"></div>
+    <p id="nextInfo"></p>
+    <div class="btns"><button id="btnAgain" type="button">Empezar la siguiente ronda</button><button id="btnQuit" class="ghost" type="button">Terminar partida</button></div>
   </section>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -495,10 +521,16 @@ function drawScreen(t, hostiles) {
   g.strokeStyle = '#35f2ff'; g.lineWidth = 2; g.beginPath();
   for (let x = 0; x <= w; x += 4) { const y = 92 + Math.sin(x * 0.05 + t * 3) * 14 + Math.sin(x * 0.13 - t * 5) * 6; x === 0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
   g.fillStyle = '#ff3fa4'; for (let i = 0; i < 12; i++) { const v = (Math.sin(t * 2 + i) * 0.5 + 0.5) * 26; g.fillRect(12 + i * 10, 132 - v, 6, v); }
-  g.font = '700 18px "Chakra Petch", sans-serif'; g.fillStyle = '#dff6ff'; g.fillText('Nexus Villa · seguridad', 12, 26);
-  g.font = '600 14px "Chakra Petch", sans-serif'; g.fillStyle = hostiles > 0 ? '#ff4d6d' : '#5dff9c';
-  g.fillText(hostiles > 0 ? `Intrusos detectados: ${hostiles}` : 'Perímetro seguro', 12, 48);
-  const d = new Date(); g.fillStyle = '#ffb23f'; g.fillText(d.toTimeString().slice(0, 8), 176, 26);
+  const fit = (txt, weight, size, maxW) => { let s = size; do { g.font = `${weight} ${s}px "Chakra Petch", sans-serif`; } while (g.measureText(txt).width > maxW && --s > 9); };
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  fit('Nexus Villa · seguridad', 700, 18, w - 24); g.fillStyle = '#dff6ff'; g.fillText('Nexus Villa · seguridad', 12, 26);
+  const msg = hostiles > 0 ? `Intrusos detectados: ${hostiles}` : 'Perímetro seguro';
+  fit(msg, 600, 14, w - 24); g.fillStyle = hostiles > 0 ? '#ff4d6d' : '#5dff9c'; g.fillText(msg, 12, 48);
+  // la hora va abajo a la derecha, junto a las barras, donde no pisa ningún texto
+  const d = new Date(), hh = d.toTimeString().slice(0, 8);
+  g.font = '600 15px "Chakra Petch", sans-serif'; g.textAlign = 'right';
+  g.fillStyle = 'rgba(8,6,22,.65)'; g.fillRect(w - 86, 118, 78, 20);
+  g.fillStyle = '#ffb23f'; g.fillText(hh, w - 12, 133); g.textAlign = 'left';
   g.fillStyle = 'rgba(255,255,255,.06)'; for (let y = (t * 40) % 4; y < h; y += 4) g.fillRect(0, y, w, 1);
   screenTex.needsUpdate = true;
 }
@@ -1549,6 +1581,10 @@ const keys = Object.create(null);
 const CTRL = { mode: 'kb', mx: 0, my: 0, fire: false, jump: false, crouch: false, run: false };
 const GYRO = { ok: false, listening: false, first: true, t0: 0, yaw: 0, pitch: 0, roll: 0, yawOff: 0, pitchOff: 0 };
 let baseFov = 75, VMX = 0.24;
+/* ajustes guardados (sensibilidad) */
+const SET = { mouseSens: 1, touchSens: 1 };
+try { const s = JSON.parse(localStorage.getItem('nexus-villa-settings') || '{}'); for (const k in SET) if (typeof s[k] === 'number' && s[k] >= 0.2 && s[k] <= 3) SET[k] = s[k]; } catch (e) { /* sin almacenamiento */ }
+function saveSettings() { try { localStorage.setItem('nexus-villa-settings', JSON.stringify(SET)); } catch (e) { /* sin almacenamiento */ } }
 const mouse = { l: false, r: false, any: false };
 let locked = false, fallback = false, zoom = false, zoomK = 0;
 
@@ -1765,7 +1801,6 @@ function updPlayer(dt) {
     P.stepT -= dt * hs;
     if (P.stepT <= 0) { P.stepT = running ? 2.9 : P.crouch ? 1.6 : 2.3; sfx('step', surfaceAt(), running ? 1 : P.crouch ? 0.35 : 0.7); if (running && R() < 0.5) alertNoise(P.x, P.y, P.z, 9); }
   }
-  if (P.shieldT > 0) P.shieldT -= dt; else if (P.shield < 50) { P.shield = Math.min(50, P.shield + 12 * dt); hudDirty = true; }
   P.dmgT = Math.max(0, P.dmgT - dt * 1.4); P.shake = Math.max(0, P.shake - dt * 1.5);
   P.recoil *= Math.exp(-dt * 11);
   const eye = P.y + P.h - 0.12;
@@ -1790,15 +1825,36 @@ const SPAWNS = [
   ['soldier', 4, 0, -10], ['soldier', -1, 0, -7], ['soldier', 16, 0, -13], ['soldier', -11, 0, -22], ['soldier', 12, 0, -25.7], ['crawler', -14, 0, -12.5], ['crawler', -3, 0, -22], ['drone', 14, 0, -10], ['drone', 16, 0, -19],
   ['soldier', 9.75, -4.5, 26], ['soldier', 0, -4.5, 21.5], ['soldier', -10, -4.5, 10], ['soldier', -4, -4.5, -10], ['crawler', 9.75, -4.5, 18], ['crawler', -2, -4.5, 22.5], ['crawler', -10, -4.5, 1], ['drone', 0, -4.5, 16.2], ['drone', -14, -4.5, -8],
   ['soldier', -12, 4.3, -22], ['soldier', 10, 4.3, -26], ['soldier', 8, 4.3, -8], ['drone', -10, 4.3, -26], ['drone', -10, 4.3, -10], ['crawler', -4, 4.3, -12],
-  ['boss', -9, -4.5, -24],
 ];
+const CURATED = SPAWNS;
+const BOSS_SPOTS = [[-9, -4.5, -24], [-13, -4.5, -10], [-4.5, -4.5, -27.5], [-14, -4.5, -17], [-3.5, -4.5, -13]];
+const TNAME = { drone: 'Drones', soldier: 'Soldados', crawler: 'Arañas', boss: 'Colosos' };
 const enemies = [];
 const eLaserMat = () => new THREE.MeshBasicMaterial({ color: 0xff2a4a, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending });
 function ebox(g, w, h, d, x, y, z, mat) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); return m; }
+let SPG = null;
+function spiderGeos() {
+  if (SPG) return SPG;
+  const femur = new THREE.BoxGeometry(0.46, 0.06, 0.06); femur.translate(0.23, 0, 0); femur.rotateZ(0.65);
+  const knee = new THREE.SphereGeometry(0.058, 8, 6); knee.translate(0.366, 0.279, 0);
+  const tibia = new THREE.BoxGeometry(0.82, 0.045, 0.045); tibia.translate(0.41, 0, 0); tibia.rotateZ(-1.25); tibia.translate(0.366, 0.279, 0);
+  const claw = new THREE.ConeGeometry(0.035, 0.1, 5); claw.rotateZ(PI); claw.translate(0.624, -0.47, 0);
+  const ceph = new THREE.SphereGeometry(0.3, 16, 12); ceph.scale(1, 0.62, 1.15);
+  const abd = new THREE.SphereGeometry(0.4, 18, 14); abd.scale(1, 0.8, 1.3);
+  const rings = [-0.24, 0, 0.24].map((dz) => { const k = Math.sqrt(1 - (dz / 0.52) ** 2); const t = new THREE.TorusGeometry(0.405 * k, 0.022, 6, 28); t.scale(1, 0.8, 1); t.translate(0, 0, dz); return t; });
+  // ojos colocados sobre la superficie del cefalotórax (elipsoide centrado en 0, 0.55, 0.12)
+  const eyes = [[0.075, 0.6, 0.055], [0.15, 0.58, 0.033], [0.045, 0.66, 0.03], [0.11, 0.645, 0.024]].flatMap(([x, y, r]) => [-1, 1].map((s) => {
+    const k = Math.sqrt(Math.max(0, 1 - (x / 0.3) ** 2 - ((y - 0.55) / 0.186) ** 2)), z = 0.12 + 0.345 * k - r * 0.4;
+    const g = new THREE.SphereGeometry(r, 8, 6); g.translate(s * x, y, z); return g;
+  }));
+  const fang = new THREE.ConeGeometry(0.04, 0.2, 6); fang.rotateZ(PI); fang.translate(0, -0.1, 0);
+  SPG = { leg: mergeGeos([femur, knee, tibia, claw]), ceph, abd, rings: mergeGeos(rings), eyes: mergeGeos(eyes), fang, crest: new THREE.BoxGeometry(0.04, 0.035, 0.3), sac: new THREE.SphereGeometry(0.1, 10, 8) };
+  return SPG;
+}
 function buildEnemyModel(type) {
   const g = new THREE.Group(), p = {};
-  const hull = std({ color: { drone: 0x3a4058, soldier: 0x2b2f3f, crawler: 0x2a3a34, boss: 0x3a2a44 }[type], metalness: 0.7, roughness: 0.35, emissive: 0x000000 });
-  const trim = std({ color: 0xc9d0e0, metalness: 0.5, roughness: 0.4, emissive: 0x000000 });
+  const hull = std({ color: { drone: 0x3a4058, soldier: 0x2b2f3f, crawler: 0x1b2226, boss: 0x3a2a44 }[type], metalness: 0.7, roughness: 0.35, emissive: 0x000000 });
+  const trim = std({ color: type === 'crawler' ? 0x3a434c : 0xc9d0e0, metalness: type === 'crawler' ? 0.85 : 0.5, roughness: type === 'crawler' ? 0.3 : 0.4, emissive: 0x000000 });
   if (type === 'drone') {
     const b = new THREE.Group(); b.position.y = 1.45; g.add(b); p.body = b;
     b.add(new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), hull));
@@ -1821,12 +1877,26 @@ function buildEnemyModel(type) {
     ebox(up, 0.08, 0.1, 0.6, 0.18, 0.38, 0.38, M.black); ebox(up, 0.085, 0.02, 0.5, 0.18, 0.44, 0.38, M.neonR);
     p.gun = new THREE.Vector3(0.18, 1.2, 0.7);
   } else if (type === 'crawler') {
+    // araña mecánica: cefalotórax + abdomen con anillos de neón, 8 ojos, colmillos y 8 patas articuladas
+    const G = spiderGeos();
     const b = new THREE.Group(); g.add(b); p.body = b;
-    ebox(b, 0.6, 0.3, 0.9, 0, 0.5, 0, hull); ebox(b, 0.4, 0.25, 0.3, 0, 0.55, 0.55, trim);
-    for (const x of [-0.1, 0, 0.1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), M.neonG); e.position.set(x, 0.6 - Math.abs(x) * 0.4, 0.71); b.add(e); }
-    for (let i = 0; i < 3; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.25, 5), M.neonG); c.position.set(0, 0.72, -0.25 + i * 0.25); b.add(c); }
+    const ceph = new THREE.Mesh(G.ceph, hull); ceph.position.set(0, 0.55, 0.12); b.add(ceph);
+    const crest = new THREE.Mesh(G.crest, M.neonG); crest.position.set(0, 0.735, 0.08); b.add(crest);
+    const abd = new THREE.Group(); abd.position.set(0, 0.7, -0.5); abd.rotation.x = -0.28; b.add(abd); p.abd = abd;
+    abd.add(new THREE.Mesh(G.abd, hull)); abd.add(new THREE.Mesh(G.rings, M.neonG));
+    p.sac = new THREE.Mesh(G.sac, M.neonR); p.sac.position.set(0, 0.27, -0.12); abd.add(p.sac);
+    b.add(new THREE.Mesh(G.eyes, M.neonR));
+    p.fangs = [-1, 1].map((s) => { const f = new THREE.Mesh(G.fang, M.neonG); f.position.set(s * 0.075, 0.49, 0.43); f.rotation.x = -0.4; b.add(f); return f; });
     p.legs = [];
-    for (let i = 0; i < 6; i++) { const s = i < 3 ? -1 : 1, lg = new THREE.Group(); lg.position.set(s * 0.3, 0.5, -0.3 + (i % 3) * 0.3); b.add(lg); const l = ebox(lg, 0.45, 0.05, 0.05, s * 0.2, -0.2, 0, hull); l.rotation.z = s * 0.8; p.legs.push(lg); }
+    const zs = [0.26, 0.13, 0.0, -0.13], splay = [0.9, 0.35, -0.2, -0.75];
+    for (const s of [1, -1]) for (let i = 0; i < 4; i++) {
+      const base = s > 0 ? -splay[i] : PI + splay[i];
+      const swing = new THREE.Group(); swing.position.set(s * 0.2, 0.52, zs[i]); swing.rotation.y = base; b.add(swing);
+      const lift = new THREE.Group(); swing.add(lift); lift.add(new THREE.Mesh(G.leg, trim));
+      p.legs.push({ swing, lift, base, s, grp: (i + (s > 0 ? 0 : 1)) % 2 });
+    }
+    const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.glow, color: 0x5dff9c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.35 }));
+    h.scale.set(1.9, 1.9, 1); h.position.set(0, 0.08, -0.1); g.add(h);
   } else {
     p.legs = [];
     for (const s of [-1, 1]) { const lg = new THREE.Group(); lg.position.set(s * 0.48, 1.35, 0); g.add(lg); ebox(lg, 0.45, 1.35, 0.5, 0, -0.67, 0, hull); ebox(lg, 0.47, 0.08, 0.52, 0, -0.5, 0, M.neonM); p.legs.push(lg); }
@@ -1840,14 +1910,14 @@ function buildEnemyModel(type) {
   }
   return { g, p, hull, trim };
 }
-function spawnEnemies() {
+function spawnEnemies(list) {
   for (const e of enemies) { e.dead = e.gone = true; scene.remove(e.g); if (e.laser) scene.remove(e.laser); }
   enemies.length = 0;
-  for (const [type, x, y, z] of SPAWNS) {
+  for (const [type, x, y, z] of list) {
     const T = ETYPE[type], mdl = buildEnemyModel(type);
     const e = { type, x, y, z, vx: 0, vz: 0, vy: 0, r: T.r, hp: T.hp, max: T.hp, onGround: true, alert: false, see: false, thinkT: R() * 0.3, atkT: 1 + R(), wp: null, wpLink: false, linkT: 0,
       face: R() * TAU, g: mdl.g, p: mdl.p, hull: mdl.hull, trim: mdl.trim, flash: 0, dead: false, gone: false, deathT: 0, stuckT: 0, lastX: x, lastZ: z, strafe: R() < 0.5 ? -1 : 1, strafeT: 0,
-      charge: 0, aimX: 0, aimY: 0, aimZ: 0, homeX: x, homeZ: z, patrolT: R() * 3, animP: R() * 10, lunge: 0, burst: 0, landV: 0 };
+      charge: 0, aimX: 0, aimY: 0, aimZ: 0, homeX: x, homeZ: z, patrolT: R() * 3, animP: R() * 10, lunge: 0, burst: 0, landV: 0, leap: 0, leapT: 1 + R() * 2 };
     e.y = Math.max(y, groundAt(x, z, 0.3, y + 0.5));
     if (type === 'soldier') { e.laser = new THREE.Mesh(trGeo, eLaserMat()); e.laser.visible = false; e.laser.frustumCulled = false; scene.add(e.laser); }
     e.g.position.set(e.x, e.y, e.z); e.g.rotation.y = e.face; scene.add(e.g);
@@ -1855,7 +1925,50 @@ function spawnEnemies() {
   }
 }
 const aliveCount = () => enemies.reduce((n, e) => n + (e.dead ? 0 : 1), 0);
-const boss = () => enemies.find((e) => e.type === 'boss');
+const boss = () => { let b = null, bd = 1e9; for (const e of enemies) { if (e.type !== 'boss' || e.dead) continue; const d = Math.hypot(e.x - P.x, e.z - P.z) - (e.alert ? 1000 : 0); if (d < bd) { bd = d; b = e; } } return b; };
+/* ---- rondas: composición y posiciones ---- */
+const ROUND_CAP = IS_TOUCH ? 44 : 56;
+const enemiesForRound = (n) => Math.min(ROUND_CAP, 20 + 3 * (n - 1));
+const bossesForRound = (n) => (n === 5 ? 1 : n === 10 ? 2 : 0);
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+let navInterior = null;
+function interiorCells() {
+  if (navInterior) return navInterior;
+  navInterior = [];
+  for (let L = 0; L < 3; L++) for (let j = 1; j < NAV.H - 1; j++) for (let i = 1; i < NAV.W - 1; i++) {
+    const n = L * NN + j * NAV.W + i; if (!navWalk[n]) continue;
+    let ok = true;
+    for (let dj = -1; dj <= 1 && ok; dj++) for (let di = -1; di <= 1; di++) if (!navWalk[L * NN + (j + dj) * NAV.W + i + di]) { ok = false; break; }
+    if (ok) navInterior.push(n);
+  }
+  return navInterior;
+}
+const farFromPlayer = (x, y, z, same, other) => { const d = Math.hypot(x - P.x, z - P.z); return levelOf(y + 0.3) === levelOf(P.y + 0.3) ? d >= same : d >= other; };
+function randomSpot(minSame, minOther, taken) {
+  const cells = interiorCells();
+  for (let k = 0; k < 80; k++) {
+    const n = cells[Math.floor(R() * cells.length)], L = Math.floor(n / NN), x = cellX(n), z = cellZ(n), y = LV[L];
+    if (!farFromPlayer(x, y, z, minSame, minOther)) continue;
+    if (taken.some((q) => Math.abs(q[1] - x) + Math.abs(q[3] - z) < 2.2 && Math.abs(q[2] - y) < 1)) continue;
+    return [x, y, z];
+  }
+  return null;
+}
+function roundSpawnList(n) {
+  const N = enemiesForRound(n), list = [];
+  for (const s of shuffle(CURATED.slice())) { if (list.length >= N) break; if (farFromPlayer(s[1], s[2], s[3], 16, 6)) list.push(s.slice()); }
+  const W = [['soldier', 0.38], ['drone', 0.3], ['crawler', 0.32]];
+  while (list.length < N) {
+    const q = randomSpot(16, 6, list); if (!q) break;
+    let r = R(), t = 'soldier'; for (const [k, w] of W) { if ((r -= w) <= 0) { t = k; break; } }
+    list.push([t, q[0], q[1], q[2]]);
+  }
+  // los Colosos aparecen en el sótano, lo más lejos posible del jugador
+  const inBase = P.y < -2 && P.z < -4;
+  const spots = BOSS_SPOTS.map((b) => ({ b, d: inBase ? Math.hypot(b[0] - P.x, b[2] - P.z) : R() })).sort((a, c) => c.d - a.d);
+  for (let i = 0; i < bossesForRound(n); i++) { const b = spots[i].b; list.push(['boss', b[0], b[1], b[2]]); }
+  return list;
+}
 function alertEnemy(e, chain) {
   if (e.dead || e.alert) return;
   e.alert = true; e.thinkT = 0; e.atkT = Math.max(e.atkT, 0.5 + R() * 0.6);
@@ -1881,17 +1994,17 @@ function damageEnemy(e, d, hx, hy, hz) {
 }
 function killEnemy(e) {
   const T = ETYPE[e.type];
-  e.dead = true; e.deathT = e.type === 'boss' ? 1.2 : 0.4; P.kills++;
+  e.dead = true; e.deathT = e.type === 'boss' ? 1.2 : 0.4; P.kills++; game.kills[e.type]++; game.rkills[e.type]++;
   const cy = e.y + (T.hb0 + T.hb1) / 2;
   spark(e.x, cy, e.z, e.type === 'boss' ? 120 : 34, T.color, e.type === 'boss' ? 9 : 5, 0.9, 7);
   spark(e.x, cy, e.z, 14, 0xffffff, 3, 0.5, 4);
   flash(e.x, cy, e.z, T.color, e.type === 'boss' ? 7 : 2.6, 0.35);
   if (e.laser) e.laser.visible = false;
   sfxAt(e.type === 'boss' ? 'bossdeath' : 'edeath', e.x, cy, e.z);
-  if (e.type === 'boss') { makePickup('health', e.x + 1, e.y, e.z); makePickup('cells', e.x - 1, e.y, e.z); toast('Coloso destruido', 'good'); }
-  else if (R() < 0.25) { const need = P.hp < 60 ? 'health' : WEAPONS[1].ammo < 10 ? 'shells' : WEAPONS[2].ammo < 60 ? 'cells' : ['health', 'shells', 'cells'][Math.floor(R() * 3)]; makePickup(need, e.x, e.y, e.z); }
+  if (e.type === 'boss') { makePickup('shells', e.x + 1, e.y, e.z); makePickup('cells', e.x - 1, e.y, e.z); toast('Coloso destruido', 'good'); }
+  else if (R() < 0.15) makePickup(WEAPONS[1].ammo * 5 < WEAPONS[2].ammo ? 'shells' : 'cells', e.x, e.y, e.z);
   hudDirty = true;
-  if (aliveCount() === 0) setTimeout(() => { if (game.state === 'play') gameWin(); }, 900);
+  if (aliveCount() === 0) { const r = game.round; setTimeout(() => { if (game.state === 'play' && game.round === r && aliveCount() === 0) roundCleared(); }, 900); }
 }
 const angLerp = (a, b, k) => { let d = ((b - a + PI) % TAU + TAU) % TAU - PI; return a + d * Math.min(1, k); };
 function updEnemy(e, dt, t) {
@@ -1899,6 +2012,7 @@ function updEnemy(e, dt, t) {
   if (e.dead) {
     e.deathT -= dt; const k = Math.max(0, e.deathT / (e.type === 'boss' ? 1.2 : 0.4));
     e.g.scale.setScalar(0.15 + 0.85 * k); e.g.rotation.z = (1 - k) * 0.6;
+    if (e.type === 'crawler') for (const L of e.p.legs) L.lift.rotation.z = (1 - k) * 1.4;
     if (e.type === 'boss' && R() < 0.3) spark(e.x + (R() - 0.5) * 2, e.y + R() * 3, e.z + (R() - 0.5) * 2, 4, 0xff3fa4, 4, 0.6, 5);
     if (e.deathT <= 0) { scene.remove(e.g); e.gone = true; }
     return;
@@ -1942,6 +2056,8 @@ function updEnemy(e, dt, t) {
     }
   }
   if (e.charge > 0) spd *= 0.1;
+  if (e.leapT > 0) e.leapT -= dt;
+  if (e.leap > 0) { e.leap -= dt; spd *= 2.1; }
   for (const o of enemies) {
     if (o === e || o.dead) continue;
     const ox = e.x - o.x, oz = e.z - o.z, d2 = ox * ox + oz * oz, rs = T.r + ETYPE[o.type].r + 0.25;
@@ -1970,6 +2086,7 @@ function updEnemy(e, dt, t) {
   if (e.alert && e.see && P.alive && game.state === 'play') {
     if (e.type === 'crawler') {
       if (dist < T.rmax && Math.abs(dy) < 1.3 && e.atkT <= 0) { e.atkT = T.atk; e.lunge = 1; hurtPlayer(14, e.x, e.z); sfxAt('claw', e.x, e.y + 0.5, e.z); }
+      else if (dist > 3 && dist < 7 && e.onGround && e.leapT <= 0 && Math.abs(dy) < 0.8) { e.vy = 4.3; e.onGround = false; e.leap = 0.5; e.leapT = 2.5 + R() * 1.5; e.lunge = 0.6; sfxAt('screech', e.x, e.y + 0.5, e.z); }
     } else if (e.type === 'soldier') {
       if (e.charge <= 0 && e.atkT <= 0 && dist < T.rmax + 5) { e.charge = 0.65; e.aimX = px; e.aimY = py; e.aimZ = pz; sfxAt('charge', e.x, e.y + 1.2, e.z); }
     } else if (e.type === 'drone') {
@@ -2004,7 +2121,23 @@ function updEnemy(e, dt, t) {
   const pr = e.p;
   if (e.type === 'drone') { pr.body.position.y = 1.45 + Math.sin(t * 2 + e.animP * 0.1) * 0.08; pr.ring.rotation.z += dt * 3; pr.rotors.forEach((r) => { r.rotation.y += dt * 30; }); pr.body.rotation.x = clamp(sp * 0.05, 0, 0.3); }
   else if (e.type === 'soldier') { const s = Math.sin(e.animP) * Math.min(1, sp / 2) * 0.6; pr.legs[0].rotation.x = s; pr.legs[1].rotation.x = -s; pr.up.rotation.y = e.charge > 0 ? 0.15 : 0; }
-  else if (e.type === 'crawler') { pr.legs.forEach((l, i) => { l.rotation.y = Math.sin(e.animP * 2 + i * 1.3) * 0.4; }); e.lunge = Math.max(0, e.lunge - dt * 4); pr.body.position.z = Math.sin(e.lunge * PI) * 0.35; pr.body.position.y = Math.abs(Math.sin(e.animP * 2)) * 0.04; }
+  else if (e.type === 'crawler') {
+    const k = e.onGround ? Math.min(1, sp / 3) : 0, idle = 1 - k;
+    for (const L of pr.legs) {
+      const ph = e.animP * 2.2 + (L.grp ? PI : 0);
+      const sw = Math.sin(ph) * 0.34 * k + Math.sin(t * 3.1 + L.base * 5) * 0.05 * idle;
+      L.swing.rotation.y = L.base - L.s * sw;
+      L.lift.rotation.z = e.onGround ? Math.max(0, Math.cos(ph)) * 0.38 * k + (e.alert ? 0.04 : 0) : 0.55;
+    }
+    e.lunge = Math.max(0, e.lunge - dt * 4);
+    pr.body.position.z = Math.sin(e.lunge * PI) * 0.35;
+    pr.body.position.y = Math.abs(Math.sin(e.animP * 2.2)) * 0.035 * k;
+    pr.body.rotation.x = e.onGround ? 0 : -0.3;
+    const fo = 0.15 + e.lunge * 0.55 + (e.alert ? Math.abs(Math.sin(t * 11 + e.animP)) * 0.12 : 0);
+    pr.fangs[0].rotation.z = -fo; pr.fangs[1].rotation.z = fo;
+    pr.sac.scale.setScalar(1 + Math.sin(t * (e.alert ? 9 : 4) + e.animP) * 0.25);
+    pr.abd.rotation.x = -0.28 + Math.sin(t * 2 + e.animP) * 0.05;
+  }
   else { const s = Math.sin(e.animP * 0.6) * Math.min(1, sp) * 0.35; pr.legs[0].rotation.x = s; pr.legs[1].rotation.x = -s; pr.core.scale.setScalar(1 + Math.sin(t * 6) * 0.15); pr.up.position.y = 1.35 + Math.abs(s) * 0.05; }
 }
 
@@ -2039,12 +2172,12 @@ function updOrbs(dt) {
 }
 
 /* =================== RECOGIBLES =================== */
-const PTYPES = { health: { color: 0x5dff9c, label: '+25 salud' }, shells: { color: 0xffb23f, label: '+8 cartuchos' }, cells: { color: 0xff3fa4, label: '+40 celdas' } };
+const PTYPES = { health: { color: 0x5dff9c, label: '+25 salud' }, vest: { color: 0x35f2ff, label: '+25 chaleco' }, shells: { color: 0xffb23f, label: '+8 cartuchos' }, cells: { color: 0xff3fa4, label: '+40 celdas' } };
 const PICK_SPOTS = [
-  ['health', -12, 0, 20], ['shells', 12, 0, 20], ['cells', -20, 0, -10], ['health', 24, 0, -6], ['shells', 22, 0, 14], ['cells', -6.5, 0, -32], ['shells', -3, 0, 44], ['cells', 18, 0, 40],
-  ['health', -15, 0, -5.8], ['shells', -10, 0, -28], ['cells', 15, 0, -20], ['health', 0, 0, -28], ['shells', 5, 0, -14],
-  ['health', 0, -4.5, 23], ['shells', 2, -4.5, 21], ['cells', -1, -4.5, 23], ['health', 9.75, -4.5, 16], ['shells', -10, -4.5, -3], ['health', -18, -4.5, -20], ['cells', -3, -4.5, -12], ['shells', -12, -4.5, -12],
-  ['health', -12, 4.3, -18], ['cells', 14, 4.3, -24], ['shells', -8, 4.3, -6], ['health', 16, 4.3, -6],
+  ['health', -12, 0, 20], ['health', -15, 0, -5.8], ['health', 0, 0, -28], ['health', 0, -4.5, 23], ['health', 9.75, -4.5, 16], ['health', -18, -4.5, -20], ['health', 16, 4.3, -6],
+  ['vest', 24, 0, -6], ['vest', -12, 4.3, -18], ['vest', -10, -4.5, -3], ['vest', 5, 0, -14],
+  ['shells', 12, 0, 20], ['shells', 22, 0, 14], ['shells', -3, 0, 44], ['shells', -10, 0, -28], ['shells', 2, -4.5, 21], ['shells', -12, -4.5, -12], ['shells', -8, 4.3, -6],
+  ['cells', -20, 0, -10], ['cells', -6.5, 0, -32], ['cells', 18, 0, 40], ['cells', 15, 0, -20], ['cells', -1, -4.5, 23], ['cells', -3, -4.5, -12], ['cells', 14, 4.3, -24],
 ];
 const picks = [];
 function makePickup(type, x, y, z) {
@@ -2052,6 +2185,11 @@ function makePickup(type, x, y, z) {
   const gy = groundAt(x, z, 0.2, y + 0.6); const baseY = (gy > -1e8 ? gy : y) + 0.55;
   if (type === 'health') { const m = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.13, 0.13), M.neonG); g.add(m); const m2 = m.clone(); m2.rotation.z = PI / 2; g.add(m2); const b = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.1), M.white); b.position.z = -0.08; g.add(b); }
   else if (type === 'shells') { for (let i = 0; i < 3; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 10), i === 1 ? M.neonA : M.hazard); c.position.x = (i - 1) * 0.14; g.add(c); } }
+  else if (type === 'vest') {
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 6), M.metal); plate.rotation.x = PI / 2; plate.rotation.y = PI / 6; g.add(plate);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.025, 6, 6), M.neonC); rim.rotation.z = PI / 6; g.add(rim);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.1, 6), M.neonC); core.rotation.x = PI / 2; g.add(core);
+  }
   else { const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), M.neonM); g.add(o); const r = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.02, 6, 24), M.neonW); r.rotation.x = PI / 2; g.add(r); }
   const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.glow, color: T.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
   h.scale.set(1.3, 1.3, 1); g.add(h);
@@ -2059,7 +2197,12 @@ function makePickup(type, x, y, z) {
   const p = { type, x, y: baseY - 0.55, z, g, baseY, ph: R() * TAU, on: true };
   picks.push(p); return p;
 }
-function spawnPickups() { for (const p of picks) scene.remove(p.g); picks.length = 0; for (const s of PICK_SPOTS) makePickup(s[0], s[1], s[2], s[3]); }
+function spawnRoundPickups(n) {
+  for (const q of picks) scene.remove(q.g); picks.length = 0;
+  for (const s of PICK_SPOTS) makePickup(s[0], s[1], s[2], s[3]);
+  const taken = [];
+  for (let i = 0; i < Math.min(n - 1, 6); i++) { const q = randomSpot(8, 4, taken); if (!q) break; taken.push(['x', q[0], q[1], q[2]]); makePickup(i % 2 ? 'cells' : 'shells', q[0], q[1], q[2]); }
+}
 function updPickups(dt, t) {
   for (const p of picks) {
     if (!p.on) continue;
@@ -2067,6 +2210,7 @@ function updPickups(dt, t) {
     if (!P.alive || Math.hypot(P.x - p.x, P.z - p.z) > 1.15 || Math.abs(P.y - p.y) > 1.4) continue;
     let ok = false;
     if (p.type === 'health' && P.hp < 100) { P.hp = Math.min(100, P.hp + 25); ok = true; }
+    else if (p.type === 'vest' && P.shield < 100) { P.shield = Math.min(100, P.shield + 25); ok = true; }
     else if (p.type === 'shells' && WEAPONS[1].ammo < WEAPONS[1].max) { WEAPONS[1].ammo = Math.min(WEAPONS[1].max, WEAPONS[1].ammo + 8); ok = true; }
     else if (p.type === 'cells' && WEAPONS[2].ammo < WEAPONS[2].max) { WEAPONS[2].ammo = Math.min(WEAPONS[2].max, WEAPONS[2].ammo + 40); ok = true; }
     if (ok) { p.on = false; scene.remove(p.g); sfx('pickup'); toast(PTYPES[p.type].label, 'good'); spark(p.x, p.baseY, p.z, 16, PTYPES[p.type].color, 2.5, 0.5, 2); hudDirty = true; }
@@ -2250,7 +2394,7 @@ function resetToggles() {
   for (const a of ['crouch', 'zoom']) { const b = $('t_' + a); if (b) b.classList.remove('on'); }
 }
 function touchLook(dx, dy) {
-  const s = TOUCH_SENS * (zoom ? 0.45 : 1);
+  const s = TOUCH_SENS * SET.touchSens * (zoom ? 0.45 : 1);
   if (CTRL.mode === 'gyro' && GYRO.ok) { GYRO.yawOff -= dx * s; GYRO.pitchOff -= dy * s; }
   else { P.yaw -= dx * s; P.pitch = clamp(P.pitch - dy * s, -1.5, 1.5); }
   VM.swayX = clamp(VM.swayX - dx * 0.00012, -0.04, 0.04); VM.swayY = clamp(VM.swayY + dy * 0.00012, -0.03, 0.03);
@@ -2369,7 +2513,7 @@ function setMode(m) {
   if (m !== 'kb') { if (document.pointerLockElement) document.exitPointerLock(); H.clickMsg.classList.remove('show'); }
   H.hint.innerHTML = m === 'kb' ? 'Paso bajo: mantén <kbd>C</kbd> para agacharte' : 'Paso bajo: pulsa <b>Agachar</b>';
   document.querySelectorAll('[data-setmode]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.setmode === m)));
-  touchReset(); onResize(); hudDirty = true;
+  touchReset(); onResize(); hudDirty = true; syncSensUI();
 }
 function tryFullscreen() {
   const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen;
@@ -2396,10 +2540,11 @@ function initControlsUI() {
 }
 
 /* =================== ESTADO, HUD Y BUCLE =================== */
-const game = { state: 'menu', time: 0, zone: '', bestKey: 'nexus-villa-best', dmgMul: 1 };
+const zeroKills = () => ({ drone: 0, soldier: 0, crawler: 0, boss: 0 });
+const game = { state: 'menu', time: 0, roundTime: 0, round: 1, cleared: 0, zone: '', bestKey: 'nexus-villa-best-rounds', dmgMul: 1, kills: zeroKills(), rkills: zeroKills() };
 let hudDirty = true;
 const H = {};
-['hud', 'zone', 'objective', 'timer', 'radar', 'xhair', 'hitm', 'shieldBar', 'hpBar', 'hpNum', 'shieldNum', 'stance', 'wname', 'ammo', 'wslots', 'toasts', 'hint', 'banner', 'bossWrap', 'bossFill', 'vign', 'dmgDir', 'overlay', 'pStart', 'pPause', 'pDead', 'pWin', 'deadStats', 'winStats', 'clickMsg', 'btnResume', 'btnRestart', 'btnRetry', 'btnAgain'].forEach((id) => { H[id] = $(id); });
+['hud', 'zone', 'objective', 'timer', 'radar', 'xhair', 'hitm', 'shieldBar', 'hpBar', 'hpNum', 'shieldNum', 'stance', 'wname', 'ammo', 'wslots', 'toasts', 'hint', 'banner', 'bossWrap', 'bossFill', 'vign', 'dmgDir', 'overlay', 'pStart', 'pPause', 'pDead', 'pWin', 'deadStats', 'winStats', 'winTitle', 'nextInfo', 'endTitle', 'endKicker', 'clickMsg', 'btnResume', 'btnRestart', 'btnRetry', 'btnAgain', 'btnQuit'].forEach((id) => { H[id] = $(id); });
 const setText = (el, s) => { if (el && el.textContent !== s) el.textContent = s; };
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 function toast(msg, kind) {
@@ -2485,13 +2630,14 @@ function updLights(t, dt) {
   return z;
 }
 /* ---- HUD ---- */
-let radarT = 0, bannerT = 0, lastZoneChange = 0;
+let radarT = 0, bannerT = 0, lastZoneChange = 0, bannerHold = 0;
+function showBanner(s, hold) { setText(H.banner, s); H.banner.classList.remove('show'); void H.banner.offsetWidth; H.banner.classList.add('show'); if (hold) bannerHold = performance.now() / 1000 + hold; }
 function updHUD(dt, t) {
   if (game.state === 'menu') return;
   const z = zoneOf(P.x, P.y, P.z);
   if (z !== game.zone) {
     game.zone = z; setText(H.zone, z);
-    if (t - lastZoneChange > 1.2) { setText(H.banner, z); H.banner.classList.remove('show'); void H.banner.offsetWidth; H.banner.classList.add('show'); lastZoneChange = t; }
+    if (t - lastZoneChange > 1.2 && t > bannerHold) { showBanner(z); lastZoneChange = t; }
     setEcho(levelOf(P.y + 0.3) === 0);
   }
   setText(H.timer, fmtTime(game.time));
@@ -2513,8 +2659,8 @@ function updHUD(dt, t) {
   if (!hudDirty) return;
   hudDirty = false;
   const n = aliveCount();
-  setText(H.objective, n > 0 ? `Hostiles restantes: ${n}` : 'Mansión despejada');
-  H.hpBar.style.transform = `scaleX(${(P.hp / 100).toFixed(3)})`; H.shieldBar.style.transform = `scaleX(${(P.shield / 50).toFixed(3)})`;
+  setText(H.objective, n > 0 ? `Ronda ${game.round} · Hostiles: ${n}` : `Ronda ${game.round} superada`);
+  H.hpBar.style.transform = `scaleX(${(P.hp / 100).toFixed(3)})`; H.shieldBar.style.transform = `scaleX(${(P.shield / 100).toFixed(3)})`;
   setText(H.hpNum, String(Math.ceil(P.hp))); setText(H.shieldNum, String(Math.ceil(P.shield)));
   setText(H.wname, w.name); setText(H.ammo, w.ammo === Infinity ? '∞' : String(w.ammo));
   H.ammo.classList.toggle('low', w.ammo !== Infinity && w.ammo <= (w.pellets > 1 ? 4 : 20));
@@ -2546,32 +2692,71 @@ function enableFallback() {
   toast('Ratón sin captura: mantén pulsado un botón y arrastra para mirar · flechas para girar', 'info');
 }
 function clearInput() { for (const k in keys) keys[k] = false; mouse.l = mouse.r = mouse.any = false; if (CTRL.mode === 'kb') zoom = false; touchReset(); }
-function startGame(mode) { setMode(mode || CTRL.mode); audioInit(); musicStart(); game.state = 'play'; showPanel(null); hudDirty = true; game.zone = ''; requestLock(); if (CTRL.mode !== 'kb') toast(CTRL.mode === 'gyro' ? 'Sostén el móvil de frente para mirar al horizonte · ⌖ recentra' : 'Joystick a la izquierda · arrastra a la derecha para mirar', 'info'); }
-function pauseGame() { if (game.state !== 'play') return; game.state = 'paused'; clearInput(); showPanel('pPause'); if (document.pointerLockElement) document.exitPointerLock(); }
+function startGame(mode) { setMode(mode || CTRL.mode); audioInit(); musicStart(); newRun(); if (CTRL.mode !== 'kb') toast(CTRL.mode === 'gyro' ? 'Sostén el móvil de frente para mirar al horizonte · ⌖ recentra' : 'Joystick a la izquierda · arrastra a la derecha para mirar', 'info'); }
+function pauseGame() { if (game.state !== 'play') return; game.state = 'paused'; clearInput(); syncSensUI(); showPanel('pPause'); if (document.pointerLockElement) document.exitPointerLock(); }
 function resumeGame() { audioInit(); game.state = 'play'; showPanel(null); requestLock(); }
 function playerDie() {
-  P.alive = false; game.state = 'dead'; clearInput(); sfx('die');
+  P.alive = false; game.state = 'dead'; clearInput(); sfx('die'); MUS.target = 0;
   if (document.pointerLockElement) document.exitPointerLock();
-  setText(H.deadStats, `Hostiles eliminados: ${P.kills} · Tiempo: ${fmtTime(game.time)} · Zona: ${game.zone}`);
-  setTimeout(() => { if (game.state === 'dead') showPanel('pDead'); }, 1300);
+  setTimeout(() => { if (game.state === 'dead') endRun('dead'); }, 1300);
 }
-function gameWin() {
-  game.state = 'won'; clearInput(); sfx('win'); MUS.target = 0;
-  if (document.pointerLockElement) document.exitPointerLock();
-  let best = null; try { best = parseFloat(localStorage.getItem(game.bestKey)); } catch (e) { best = null; }
-  const isBest = !best || game.time < best;
-  if (isBest) { try { localStorage.setItem(game.bestKey, String(game.time)); } catch (e) { /* sin almacenamiento */ } }
-  setText(H.winStats, `Tiempo: ${fmtTime(game.time)}${isBest ? ' · ¡Nuevo récord!' : ` · Récord: ${fmtTime(best)}`} · Salud restante: ${Math.ceil(P.hp)}`);
-  showPanel('pWin');
+const killGrid = (k) => {
+  const tot = k.drone + k.soldier + k.crawler + k.boss;
+  return '<div class="killgrid">' + ['drone', 'soldier', 'crawler', 'boss'].map((t) => `<span class="kt kt-${t}">${TNAME[t]}</span><b>${k[t]}</b>`).join('') + `<span class="kt">Total</span><b>${tot}</b></div>`;
+};
+function placeAtSpawn() {
+  // cada ronda empieza en la zona de aterrizaje; se conservan salud, chaleco y munición
+  Object.assign(P, { x: SPAWN.x, y: SPAWN.y, z: SPAWN.z, vx: 0, vz: 0, vy: 0, yaw: 0, pitch: -0.04, onGround: true, crouch: false, h: H_STAND, camY: SPAWN.y + 1.68, recoil: 0, roll: 0, landV: 0, dmgT: 0, shake: 0, jumpOK: true });
+  resetToggles(); GYRO.first = true;
 }
-function restartGame() {
-  spawnEnemies(); spawnPickups(); resetPlayer(); resetDoors();
+function beginRound(n) {
+  placeAtSpawn();
+  game.round = n; game.roundTime = 0; game.rkills = zeroKills();
+  spawnEnemies(roundSpawnList(n)); spawnRoundPickups(n); resetDoors();
+  for (const o of orbs) killOrb(o);
+  const pool = shuffle(enemies.filter((e) => e.type !== 'boss')), na = Math.round(pool.length * Math.min(0.6, 0.12 + 0.04 * n));
+  for (let i = 0; i < na; i++) { pool[i].alert = true; pool[i].thinkT = R() * 1.5; }
+  hudDirty = true; flowT = 0; game.zone = '';
+  const nb = bossesForRound(n);
+  showBanner(`Ronda ${n}`, 2.2);
+  toast(`${enemies.length - nb} hostiles${nb ? ` · ${nb === 1 ? '¡un Coloso' : '¡dos Colosos'} en el sótano!` : ''}`, nb ? 'warn' : 'info');
+}
+function newRun() {
+  resetPlayer(); resetDoors();
   WEAPONS.forEach((w) => { w.ammo = w.start; });
   models.forEach((m, i) => { m.visible = i === 0; }); Object.assign(VM, { cur: 0, want: 0, switchT: 0, kick: 0, bloom: 0, next: 0 });
-  for (const o of orbs) killOrb(o);
   for (const d of decals) d.visible = false;
-  game.time = 0; game.zone = ''; hudDirty = true; camera.rotation.z = 0; flowT = 0; resetToggles(); touchReset(); GYRO.first = true;
+  game.time = 0; game.cleared = 0; game.kills = zeroKills(); camera.rotation.z = 0; resetToggles(); touchReset(); GYRO.first = true;
+  beginRound(1);
   audioInit(); game.state = 'play'; showPanel(null); requestLock();
+}
+const restartGame = newRun;
+function roundCleared() {
+  game.cleared = game.round; game.state = 'round'; clearInput(); sfx('win'); MUS.target = 0;
+  if (document.pointerLockElement) document.exitPointerLock();
+  const nx = game.round + 1, nb = bossesForRound(nx);
+  setText(H.winTitle, `Ronda ${game.round} superada`);
+  H.winStats.innerHTML = killGrid(game.rkills) + `<p class="stats">Tiempo de ronda ${fmtTime(game.roundTime)} · Salud ${Math.ceil(P.hp)} · Chaleco ${Math.ceil(P.shield)}</p>`;
+  setText(H.nextInfo, `Ronda ${nx}: ${enemiesForRound(nx)} hostiles${nb ? (nb === 1 ? ' y un Coloso' : ' y dos Colosos') : ''}. Empiezas en la zona de aterrizaje con la salud, el chaleco y la munición que tienes ahora. Los botiquines y chalecos del mapa vuelven a su sitio y aparece algo más de munición.`);
+  setText(H.btnAgain, `Empezar ronda ${nx}`);
+  showPanel('pWin');
+}
+function nextRound() {
+  if (game.state !== 'round') return;
+  beginRound(game.round + 1);
+  audioInit(); game.state = 'play'; showPanel(null); requestLock();
+}
+function endRun(reason) {
+  const died = reason === 'dead';
+  if (!died) { game.state = 'over'; clearInput(); if (document.pointerLockElement) document.exitPointerLock(); }
+  let best = 0; try { best = parseInt(localStorage.getItem(game.bestKey), 10) || 0; } catch (e) { best = 0; }
+  const rec = game.cleared > best;
+  if (rec) { try { localStorage.setItem(game.bestKey, String(game.cleared)); } catch (e) { /* sin almacenamiento */ } }
+  setText(H.endKicker, died ? `Señal perdida en la ronda ${game.round}` : 'Operación finalizada');
+  setText(H.endTitle, died ? 'Has caído' : 'Partida terminada');
+  H.deadStats.innerHTML = `<p class="roundsBig">Rondas superadas <b>${game.cleared}</b></p>` + killGrid(game.kills) +
+    `<p class="stats">Tiempo total ${fmtTime(game.time)} · ${rec && game.cleared > 0 ? '¡Nuevo récord!' : `Récord: ${Math.max(best, game.cleared)} rondas`}</p>`;
+  showPanel('pDead');
 }
 function toggleRetro() {
   retro = !retro; renderer.setPixelRatio(retro ? 0.34 : BASE_PR); renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -2590,7 +2775,8 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'KeyM') { setMusic(!AU.musicOn); toast(AU.musicOn ? 'Música activada' : 'Música desactivada', 'info'); }
     else if (e.code === 'KeyT') toggleRetro();
     else if (e.code === 'KeyP' || (e.code === 'Escape' && !locked)) pauseGame();
-  } else if ((game.state === 'dead' || game.state === 'won') && e.code === 'KeyR') restartGame();
+  } else if ((game.state === 'dead' || game.state === 'over') && e.code === 'KeyR') newRun();
+  else if (game.state === 'round' && (e.code === 'KeyR' || e.code === 'KeyN')) nextRound();
 });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { clearInput(); if (game.state === 'play' && fallback) pauseGame(); });
@@ -2606,7 +2792,7 @@ window.addEventListener('mouseup', (e) => { if (e.button === 0) mouse.l = false;
 window.addEventListener('mousemove', (e) => {
   if (game.state !== 'play') return;
   if (locked || (fallback && mouse.any)) {
-    const s = 0.0022 * (zoom ? 0.55 : 1), mx = clamp(e.movementX || 0, -300, 300), my = clamp(e.movementY || 0, -300, 300);
+    const s = 0.0022 * SET.mouseSens * (zoom ? 0.55 : 1), mx = clamp(e.movementX || 0, -300, 300), my = clamp(e.movementY || 0, -300, 300);
     P.yaw -= mx * s; P.pitch = clamp(P.pitch - my * s, -1.5, 1.5);
     VM.swayX = clamp(VM.swayX - mx * 0.00006, -0.04, 0.04); VM.swayY = clamp(VM.swayY + my * 0.00006, -0.03, 0.03);
   }
@@ -2625,9 +2811,26 @@ document.addEventListener('pointerlockchange', () => {
 document.addEventListener('pointerlockerror', () => { if (CTRL.mode !== 'kb') return; if (!everLocked) enableFallback(); else if (game.state === 'play') H.clickMsg.classList.add('show'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.state === 'play') pauseGame(); });
 H.btnResume.addEventListener('click', resumeGame);
-H.btnRestart.addEventListener('click', restartGame);
-H.btnRetry.addEventListener('click', restartGame);
-H.btnAgain.addEventListener('click', restartGame);
+H.btnRestart.addEventListener('click', newRun);
+H.btnRetry.addEventListener('click', newRun);
+H.btnAgain.addEventListener('click', nextRound);
+H.btnQuit.addEventListener('click', () => endRun('quit'));
+/* ---- sensibilidad (panel de pausa) ---- */
+const sensEl = $('sens'), sensVal = $('sensVal'), sensLbl = $('sensLabel');
+function syncSensUI() {
+  if (!sensEl) return;
+  const k = CTRL.mode === 'kb' ? 'mouseSens' : 'touchSens';
+  sensEl.value = String(SET[k]); setText(sensVal, SET[k].toFixed(2) + '×');
+  setText(sensLbl, CTRL.mode === 'kb' ? 'Sensibilidad del ratón' : 'Sensibilidad al arrastrar');
+}
+if (sensEl) {
+  sensEl.addEventListener('input', () => {
+    const v = clamp(parseFloat(sensEl.value) || 1, 0.2, 3), k = CTRL.mode === 'kb' ? 'mouseSens' : 'touchSens';
+    SET[k] = v; setText(sensVal, v.toFixed(2) + '×');
+  });
+  sensEl.addEventListener('change', saveSettings);
+  const rs = $('sensReset'); if (rs) rs.addEventListener('click', () => { SET[CTRL.mode === 'kb' ? 'mouseSens' : 'touchSens'] = 1; saveSettings(); syncSensUI(); });
+}
 function onResize() {
   const w = window.innerWidth, h = window.innerHeight, asp = w / h;
   renderer.setSize(w, h, false);
@@ -2649,7 +2852,7 @@ function step(dt, t) {
   for (const a of anims) a(t, dt);
   if (frame % 6 === 0) drawScreen(t, aliveCount());
   if (game.state === 'play') {
-    game.time += dt;
+    game.time += dt; game.roundTime += dt;
     updPlayer(dt);
     flowT -= dt; if (flowT <= 0) { flowT = 0.3; buildFlow(findNode(P.x, P.y + 0.3, P.z, 3)); }
     for (const e of enemies) if (!e.gone) updEnemy(e, dt, t);
@@ -2677,10 +2880,10 @@ function loop(now) {
   step(dt, now / 1000); render();
 }
 /* ---- arranque ---- */
-spawnEnemies(); spawnPickups(); resetPlayer(); initControlsUI(); sizeRadar(); onResize();
+resetPlayer(); spawnEnemies(roundSpawnList(1)); spawnRoundPickups(1); initControlsUI(); syncSensUI(); sizeRadar(); onResize();
 if (noteEl) noteEl.textContent = '';
 showPanel('pStart');
-window.__nexus = { CTRL, GYRO, devEuler, setMode, chooseMode, TUI, baseFov: () => baseFov, P, enemies, colliders, doors, picks, WEAPONS, game, step, navWalk, navDist, NN, findNode, buildFlow, raycast, groundAt, mergeInfo, startGame, restartGame, keys, mouse, zoneOf, VM, selectWeapon, tryFire };
+window.__nexus = { SET, drawScreen, screenCanvas: screenTex.userData.canvas, CTRL, GYRO, devEuler, setMode, chooseMode, TUI, baseFov: () => baseFov, P, enemies, colliders, doors, picks, WEAPONS, game, step, navWalk, navDist, NN, findNode, buildFlow, raycast, groundAt, mergeInfo, startGame, restartGame, newRun, nextRound, endRun, hurtPlayer, damageEnemy, colliders_: colliders, roundSpawnList, enemiesForRound, keys, mouse, zoneOf, VM, selectWeapon, tryFire };
 requestAnimationFrame(loop);
 })();
 
