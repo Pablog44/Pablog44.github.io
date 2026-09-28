@@ -334,6 +334,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
     <div class="btns">
       <button class="b" id="btnResume">Seguir jugando</button>
       <button class="b alt" id="btnMapP">Ver mapa</button>
+      <button class="b alt" id="btnGrass">Césped: Alto</button>
       <button class="b alt" id="btnRestart">Empezar de cero</button>
     </div>
   </div>
@@ -552,6 +553,14 @@ const FLAT=[];const FLATR=[];
 function hZones(x,z){
   let h=baseH(x,z)+noiseH(x,z);
   for(const f of FLAT){
+    if(f.org){ // vaso del lago: cubeta con orilla irregular, ribera por encima del agua y presa recta al sur
+      const rc=f.org,w1=Math.sin(z*0.061+1.3)*5.5+Math.sin(z*0.143+0.4)*2.2,w2=Math.sin(x*0.058+2.1)*5+Math.sin(x*0.151)*2;
+      const ex=Math.max(f.x0+rc+w1-x,0,x-(f.x1-rc+w1*0.8)),ez=Math.max(f.z0+rc+w2-z,0),dn=Math.max(0,Math.hypot(ex,ez)-rc),ds=z-f.z1;
+      const b=f.b*(0.8+0.25*Math.sin(Math.atan2(z+660,x+160)*3+0.7)),wl=f.h+3,rim=wl+0.8;
+      if(ds>0&&ds>=dn){if(ds<b)h=lerp(h,f.h,1-smoothstep(0,b,ds));continue;} // aguas abajo de la presa: el terreno baja al valle
+      if(dn<=0.5*b)h=f.h+(rim-f.h)*smoothstep(0,0.5*b,dn);
+      else if(dn<b+26)h=h<rim?rim:lerp(rim,h,smoothstep(0.5*b,b+26,dn));else if(dn<b+70&&h<rim)h=lerp(rim,h,smoothstep(b+26,b+70,dn));
+      continue;}
     const dx=Math.max(f.x0-x,0,x-f.x1),dz=Math.max(f.z0-z,0,z-f.z1);
     if(dx>=f.b||dz>=f.b)continue;const d=Math.hypot(dx,dz);if(d>=f.b)continue;
     h=lerp(h,f.h,1-smoothstep(0,f.b,d));
@@ -578,7 +587,7 @@ addFlat(210,268,-282,-244,6);           // Cocheras del Rey
 addFlat(-632,-592,676,710,10,0,hZones(-590,680));          // aparcamiento de la Silla
 addFlat(-500,-445,-1068,-1016,10,0,hZones(-455.7,-1014.8));      // Mirador de Abantos
 
-const Flake=addFlat(-200,-120,-700,-620,22,-7); // Presa del Romeral
+const Flake=addFlat(-200,-120,-700,-620,22,-7);Flake.org=15; // Presa del Romeral: orilla irregular, presa recta al sur
 // Aeródromo de la Silla: pista de tierra girada según la curva de nivel de Las Machotas
 const AIRSTRIP={cx:-740,cz:680,rot:0.987,hx:12,hz:85};
 (function(){const r=AIRSTRIP,c=Math.cos(r.rot),s=Math.sin(r.rot);let sum=0,n=0;for(let t=-1;t<=1.001;t+=0.25){sum+=hZones(r.cx+s*r.hz*t,r.cz+c*r.hz*t);n++;}r.h=sum/n;FLATR.push({cx:r.cx,cz:r.cz,c,s,hx:r.hx+4,hz:r.hz+6,b:26,h:r.h});})();
@@ -593,7 +602,7 @@ function CW(x,z){const c=Math.cos(CASITA.rot),s=Math.sin(CASITA.rot),dx=x-540,dz
 const SERV=(()=>{const E=[640,-1180],F=[560,-1010];let dx=E[0]-F[0],dz=E[1]-F[1];const l=Math.hypot(dx,dz);dx/=l;dz/=l;return{x:E[0],z:E[1],rot:Math.atan2(dx,dz)};})();
 function SW(lx,lz){const c=Math.cos(SERV.rot),s=Math.sin(SERV.rot);return[SERV.x+lx*c+lz*s,SERV.z-lx*s+lz*c];} // lx>0: lado del hospital; lz>0: hacia delante
 {const[cx,cz]=SW(0,10);FLATR.push({cx,cz,c:Math.cos(SERV.rot),s:Math.sin(SERV.rot),hx:56,hz:38,b:16,h:hZones(605.9,-1107.6)});}
-const LAKE={x0:-206,x1:-114,z0:-706,z1:-614,wl:Flake.h+3};
+const LAKE={x0:-236,x1:-84,z0:-738,z1:-614,wl:Flake.h+3};
 
 // ---------------------------------------------------------------- red viaria (trazado aproximado del real)
 const ROADS=[
@@ -724,6 +733,7 @@ function buildTerrain(){
     r=lerp(r,0.38,her);g=lerp(g,0.46,her);b=lerp(b,0.25,her);
     r=lerp(r,0.33,gf);g=lerp(g,0.60,gf);b=lerp(b,0.26,gf);
     r=lerp(r,0.56,tw*0.55);g=lerp(g,0.52,tw*0.55);b=lerp(b,0.40,tw*0.55);
+    if(x>LAKE.x0&&x<LAKE.x1&&z>LAKE.z0&&z<LAKE.z1+16&&h<LAKE.wl+1.2){const k=smoothstep(LAKE.wl+1.2,LAKE.wl-1.2,h);r=lerp(r,0.36,k);g=lerp(g,0.34,k);b=lerp(b,0.24,k);} // orilla húmeda y fondo embarrado
     const rock=clamp((slope-0.42)*2.4,0,1)*0.85+smoothstep(150,230,h)*0.55;
     r=lerp(r,0.57,Math.min(1,rock));g=lerp(g,0.55,Math.min(1,rock));b=lerp(b,0.51,Math.min(1,rock));
     col[k*3]=r+n;col[k*3+1]=g+n;col[k*3+2]=b+n*0.7;
@@ -1239,8 +1249,9 @@ function buildLandmarks(){
    WALLS.box(-490,ty+12,-1060,2.2,2.4,2.2,0,[0.6,0.5,0.4],4,3.2,ty+12);ROOF.pyramid(-490,ty+14.4,-1060,2.6,1.4,SLATE);addCollider(-490,-1060,1.8,1.8,0,ty-1,ty+15,'b');
    signMesh(signTex(['MIRADOR DE ABANTOS'],512,96,'#3a3024','#f0e3c0','bold 50px Georgia,serif'),3.6,0.7,-466,y+1.6,-1039.5,0);}
   // Presa del Romeral
-  {const wl=LAKE.wl;const w=new THREE.Mesh(new THREE.PlaneGeometry(LAKE.x1-LAKE.x0,LAKE.z1-LAKE.z0),MAT.water);w.rotation.x=-Math.PI/2;w.position.set((LAKE.x0+LAKE.x1)/2,wl,(LAKE.z0+LAKE.z1)/2);scene.add(w);
-   for(let x=LAKE.x0;x<LAKE.x1;x+=8){const lo=groundH(x+4,LAKE.z1+2)-2;STONE.box(x+4,lo,LAKE.z1+1,4.02,wl+1.2-lo,1.3,0,GRAN,2,2,lo);addCollider(x+4,LAKE.z1+1,4,1.3,0,lo,wl+1.2,'b');}
+  {const wl=LAKE.wl;buildLakeWater();
+   let da=1e9,db=-1e9;for(let x=LAKE.x0;x<LAKE.x1;x+=1)if(groundH(x,LAKE.z1-3)<wl){da=Math.min(da,x);db=Math.max(db,x);} // la presa cierra el agua de orilla a orilla
+   for(let x=Math.floor((da-8)/8)*8;x<db+8;x+=8){const lo=groundH(x+4,LAKE.z1+2)-2;STONE.box(x+4,lo,LAKE.z1+1,4.02,wl+1.2-lo,1.3,0,GRAN,2,2,lo);addCollider(x+4,LAKE.z1+1,4,1.3,0,lo,wl+1.2,'b');}
    SPOTS.presa={x:(LAKE.x0+LAKE.x1)/2,z:LAKE.z1+6};}
   // Golf La Herrería: greens, banderas, búnkeres y casa club
   {const GREEN_M=new THREE.MeshLambertMaterial({color:0x6fb04f,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),SAND_M=new THREE.MeshLambertMaterial({color:0xe6d6a6,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});
@@ -1567,7 +1578,7 @@ function buildMap(){
   }
   sg.putImageData(img,0,0);g.imageSmoothingEnabled=true;g.drawImage(small,0,0,2048,2048);
   const rect=(x0,x1,z0,z1,fill)=>{const[a,b]=w2m(x0,z0),[c,d]=w2m(x1,z1);g.fillStyle=fill;g.fillRect(a,b,c-a,d-b);};
-  rect(LAKE.x0+6,LAKE.x1-6,LAKE.z0+6,LAKE.z1-4,'#5d8fae');
+  g.fillStyle='#5d8fae';for(let x=LAKE.x0;x<LAKE.x1;x+=3)for(let z=LAKE.z0;z<LAKE.z1;z+=3)if(groundH(x+1.5,z+1.5)<LAKE.wl-0.1){const[a,b]=w2m(x,z),[c,d]=w2m(x+3,z+3);g.fillRect(a,b,c-a+0.7,d-b+0.7);}
   rect(-120,-72,-147,96,'#cfc6b3');rect(-72,116,-147,-93,'#cfc6b3');rect(-124,94,96,152,'#b9c48f');
   rect(-150,-90,-236,-184,'#d5ccb8');rect(52,90,-230,-188,'#d5ccb8');rect(-62,6,-318,-284,'#d5ccb8');rect(86,134,-220,-186,'#a7b986');
   {g.fillStyle='#b9c48f';g.beginPath();for(const[x,z]of[[492,198],[592,198],[592,304],[492,304]]){const[wx,wz]=CW(x,z);const[px,py]=w2m(wx,wz);g.lineTo(px,py);}g.closePath();g.fill();}
@@ -3017,7 +3028,7 @@ function updatePlayer(dt,I){
   const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
   const mag=Math.min(1,Math.hypot(I.mx,I.my));let dx=fx*I.my+rx*I.mx,dz=fz*I.my+rz*I.mx;const dl=Math.hypot(dx,dz)||1;dx/=dl;dz/=dl;
   const aiming=isAiming(I);const swim=inLake(P.x,P.z);
-  let spd=mag*(swim?2:(P.chute?4.5:(aiming?2.8:(I.sprint?8.2:5.2))));
+  let spd=mag*(swim?(I.sprint?4.9:3.6):(P.chute?4.5:(aiming?2.8:(I.sprint?8.2:5.2))));
   const k=Math.min(1,dt*(P.ground?11:(P.chute?2.5:2)));P.vx=lerp(P.vx,dx*spd,k);P.vz=lerp(P.vz,dz*spd,k);
   const ox=P.x,oz=P.z;P.x+=P.vx*dt;P.z+=P.vz*dt;
   collideCircle(P,0.4,P.y+0.15,P.y+1.8);
@@ -3025,7 +3036,7 @@ function updatePlayer(dt,I){
   if(P.ground&&!swim&&surfaceH(P.x,P.z)-P.y>0.95){P.x=ox;P.z=oz;}
   for(const c of CARS){if(Math.abs(c.x-P.x)>5.5||Math.abs(c.z-P.z)>5.5)continue;const o=c.obb();if(P.y>c.y+c.T.hgt-0.2)continue;pushOutOBB(o,P,0.4);}
   P.x=clamp(P.x,-LIMIT,LIMIT);P.z=clamp(P.z,-LIMIT,LIMIT);
-  const gy=swim?LAKE.wl-1.25:surfaceH(P.x,P.z);
+  const gy=swim?LAKE.wl-1.25+Math.sin(G.time*2.4)*0.07:surfaceH(P.x,P.z);
   if(I.jump&&P.ground&&!swim){P.vy=6.6;P.ground=false;}
   if(P.bail&&!P.ground&&!P.chute&&P.y-gy>7&&P.vy<-3)openChute();
   P.vy-=20*dt;if(P.chute)P.vy=Math.max(P.vy,-6.5);P.y+=P.vy*dt;
@@ -3327,13 +3338,14 @@ function menuNav(){
   if(padP(0))bs[menuIdx].click();else if(G.state==='paused'&&(padP(1)||padP(9)))resume();
 }
 function openPause(){if(G.state!=='play')return;G.state='paused';showScreen('pause',true);menuIdx=0;
-  $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.`;
+  $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped.`;
   if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function resume(){showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();}
 function openMap(){if(G.state!=='play'&&G.state!=='paused')return;G.prevState=G.state;G.state='map';showScreen('pause',false);drawBigMap();showScreen('bigmap',true);if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function closeMap(){showScreen('bigmap',false);G.state='play';tryLock();}
 $('btnResume').onclick=resume;$('btnMapP').onclick=openMap;
 $('btnRestart').onclick=()=>{try{localStorage.removeItem('gte-save-v1');}catch(e){}location.reload();};
+$('btnGrass').onclick=()=>setGrassLevel((GRASS.level+3)%4);
 $('volR').oninput=e=>{AU.vol=+e.target.value;if(AU.master)AU.master.gain.value=AU.vol;};
 $('sensR').oninput=e=>{sens=+e.target.value;};
 $('bigmap').onclick=()=>{if(G.state==='map')closeMap();};
@@ -3419,7 +3431,7 @@ function syncWorldToCamera(){
 let lastT=performance.now();
 function frame(now){
   requestAnimationFrame(frame);
-  const rdt=Math.min(0.05,Math.max(0,(now-lastT)/1000));lastT=now;
+  const rawDt=Math.max(0,(now-lastT)/1000),rdt=Math.min(0.05,rawDt);lastT=now;if(rawDt>0&&rawDt<1)G.fps=G.fps?lerp(G.fps,1/rawDt,0.05):60;
   pollPad();const I=readInput(rdt);LASTI=I;
   if(G.state==='title'){titleCam(now/1000);menuNav();if(KP.has('Enter')&&document.activeElement===document.body)startGame(false);}
   else if(G.state==='play'){
@@ -3454,7 +3466,7 @@ function frame(now){
   if(IS_TOUCH&&G.state==='play'&&innerHeight>innerWidth*1.05)openPause();
   {const tv=IS_TOUCH&&G.state==='play';if(tv!==TOUCH.vis){TOUCH.vis=tv;$('touch').classList.toggle('hidden',!tv);TOUCH.mode='';}}
   updateAudio(rdt);if(G.state==='play')updateBells(rdt);syncWorldToCamera();
-  placeDriveBy();renderer.render(scene,camera);endInputFrame();
+  placeDriveBy();updateGrass(rdt);updateLakeWater(rdt);renderer.render(scene,camera);endInputFrame();
 }
 function civSpawner(dt){
   G.civT-=dt;if(G.civT>0)return;G.civT=0.35;
@@ -3475,10 +3487,92 @@ async function boot(){
   for(let i=0;i<steps.length;i++){$('loadText').textContent=steps[i][0];$('loadBar').firstElementChild.style.width=(i/steps.length*100)+'%';await new Promise(r=>setTimeout(r,40));steps[i][1]();}
   $('loadBar').firstElementChild.style.width='100%';
   showScreen('loading',false);showScreen('title',true);G.state='title';
-  if(loadSave())$('btnContinue').classList.remove('hidden');
+  loadOpts();if(loadSave())$('btnContinue').classList.remove('hidden');
   requestAnimationFrame(frame);
 }
 boot().catch(e=>{console.error(e);$('loadText').textContent='Error al generar el mundo: '+e.message;});
+// =====================================================================
+//  SHADERS: césped con viento y agua del lago
+// =====================================================================
+const GRASS_VS_HEAD=`uniform float uTime;
+uniform vec2 uWind;
+uniform vec4 uPush;
+uniform float uR;
+`;
+// sustituye a <project_vertex>: el viento y el empuje se aplican en coordenadas del mundo (la malla está en el origen)
+const GRASS_VS_PROJ=`vec4 mvPosition = vec4( transformed, 1.0 );
+#ifdef USE_INSTANCING
+	vec3 gIp = vec3( instanceMatrix[ 3 ] );
+	float gFade = 1.0 - smoothstep( uR * 0.68, uR, distance( gIp.xz, cameraPosition.xz ) );
+	mvPosition.xyz *= vec3( 1.0, gFade, 1.0 );
+	mvPosition = instanceMatrix * mvPosition;
+	float gK = transformed.y * transformed.y * 1.9;
+	float gPh = gIp.x * 0.11 + gIp.z * 0.083;
+	float gW = sin( uTime * 1.6 + gPh ) * 0.5 + sin( uTime * 2.9 + gPh * 1.9 ) * 0.18 + sin( uTime * 0.43 + gPh * 0.31 ) * 0.5;
+	mvPosition.xz += uWind * gW * gK;
+	vec2 gD = mvPosition.xz - uPush.xz;
+	float gL = length( gD );
+	if ( gL < uPush.w && gL > 0.001 ) {
+		float gP = 1.0 - gL / uPush.w;
+		mvPosition.xz += gD / gL * gP * 0.6 * min( 1.0, transformed.y * 2.2 );
+		mvPosition.y -= gP * transformed.y * 0.55;
+	}
+#endif
+mvPosition = modelViewMatrix * mvPosition;
+gl_Position = projectionMatrix * mvPosition;
+`;
+const WATER_VS=`attribute float depth;
+uniform float uTime;
+varying vec3 vW;
+varying float vD;
+#include <fog_pars_vertex>
+void main() {
+	vec4 wp = modelMatrix * vec4( position, 1.0 );
+	float sh = smoothstep( 0.0, 1.5, depth );
+	wp.y += ( sin( wp.x * 0.21 + uTime * 1.3 ) + sin( wp.z * 0.17 - uTime * 1.1 ) ) * 0.045 * sh;
+	vW = wp.xyz;
+	vD = depth;
+	vec4 mvPosition = viewMatrix * wp;
+	gl_Position = projectionMatrix * mvPosition;
+	#include <fog_vertex>
+}
+`;
+const WATER_FS=`uniform float uTime;
+uniform vec3 uSun;
+uniform vec3 uSunCol;
+uniform vec3 uSky;
+uniform vec3 uHor;
+uniform vec3 uDeep;
+uniform vec3 uShal;
+varying vec3 vW;
+varying float vD;
+#include <fog_pars_fragment>
+vec2 wv( vec2 p, vec2 d, float f, float s, float a ) {
+	return d * cos( dot( p, d ) * f + uTime * s ) * f * a;
+}
+void main() {
+	vec2 p = vW.xz;
+	vec2 g = wv( p, vec2( 0.8, 0.6 ), 0.35, 1.2, 0.09 ) + wv( p, vec2( -0.5, 0.866 ), 0.55, 1.7, 0.06 )
+	       + wv( p, vec2( 0.95, -0.31 ), 1.3, 2.6, 0.025 ) + wv( p, vec2( -0.2, -0.98 ), 2.4, 3.5, 0.014 )
+	       + wv( p, vec2( 0.6, -0.8 ), 4.1, 4.4, 0.006 );
+	vec3 n = normalize( vec3( -g.x, 1.0, -g.y ) );
+	vec3 v = normalize( cameraPosition - vW );
+	float fres = 0.04 + 0.96 * pow( 1.0 - max( dot( n, v ), 0.0 ), 4.0 );
+	vec3 r = reflect( -v, n );
+	vec3 sky = mix( uHor, uSky, clamp( r.y * 1.6, 0.0, 1.0 ) );
+	vec3 wc = mix( uShal, uDeep, smoothstep( 0.0, 3.0, vD ) );
+	vec3 col = mix( wc, sky, fres * 0.85 );
+	col += uSunCol * pow( max( dot( r, uSun ), 0.0 ), 220.0 ) * 2.4;
+	float fo = ( 1.0 - smoothstep( 0.04, 0.42, vD ) ) * ( 0.6 + 0.4 * sin( p.x * 1.7 + p.y * 1.3 + uTime * 1.5 ) );
+	fo = clamp( fo, 0.0, 1.0 );
+	col = mix( col, vec3( 0.93, 0.95, 0.93 ), fo * 0.7 );
+	float a = mix( 0.42, 0.93, smoothstep( 0.0, 1.6, vD ) );
+	a = max( a, fo * 0.85 );
+	a = mix( a, 1.0, fres * 0.5 );
+	gl_FragColor = vec4( col, a );
+	#include <fog_fragment>
+}
+`;
 
 // =====================================================================
 //  ACTIVIDADES: Gran Premio del Real Sitio (carrera) y Circuito de Aros (avioneta)
@@ -3768,6 +3862,90 @@ function updateDetails(dt){
   DET.ba+=dt*0.011;const bx=100+Math.cos(DET.ba)*460,bz=-260+Math.sin(DET.ba)*460;DET.balloon.position.set(bx,H0+205+Math.sin(t*0.2)*6,bz);DET.balloon.rotation.y=t*0.05;
   DET.flame.visible=Math.sin(t*0.9)>0.55&&Math.random()>0.2;
 }
+// ---------------------------------------------------------------- Césped con viento (nivel configurable en la pausa)
+const GRASS_CS=24,GRASS_LV=[null,{r:46,n:120},{r:64,n:210},{r:84,n:320}],GRASS_NAMES=['Desactivado','Bajo','Medio','Alto'];
+const GRASS={level:IS_TOUCH?1:3,cells:new Map(),pool:[],geo:null,mat:null,wa:0.6,
+  uni:{uTime:{value:0},uWind:{value:new THREE.Vector2(0.5,0.3)},uPush:{value:new THREE.Vector4(0,0,0,1)},uR:{value:84}},
+  fr:new THREE.Frustum(),pm:new THREE.Matrix4(),m4:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),sv:new THREE.Vector3(),col:new THREE.Color(),up:new THREE.Vector3(0,1,0)};
+function grassGeo(){ // mata de 7 hojas curvadas; el gris de los vértices (oscuro abajo, claro en la punta) se tiñe por instancia
+  const pos=[],col=[],nor=[],idx=[];let v=0;
+  for(let b=0;b<7;b++){const a=b/7*TAU+Math.random()*0.7,r=0.04+Math.random()*0.17,cx=Math.cos(a)*r,cz=Math.sin(a)*r,h=0.4+Math.random()*0.4,w=0.03+Math.random()*0.022,ya=Math.random()*TAU,px=Math.cos(ya),pz=Math.sin(ya),ln=0.06+Math.random()*0.2,lx=Math.cos(a)*ln,lz=Math.sin(a)*ln;
+    const P=[[cx-px*w,0,cz-pz*w],[cx+px*w,0,cz+pz*w],[cx-px*w*0.65+lx*0.3,h*0.55,cz-pz*w*0.65+lz*0.3],[cx+px*w*0.65+lx*0.3,h*0.55,cz+pz*w*0.65+lz*0.3],[cx+lx,h,cz+lz]],C=[0.42,0.42,0.76,0.76,1.1];
+    for(let k=0;k<5;k++){pos.push(P[k][0],P[k][1],P[k][2]);nor.push(0,1,0);col.push(C[k],C[k],C[k]);}
+    idx.push(v,v+1,v+3,v,v+3,v+2,v+2,v+3,v+4);v+=5;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);return g;
+}
+function grassMat(){
+  const m=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,GRASS.uni);
+    sh.vertexShader=GRASS_VS_HEAD+sh.vertexShader.replace('#include <project_vertex>',GRASS_VS_PROJ);
+    // las dos caras de cada hoja se iluminan igual (si no, el envés sale negro)
+    sh.fragmentShader=sh.fragmentShader.replace('( gl_FrontFacing ) ? vLightFront : vLightBack','vLightFront').replace('( gl_FrontFacing ) ? vIndirectFront : vIndirectBack','vIndirectFront');};
+  return m;
+}
+function grassAt(x,z){ // ¿crece hierba aquí? devuelve densidad, tamaño y color, o null
+  if(Math.abs(x)>LIMIT-20||Math.abs(z)>LIMIT-20||(golfF(x,z)<0.5&&reserved(x,z)))return null; // en el golf sí: césped corto
+  const tw=townF(x,z);if(tw>0.8)return null;
+  const rd=nearestRoad(x,z);if(rd&&rd.edge<(rd.road.t==='s'?2.8:1.1))return null;
+  const h=groundH(x,z);if(x>LAKE.x0&&x<LAKE.x1&&z>LAKE.z0&&z<LAKE.z1+14&&h<LAKE.wl+0.3)return null;
+  if(h>172||extraH(x,z)>0.05)return null;
+  const sl=Math.abs(groundH(x+1.2,z)-groundH(x-1.2,z))+Math.abs(groundH(x,z+1.2)-groundH(x,z-1.2));if(sl>1.2)return null;
+  if(blockedAt(x,z,0.25))return null;
+  const pin=pinarF(x,z),her=herreriaF(x,z),gf=golfF(x,z),nz=vnoise(x/23+3,z/23),nz2=vnoise(x/61,z/61+9);
+  const dens=(0.5+0.5*nz)*(1-pin*0.6)*(1-smoothstep(0.35,0.8,tw));
+  let r=0.68,g=0.64,b=0.3;r=lerp(r,0.46,nz2*0.5);g=lerp(g,0.62,nz2*0.5);           // pradera seca, con manchas más verdes
+  r=lerp(r,0.5,pin);g=lerp(g,0.5,pin);b=lerp(b,0.27,pin);r=lerp(r,0.4,her);g=lerp(g,0.58,her);b=lerp(b,0.24,her);r=lerp(r,0.36,gf);g=lerp(g,0.7,gf);b=lerp(b,0.27,gf);
+  return{dens,s:lerp(lerp(1,1.15,her),0.45,gf)*(0.8+nz*0.35),r,g,b};
+}
+function grassCell(){
+  const L=GRASS_LV[GRASS.level];let c=GRASS.pool.pop();
+  if(!c){const m=new THREE.InstancedMesh(GRASS.geo,GRASS.mat,L.n);m.frustumCulled=false;m.receiveShadow=true;m.castShadow=false;scene.add(m);c={mesh:m,box:new THREE.Box3(),n:0};}
+  return c;
+}
+function grassFill(c,ci,cj){
+  const L=GRASS_LV[GRASS.level],m=c.mesh;let seed=((ci*73856093)^(cj*19349663))>>>0,n=0,lo=1e9,hi=-1e9;
+  const rnd=()=>{seed=(Math.imul(seed,1103515245)+12345)>>>0;return(seed>>>8)/16777216;};
+  m.count=L.n;
+  for(let k=0;k<L.n;k++){const x=(ci+rnd())*GRASS_CS,z=(cj+rnd())*GRASS_CS,r1=rnd(),r2=rnd(),r3=rnd();
+    const g=grassAt(x,z);if(!g||r1>g.dens)continue;const y=groundH(x,z)-0.03;lo=Math.min(lo,y);hi=Math.max(hi,y);
+    GRASS.q.setFromAxisAngle(GRASS.up,r2*TAU);const s=g.s*(0.75+r3*0.55);GRASS.sv.set(s*(0.9+r2*0.3),s*(0.85+r1*0.3),s*(0.9+r3*0.3));
+    GRASS.m4.compose(GRASS.v.set(x,y,z),GRASS.q,GRASS.sv);m.setMatrixAt(n,GRASS.m4);GRASS.col.setRGB(g.r*(0.9+r1*0.2),g.g*(0.92+r2*0.16),g.b*(0.9+r3*0.2));m.setColorAt(n,GRASS.col);n++;}
+  m.count=n;c.n=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;
+  c.box.min.set(ci*GRASS_CS-1,lo-0.5,cj*GRASS_CS-1);c.box.max.set((ci+1)*GRASS_CS+1,hi+1.6,(cj+1)*GRASS_CS+1);
+}
+function grassClear(){for(const c of GRASS.cells.values()){scene.remove(c.mesh);}for(const c of GRASS.pool)scene.remove(c.mesh);GRASS.cells.clear();GRASS.pool.length=0;}
+function setGrassLevel(l){if(l===GRASS.level)return;grassClear();GRASS.level=l;const b=$('btnGrass');if(b)b.textContent='Césped: '+GRASS_NAMES[l];saveOpts();}
+function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level}));}catch(e){}}
+function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;}catch(e){}const b=$('btnGrass');if(b)b.textContent='Césped: '+GRASS_NAMES[GRASS.level];}
+function updateGrass(dt){
+  if(!GRASS.geo){GRASS.geo=grassGeo();GRASS.mat=grassMat();}
+  const U=GRASS.uni;U.uTime.value+=dt;GRASS.wa+=dt*0.03;const gust=0.38+0.3*Math.max(0,Math.sin(U.uTime.value*0.21))+0.12*Math.sin(U.uTime.value*0.77);
+  U.uWind.value.set(Math.cos(GRASS.wa)*gust,Math.sin(GRASS.wa)*gust);
+  if(!GRASS.level)return;const L=GRASS_LV[GRASS.level];U.uR.value=L.r;
+  const cam=camera.position;
+  if(cam.y-groundH(cam.x,cam.z)>90){for(const c of GRASS.cells.values())c.mesh.visible=false;return;}
+  if(P.car)U.uPush.value.set(P.car.x,0,P.car.z,2.7);else U.uPush.value.set(P.x,0,P.z,0.95);
+  const ci0=Math.floor(cam.x/GRASS_CS),cj0=Math.floor(cam.z/GRASS_CS),rc=Math.ceil(L.r/GRASS_CS),need=new Set();let built=0;
+  for(let di=-rc;di<=rc;di++)for(let dj=-rc;dj<=rc;dj++){const ci=ci0+di,cj=cj0+dj;
+    if(Math.hypot((ci+0.5)*GRASS_CS-cam.x,(cj+0.5)*GRASS_CS-cam.z)>L.r+GRASS_CS*0.72)continue;const key=ci*4096+cj;need.add(key);
+    if(!GRASS.cells.has(key)&&built<3){built++;const c=grassCell();grassFill(c,ci,cj);GRASS.cells.set(key,c);}}
+  for(const[k,c]of GRASS.cells)if(!need.has(k)){c.mesh.visible=false;GRASS.pool.push(c);GRASS.cells.delete(k);}
+  GRASS.pm.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);GRASS.fr.setFromProjectionMatrix(GRASS.pm);
+  for(const c of GRASS.cells.values())c.mesh.visible=c.n>0&&GRASS.fr.intersectsBox(c.box);
+}
+// ---------------------------------------------------------------- Agua del lago (reflejos, oleaje, profundidad y espuma)
+let LAKEW=null;
+function buildLakeWater(){
+  const W=LAKE.x1-LAKE.x0,D=LAKE.z1-LAKE.z0,geo=new THREE.PlaneGeometry(W,D,Math.round(W/2),Math.round(D/2));geo.rotateX(-Math.PI/2);
+  const cx=(LAKE.x0+LAKE.x1)/2,cz=(LAKE.z0+LAKE.z1)/2,p=geo.attributes.position.array,dep=new Float32Array(p.length/3);
+  for(let i=0;i<dep.length;i++)dep[i]=clamp(LAKE.wl-groundH(p[i*3]+cx,p[i*3+2]+cz),-2,6);
+  geo.setAttribute('depth',new THREE.BufferAttribute(dep,1));
+  const mat=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uTime:{value:0},uSun:{value:new THREE.Vector3(0.4,0.8,0.3)},uSunCol:{value:new THREE.Color(1,0.9,0.75)},
+      uSky:{value:new THREE.Color(0.55,0.68,0.86)},uHor:{value:new THREE.Color(FOG_RGB[0],FOG_RGB[1],FOG_RGB[2])},uDeep:{value:new THREE.Color(0.07,0.2,0.27)},uShal:{value:new THREE.Color(0.26,0.4,0.33)}}]),
+    vertexShader:WATER_VS,fragmentShader:WATER_FS,transparent:true,fog:true});
+  const m=new THREE.Mesh(geo,mat);m.position.set(cx,LAKE.wl,cz);m.frustumCulled=true;scene.add(m);LAKEW=m;
+}
+function updateLakeWater(dt){if(!LAKEW)return;const u=LAKEW.material.uniforms;u.uTime.value+=dt;u.uSun.value.copy(sun.position).sub(sun.target.position).normalize();}
 </script>
 </body>
 </html>
