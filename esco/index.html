@@ -150,6 +150,7 @@ button.b:focus-visible,button.b.pad-focus{ outline:3px solid #fff; outline-offse
 #pause{ background:rgba(16,19,24,.8); align-items:flex-start; justify-content:center; overflow-y:auto; }
 #pauseInner{ width:min(560px,92vw); margin:auto 0; padding:16px 0; }
 #pause h2{ font-family:var(--display); font-size:64px; font-weight:400; margin:0 0 16px; }
+button.b.dim{ opacity:0.45; }
 #pause .btns{ flex-direction:column; align-items:flex-start; }
 .sliders{ display:grid; grid-template-columns:auto 1fr; gap:10px 16px; align-items:center; font-size:18px; font-weight:600; margin-bottom:18px; }
 .sliders input{ accent-color:var(--oro); width:100%; }
@@ -335,6 +336,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
       <button class="b" id="btnResume">Seguir jugando</button>
       <button class="b alt" id="btnMapP">Ver mapa</button>
       <button class="b alt" id="btnGrass">Césped: Alto</button>
+      <button class="b alt" id="btnGrassD">Alcance del césped: 170 m</button>
       <button class="b alt" id="btnRestart">Empezar de cero</button>
     </div>
   </div>
@@ -952,7 +954,24 @@ class GB{
     this.p=this.n=this.u=this.c=this.i=null;return m;
   }
 }
-const WALLS=new GB(MAT.house),MONW=new GB(MAT.mon),STONE=new GB(MAT.stone),ROOF=new GB(MAT.roof),HEDGE=new GB(MAT.hedge),BRICK=new GB(MAT.brick),PROPS=new GB(MAT.plain);
+function doorTex(){
+  const c=mkCanvas(256,512),g=c.getContext('2d');
+  g.fillStyle='#4a2f1b';g.fillRect(0,0,256,512);
+  for(let i=0;i<70;i++){g.strokeStyle=`rgba(${15+Math.random()*30|0},${8+Math.random()*18|0},0,${(0.2+Math.random()*0.3).toFixed(2)})`;g.lineWidth=1+Math.random()*2;const x=Math.random()*256;g.beginPath();g.moveTo(x,0);g.bezierCurveTo(x+Math.random()*12-6,170,x+Math.random()*12-6,340,x+Math.random()*8-4,512);g.stroke();}
+  for(const L of[0,128]){
+    for(let k=0;k<3;k++){const x=L+18,y=26+k*156,w=92,h=132;
+      g.fillStyle='rgba(0,0,0,0.3)';g.fillRect(x-4,y-4,w+8,h+8);g.fillStyle='#5c3b22';g.fillRect(x,y,w,h);
+      g.fillStyle='rgba(255,220,170,0.12)';g.fillRect(x,y,w,5);g.fillRect(x,y,5,h);g.fillStyle='rgba(0,0,0,0.28)';g.fillRect(x+w-5,y,5,h);g.fillRect(x,y+h-5,w,5);
+      g.fillStyle='#6a4428';g.fillRect(x+16,y+16,w-32,h-32);g.fillStyle='rgba(0,0,0,0.18)';g.fillRect(x+16,y+h-20,w-32,4);}
+    g.fillStyle='#1c1a18';for(const yy of[13,174,330,492])for(let xx=L+14;xx<L+122;xx+=18){g.beginPath();g.arc(xx,yy,3.6,0,TAU);g.fill();}
+  }
+  g.fillStyle='#1a120b';g.fillRect(125,0,6,512);
+  g.strokeStyle='#26221e';g.lineWidth=5;for(const xx of[108,148]){g.beginPath();g.arc(xx,262,11,0,TAU);g.stroke();g.fillStyle='#26221e';g.fillRect(xx-4,246,8,8);}
+  g.fillStyle='#2e1d10';g.fillRect(0,490,256,22);
+  return texFrom(c,false);
+}
+MAT.door=new THREE.MeshLambertMaterial({map:doorTex(),vertexColors:true});
+const WALLS=new GB(MAT.house),MONW=new GB(MAT.mon),STONE=new GB(MAT.stone),ROOF=new GB(MAT.roof),HEDGE=new GB(MAT.hedge),BRICK=new GB(MAT.brick),PROPS=new GB(MAT.plain),DOORS=new GB(MAT.door);
 const WHITE=[1,1,1],SLATE=[0.37,0.40,0.47],TILE=[0.76,0.42,0.29],GRAN=[0.97,0.95,0.92],IRON=[0.16,0.16,0.17];
 const WALLCOLS=[[0.93,0.90,0.83],[0.96,0.94,0.89],[0.86,0.82,0.74],[0.93,0.86,0.71],[0.91,0.85,0.78],[0.80,0.78,0.72],[0.95,0.91,0.84]];
 const RESERVED=[];
@@ -968,7 +987,8 @@ const RESERVED_R=[];{const[cx,cz]=CW(542,251);RESERVED_R.push({cx,cz,c:Math.cos(
 reserve(-565,-530,662,700);
 reserve(-80,-45,-128,-112);reserve(-30,70,322,338);reserve(640,660,286,390);reserve(719,784,286,318);reserve(-632,-568,752,806);reserve(-570,-500,-1026,-970);
 
-function pave(x0,x1,z0,z1,y,mat=MAT.paving,rep=4,off=0.05){
+const PAVED=[]; // suelos pavimentados (rectángulos alineados con los ejes, con margen): aquí no crece césped
+function pave(x0,x1,z0,z1,y,mat=MAT.paving,rep=4,off=0.05){PAVED.push([x0-1,x1+1,z0-1,z1+1]);
   // malla que se adapta al terreno vértice a vértice (antes era un plano plano y flotaba)
   const w=x1-x0,d=z1-z0,step=w*d>20000?3:1.6;const nx=Math.max(1,Math.ceil(w/step)),nz=Math.max(1,Math.ceil(d/step));
   const g=new THREE.PlaneGeometry(w,d,nx,nz);g.rotateX(-Math.PI/2);
@@ -976,7 +996,7 @@ function pave(x0,x1,z0,z1,y,mat=MAT.paving,rep=4,off=0.05){
   for(let i=0;i<p.length/3;i++){const x=p[i*3]+cx,z=p[i*3+2]+cz;p[i*3]=x;p[i*3+2]=z;p[i*3+1]=groundH(x,z)+off;uv[i*2]=(x-x0)/rep;uv[i*2+1]=(z1-z)/rep;}
   g.computeVertexNormals();g.computeBoundingSphere();const m=new THREE.Mesh(g,mat);m.receiveShadow=true;scene.add(m);return m;
 }
-function paveR(cx,cz,hx,hz,rot,mat=MAT.paving,rep=4,off=0.05){
+function paveR(cx,cz,hx,hz,rot,mat=MAT.paving,rep=4,off=0.05){{const e=Math.abs(hx*Math.cos(rot))+Math.abs(hz*Math.sin(rot)),f=Math.abs(hx*Math.sin(rot))+Math.abs(hz*Math.cos(rot));PAVED.push([cx-e-1,cx+e+1,cz-f-1,cz+f+1]);}
   const c=Math.cos(rot),s=Math.sin(rot),nx=Math.max(1,Math.ceil(hx/0.8)),nz=Math.max(1,Math.ceil(hz/0.8));
   const g=new THREE.PlaneGeometry(2*hx,2*hz,nx,nz);g.rotateX(-Math.PI/2);const p=g.attributes.position.array,uv=g.attributes.uv.array;
   for(let i=0;i<p.length/3;i++){const lx=p[i*3],lz=p[i*3+2],x=cx+lx*c+lz*s,z=cz-lx*s+lz*c;p[i*3]=x;p[i*3+2]=z;p[i*3+1]=groundH(x,z)+off;uv[i*2]=(lx+hx)/rep;uv[i*2+1]=(lz+hz)/rep;}
@@ -1031,6 +1051,15 @@ function pediment(cx,base,cz,hw,hd,H){ // frontón mirando a poniente (-x): corn
   const ball=(bx,by,bz,k)=>{STONE.box(bx,by,bz,0.42*k,0.75*k,0.42*k,0,GRAN,1,1);const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(k*0.95);b.position.set(bx,by+0.75*k+0.55*k,bz);b.castShadow=true;scene.add(b);};
   const k=hw>12?1.4:1;ball(cx,base+H-0.15,cz,k);for(const sd of[-1,1])ball(cx,base,cz+sd*(hw-0.3),k);
 }
+function woodDoor(x,y,z,ry,w,h,frame=true){
+  const rx=Math.cos(ry),rz=-Math.sin(ry),nx=Math.sin(ry),nz=Math.cos(ry),bx=x+nx*0.05,bz=z+nz*0.05;
+  DOORS.quad([bx-rx*w/2,y,bz-rz*w/2],[bx+rx*w/2,y,bz+rz*w/2],[bx+rx*w/2,y+h,bz+rz*w/2],[bx-rx*w/2,y+h,bz-rz*w/2],[0,0],[1,0],[1,1],[0,1],WHITE);
+  if(!frame)return;
+  for(const sd of[-1,1])STONE.box(x+rx*sd*(w/2+0.22)+nx*0.12,y-0.1,z+rz*sd*(w/2+0.22)+nz*0.12,0.22,h+0.1,0.14,ry,GRAN,1,1);
+  STONE.box(x+nx*0.14,y+h,z+nz*0.14,w/2+0.44,0.42,0.16,ry,GRAN,1,1,null,true,true);
+  STONE.box(x+nx*0.22,y+h+0.42,z+nz*0.22,w/2+0.62,0.16,0.24,ry,GRAN,1,1,null,true,true);
+  STONE.box(x+nx*0.3,y-0.25,z+nz*0.3,w/2+0.55,0.3,0.36,ry,GRAN,1,1);
+}
 function buildMonastery(){
   const y=H0;
   // anillo exterior
@@ -1055,8 +1084,7 @@ function buildMonastery(){
   MONW.box(-74.5,y-3,0,2.5,31,18,0,WHITE,4.4,5.5,y);
   pediment(-74.5,y+28,0,18.6,2.8,6);
   STONE.box(-77.2,y-0.2,0,0.3,10.5,4.2,0,GRAN,1,1);
-  PROPS.box(-77.4,y,0,0.2,8.5,3.2,0,[0.12,0.1,0.09]);
-  for(const zz of [-3.1,3.1])for(let k=0;k<4;k++)PROPS.box(-77.62,y+1.2+k*1.9,zz*0.5,0.03,0.08,1.3,0,[0.55,0.45,0.25]); // herrajes de la puerta
+  woodDoor(-77.55,y,0,-Math.PI/2,6.4,8.5,false);
   // pilastras con basa y capitel, y cornisa entre los dos cuerpos de la portada
   for(const zz of [-12,-6,6,12]){STONE.box(-77.3,y,zz,0.55,24,0.7,0,GRAN,1,1);STONE.box(-77.35,y,zz,0.7,0.8,0.9,0,GRAN,1,1);STONE.box(-77.35,y+11.3,zz,0.68,0.7,0.88,0,GRAN,1,1,null,true,true);STONE.box(-77.35,y+23.2,zz,0.68,0.8,0.88,0,GRAN,1,1,null,true,true);}
   STONE.box(-77.4,y+12.2,0,0.5,0.7,13.1,0,GRAN,2,2,null,true,true);
@@ -1081,7 +1109,7 @@ function buildMonastery(){
    S(new THREE.CylinderGeometry(0.34,0.5,3.2,10),st,-77.42,y+15.55,0);S(BOXG,st,-77.42,y+17.3,0,0.42,0.4,1.0);S(GEO.bead,st,-77.44,y+17.85,0,0.27,0.3,0.27);
    S(BOXG,st,-77.6,y+16.4,-0.5,0.14,0.75,0.16);S(BOXG,st,-77.6,y+16.4,0.5,0.14,0.75,0.16);S(BOXG,new THREE.MeshLambertMaterial({color:0x6b2a24}),-77.72,y+16.05,0.52,0.1,0.36,0.3);
    for(let k=0;k<4;k++)S(BOXG,gold,-77.8,y+15.6,-0.92+k*0.14,0.03,1.0,0.03);for(const yy of[15.15,16.05])S(BOXG,gold,-77.8,y+yy,-0.71,0.03,0.03,0.46);}
-  for(const s of [-1,1]){MONW.box(-73.8,y-3,s*58,1.8,21,7,0,WHITE,4.4,5.5,y);pediment(-73.8,y+18,s*58,7.4,2,3.5);PROPS.box(-75.7,y,s*58,0.2,6,2.2,0,[0.12,0.1,0.09]);
+  for(const s of [-1,1]){MONW.box(-73.8,y-3,s*58,1.8,21,7,0,WHITE,4.4,5.5,y);pediment(-73.8,y+18,s*58,7.4,2,3.5);woodDoor(-75.92,y,s*58,-Math.PI/2,4.4,6,false);
     STONE.box(-75.75,y-0.2,s*58,0.12,7.2,3.0,0,GRAN,1,1);STONE.box(-75.8,y+7,s*58,0.35,0.5,3.4,0,GRAN,1,1,null,true,true);}
   // suelos de los patios
   pave(-72,72,-93,93,y+0.04,MAT.paving,4);
@@ -1124,7 +1152,7 @@ function buildLonja(){
   }
   // Casas de Oficios (Herrera, 1587) y arco de la calle Grimaldi
   const casa=(x0,x1)=>{const cx=(x0+x1)/2,hx=(x1-x0)/2;MONW.box(cx,y-2,-156,hx,16,9,0,WHITE,4.4,5.5,y);STONE.box(cx,y+13.4,-156,hx+0.3,0.6,9.3,0,GRAN,2,2);ROOF.hip(cx,y+14,-156,hx,9,0,5.5,0.5,SLATE);addCollider(cx,-156,hx,9,0,y-3,y+20,'b');
-    for(let x=x0+6;x<x1-4;x+=8)PROPS.box(x,y,-146.7,1.1,3.8,0.12,0,[0.13,0.11,0.1]);};
+    const nd=Math.max(1,Math.round((x1-x0)/16)),st=(x1-x0)/nd;for(let k=0;k<nd;k++)woodDoor(x0+st*(k+0.5),y+0.06,-147,0,2.4,3.9);};
   casa(-120,-24);casa(-6,58);casa(72,112);
   MONW.box(-15,y+7.5,-157,9,6.5,4,0,WHITE,4.4,5.5,y);ROOF.hip(-15,y+14,-157,9,4,0,2.5,0.3,SLATE);addCollider(-15,-157,9,4,0,y+7.5,y+16,'b');
   // farolas de la Lonja
@@ -3346,6 +3374,7 @@ function closeMap(){showScreen('bigmap',false);G.state='play';tryLock();}
 $('btnResume').onclick=resume;$('btnMapP').onclick=openMap;
 $('btnRestart').onclick=()=>{try{localStorage.removeItem('gte-save-v1');}catch(e){}location.reload();};
 $('btnGrass').onclick=()=>setGrassLevel((GRASS.level+3)%4);
+$('btnGrassD').onclick=()=>setGrassDist((GRASS.dist+1)%GRASS_DIST.length);
 $('volR').oninput=e=>{AU.vol=+e.target.value;if(AU.master)AU.master.gain.value=AU.vol;};
 $('sensR').oninput=e=>{sens=+e.target.value;};
 $('bigmap').onclick=()=>{if(G.state==='map')closeMap();};
@@ -3367,7 +3396,7 @@ function startGame(cont){
     setTimeout(()=>hintOnce('map',`Pulsa ${kb('M','Back','Mapa')} para ver el mapa de San Lorenzo.`,6),20000);
   });
 }
-function finalizeBuilders(){for(const b of[WALLS,MONW,STONE,ROOF,HEDGE,BRICK,PROPS])b.build();}
+function finalizeBuilders(){for(const b of[WALLS,MONW,STONE,ROOF,HEDGE,BRICK,PROPS,DOORS])b.build();}
 function spawnWorld(){
   initFX();
   [targetBeam,targetRing]=makeBeam(0xe8b93a);[remBeam,remRing]=makeBeam(0xe8b93a);
@@ -3494,7 +3523,9 @@ boot().catch(e=>{console.error(e);$('loadText').textContent='Error al generar el
 // =====================================================================
 //  SHADERS: césped con viento y agua del lago
 // =====================================================================
-const GRASS_VS_HEAD=`uniform float uTime;
+const GRASS_VS_HEAD=`attribute float aRnd;
+uniform vec3 uCam;
+uniform float uTime;
 uniform vec2 uWind;
 uniform vec4 uPush;
 uniform float uR;
@@ -3503,8 +3534,11 @@ uniform float uR;
 const GRASS_VS_PROJ=`vec4 mvPosition = vec4( transformed, 1.0 );
 #ifdef USE_INSTANCING
 	vec3 gIp = vec3( instanceMatrix[ 3 ] );
-	float gFade = 1.0 - smoothstep( uR * 0.68, uR, distance( gIp.xz, cameraPosition.xz ) );
-	mvPosition.xyz *= vec3( 1.0, gFade, 1.0 );
+	float gDist = distance( gIp.xz, uCam.xz );
+	float gDens = mix( 1.0, 0.2, smoothstep( uR * 0.3, uR * 0.85, gDist ) );
+	float gFade = ( 1.0 - smoothstep( uR * 0.82, uR, gDist ) ) * ( 1.0 - smoothstep( gDens - 0.06, gDens, aRnd ) );
+	float gGrow = 1.0 + 0.6 * smoothstep( uR * 0.3, uR, gDist );
+	mvPosition.xyz *= vec3( gGrow, gFade * gGrow, gGrow );
 	mvPosition = instanceMatrix * mvPosition;
 	float gK = transformed.y * transformed.y * 1.9;
 	float gPh = gIp.x * 0.11 + gIp.z * 0.083;
@@ -3863,9 +3897,9 @@ function updateDetails(dt){
   DET.flame.visible=Math.sin(t*0.9)>0.55&&Math.random()>0.2;
 }
 // ---------------------------------------------------------------- Césped con viento (nivel configurable en la pausa)
-const GRASS_CS=24,GRASS_LV=[null,{r:46,n:120},{r:64,n:210},{r:84,n:320}],GRASS_NAMES=['Desactivado','Bajo','Medio','Alto'];
-const GRASS={level:IS_TOUCH?1:3,cells:new Map(),pool:[],geo:null,mat:null,wa:0.6,
-  uni:{uTime:{value:0},uWind:{value:new THREE.Vector2(0.5,0.3)},uPush:{value:new THREE.Vector4(0,0,0,1)},uR:{value:84}},
+const GRASS_CS=24,GRASS_LV=[null,{n:110},{n:200},{n:320}],GRASS_NAMES=['Desactivado','Bajo','Medio','Alto'],GRASS_DIST=[50,80,120,170,230];
+const GRASS={level:IS_TOUCH?1:3,dist:IS_TOUCH?1:3,cells:new Map(),pool:[],geo:null,mat:null,wa:0.6,
+  uni:{uCam:{value:new THREE.Vector3()},uTime:{value:0},uWind:{value:new THREE.Vector2(0.5,0.3)},uPush:{value:new THREE.Vector4(0,0,0,1)},uR:{value:84}},
   fr:new THREE.Frustum(),pm:new THREE.Matrix4(),m4:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),sv:new THREE.Vector3(),col:new THREE.Color(),up:new THREE.Vector3(0,1,0)};
 function grassGeo(){ // mata de 7 hojas curvadas; el gris de los vértices (oscuro abajo, claro en la punta) se tiñe por instancia
   const pos=[],col=[],nor=[],idx=[];let v=0;
@@ -3885,21 +3919,23 @@ function grassMat(){
 }
 function grassAt(x,z){ // ¿crece hierba aquí? devuelve densidad, tamaño y color, o null
   if(Math.abs(x)>LIMIT-20||Math.abs(z)>LIMIT-20||(golfF(x,z)<0.5&&reserved(x,z)))return null; // en el golf sí: césped corto
-  const tw=townF(x,z);if(tw>0.8)return null;
+  const tw=townF(x,z);for(const q of PAVED)if(x>q[0]&&x<q[1]&&z>q[2]&&z<q[3])return null;
   const rd=nearestRoad(x,z);if(rd&&rd.edge<(rd.road.t==='s'?2.8:1.1))return null;
   const h=groundH(x,z);if(x>LAKE.x0&&x<LAKE.x1&&z>LAKE.z0&&z<LAKE.z1+14&&h<LAKE.wl+0.3)return null;
   if(h>172||extraH(x,z)>0.05)return null;
   const sl=Math.abs(groundH(x+1.2,z)-groundH(x-1.2,z))+Math.abs(groundH(x,z+1.2)-groundH(x,z-1.2));if(sl>1.2)return null;
   if(blockedAt(x,z,0.25))return null;
   const pin=pinarF(x,z),her=herreriaF(x,z),gf=golfF(x,z),nz=vnoise(x/23+3,z/23),nz2=vnoise(x/61,z/61+9);
-  const dens=(0.5+0.5*nz)*(1-pin*0.6)*(1-smoothstep(0.35,0.8,tw));
+  const dens=(0.5+0.5*nz)*(1-pin*0.6)*(1-0.7*smoothstep(0.35,1,tw));
   let r=0.68,g=0.64,b=0.3;r=lerp(r,0.46,nz2*0.5);g=lerp(g,0.62,nz2*0.5);           // pradera seca, con manchas más verdes
   r=lerp(r,0.5,pin);g=lerp(g,0.5,pin);b=lerp(b,0.27,pin);r=lerp(r,0.4,her);g=lerp(g,0.58,her);b=lerp(b,0.24,her);r=lerp(r,0.36,gf);g=lerp(g,0.7,gf);b=lerp(b,0.27,gf);
   return{dens,s:lerp(lerp(1,1.15,her),0.45,gf)*(0.8+nz*0.35),r,g,b};
 }
 function grassCell(){
   const L=GRASS_LV[GRASS.level];let c=GRASS.pool.pop();
-  if(!c){const m=new THREE.InstancedMesh(GRASS.geo,GRASS.mat,L.n);m.frustumCulled=false;m.receiveShadow=true;m.castShadow=false;scene.add(m);c={mesh:m,box:new THREE.Box3(),n:0};}
+  if(!c){const B=GRASS.geo,g=new THREE.BufferGeometry();for(const k of['position','normal','color'])g.setAttribute(k,B.attributes[k]);g.setIndex(B.index); // comparte los datos de la mata
+    const ar=new THREE.InstancedBufferAttribute(new Float32Array(L.n),1);g.setAttribute('aRnd',ar);
+    const m=new THREE.InstancedMesh(g,GRASS.mat,L.n);m.frustumCulled=false;m.receiveShadow=true;m.castShadow=false;scene.add(m);c={mesh:m,box:new THREE.Box3(),n:0,ar};}
   return c;
 }
 function grassFill(c,ci,cj){
@@ -3911,27 +3947,33 @@ function grassFill(c,ci,cj){
     GRASS.q.setFromAxisAngle(GRASS.up,r2*TAU);const s=g.s*(0.75+r3*0.55);GRASS.sv.set(s*(0.9+r2*0.3),s*(0.85+r1*0.3),s*(0.9+r3*0.3));
     GRASS.m4.compose(GRASS.v.set(x,y,z),GRASS.q,GRASS.sv);m.setMatrixAt(n,GRASS.m4);GRASS.col.setRGB(g.r*(0.9+r1*0.2),g.g*(0.92+r2*0.16),g.b*(0.9+r3*0.2));m.setColorAt(n,GRASS.col);n++;}
   m.count=n;c.n=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;
-  c.box.min.set(ci*GRASS_CS-1,lo-0.5,cj*GRASS_CS-1);c.box.max.set((ci+1)*GRASS_CS+1,hi+1.6,(cj+1)*GRASS_CS+1);
+  for(let i=0;i<n;i++)c.ar.array[i]=i/Math.max(1,n);c.ar.needsUpdate=true; // orden en que se van ocultando con la distancia
+  c.box.min.set(ci*GRASS_CS-1,lo-0.5,cj*GRASS_CS-1);c.box.max.set((ci+1)*GRASS_CS+1,hi+1.6,(cj+1)*GRASS_CS+1);c.x0=ci*GRASS_CS;c.z0=cj*GRASS_CS;
 }
 function grassClear(){for(const c of GRASS.cells.values()){scene.remove(c.mesh);}for(const c of GRASS.pool)scene.remove(c.mesh);GRASS.cells.clear();GRASS.pool.length=0;}
-function setGrassLevel(l){if(l===GRASS.level)return;grassClear();GRASS.level=l;const b=$('btnGrass');if(b)b.textContent='Césped: '+GRASS_NAMES[l];saveOpts();}
-function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level}));}catch(e){}}
-function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;}catch(e){}const b=$('btnGrass');if(b)b.textContent='Césped: '+GRASS_NAMES[GRASS.level];}
+function grassLabels(){const b=$('btnGrass');if(b)b.textContent='Césped: '+GRASS_NAMES[GRASS.level];const d=$('btnGrassD');if(d){d.textContent='Alcance del césped: '+GRASS_DIST[GRASS.dist]+' m';d.classList.toggle('dim',!GRASS.level);}}
+function setGrassLevel(l){if(l===GRASS.level)return;grassClear();GRASS.level=l;grassLabels();saveOpts();}
+function setGrassDist(i){GRASS.dist=i;grassLabels();saveOpts();}
+function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level,dist:GRASS.dist}));}catch(e){}}
+function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;if(o&&o.dist>=0&&o.dist<GRASS_DIST.length)GRASS.dist=o.dist;}catch(e){}grassLabels();}
 function updateGrass(dt){
   if(!GRASS.geo){GRASS.geo=grassGeo();GRASS.mat=grassMat();}
   const U=GRASS.uni;U.uTime.value+=dt;GRASS.wa+=dt*0.03;const gust=0.38+0.3*Math.max(0,Math.sin(U.uTime.value*0.21))+0.12*Math.sin(U.uTime.value*0.77);
   U.uWind.value.set(Math.cos(GRASS.wa)*gust,Math.sin(GRASS.wa)*gust);
-  if(!GRASS.level)return;const L=GRASS_LV[GRASS.level];U.uR.value=L.r;
-  const cam=camera.position;
+  if(!GRASS.level)return;const R=GRASS_DIST[GRASS.dist];U.uR.value=R;
+  const cam=camera.position;U.uCam.value.copy(cam);
   if(cam.y-groundH(cam.x,cam.z)>90){for(const c of GRASS.cells.values())c.mesh.visible=false;return;}
   if(P.car)U.uPush.value.set(P.car.x,0,P.car.z,2.7);else U.uPush.value.set(P.x,0,P.z,0.95);
-  const ci0=Math.floor(cam.x/GRASS_CS),cj0=Math.floor(cam.z/GRASS_CS),rc=Math.ceil(L.r/GRASS_CS),need=new Set();let built=0;
+  const ci0=Math.floor(cam.x/GRASS_CS),cj0=Math.floor(cam.z/GRASS_CS),rc=Math.ceil(R/GRASS_CS),need=new Set();let built=0;
   for(let di=-rc;di<=rc;di++)for(let dj=-rc;dj<=rc;dj++){const ci=ci0+di,cj=cj0+dj;
-    if(Math.hypot((ci+0.5)*GRASS_CS-cam.x,(cj+0.5)*GRASS_CS-cam.z)>L.r+GRASS_CS*0.72)continue;const key=ci*4096+cj;need.add(key);
-    if(!GRASS.cells.has(key)&&built<3){built++;const c=grassCell();grassFill(c,ci,cj);GRASS.cells.set(key,c);}}
+    if(Math.hypot((ci+0.5)*GRASS_CS-cam.x,(cj+0.5)*GRASS_CS-cam.z)>R+GRASS_CS*0.72)continue;const key=ci*4096+cj;need.add(key);
+    if(!GRASS.cells.has(key)&&built<4){built++;const c=grassCell();grassFill(c,ci,cj);GRASS.cells.set(key,c);}}
   for(const[k,c]of GRASS.cells)if(!need.has(k)){c.mesh.visible=false;GRASS.pool.push(c);GRASS.cells.delete(k);}
   GRASS.pm.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);GRASS.fr.setFromProjectionMatrix(GRASS.pm);
-  for(const c of GRASS.cells.values())c.mesh.visible=c.n>0&&GRASS.fr.intersectsBox(c.box);
+  for(const c of GRASS.cells.values()){c.mesh.visible=c.n>0&&GRASS.fr.intersectsBox(c.box);if(!c.mesh.visible)continue;
+    // solo se mandan a la tarjeta las matas que el shader no va a ocultar por distancia
+    const dx=Math.max(c.x0-cam.x,0,cam.x-c.x0-GRASS_CS),dz=Math.max(c.z0-cam.z,0,cam.z-c.z0-GRASS_CS),dens=lerp(1,0.2,smoothstep(R*0.3,R*0.85,Math.hypot(dx,dz)));
+    c.mesh.count=Math.min(c.n,Math.ceil(c.n*(dens+0.08)));}
 }
 // ---------------------------------------------------------------- Agua del lago (reflejos, oleaje, profundidad y espuma)
 let LAKEW=null;
