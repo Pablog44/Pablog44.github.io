@@ -663,7 +663,7 @@ function segDistT(s,x,z){const dx=s.bx-s.ax,dz=s.bz-s.az;const L2=dx*dx+dz*dz||1
       for(let i=0;i<r.pts.length;i+=1){const p=r.pts[i];for(let j=0;j<m6.pts.length-1;j++){const a=m6.pts[j],b=m6.pts[j+1];const dx=b[0]-a[0],dz=b[1]-a[1],L2=dx*dx+dz*dz||1;let t=((p[0]-a[0])*dx+(p[1]-a[1])*dz)/L2;t=clamp(t,0,1);const d=Math.hypot(p[0]-a[0]-dx*t,p[1]-a[1]-dz*t);if(d<cd){cd=d;ci=i;rh=lerp(m6.hs[j],m6.hs[j+1],t);}}}
       if(ci>=0&&cd<3){const S=[0];for(let i=1;i<r.pts.length;i++)S.push(S[i-1]+Math.hypot(r.pts[i][0]-r.pts[i-1][0],r.pts[i][1]-r.pts[i-1][1]));
         r.bridge={i:ci,x:r.pts[ci][0],z:r.pts[ci][1],h:rh+5.6,road:rh};
-        for(let i=0;i<r.pts.length;i++){const D=Math.abs(S[i]-S[ci]);if(D<12)r.bridgeI.add(i);const tg=rh+5.6-Math.max(0,D-12)*0.12;if(tg>hs[i])hs[i]=tg;}}}
+        for(let i=0;i<r.pts.length;i++){const D=Math.abs(S[i]-S[ci]);if(D<26)r.bridgeI.add(i);const tg=rh+5.6-Math.max(0,D-12)*0.12;if(tg>hs[i])hs[i]=tg;}}}
     r.hs=hs;
     for(let i=0;i<r.pts.length-1;i++){
       const s={ax:r.pts[i][0],az:r.pts[i][1],ah:hs[i],bx:r.pts[i+1][0],bz:r.pts[i+1][1],bh:hs[i+1],hw:r.w,road:r,bridge:r.bridgeI.has(i)&&r.bridgeI.has(i+1)};
@@ -686,12 +686,18 @@ function otherRoadNear(x,z,road,margin){const k=rcell(x,z);if(k<0)return false;c
 
 // ---------------------------------------------------------------- malla de alturas
 const Hg=new Float32Array(GW*GW);
+const HLOCK=[]; // rectángulos donde la altura del terreno se fija después de aplanar carreteras
+// Escalinata de la puerta principal: de la Lonja (H0) sube hacia el oeste hasta la calle Floridablanca
+const STAIR=(()=>{const r=nearestRoad(-138,0),htop=(r?r.h:H0+3)+0.12,N=Math.max(1,Math.ceil((htop-H0)/0.18));return{x0:-120,run:0.36,hw:5.2,htop,N,rise:(htop-H0)/N,xl:-129.2};})();
+HLOCK.push({x0:-120.5,x1:116,z0:-147.5,z1:96,f:()=>H0});               // la Lonja, llana de verdad hasta el muro
+HLOCK.push({x0:-129,x1:-127,z0:-9,z1:9,f:()=>STAIR.htop-0.15});           // bajo la escalinata, por debajo de los peldaños
 function buildHeights(){
   for(let j=0;j<=GN;j++)for(let i=0;i<=GN;i++){
     const x=-HALF+i*CELL,z=-HALF+j*CELL;
     let h=hZones(x,z);
     const r=nearestRoad(x,z,true);
     if(r){const w=1-smoothstep(r.seg.hw+11,r.seg.hw+22,r.d);if(w>0)h=lerp(h,r.h,w);}
+    for(const L of HLOCK)if(x>=L.x0&&x<=L.x1&&z>=L.z0&&z<=L.z1)h=L.f(x,z,h);
     Hg[j*GW+i]=h;
   }
 }
@@ -1084,7 +1090,12 @@ function buildMonastery(){
   MONW.box(-74.5,y-3,0,2.5,31,18,0,WHITE,4.4,5.5,y);
   pediment(-74.5,y+28,0,18.6,2.8,6);
   STONE.box(-77.2,y-0.2,0,0.3,10.5,4.2,0,GRAN,1,1);
-  woodDoor(-77.55,y,0,-Math.PI/2,6.4,8.5,false);
+  {const c=mkCanvas(256,340),g=c.getContext('2d'),gr=g.createLinearGradient(0,0,0,340);gr.addColorStop(0,'#1b1714');gr.addColorStop(1,'#0d0b0a');g.fillStyle=gr;g.fillRect(0,0,256,340);
+   g.fillStyle='rgba(150,132,105,0.32)';g.fillRect(30,262,196,78);g.fillStyle='rgba(150,132,105,0.12)';g.fillRect(60,120,136,142);
+   g.fillStyle='#2c2a27';for(let x=5;x<256;x+=12)g.fillRect(x,0,4,340);for(const yy of[3,112,224,333])g.fillRect(0,yy,256,7);
+   g.fillStyle='#3d3a36';for(let x=5;x<256;x+=12)for(const yy of[115,227]){g.beginPath();g.arc(x+2,yy+3,4.2,0,TAU);g.fill();}
+   g.fillStyle='#14110f';g.fillRect(126,0,5,340);
+   const m=new THREE.Mesh(new THREE.PlaneGeometry(6.4,8.5),new THREE.MeshLambertMaterial({map:texFrom(c,false)}));m.position.set(-77.58,y+4.25,0);m.rotation.y=-Math.PI/2;scene.add(m);}
   // pilastras con basa y capitel, y cornisa entre los dos cuerpos de la portada
   for(const zz of [-12,-6,6,12]){STONE.box(-77.3,y,zz,0.55,24,0.7,0,GRAN,1,1);STONE.box(-77.35,y,zz,0.7,0.8,0.9,0,GRAN,1,1);STONE.box(-77.35,y+11.3,zz,0.68,0.7,0.88,0,GRAN,1,1,null,true,true);STONE.box(-77.35,y+23.2,zz,0.68,0.8,0.88,0,GRAN,1,1,null,true,true);}
   STONE.box(-77.4,y+12.2,0,0.5,0.7,13.1,0,GRAN,2,2,null,true,true);
@@ -1143,13 +1154,31 @@ function buildMonastery(){
 function buildLonja(){
   const y=H0;
   pave(-120,-72,-147,96,y+0.06);pave(-72,116,-147,-93,y+0.06);
-  // muro de contención y pretil hacia la calle Floridablanca
-  for(let z=-141;z<96;z+=12){
+  // muro de contención y pretil hacia la calle Floridablanca, con la escalinata de la puerta principal en medio
+  const ST=STAIR,gap=ST.hw;
+  const wallPiece=(za,zb)=>{if(zb-za<0.3)return;const z=(za+zb)/2,hz=(zb-za)/2;
     const r=nearestRoad(-141,z);const rh=r?r.h:groundH(-141,z);const top=Math.max(rh+0.15,y+1.2);
-    STONE.box(-124.5,y-1,z,4.5,top-(y-1),6.02,0,GRAN,2,2,y-1);
-    STONE.box(-120.5,top,z,0.5,1.0,6.02,0,GRAN,1,1);
-    addCollider(-124.5,z,4.5,6,0,y-1,top+1,'wall');
-  }
+    STONE.box(-124.5,y-1,z,4.5,top-(y-1),hz+0.02,0,GRAN,2,2,y-1);
+    STONE.box(-120.5,top,z,0.5,1.0,hz+0.02,0,GRAN,1,1);
+    addCollider(-124.5,z,4.5,hz,0,y-1,top+1,'wall');};
+  for(let z=-141;z<96;z+=12){const a=z-6,b=z+6;if(b<=-gap||a>=gap)wallPiece(a,b);else{wallPiece(a,-gap);wallPiece(gap,b);}}
+  // escalinata de granito: peldaños macizos y, encima de cada uno, la superficie por la que se camina
+  {const tread=k=>y+Math.min(ST.htop-y,(k+1)*ST.rise);
+   for(let k=0;k<ST.N;k++){const xa=ST.x0-k*ST.run,cx=xa-ST.run/2,t=tread(k);
+     STONE.box(cx,y-0.6,0,ST.run/2+0.01,t-(y-0.6),gap+0.35,0,GRAN,1,1);
+     SURF.push({x:cx,z:0,c:1,s:0,hx:ST.run/2,hz:gap,h:Math.max(0,t-groundH(cx,0))});}
+   const xl0=ST.x0-ST.N*ST.run,xl1=ST.xl;STONE.box((xl0+xl1)/2,y-0.6,0,(xl0-xl1)/2+0.01,ST.htop-(y-0.6),gap+0.35,0,GRAN,2,2);
+   for(let x=xl0;x>xl1;x-=0.4){const cx=x-0.2;SURF.push({x:cx,z:0,c:1,s:0,hx:0.2,hz:gap,h:Math.max(0,ST.htop-groundH(cx,0))});}
+   // grandes bolas sobre pedestales a los lados de la salida (como en la Lonja de verdad)
+   for(const sd of[-1,1]){const pz=sd*(gap+1.1),r=nearestRoad(-141,pz),top=Math.max((r?r.h:y)+0.15,y+1.2);
+     let wt=1e9;for(let q=gap;q<=gap+6;q+=0.5){const rr2=nearestRoad(-141,sd*q);wt=Math.min(wt,Math.max((rr2?rr2.h:y)+0.15,y+1.2));}
+     STONE.box(-124.5,wt-0.5,pz,1.05,top+1.5-(wt-0.5),1.05,0,GRAN,1,1,null,true,true);STONE.box(-124.5,top+1.5,pz,1.2,0.22,1.2,0,GRAN,1,1,null,true,true);
+     const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(1.55);b.position.set(-124.5,top+1.72+0.93,pz);b.castShadow=true;scene.add(b);addCollider(-124.5,pz,1.2,1.2,0,top,top+3.6,'wall');}
+   // bolardos de granito arriba: se pasa andando, pero los coches no bajan por la escalinata
+   for(let z=-4;z<=4;z+=2){const bx=ST.xl-0.6,g=groundH(bx,z);STONE.box(bx,g-0.3,z,0.25,1.15,0.25,0,GRAN,1,1);addCollider(bx,z,0.25,0.25,0,g-0.5,g+0.9,'wall');}}
+  // bolas más pequeñas sobre el pretil, cada 24 m
+  for(let z=-129;z<=90;z+=24){if(Math.abs(z)<gap+4)continue;const r=nearestRoad(-141,z),top=Math.max((r?r.h:y)+0.15,y+1.2)+1.0;
+    STONE.box(-120.5,top-0.4,z,0.55,1.1,0.55,0,GRAN,1,1,null,true,true);const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(0.85);b.position.set(-120.5,top+0.7+0.5,z);b.castShadow=true;scene.add(b);}
   // Casas de Oficios (Herrera, 1587) y arco de la calle Grimaldi
   const casa=(x0,x1)=>{const cx=(x0+x1)/2,hx=(x1-x0)/2;MONW.box(cx,y-2,-156,hx,16,9,0,WHITE,4.4,5.5,y);STONE.box(cx,y+13.4,-156,hx+0.3,0.6,9.3,0,GRAN,2,2);ROOF.hip(cx,y+14,-156,hx,9,0,5.5,0.5,SLATE);addCollider(cx,-156,hx,9,0,y-3,y+20,'b');
     const nd=Math.max(1,Math.round((x1-x0)/16)),st=(x1-x0)/nd;for(let k=0;k<nd;k++)woodDoor(x0+st*(k+0.5),y+0.06,-147,0,2.4,3.9);};
@@ -1219,7 +1248,29 @@ function buildLandmarks(){
   {let fx=null,fz=null,bd=1e9;for(let x=-58;x<=2;x+=2)for(let z=-314;z<=-288;z+=2){if(!roadClear(x,z,5.5))continue;const d=Math.hypot(x+30,z+300);if(d<bd){bd=d;fx=x;fz=z;}}
    if(fx!==null){const y=groundH(fx,fz);const f=new THREE.Mesh(new THREE.CylinderGeometry(3,3.3,0.8,20),new THREE.MeshLambertMaterial({map:TEX.granite}));f.position.set(fx,y+0.4,fz);scene.add(f);const w=new THREE.Mesh(new THREE.CircleGeometry(2.7,20),MAT.water);w.rotation.x=-Math.PI/2;w.position.set(fx,y+0.82,fz);scene.add(w);STONE.box(fx,y+0.6,fz,0.35,2.4,0.35,0,GRAN,1,1);addCollider(fx,fz,2.6,2.6,0,y-1,y+0.8);}}
   // El Laberinto (Plaza de la Virgen de Gracia): setos en laberinto
-  {const y=maxGround(86,134,-220,-186);pave(86,134,-220,-186,y+0.05);const hg=(x,z,a,b)=>{if(roadClear(x-a,z-b,0.5)&&roadClear(x+a,z+b,0.5)&&roadClear(x,z,0.5))HEDGE.box(x,y,z,a,1.1,b,0,[0.4,0.58,0.32],2,2);};for(let k=0;k<5;k++){const m=2+k*2.6;hg(110,-203-m,m*1.4,0.4);hg(110,-203+m,m*1.4,0.4);if(k%2)hg(110-m*1.4,-203,0.4,m*0.6);else hg(110+m*1.4,-203,0.4,m*0.6);}}
+  {if(!MAT.gravel){const c=mkCanvas(128,128),g=c.getContext('2d');g.fillStyle='#c9b893';g.fillRect(0,0,128,128);for(let k=0;k<900;k++){const v=150+Math.random()*80|0;g.fillStyle=`rgb(${v},${v-14|0},${v-40|0})`;g.fillRect(Math.random()*128,Math.random()*128,1+Math.random()*2.5,1+Math.random()*2.5);}
+     MAT.gravel=new THREE.MeshLambertMaterial({map:texFrom(c),polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});}
+   pave(86,134,-220,-186,0,MAT.gravel,10);
+   const X0=89,Z0=-218,CS=3,NC=14,NR=10;let sd=1587;const rnd=()=>{sd=(Math.imul(sd,1664525)+1013904223)>>>0;return sd/4294967296;};
+   // laberinto perfecto (backtracking con semilla fija): V[r][c] = seto a la izquierda de la celda, H[r][c] = seto por encima
+   const V=[],H=[],vis=[];for(let r=0;r<NR;r++){V.push(new Array(NC+1).fill(true));vis.push(new Array(NC).fill(false));}for(let r=0;r<=NR;r++)H.push(new Array(NC).fill(true));
+   const st=[[0,0]];vis[0][0]=true;
+   while(st.length){const[r,c]=st[st.length-1],nb=[];if(r>0&&!vis[r-1][c])nb.push([r-1,c]);if(r<NR-1&&!vis[r+1][c])nb.push([r+1,c]);if(c>0&&!vis[r][c-1])nb.push([r,c-1]);if(c<NC-1&&!vis[r][c+1])nb.push([r,c+1]);
+     if(!nb.length){st.pop();continue;}const[nr,nc]=nb[Math.floor(rnd()*nb.length)];if(nr!==r)H[Math.max(r,nr)][c]=false;else V[r][Math.max(c,nc)]=false;vis[nr][nc]=true;st.push([nr,nc]);}
+   const cr=NR/2-1,cc=NC/2-1;H[cr+1][cc]=H[cr+1][cc+1]=false;V[cr][cc+1]=V[cr+1][cc+1]=false;   // plazoleta central de 2x2
+   H[NR][2]=false;V[7][NC]=false;                                                                // entradas: Floridablanca (sur) y calle del Rey (este)
+   const wall=(x0,z0,x1,z1)=>{const cx=(x0+x1)/2,cz=(z0+z1)/2,ax=Math.abs(x1-x0)>0.1,L=CS/2+0.42,T=0.42,hx=ax?L:T,hz=ax?T:L;if(!roadClear(cx,cz,0.3))return;
+     const g=[groundH(x0,z0),groundH(x1,z1),groundH(cx,cz)],lo=Math.min(...g)-0.35,hi=Math.max(...g)+2.2,k=0.9+rnd()*0.16;
+     HEDGE.box(cx,lo,cz,hx,hi-lo,hz,0,[0.36*k,0.54*k,0.28*k],2,2);addCollider(cx,cz,hx,hz,0,lo,hi,'wall');};
+   for(let r=0;r<NR;r++)for(let c=0;c<=NC;c++)if(V[r][c])wall(X0+c*CS,Z0+r*CS,X0+c*CS,Z0+(r+1)*CS);
+   for(let r=0;r<=NR;r++)for(let c=0;c<NC;c++)if(H[r][c])wall(X0+c*CS,Z0+r*CS,X0+(c+1)*CS,Z0+r*CS);
+   // fuente en el centro
+   const fx=X0+(cc+1)*CS,fz=Z0+(cr+1)*CS,fy=groundH(fx,fz);SPOTS.laberinto={x:fx,z:fz};
+   const bas=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.8,0.7,18),new THREE.MeshLambertMaterial({map:TEX.granite}));bas.position.set(fx,fy+0.3,fz);bas.castShadow=true;scene.add(bas);
+   const wat=new THREE.Mesh(new THREE.CircleGeometry(1.5,18),MAT.water);wat.rotation.x=-Math.PI/2;wat.position.set(fx,fy+0.6,fz);scene.add(wat);
+   const col=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.26,1.3,10),new THREE.MeshLambertMaterial({map:TEX.granite}));col.position.set(fx,fy+1.2,fz);scene.add(col);
+   const bl=new THREE.Mesh(ballG2(),MAT.granBall);bl.scale.setScalar(0.45);bl.position.set(fx,fy+2.05,fz);scene.add(bl);addCollider(fx,fz,1.75,1.75,0,fy-1,fy+0.8,'wall');
+   {const[ex,ez]=[X0+2.5*CS,Z0+NR*CS+0.9];signMesh(signTex(['EL LABERINTO'],512,96,'#2d2a26','#e9dcb5','bold 52px Georgia,serif','#b4955a'),3.4,0.64,ex,groundH(ex,ez)+2.5,ez,0);}}
   // Casa de la Compaña (Francisco de Mora, c.1590)
   {const y=maxGround(-240,-190,116,160);const w=(cx,cz,hx,hz)=>{MONW.box(cx,y-2,cz,hx,15,hz,0,WHITE,4.4,5.5,y);ROOF.hip(cx,y+13,cz,hx,hz,0,4.5,0.5,SLATE);addCollider(cx,cz,hx,hz,0,y-3,y+18);};
    w(-215,121,25,5);w(-215,155,25,5);w(-235,138,5,12);w(-195,138,5,12);}
@@ -1383,20 +1434,20 @@ function buildCrossings(){
   });
 }
 function buildBridge(){
-  const tr=roadByName('Vía del Tren Turístico'),B=tr.bridge;if(!B)return;const P=tr.pts,H=tr.hs;
-  for(let i=Math.max(0,B.i-6);i<Math.min(P.length-1,B.i+6);i++){
+  const tr=roadByName('Vía del Tren Turístico'),B=tr.bridge;if(!B)return;const P=tr.pts,H=tr.hs,S=[0];
+  for(let i=1;i<P.length;i++)S.push(S[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+  for(let i=0;i<P.length-1;i++){if(!tr.bridgeI.has(i)||!tr.bridgeI.has(i+1))continue;
     const a=P[i],b=P[i+1],dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz)||1,rot=Math.atan2(-dz,dx),mx=(a[0]+b[0])/2,mz=(a[1]+b[1])/2,top=(H[i]+H[i+1])/2;
-    STONE.box(mx,top-1.15,mz,L/2+0.05,1.13,3.3,rot,[0.78,0.76,0.72],2,2);
+    STONE.box(mx,top-1.15,mz,L/2+0.05,1.13,3.3,rot,[0.78,0.76,0.72],2,2,null,true,true);
     for(const sd of[-1,1]){const px=mx+(-dz/L)*sd*3.15,pz=mz+(dx/L)*sd*3.15;STONE.box(px,top-0.05,pz,L/2+0.05,0.95,0.15,rot,[0.8,0.78,0.74],2,2);}
-    addCollider(mx,mz,L/2,3.3,rot,top-1.15,top+1,'b');
-  }
-  // estribos a ambos lados de la carretera, desde el firme hasta el tablero
-  const S=[0];for(let i=1;i<P.length;i++)S.push(S[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
-  for(const sd of[-1,1]){let j=B.i;while(j>0&&j<P.length-1&&Math.abs(S[j]-S[B.i])<13)j+=sd;
-    const a=P[j],b=P[j+sd]||P[j],dx=b[0]-a[0],dz=b[1]-a[1],rot=Math.atan2(-dz,dx),g=Math.min(groundH(a[0],a[1]),B.road)-1;
-    STONE.box(a[0],g,a[1],2.4,H[j]-0.05-g,3.6,rot,GRAN,2,2,g);addCollider(a[0],a[1],2.4,3.6,rot,g,H[j],'b');}
+    addCollider(mx,mz,L/2,3.3,rot,top-1.15,top+1,'b');}
+  const at=D=>{let j=B.i;const sd=Math.sign(D);while(j>0&&j<P.length-1&&(S[j]-S[B.i])*sd<Math.abs(D))j+=sd;return j;};
+  // pilas de granito a 15 m del eje (fuera de la calzada y del arcén) y estribos al final del viaducto
+  for(const D of[-15,15,-27,27]){const j=at(D),a=P[j],b=P[j+Math.sign(D)]||P[j],dx=b[0]-a[0],dz=b[1]-a[1],rot=Math.atan2(-dz,dx),g=Math.min(groundH(a[0],a[1]),B.road)-1,abut=Math.abs(D)>20;
+    STONE.box(a[0],g,a[1],abut?2.4:1.1,H[j]-1.15-g+(abut?1.1:0),abut?3.6:2.9,rot,GRAN,2,2,g);if(!abut)STONE.box(a[0],H[j]-1.45,a[1],1.4,0.3,3.3,rot,GRAN,1,1,null,true,true);
+    addCollider(a[0],a[1],abut?2.4:1.1,abut?3.6:2.9,rot,g,H[j]-1.1,'b');}
   const q=P[B.i],n=P[B.i+1],dx=n[0]-q[0],dz=n[1]-q[1],L=Math.hypot(dx,dz)||1;
-  for(const sd of[-1,1]){const px=q[0]+(-dz/L)*sd*3.32,pz=q[1]+(dx/L)*sd*3.32;signMesh(signTex(['PUENTE DE LA SIERRA'],640,96,'#c9c4b8','#3a3530','bold 50px Georgia,serif'),5,0.75,px,B.h-0.6,pz,Math.atan2(-dz*sd,dx*sd)+(sd>0?0:0));}
+  for(const sd of[-1,1]){const px=q[0]+(-dz/L)*sd*3.32,pz=q[1]+(dx/L)*sd*3.32;signMesh(signTex(['PUENTE DE LA SIERRA'],640,96,'#c9c4b8','#3a3530','bold 50px Georgia,serif'),5,0.75,px,B.h-0.6,pz,Math.atan2(-dz*sd,dx*sd));}
 }
 function trackAt(s){
   const S=TRACK.S,P=TRACK.P;s=TRACK.loop?((s%TRACK.len)+TRACK.len)%TRACK.len:clamp(s,0,TRACK.len);let lo=0,hi=S.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(S[m]<=s)lo=m;else hi=m;}
@@ -2133,18 +2184,31 @@ const kb=(k,p,t)=>`<kbd>${lastDevice==='pad'?p:(lastDevice==='touch'?(t||p):k)}<
 //  ENTRADA: teclado, ratón (pointer lock con alternativa) y mando
 // =====================================================================
 const KEYS={},KP=new Set();const MOUSE={dx:0,dy:0,l:false,r:false,lp:false,wheel:0};
-let locked=false,lockOK=true,wasLocked=false;const CANVAS=renderer.domElement;
+let locked=false,lockOK=true,wasLocked=false,lockT=0,rawOK=true,lockPromise=false,mEma=8;const CANVAS=renderer.domElement;
 addEventListener('keydown',e=>{KEYS[e.code]=true;if(!e.repeat)KP.add(e.code);lastDevice='kb';if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','Backspace'].includes(e.code)&&G.state==='play')e.preventDefault();});
 addEventListener('keyup',e=>{KEYS[e.code]=false;});
-addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;MOUSE.l=MOUSE.r=false;});
+addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;MOUSE.l=MOUSE.r=false;MOUSE.dx=MOUSE.dy=0;});
 CANVAS.addEventListener('mousedown',e=>{lastDevice='kb';if(e.button===0){MOUSE.l=true;MOUSE.lp=true;}if(e.button===2)MOUSE.r=true;tryLock();});
 addEventListener('mouseup',e=>{if(e.button===0)MOUSE.l=false;if(e.button===2)MOUSE.r=false;});
-addEventListener('mousemove',e=>{if(locked||MOUSE.r){MOUSE.dx+=e.movementX||0;MOUSE.dy+=e.movementY||0;}});
+addEventListener('mousemove',e=>{
+  if(!(locked||MOUSE.r))return;if(performance.now()-lockT<120)return; // justo al capturar el ratón llega un salto acumulado
+  const mx=e.movementX||0,my=e.movementY||0,m=Math.max(Math.abs(mx),Math.abs(my));
+  // Chrome, con el puntero capturado, a veces manda un salto enorme de golpe: si no encaja con el movimiento reciente, se descarta
+  if(m>Math.max(260,mEma*9)){mEma=mEma*0.9+20;return;}
+  mEma=mEma*0.85+m*0.15;MOUSE.dx+=mx;MOUSE.dy+=my;});
 CANVAS.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('wheel',e=>{if(G.state==='play')MOUSE.wheel+=Math.sign(e.deltaY);},{passive:true});
-function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH)return;if(!CANVAS.requestPointerLock){lockOK=false;return;}try{const p=CANVAS.requestPointerLock();if(p&&p.catch)p.catch(()=>{lockOK=false;toast('El navegador no deja capturar el ratón: mantén el clic derecho y arrastra para girar la cámara.',6);});}catch(e){lockOK=false;}}
-document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(!locked&&wasLocked&&G.state==='play')openPause();wasLocked=locked;});
-document.addEventListener('pointerlockerror',()=>{lockOK=false;toast('El navegador no deja capturar el ratón: mantén el clic derecho y arrastra para girar la cámara.',6);});
+function lockFail(){lockOK=false;toast('El navegador no deja capturar el ratón: mantén el clic derecho y arrastra para girar la cámara.',6);}
+function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH)return;if(!CANVAS.requestPointerLock){lockOK=false;return;}
+  const plain=gesture=>{try{const p=CANVAS.requestPointerLock();if(p&&p.catch)p.catch(()=>{if(gesture)lockFail();});}catch(e){if(gesture)lockFail();}};
+  if(!rawOK){plain(true);return;}
+  // movimiento del ratón en crudo (sin aceleración del sistema): evita casi todos los saltos; si no se admite, captura normal
+  let p=null;try{p=CANVAS.requestPointerLock({unadjustedMovement:true});}catch(e){rawOK=false;plain(true);return;}
+  if(p&&p.catch){lockPromise=true;p.catch(()=>{rawOK=false;plain(false);});}else rawOK=false; // sin promesas, la petición ya fue normal
+}
+
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(locked){lockT=performance.now();MOUSE.dx=MOUSE.dy=0;mEma=8;}if(!locked&&wasLocked&&G.state==='play')openPause();wasLocked=locked;});
+document.addEventListener('pointerlockerror',()=>{if(lockPromise)return;lockFail();}); // con promesas, los fallos se gestionan en tryLock
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play')openPause();});
 const PAD={b:[],pb:[],ax:[0,0,0,0],lt:0,rt:0,plt:0,prt:0,on:false};
 addEventListener('gamepadconnected',()=>{toast('Mando conectado. ¡A repartir churros!');lastDevice='pad';});
@@ -3882,6 +3946,7 @@ function setupDetails(){
 function clack(v){for(let k=0;k<9;k++)nBurst(0.2*v,0.025,2600,1.5,'bandpass',AU.ctx.currentTime+k*0.07);}
 function updateDetails(dt){
   if(!DET.balloon)return;const t=G.time;
+  if(G.state==='play'&&!G.mazeDone&&SPOTS.laberinto&&!P.car&&Math.hypot(P.x-SPOTS.laberinto.x,P.z-SPOTS.laberinto.z)<3){G.mazeDone=true;P.money+=100;toast('¡Has llegado al centro del <b>Laberinto</b>! Los jardineros te dan <b>100 €</b> de propina.',3.5);}
   for(const b of DET.storks){const s=b.s;b.t-=dt;
     const circ=()=>[26+Math.cos(b.a)*b.r,b.h+Math.sin(t*0.7+b.r)*2,Math.sin(b.a)*b.r];let pos,fly=true;
     if(b.st==='sit'){pos=b.nest;fly=false;if(b.t<=0){b.st='out';b.k=0;}}
