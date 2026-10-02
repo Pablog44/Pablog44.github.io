@@ -70,7 +70,14 @@ p{margin:0}
 #deployMap{width:100%; aspect-ratio:720/561; display:block; border:1.5px solid var(--ink); cursor:pointer}
 .dep-map{display:grid; gap:.6rem}
 .dep-side{display:grid; gap:.8rem}
-#classes{display:grid; grid-template-columns:1fr 1fr; gap:.4rem}
+#classes,#vehPick{display:grid; grid-template-columns:1fr 1fr; gap:.4rem}
+#vehPick button{display:grid; text-align:left; padding:.4rem .6rem; background:transparent; border:1.5px solid var(--rule)}
+#vehPick button strong{font-family:var(--f-disp); font-size:1.08rem; font-weight:600; line-height:1.1}
+#vehPick button span{font-size:.8rem; color:var(--ink-soft)}
+#vehPick button[aria-pressed="true"]{border-color:var(--blue); background:var(--blue); color:#fff}
+#vehPick button[aria-pressed="true"] span{color:#fff}
+#vehPick button:disabled{opacity:.55; cursor:default; border-style:dashed}
+.pickhead2{font-family:var(--f-disp); font-weight:600; font-size:1.1rem}
 #classes button{display:grid; text-align:left; padding:.45rem .6rem; background:transparent; border:1.5px solid var(--rule)}
 #classes button strong{font-family:var(--f-disp); font-size:1.15rem; font-weight:600; line-height:1.1}
 #classes button span{font-size:.82rem; color:var(--ink-soft)}
@@ -81,6 +88,8 @@ p{margin:0}
 #wCard dt{color:var(--ink-soft)} #wCard dd{margin:0}
 .primary{font-family:var(--f-disp); font-size:1.4rem; font-weight:600; padding:.6rem 1rem; background:var(--blue); color:#fff; border:0; justify-self:start}
 :root[data-theme="dark"] .primary{color:#10161c}
+:root[data-theme="dark"] #vehPick button[aria-pressed="true"],:root[data-theme="dark"] #vehPick button[aria-pressed="true"] span{color:#10161c}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) #vehPick button[aria-pressed="true"],:root:not([data-theme="light"]) #vehPick button[aria-pressed="true"] span{color:#10161c} }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .primary{color:#10161c} }
 .primary:disabled{background:transparent; color:var(--ink-soft); border:1.5px dashed var(--rule); cursor:default}
 .typed{border-top:1px solid var(--rule); padding-top:.7rem; display:grid; gap:.3rem}
@@ -98,6 +107,8 @@ p{margin:0}
 .sens{display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .8rem; font-size:.95rem}
 .sens input{flex:1 1 9rem; accent-color:var(--blue); min-width:0}
 .sens output{font-family:var(--f-disp); font-weight:600; min-width:2ch}
+.chk{display:flex; gap:.55rem; align-items:flex-start; font-size:.95rem}
+.chk input{width:1.15rem; height:1.15rem; margin:.15rem 0 0; accent-color:var(--blue); flex:none}
 #pauseScore{display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-height:16rem; overflow:auto; font-family:var(--f-disp); border-top:1px solid var(--rule); padding-top:.6rem}
 #pauseScore table{border-collapse:collapse; width:100%; font-size:.95rem}
 #pauseScore caption{font-size:1.2rem; font-weight:700; text-align:left}
@@ -251,6 +262,7 @@ body.nogl #fatal{max-width:none}
       <button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button>
       <button type="button" class="link" data-open="controls">Ver los controles</button>
     </div>
+    <p id="padMenu" class="quiet" hidden>Mando detectado. LB empieza con la República y RB con los sublevados.</p>
     <p class="note">Recreación didáctica. La batalla del Ebro costó decenas de miles de vidas en los dos bandos; el juego no toma partido por ninguno.</p>
   </div>
   <canvas id="menuMap" aria-label="Mapa del sector del Ebro con el avance republicano del 25 de julio de 1938"></canvas>
@@ -264,13 +276,16 @@ body.nogl #fatal{max-width:none}
     </header>
     <div class="dep-map">
       <canvas id="deployMap" aria-label="Mapa de despliegue. Elige una posición de tu bando."></canvas>
-      <p class="quiet">Toca una posición rodeada de azul para desplegar en ella. Gana quien deja al contrario sin refuerzos: cada caído cuesta uno, y dominar tres o más posiciones desangra al enemigo. En tu base esperan camiones, dos carros y dos cazas: el primer carro y el primer caza te aguardan algo más de un minuto antes de salir con otra dotación. Las casas dibujadas en hueco tienen la puerta abierta.</p>
+      <p class="pickhead2">O sal ya dentro de un carro o un caza</p>
+      <div id="vehPick" role="group" aria-label="Vehículos disponibles"></div>
+      <p class="quiet">Toca una posición rodeada de azul para desplegar en ella. Gana quien deja al contrario sin refuerzos: cada caído cuesta uno, y dominar tres o más posiciones desangra al enemigo. Los carros y cazas de tu bando están marcados en el mapa: tócalos, o elígelos en la lista, para salir ya dentro. Si lo lleva un soldado, se baja y te lo deja; los demás soldados llegan a los vehículos a pie. Cada base tiene además ametralladoras antiaéreas, que disparan solas a los aviones enemigos y que puedes servir tú. Las casas dibujadas en hueco tienen la puerta abierta.</p>
     </div>
     <div class="dep-side">
       <div id="classes" role="group" aria-label="Clase de soldado"></div>
       <div id="wCard"></div>
       <p id="uniNote" class="quiet"></p>
       <button type="button" id="btnDeploy" class="primary">Desplegar</button>
+      <p id="padDeploy" class="quiet" hidden>Con el mando: A despliega; la cruceta cambia de clase (izquierda y derecha) y de posición (arriba y abajo).</p>
       <aside class="typed"><h3>Del archivo</h3><p id="fact"></p></aside>
     </div>
   </div>
@@ -288,6 +303,8 @@ body.nogl #fatal{max-width:none}
       </div>
       <p class="quiet" id="gyroNote" aria-live="polite"></p>
       <label class="sens" for="sens">Sensibilidad al mirar <input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"> <output id="sensOut">1,0</output></label>
+      <label class="chk" for="invY"><input type="checkbox" id="invY" checked> En el avión, mando de vuelo invertido: ratón (o palanca del mando) hacia delante baja el morro, y hacia atrás lo sube. Desmárcalo si prefieres que arriba sea subir.</label>
+      <p class="quiet" id="padState"></p>
     </fieldset>
     <div class="links">
       <button type="button" class="link" id="btnScore">Ver el marcador</button>
@@ -326,14 +343,25 @@ body.nogl #fatal{max-width:none}
       <dt>R</dt><dd>Recargar</dd>
       <dt>1, 2 o Q</dt><dd>Cambiar entre arma larga y pistola</dd>
       <dt>G</dt><dd>Lanzar granada (estalla al chocar)</dd>
-      <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él.</dd>
+      <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
       <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón mueve la torre: clic izquierdo dispara el cañón y clic derecho la ametralladora.</dd>
-      <dt>Caza</dt><dd>Mantén W para despegar. En el aire el avión sigue al ratón; W y S dan y quitan gas, clic izquierdo dispara y G o Espacio suelta una bomba. Para bajar, aterriza suave y frena con S.</dd>
+      <dt>Caza</dt><dd>Mantén W para despegar. En el aire, mueve el ratón con suavidad: tirando de él hacia ti sube el morro, empujándolo hacia delante baja (como una palanca de vuelo; se puede cambiar en el menú de pausa) y a los lados vira; si lo dejas quieto, el avión sigue recto como va. A y D (o las flechas) viran de forma continua. W y S dan y quitan gas, clic izquierdo dispara y G o Espacio suelta una bomba. Para bajar, aterriza suave y frena con S.</dd>
       <dt>Tab</dt><dd>Marcador</dd>
       <dt>Esc o P</dt><dd>Pausa</dd>
       <dt>Flechas</dt><dd>Girar, por si el navegador no captura el ratón</dd>
     </dl>
+    <h3>Con mando</h3>
+    <dl class="keys">
+      <dt>Palanca izquierda</dt><dd>Moverse; al tope, o pulsándola, corres. En los vehículos acelera, frena y gira.</dd>
+      <dt>Palanca derecha</dt><dd>Mirar y apuntar; en el caza es la palanca de vuelo: sube, baja y vira.</dd>
+      <dt>RT y LT</dt><dd>Disparar y apuntar por el alza. En el carro, LT dispara la ametralladora.</dd>
+      <dt>A, B</dt><dd>Saltar y agacharse. En el caza, A suelta una bomba.</dd>
+      <dt>X</dt><dd>Recargar; junto a un vehículo, subir o bajar.</dd>
+      <dt>Y, RB</dt><dd>Cambiar de arma y lanzar granada.</dd>
+      <dt>Start, Select</dt><dd>Pausa y marcador.</dd>
+    </dl>
     <p>Junto a una bandera de tu bando repones munición y granadas y recuperas salud poco a poco.</p>
+    <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: arriba hay cuatro vanos con pretil para disparar a cubierto. Saltar desde allí es casi siempre mortal.</p>
     <p>Las casas que el mapa dibuja en hueco se pueden ocupar: entra por la puerta y dispara desde las ventanas. Las balas no dañan a los carros: hacen falta granadas, cañón o bombas.</p>
     <p class="quiet">En el móvil, arrastra en la mitad izquierda para moverte (hasta el tope, corres) y en la derecha para mirar; los botones hacen el resto. En el menú de pausa eliges si además apuntas moviendo el teléfono con el giroscopio, y ajustas la sensibilidad.</p>
   </div>
@@ -798,6 +826,18 @@ const TIMELINE = [
 
 const AFTERMATH = 'Tras 115 días, el Ejército del Ebro volvió a la orilla de la que había partido. Los historiadores calculan decenas de miles de bajas en cada bando, entre muertos, heridos y prisioneros; las cifras exactas siguen en discusión. La República perdió sus mejores unidades y un material que ya no pudo reponer. Cinco semanas después empezó la ofensiva sobre Cataluña; Barcelona cayó el 26 de enero de 1939 y la guerra terminó el 1 de abril.';
 
+/* ametralladoras antiaéreas fijas: dos en cada base y una en la posición avanzada de cada bando (esa cambia de manos con la bandera) */
+const AADEFS = {
+  maxim: { name: 'Ametralladora Maxim antiaérea', art: 'la Maxim antiaérea', verb: 'usar',
+    hist: 'La Maxim M1910 soviética, refrigerada por agua, llegó por miles a la República. Montada en un trípode alto servía contra los aviones que atacaban a baja cota. En el Ebro la República concentró junto a los puentes casi toda su defensa antiaérea, y aun así no bastó para protegerlos.' },
+  hotch: { name: 'Ametralladora Hotchkiss antiaérea', art: 'la Hotchkiss antiaérea', verb: 'usar',
+    hist: 'La Hotchkiss M1914 de 7 mm, fabricada bajo licencia en Oviedo, era la ametralladora pesada reglamentaria del ejército español y la usaron los dos bandos. En afuste antiaéreo protegía aeródromos y posiciones. La defensa de más alcance la ponían los cañones alemanes de la Legión Cóndor, entre ellos el célebre «88».' }
+};
+const AAPOS = [
+  { x: 306, z: 30, team: REP, t: 'maxim' }, { x: 338, z: 40, team: REP, t: 'maxim' }, { x: 172, z: 10, flag: 'A', t: 'maxim' },
+  { x: -310, z: 24, team: NAT, t: 'hotch' }, { x: -262, z: -127, team: NAT, t: 'hotch' }, { x: -200, z: -16, flag: 'E', t: 'hotch' }
+];
+
 /* ============ terreno de la Terra Alta ============ */
 const W = { X0: -360, Z0: -280.5, CELL: 3, NX: 241, NZ: 188 };
 W.X1 = W.X0 + (W.NX - 1) * W.CELL; W.Z1 = W.Z0 + (W.NZ - 1) * W.CELL;
@@ -855,10 +895,16 @@ function mkBridge(z, half, y, name) {
 }
 const pontoon = mkBridge(10, 2.7, 0.95, 'Puente de barcas');
 const pasarela = mkBridge(-150, 1.4, 0.75, 'Pasarela');
-function groundAt(x, z) {
+function groundAt(x, z, fy) {
   let h = terrainH(x, z);
   for (const b of BRIDGES) if (b.on && x >= b.x0 && x <= b.x1 && z >= b.z - b.half && z <= b.z + b.half && b.y > h) h = b.y;
-  for (const f of gridF[cellOf(x, z)]) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y > h) h = f.y;
+  for (const f of gridF[cellOf(x, z)]) {
+    if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue;
+    if (!f.lvl) { if (f.y > h) h = f.y; continue; }
+    if (fy === undefined) continue;                                    // balas, bots y vehículos no usan los pisos altos
+    const fh = f.y + (x - f.x0) * (f.sx || 0) + (z - f.z0) * (f.sz || 0);
+    if (fh > h && fh <= fy + 0.5) h = fh;                              // solo sirve un piso que quede a tu altura o por debajo (con un escalón de margen)
+  }
   return h;
 }
 const sideOf = (x, z) => x > riverX(z) ? 1 : -1;
@@ -889,6 +935,7 @@ function gridRect(grid, o, pad) {
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) grid[j * GNX + i].push(o);
 }
 const addFloor = (x0, x1, z0, z1, y) => gridRect(gridF, { x0, x1, z0, z1, y }, 0);
+const addLevel = (x0, x1, z0, z1, y, sx, sz) => gridRect(gridF, { x0, x1, z0, z1, y, sx: sx || 0, sz: sz || 0, lvl: true }, 0);
 const addBotBox = (x0, x1, z0, z1) => gridRect(gridB, { x0, x1, z0, z1 }, 1);
 function insideSolid(x, z, pad) {
   const c = cellOf(x, z);
@@ -943,9 +990,9 @@ const ROADS = [
   [[-30, 36], [-45, 100], [-55, 160], [-60, 198]],
   [[-300, -10], [-292, -120], [-275, -276]],
   [[298, 10], [356, 16]],
-  [[326, 46], [326, 214]], [[-325, -64], [-325, -208]]      // pistas de los aeródromos de campaña
+  [[326, 46], [326, 214]], [[-256, -112], [-346, -112]]      // pistas de los aeródromos de campaña
 ];
-const STRIPS = [{ x: 326, z0: 46, z1: 214 }, { x: -325, z0: -208, z1: -64 }];
+const STRIPS = [[326, 46, 326, 214], [-256, -112, -346, -112]];
 function roadDist(x, z) {
   let best = 1e9;
   for (const r of ROADS) for (let i = 0; i < r.length - 1; i++) {
@@ -966,13 +1013,15 @@ const world = { houses: [] };
   const trees = [], shadeMap = new Float32Array(W.NX * W.NZ).fill(1);
   const noGo = [];   // zonas despejadas (plazas, banderas)
   for (const f of FLAGS) noGo.push([f.x, f.z, 7]);
-  for (const st of STRIPS) {     // allana cada pista y la deja libre de árboles
-    const y0 = terrainH(st.x, (st.z0 + st.z1) / 2);
+  for (const a of AAPOS) noGo.push([a.x, a.z, 6]);
+  for (const [ax, az, bx, bz] of STRIPS) {     // allana cada pista y la deja libre de árboles
+    const y0 = terrainH((ax + bx) / 2, (az + bz) / 2), vx = bx - ax, vz = bz - az, L2 = vx * vx + vz * vz, L = Math.sqrt(L2);
     for (let j = 0; j < W.NZ; j++) for (let i = 0; i < W.NX; i++) {
-      const px = W.X0 + i * W.CELL, pz = W.Z0 + j * W.CELL, out = Math.hypot(Math.max(0, Math.abs(px - st.x) - 9), Math.max(0, st.z0 - pz, pz - st.z1));
-      if (out < 16) hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(1, 16, out));
+      const px = W.X0 + i * W.CELL, pz = W.Z0 + j * W.CELL, t = clamp(((px - ax) * vx + (pz - az) * vz) / L2, 0, 1);
+      const out = Math.max(0, Math.hypot(px - ax - vx * t, pz - az - vz * t) - 10);
+      if (out < 18) hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(1, 18, out));
     }
-    for (let z = st.z0; z <= st.z1; z += 14) noGo.push([st.x, z, 15]);
+    for (let d = 0; d <= L; d += 14) noGo.push([ax + vx * d / L, az + vz * d / L, 15]);
   }
 
   function house(x, z, w, d, h, o) {
@@ -1088,19 +1137,84 @@ const world = { houses: [] };
   /* ---- Corbera d'Ebre: Poble Vell ---- */
   const cw = hex(0xc8b792);
   (function church() {
-    const x = -54, z = 16, y = terrainH(x, z);
-    g.box(x, y + 4.5 - 2, z, 11, 9 + 4, 20, cw);
-    g.gable(x - 5.8, x + 5.8, z - 10.3, z - 2, y + 9, 3, ROOF[0], false, cw);           // parte del tejado sigue en pie
-    g.box(x - 5.2, y + 10, z + 4, 0.6, 2.2, 10, shade(cw, 0.9)); g.box(x + 5.2, y + 9.6, z + 6, 0.6, 1.4, 7, shade(cw, 0.9));
-    g.box(x, y + 10.4, z + 9.7, 7, 3, 0.6, shade(cw, 0.95)); g.box(x, y + 12.3, z + 9.7, 3.4, 1.2, 0.6, shade(cw, 0.95));
-    g.box(x, y + 2, z + 10.05, 2.2, 4, 0.1, DARK); g.box(x, y + 7, z + 10.05, 1.3, 1.3, 0.1, DARK);
-    addAABB(x - 5.5, x + 5.5, y - 4, y + 11, z - 10, z + 10);
-    const tx = x + 8.2, tz = z - 7;
-    g.box(tx, y + 9 - 2, tz, 5.2, 18 + 4, 5.2, shade(cw, 0.96));
-    g.box(tx, y + 15.5, tz + 2.62, 1.2, 2.2, 0.1, DARK); g.box(tx + 2.62, y + 15.5, tz, 0.1, 2.2, 1.2, DARK); g.box(tx - 2.62, y + 15.5, tz, 0.1, 2.2, 1.2, DARK);
-    g.cyl(tx, y + 19.6, tz, 3.4, 0, 3.2, 4, ROOF[1]);
-    addAABB(tx - 2.6, tx + 2.6, y - 4, y + 21, tz - 2.6, tz + 2.6);
-    world.houses.push([x, z, 11, 20], [tx, tz, 5.2, 5.2]); noGo.push([x, z, 14]);
+    /* Iglesia de Sant Pere: nave en ruinas sin tejado, en la que se puede entrar, y campanario con rampa interior hasta las campanas */
+    const x = -54, z = 16, W2 = 5.5, L2 = 10, t = 0.8, H = 9, lin = shade(cw, 0.62), STN = hex(0xddd2b6), FLR = hex(0x8f8672);
+    const tx = x + W2 + 2.6, tz = z + L2 - 2.6, h = 2.6, wt = 0.5, ih = h - wt, BF = 13.2, TOP = 16.6;
+    const y0 = terrainH(x, z);
+    for (let j = 0; j < W.NZ; j++) for (let i = 0; i < W.NX; i++) {      // allana el solar
+      const px = W.X0 + i * W.CELL, pz = W.Z0 + j * W.CELL, out = Math.hypot(Math.max(0, x - W2 - px, px - (tx + h)), Math.max(0, z - L2 - 3 - pz, pz - (z + L2)));
+      if (out < 7) hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(2, 7, out));
+    }
+    const yf = y0 + 0.08;
+    const piece = (cx, cz, sx, sz, yb, yt, col, noHit) => { g.box(cx, (yb + yt) / 2, cz, sx, yt - yb, sz, col); if (!noHit) addAABB(cx - sx / 2, cx + sx / 2, yb, yt, cz - sz / 2, cz + sz / 2); };
+    /* muros largos de la nave, con ventanales altos y la coronación rota */
+    for (const sd of [-1, 1]) {
+      const wx = x + sd * (W2 - t / 2), tops = sd < 0 ? [9, 7.9, 9.5, 7.4] : [9, 9.2, 8.6, 9], cuts = [-10, -5.65, -4.35, -0.65, 0.65, 4.35, 5.65, 10];
+      for (let k = 0; k < 7; k++) {
+        const a = cuts[k], b = cuts[k + 1], cz = z + (a + b) / 2, len = b - a, top = tops[Math.floor(k / 2)];
+        if (k % 2 === 0) { piece(wx, cz, t, len, yf - 4, yf + top, cw); g.box(wx - sd * (t / 2 + 0.012), yf + top / 2, cz, 0.024, top, len, lin); g.box(wx + sd * 0.55, yf + 3.2, z + a + (k ? 0.5 : len - 0.5), 0.5, 6.4, 0.9, shade(cw, 0.93)); }
+        else { piece(wx, cz, t, len, yf - 4, yf + 4.4, cw); if (top > 7.6) piece(wx, cz, t, len, yf + 7.4, yf + top, cw); }
+      }
+    }
+    /* cabecera con ábside y un resto de tejado */
+    piece(x, z - L2 + t / 2, 2 * W2 - 2 * t, t, yf - 4, yf + H, cw); g.box(x, yf + H / 2, z - L2 + t + 0.012, 2 * W2 - 2 * t, H, 0.024, lin);
+    piece(x, z - L2 - 1.4, 6.4, 2.8, yf - 4, yf + 6.6, shade(cw, 0.95)); g.gable(x - 3.4, x + 3.4, z - L2 - 3, z - L2, yf + 6.6, 1.5, ROOF[0], false, cw);
+    g.gable(x - W2 - 0.2, x + W2 + 0.2, z - L2 - 0.1, z - L2 + 4.2, yf + H, 2.6, ROOF[1], false, cw); addAABB(x - W2, x + W2, yf + H, yf + H + 1.6, z - L2, z - L2 + 4.2);
+    /* fachada: portada con pilastras, óculo y remate escalonado */
+    const fz = z + L2 - t / 2;
+    piece(x - 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x + 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x, fz, 2.2, t, yf + 3.7, yf + H + 1.2, cw);
+    g.box(x, yf + H / 2, fz - t / 2 - 0.012, 2 * W2 - 2 * t, H, 0.024, lin);
+    g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
+    g.box(x, yf + H + 1.25, fz + 0.1, 2 * W2 + 0.3, 0.3, t + 0.3, STN);
+    for (const sd of [-1, 1]) { g.box(x + sd * 1.55, yf + 2.2, fz + t / 2 + 0.12, 0.55, 4.4, 0.3, STN); g.box(x + sd * 4.9, yf + (H + 1.2) / 2, fz + t / 2 + 0.1, 0.8, H + 1.2, 0.25, shade(cw, 0.94)); }
+    g.box(x, yf + 4.6, fz + t / 2 + 0.14, 4, 0.45, 0.36, STN); g.gable(x - 1.9, x + 1.9, fz + t / 2, fz + t / 2 + 0.32, yf + 4.82, 0.9, STN, true, STN);
+    g.box(x, yf + 7.1, fz + t / 2 + 0.03, 1.5, 1.5, 0.08, DARK); g.box(x, yf + 7.1, fz + t / 2 + 0.05, 1.9, 0.14, 0.1, STN); g.box(x, yf + 7.1, fz + t / 2 + 0.05, 0.14, 1.9, 0.1, STN);
+    /* interior: suelo, arcos que quedan en pie, altar y escombros */
+    g.box(x, yf - 2, z, 2 * W2 - 0.1, 4, 2 * L2 - 0.1, lin, FLR); addFloor(x - W2, x + W2, z - L2, z + L2, yf);
+    g.box(x, yf - 2.03, z + L2 + 0.75, 3.2, 4, 1.5, STONE); addFloor(x - 1.6, x + 1.6, z + L2, z + L2 + 1.5, yf - 0.03);
+    piece(x, z - 3.5, 2 * W2 - 2 * t, 0.7, yf + 8.1, yf + 8.9, shade(cw, 0.95)); piece(x - 2.6, z + 3.2, 3.8, 0.7, yf + 7.9, yf + 8.7, shade(cw, 0.95));
+    for (const az of [-3.5, 3.2]) for (const sd of [-1, 1]) g.box(x + sd * (W2 - t - 0.25), yf + 4, z + az, 0.5, 8, 0.8, shade(cw, 0.9));
+    piece(x, z - L2 + 2.4, 2.6, 1.2, yf, yf + 1.1, STN); g.box(x, yf + 0.1, z - L2 + 3.4, 4.2, 0.2, 1.2, shade(STN, 0.85));
+    for (let i = 0; i < 16; i++) { const s = rr(0.35, 1.0), rx = x + rr(-W2 + 1.4, W2 - 1.4), rz = z + rr(-L2 + 4.5, L2 - 2.5); g.box(rx, yf + s * 0.3, rz, s * rr(1, 1.8), s * 0.6, s, shade(i % 4 ? cw : ROOF[0], rr(0.6, 0.92))); }
+    piece(x + 2.6, z + 1.5, 2.2, 1.4, yf, yf + 0.85, shade(cw, 0.72)); piece(x - 2.8, z - 6, 1.8, 2.2, yf, yf + 0.7, shade(cw, 0.7));
+    g.limb([x - 3.6, yf + 0.3, z + 6.5], [x + 1.2, yf + 1.5, z + 4.4], 0.26, 0.26, shade(WOOD, 0.8)); g.limb([x + 1, yf + 0.25, z - 1], [x + 3.8, yf + 0.25, z - 3], 0.24, 0.24, shade(WOOD, 0.75));
+    /* campanario: muros, puerta al sur, pilar central y rampa que sube en espiral */
+    const tw = shade(cw, 0.97), tl = shade(cw, 0.58);
+    piece(tx, tz - h + wt / 2, 2 * h, wt, yf - 4, yf + BF, tw); piece(tx + h - wt / 2, tz, wt, 2 * ih, yf - 4, yf + BF, tw); piece(tx - h + wt / 2, tz, wt, 2 * ih, yf - 4, yf + BF, tw);
+    piece(tx - 1.625, tz + h - wt / 2, 1.95, wt, yf - 4, yf + BF, tw); piece(tx + 1.625, tz + h - wt / 2, 1.95, wt, yf - 4, yf + BF, tw); piece(tx, tz + h - wt / 2, 1.3, wt, yf + 2.25, yf + BF, tw);
+    g.box(tx, yf + BF / 2, tz - ih + 0.012, 2 * ih, BF, 0.024, tl); g.box(tx + ih - 0.012, yf + BF / 2, tz, 0.024, BF, 2 * ih, tl); g.box(tx - ih + 0.012, yf + BF / 2, tz, 0.024, BF, 2 * ih, tl);
+    g.box(tx - 1.375, yf + BF / 2, tz + ih - 0.012, 1.45, BF, 0.024, tl); g.box(tx + 1.375, yf + BF / 2, tz + ih - 0.012, 1.45, BF, 0.024, tl);
+    g.box(tx, yf - 2, tz, 2 * ih, 4, 2 * ih, tl, FLR); addFloor(tx - h, tx + h, tz - h, tz + h, yf);
+    g.box(tx, yf - 2.03, tz + h + 0.6, 1.9, 4, 1.2, STONE); addFloor(tx - 0.95, tx + 0.95, tz + h, tz + h + 1.2, yf - 0.03);
+    g.box(tx - 0.72, yf + 1.1, tz + h + 0.5, 0.07, 2.2, 1.1, WOOD);
+    const pa = 0.8, rise = 1.1, rw = ih - pa, rc = pa + rw / 2, RAMP = shade(WOOD, 1.25), LAND = shade(WOOD, 1.05);
+    piece(tx, tz, 2 * pa, 2 * pa, yf, yf + BF, shade(cw, 0.8));
+    for (let k = 0; k < 12; k++) {
+      const b0 = yf + k * rise, b1 = b0 + rise, sd = k % 4;
+      if (sd === 0) { addLevel(tx + pa, tx + ih, tz - pa, tz + pa, b1, 0, -rise / (2 * pa)); g.limb([tx + rc, b0 - 0.08, tz + pa], [tx + rc, b1 - 0.08, tz - pa], rw, 0.16, RAMP); addLevel(tx + pa, tx + ih, tz - ih, tz - pa, b1); g.box(tx + rc, b1 - 0.08, tz - rc, rw, 0.16, rw, LAND); }
+      else if (sd === 1) { addLevel(tx - pa, tx + pa, tz - ih, tz - pa, b1, -rise / (2 * pa), 0); g.limb([tx + pa, b0 - 0.08, tz - rc], [tx - pa, b1 - 0.08, tz - rc], 0.16, rw, RAMP); addLevel(tx - ih, tx - pa, tz - ih, tz - pa, b1); g.box(tx - rc, b1 - 0.08, tz - rc, rw, 0.16, rw, LAND); }
+      else if (sd === 2) { addLevel(tx - ih, tx - pa, tz - pa, tz + pa, b0, 0, rise / (2 * pa)); g.limb([tx - rc, b0 - 0.08, tz - pa], [tx - rc, b1 - 0.08, tz + pa], rw, 0.16, RAMP); addLevel(tx - ih, tx - pa, tz + pa, tz + ih, b1); g.box(tx - rc, b1 - 0.08, tz + rc, rw, 0.16, rw, LAND); }
+      else { addLevel(tx - pa, tx + pa, tz + pa, tz + ih, b0, rise / (2 * pa), 0); g.limb([tx - pa, b0 - 0.08, tz + rc], [tx + pa, b1 - 0.08, tz + rc], 0.16, rw, RAMP); if (k < 11) { addLevel(tx + pa, tx + ih, tz + pa, tz + ih, b1); g.box(tx + rc, b1 - 0.08, tz + rc, rw, 0.16, rw, LAND); } }
+    }
+    /* piso de campanas, con el hueco por donde llega la rampa */
+    addLevel(tx - ih, tx + ih, tz - ih, tz + pa, yf + BF); addLevel(tx + pa, tx + ih, tz + pa, tz + ih, yf + BF);
+    g.box(tx, yf + BF - 0.1, tz - (ih - pa) / 2, 2 * ih, 0.2, ih + pa, LAND); g.box(tx + rc, yf + BF - 0.1, tz + rc, rw, 0.2, rw, LAND);
+    g.box(tx, yf + BF - 0.2, tz, 2 * h + 0.36, 0.34, 2 * h + 0.36, STN);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) piece(tx + sx * (h - 0.45), tz + sz * (h - 0.45), 0.9, 0.9, yf + BF, yf + TOP, tw);
+    for (const sd of [-1, 1]) {
+      piece(tx, tz + sd * (h - 0.2), 2 * h - 1.8, 0.4, yf + BF, yf + BF + 1.0, tw); piece(tx + sd * (h - 0.2), tz, 0.4, 2 * h - 1.8, yf + BF, yf + BF + 1.0, tw);
+      piece(tx, tz + sd * (h - 0.25), 2 * h - 1.8, 0.5, yf + TOP - 0.7, yf + TOP, tw); piece(tx + sd * (h - 0.25), tz, 0.5, 2 * h - 1.8, yf + TOP - 0.7, yf + TOP, tw);
+    }
+    g.box(tx, yf + 16.25, tz, 0.16, 0.16, 2 * h - 0.9, WOOD); g.blob(tx, yf + 15.72, tz, 0.44, 0.5, 0.44, hex(0x6b5a2e), 7, 4, 0, null, 0); g.box(tx, yf + 15.2, tz, 0.1, 0.16, 0.1, DARK);
+    g.box(tx, yf + TOP + 0.17, tz, 2 * h + 0.6, 0.34, 2 * h + 0.6, STN); addAABB(tx - h, tx + h, yf + TOP, yf + TOP + 1.8, tz - h, tz + h);
+    const e = h + 0.25, ry = yf + TOP + 0.34, ap = [tx, ry + 3.3, tz], rf = [tx, ry, tz];
+    g.tri([tx - e, ry, tz - e], [tx + e, ry, tz - e], ap, ROOF[1], rf); g.tri([tx + e, ry, tz - e], [tx + e, ry, tz + e], ap, ROOF[0], rf);
+    g.tri([tx + e, ry, tz + e], [tx - e, ry, tz + e], ap, ROOF[1], rf); g.tri([tx - e, ry, tz + e], [tx - e, ry, tz - e], ap, ROOF[0], rf);
+    g.box(tx, ry + 3.7, tz, 0.1, 0.9, 0.1, DARK); g.box(tx, ry + 3.9, tz, 0.5, 0.1, 0.1, DARK);
+    for (const yy of [5, 9.5]) { g.box(tx + h + 0.02, yf + yy, tz, 0.06, 1.3, 0.4, DARK); g.box(tx, yf + yy, tz + h + 0.02, 0.4, 1.3, 0.06, DARK); }
+    addBotBox(x - W2, tx + h, z - L2 - 3, z + L2);
+    world.tower = { x: tx, z: tz, h, yf, top: yf + BF };
+    world.houses.push([x, z, 11, 20, 1], [tx, tz, 5.2, 5.2, 1], [x, z - L2 - 1.4, 6.4, 2.8]); noGo.push([x, z, 14], [tx, tz, 8]);
   })();
   [[-30, 4, 8, 7, 6, 1], [-14, 12, 7, 9, 6.5, 0], [-6, 26, 8, 7, 5.5, 1], [-8, 44, 9, 7, 6, 0], [-22, 56, 8, 8, 6, 1], [-40, 56, 7, 9, 6.5, 0], [-56, 50, 8, 7, 5.5, 1],
    [-70, 34, 7, 8, 6, 0], [-74, 8, 8, 7, 6, 1], [-36, -10, 9, 7, 6, 0], [6, 40, 7, 7, 5.5, 1], [-18, -6, 7, 7, 5.5, 1]]
@@ -1227,6 +1341,16 @@ const world = { houses: [] };
     if (s > 1.2) addCircle(x, z, s * 0.75);
   }
   for (const f of FLAGS) pole(f.x, f.z);
+  for (const a of AAPOS) {       // emplazamiento antiaéreo: anillo de sacos terreros y trípode
+    const y = terrainH(a.x, a.z), dk = hex(0x2a2a28);
+    for (let i = 0; i < 9; i++) {
+      const an = i / 9 * Math.PI * 2, m = M4.create(); M4.translate(m, a.x + Math.cos(an) * 1.75, terrainH(a.x + Math.cos(an) * 1.75, a.z + Math.sin(an) * 1.75), a.z + Math.sin(an) * 1.75); M4.rotY(m, -an);
+      g.with(m, () => { g.box(0, 0.2, 0, 0.5, 0.9, 1.3, BURLAP, shade(BURLAP, 1.08)); g.box(0, 0.68, 0, 0.42, 0.26, 1.1, shade(BURLAP, 0.9)); });
+    }
+    for (let i = 0; i < 3; i++) { const an = i / 3 * Math.PI * 2 + 0.5; g.limb([a.x, y + 1.3, a.z], [a.x + Math.cos(an) * 0.75, y, a.z + Math.sin(an) * 0.75], 0.07, 0.07, dk); }
+    g.box(a.x, y + 1.32, a.z, 0.16, 0.14, 0.16, dk); g.box(a.x + 0.9, y + 0.2, a.z + 0.5, 0.5, 0.35, 0.3, hex(0x5a5d48));
+    addCircle(a.x, a.z, 1.95);
+  }
   for (const t of trees) {   // sombra bajo las copas
     const i0 = Math.max(0, Math.floor((t[0] - t[2] - W.X0) / W.CELL)), i1 = Math.min(W.NX - 1, Math.ceil((t[0] + t[2] - W.X0) / W.CELL));
     const j0 = Math.max(0, Math.floor((t[1] - t[2] - W.Z0) / W.CELL)), j1 = Math.min(W.NZ - 1, Math.ceil((t[1] + t[2] - W.Z0) / W.CELL));
@@ -1345,7 +1469,7 @@ const world = { houses: [] };
   };
   world.truck = { [REP]: truck(REP), [NAT]: truck(NAT) };
   /* carros de combate: casco y torre por separado */
-  const mk = fn => { const q = new Geo(); fn(q); return makeMesh(q.a); }, DK = hex(0x242421), RED = hex(0xc8281e), YEL = hex(0xf2c21e), WHT = hex(0xe8e6dc);
+  const mk = fn => { const q = new Geo(); fn(q); return makeMesh(q.a); }, GUNW = hex(0x5e4026), DK = hex(0x242421), RED = hex(0xc8281e), YEL = hex(0xf2c21e), WHT = hex(0xe8e6dc);
   const natBand = (q, r, y) => { q.cyl(0, y + 0.07, 0, r, r, 0.06, 10, RED); q.cyl(0, y, 0, r, r, 0.08, 10, YEL); q.cyl(0, y - 0.07, 0, r, r, 0.06, 10, RED); };
   const t26 = team => {
     const col = team === REP ? hex(0x57663f) : hex(0x5f6646);
@@ -1408,6 +1532,18 @@ const world = { houses: [] };
     }
     for (const sd of [-1, 1]) { q.limb([sd * 0.75, H - 0.45, wz], [sd * 0.9, 0.3, wz - 0.1], 0.08, 0.08, DK); q.box(sd * 0.9, 0.3, wz - 0.1, 0.16, 0.6, 0.6, DK); }
   });
+  world.aa = {
+    maxim: mk(q => {
+      const m = M4.create(); M4.translate(m, 0, 0, -0.52); M4.rotX(m, Math.PI / 2); q.with(m, () => q.cyl(0, 0, 0, 0.07, 0.07, 0.75, 8, hex(0x4b5340), true));
+      q.limb([0, 0, -0.88], [0, 0, -1.05], 0.03, 0.03, DK); q.box(0, 0, 0.12, 0.12, 0.17, 0.5, DK); q.box(0, -0.03, -0.13, 0.54, 0.34, 0.02, hex(0x5a6350));
+      q.box(0, 0, 0.42, 0.22, 0.06, 0.06, GUNW); q.box(-0.13, -0.02, 0.05, 0.14, 0.2, 0.3, hex(0x5a5d48));
+    }),
+    hotch: mk(q => {
+      q.limb([0, 0, -0.2], [0, 0, -1.1], 0.045, 0.045, DK); for (let i = 0; i < 5; i++) q.box(0, 0, -0.3 - i * 0.07, 0.12, 0.12, 0.03, DK);
+      q.box(0, 0, 0.1, 0.09, 0.15, 0.52, DK); q.box(0.16, 0.02, -0.05, 0.28, 0.015, 0.06, hex(0xb08a3c)); q.box(0, -0.08, 0.36, 0.05, 0.14, 0.06, GUNW);
+      q.limb([0, 0.08, -0.25], [0, 0.2, -0.25], 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.12, 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.012, 0.12, 0.012, DK);
+    })
+  };
   world.vm = {
     t26: t26(REP), t26n: t26(NAT), pz1: pz1(),
     mosca: plane({ len: 6.1, fw: 1.2, span: 9, radial: true, marks: 'rep', col: hex(0x5d6e45) }),
@@ -1568,6 +1704,7 @@ function botSpawn(s) {
   if (Math.random() < 0.25) sp = pick(own);
   else for (const f of own) { const d = Math.hypot(f.x - s.tgt.x, f.z - s.tgt.z) + (f === s.tgt ? 60 : 0); if (d < bd) { bd = d; sp = f; } }
   if (!s.isPlayer && Math.random() < 0.25) setClass(s, (Math.random() * 4) | 0);
+  if (s.goVeh && !s.goVeh.dead) sp = base;       // el que va a por un vehículo sale de la base y camina hasta él
   placeAt(s, sp);
   s.yaw = Math.atan2(-(s.dx - s.x), -(s.dz - s.z));
 }
@@ -1606,14 +1743,16 @@ function botThink(s) {
     for (const o of soldiers) {
       if (o.team === s.team || !o.alive || (o.veh && o.veh.kind === 'plane')) continue;
       const d2 = (o.x - s.x) * (o.x - s.x) + (o.z - s.z) * (o.z - s.z);
+      if (o.veh && o.veh.kind === 'tank' && d2 > 1024) continue;        // a un carro lejano no merece la pena dispararle con fusil
       if (d2 < VIEW2) _cand.push({ d2, o });
     }
     _cand.sort((a, b) => a.d2 - b.d2);
     for (let i = 0; i < _cand.length && i < 4; i++) if (canSee(s, _cand[i].o, ey)) { e = _cand[i].o; s.aimT = rnd(0.45, 1.0) + Math.sqrt(_cand[i].d2) / 380; s.first = true; break; }
   }
   if (!e) for (const v of vehicles) {      // un carro enemigo cerca: a por él con bombas de mano
-    if (v.kind !== 'tank' || v.dead || v.team === s.team || !v.aiOn) continue;
-    if (Math.hypot(v.x - s.x, v.z - s.z) < 32 && canSee(s, v.crew, ey)) { e = v.crew; s.aimT = 0.6; break; }
+    const o = vehOp(v);
+    if (v.kind !== 'tank' || v.dead || v.team === s.team || !o) continue;
+    if (Math.hypot(v.x - s.x, v.z - s.z) < 32 && canSee(s, o, ey)) { e = o; s.aimT = 0.6; break; }
   }
   s.enemy = e;
   if (e && e.veh && e.veh.kind === 'tank') {
@@ -1662,6 +1801,7 @@ function botFire(s, e, d, moving) {
   } else s.fireT = w.rate + rnd(0.35, 1.1);
 }
 function updateBot(s, dt) {
+  if (s.alive && s.veh) return;      // va de dotación: lo lleva la IA del vehículo
   if (!s.alive) {
     s.fall = Math.min(1, s.fall + dt * 2.6); s.respawnT -= dt;
     if (s.respawnT <= 0) botSpawn(s);
@@ -1672,6 +1812,11 @@ function updateBot(s, dt) {
   const f = s.tgt, nearFlag = (s.x - f.x) * (s.x - f.x) + (s.z - f.z) * (s.z - f.z) < CAP_R * CAP_R;
   s.atFlagT = nearFlag ? s.atFlagT + dt : 0;
   if (s.retargetT <= 0 || (f.owner === s.team && !f.contested && !s.defender && s.atFlagT > 4)) botPickFlag(s);
+  if (s.goVeh) {        // le han encargado un vehículo: va hasta él a pie y sube al llegar
+    const v = s.goVeh;
+    if (v.dead || v.driver || v.claim !== s) s.goVeh = null;
+    else { s.dx = v.x; s.dz = v.z; if (Math.hypot(v.x - s.x, v.z - s.z) < (v.kind === 'plane' ? 5.2 : 4.6)) { botBoard(v, s); return; } }
+  }
   const w = s.wpn, e = s.enemy;
   let mvx = 0, mvz = 0, spd = 0, wantYaw = s.yaw, nav = null;
   if (s.reloadT > 0) { s.reloadT -= dt; if (s.reloadT <= 0) s.ammo = w.mag; }
@@ -1748,12 +1893,13 @@ function drawSoldier(s) {
 }
 
 /* ============ jugador: entrada, armas, cámara ============ */
-const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, mx: -1, my: -1, bomb: false, joy: null };
+const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false };
 let P = null;
 /* opciones que se guardan en el dispositivo */
-const opts = { gyro: false, sens: 1, gyroSaved: false };
-try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; } catch (e) { }
-function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens })); } catch (e) { } }
+const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true };      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
+const stick = { ty: 0, tp: 0 };      // rumbo e inclinación del morro que el jugador le pide al caza
+try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; } catch (e) { }
+function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY })); } catch (e) { } }
 
 /* giroscopio: el giro del teléfono se suma a la mirada, igual que el arrastre del dedo */
 const gyro = { seen: false, t: 0, ux: 0, uy: 1, uz: 0, state: 'off' };
@@ -1810,10 +1956,10 @@ document.addEventListener('pointerlockerror', () => {
 addEventListener('keydown', e => {
   if (game.state === 'play' && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault();
   if (e.repeat) return;
-  input.keys[e.code] = true;
+  input.keys[e.code] = true; input.pad = false;
   if (game.state === 'play') {
     if (P.veh && (e.code === 'KeyG' || e.code === 'Space')) { input.bomb = true; return; }
-    if (P.veh && !['KeyE', 'KeyF', 'Tab', 'Escape', 'KeyP'].includes(e.code)) return;
+    if ((P.veh || P.aa) && !['KeyE', 'KeyF', 'Tab', 'Escape', 'KeyP'].includes(e.code)) return;
     switch (e.code) {
       case 'KeyE': case 'KeyF': useVehicle(); break;
       case 'KeyR': startReload(); break;
@@ -1854,6 +2000,7 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
   const act = (a, on) => {
     if (a === 'use') { if (on) useVehicle(); return; }
     if (a === 'pause') { if (on) pauseGame(); return; }
+    if (P.aa) { if (a === 'fire') input.fire = on; return; }
     if (P.veh) {
       if (P.veh.kind === 'truck') return;
       if (a === 'fire') input.fire = on; else if (on && a === 'aim') input.aim = !input.aim; else if (on && a === 'nade') input.bomb = true;
@@ -1894,6 +2041,58 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
   };
   tl.addEventListener('touchend', end); tl.addEventListener('touchcancel', end);
 })();
+
+/* ---- mando (API Gamepad, disposición estándar tipo Xbox o PlayStation) ---- */
+const pad = { on: false, id: '', prev: [], move: false, rx: 0, ry: 0 };
+function pollPad(dt) {
+  let gp = null;
+  try { const l = navigator.getGamepads ? navigator.getGamepads() : []; for (const g of l) if (g && g.connected !== false && g.buttons && g.buttons.length >= 10 && (!gp || (g.mapping === 'standard' && gp.mapping !== 'standard'))) gp = g; } catch (e) { return; }
+  if (!gp) { if (pad.on) { pad.on = false; input.pad = false; input.padSprint = false; if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; } uiPad(); } return; }
+  const B = i => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > 0.5); }, hit = i => B(i) && !pad.prev[i];
+  const dz = v => Math.abs(v) < 0.16 ? 0 : (v - Math.sign(v) * 0.16) / 0.84;
+  const lx = dz(gp.axes[0] || 0), ly = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
+  pad.rx = rx; pad.ry = ry;
+  let any = !!(lx || ly || rx || ry); for (let i = 0; i < gp.buttons.length && !any; i++) any = B(i);
+  if (!pad.on) { pad.on = true; pad.id = gp.id || 'mando'; uiPad(); }
+  if (any) input.pad = true;
+  const st = game.state;
+  if (st === 'play' && P) {
+    if (lx || ly) { input.mvx = lx; input.mvz = ly; pad.move = true; } else if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
+    input.lookX += rx * Math.abs(rx) * 3.0 * dt / 0.0023 * opts.sens; input.lookY += ry * Math.abs(ry) * 2.1 * dt / 0.0023 * opts.sens;
+    if (hit(7)) { input.fire = true; input.fireQ = 0.3; audioInit(); } else if (!B(7) && pad.prev[7]) input.fire = false;
+    if (hit(6)) input.aim = true; else if (!B(6) && pad.prev[6]) input.aim = false;
+    input.padSprint = B(10);
+    if (hit(2)) { if (P.veh || P.aa || nearVehicle(P) || nearAA(P)) useVehicle(); else startReload(); }
+    if (P.veh) { if (hit(0) || hit(5)) input.bomb = true; }
+    else if (!P.aa) {
+      if (hit(0)) input.jump = true;
+      if (hit(1)) P.crouch = !P.crouch;
+      if (hit(3) || hit(14) || hit(15)) switchWeapon(1 - P.cur);
+      if (hit(5)) playerNade();
+    }
+    if (B(8) !== !!pad.prev[8]) showScore(B(8));
+    if (hit(9)) pauseGame();
+  } else {
+    if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
+    if (st === 'pause') { if (hit(9) || hit(1)) { if (!$('archive').hidden) $('archive').hidden = true; else if (!$('controls').hidden) $('controls').hidden = true; else resumeGame(); } }
+    else if (st === 'deploy') {
+      if (hit(0)) { audioInit(); deployPlayer(); }
+      if (hit(14) || hit(15)) { game.selClass = (game.selClass + (hit(15) ? 1 : 3)) % 4; renderClassCard(); }
+      if (hit(12) || hit(13)) {       // recorre posiciones y, después, los carros y cazas disponibles
+        const own = FLAGS.filter(f => f.owner === game.team).concat(vehicles.filter(v => v.team === game.team && vehDeployable(v))), i = own.indexOf(game.selVeh || game.selSpawn), nx = own[(i + (hit(13) ? 1 : own.length - 1)) % own.length];
+        if (nx.def) game.selVeh = nx; else { game.selVeh = null; game.selSpawn = nx; }
+        drawDeployMap(); uiDeployTick();
+      }
+    }
+    else if (st === 'end') { if (hit(0)) uiToMenu(); }
+    else if (st === 'menu') {
+      if (hit(1)) { $('archive').hidden = true; $('controls').hidden = true; }
+      else if (hit(4)) startMatch(REP); else if (hit(5)) startMatch(NAT);
+    }
+  }
+  for (let i = 0; i < gp.buttons.length; i++) pad.prev[i] = B(i);
+}
+addEventListener('gamepadconnected', () => { try { pollPad(0); } catch (e) { } });
 
 /* ---- armas en primera persona ---- */
 function fpMesh(wid, team) {
@@ -2023,7 +2222,25 @@ function updatePlayer(dt) {
     if (Math.abs(p.veh.speed) > 2) game.camOff *= Math.max(0, 1 - dt * 0.9);
     p.aimT = 0; p.crouchT = 0; return;
   }
-  if (p.alive && p.veh) {      // carro o caza: el ratón apunta la torre o marca el rumbo
+  if (p.alive && p.veh && p.veh.kind === 'plane') {
+    /* Caza. El ratón no mueve la vista ni actúa como una palanca que se queda inclinada: cada movimiento desplaza un poco el rumbo (a los lados)
+       y la inclinación del morro (arriba y abajo) que el avión busca con suavidad. Si dejas quieto el ratón, el avión sigue recto como va. */
+    const v = p.veh, inv = opts.invY ? -1 : 1, invD = input.touch ? 1 : inv;      // la inversión vale para ratón, flechas y mando; el dedo y el giroscopio siguen yendo directos
+    if (v.air) {
+      const kx = clamp((k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0) + (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1), ky = (k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0);
+      if (input.pad && pad.on) { stick.ty -= pad.rx * Math.abs(pad.rx) * 1.1 * dt; stick.tp = -pad.ry * 0.65 * inv; }
+      else if (!input.locked && !input.touch && input.mx >= 0) {       // ratón sin capturar: cursor en el centro, vuelo recto; hacia un lado, vira; arriba o abajo, sube o baja
+        const R = Math.min(cw, ch) * 0.42, dzn = q => { const a = Math.abs(q); return a < 0.12 ? 0 : Math.sign(q) * Math.min(1, (a - 0.12) / 0.88); };
+        const ox = dzn((input.mx - cw / 2) / R), oy = dzn(-(input.my - ch / 2) / R);
+        stick.ty -= ox * Math.abs(ox) * 1.0 * dt; if (!ky) stick.tp = oy * 0.65 * inv;
+      } else { stick.ty -= input.lookX * 0.0016; stick.tp -= input.lookY * 0.0016 * invD; }
+      stick.ty -= kx * 0.9 * dt; stick.tp += ky * 0.6 * dt * inv;
+      stick.ty = v.yaw + clamp(angDiff(stick.ty, v.yaw), -1.2, 1.2);       // la consigna nunca se adelanta demasiado al avión
+      stick.tp = clamp(stick.tp, -0.75, 0.75);
+    } else { stick.ty = v.yaw; stick.tp = 0.3; }
+    input.lookX = input.lookY = 0; input.jump = false; p.yaw = v.yaw; p.pitch = v.pitch; p.aimT = 0; p.crouchT = 0; return;
+  }
+  if (p.alive && p.veh) {      // carro: el ratón apunta la torre
     const plane = p.veh.kind === 'plane', lo = plane ? -1.1 : -0.25, hi = plane ? 1.0 : 0.45, sv = plane ? 0.0019 : 0.0023;
     p.yaw -= input.lookX * sv; p.pitch = clamp(p.pitch - input.lookY * sv, lo, hi); input.lookX = input.lookY = 0; input.jump = false;
     if (!input.locked && !input.touch && input.mx >= 0) {
@@ -2045,21 +2262,25 @@ function updatePlayer(dt) {
   p.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.9 * dt;
   p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.2 * dt, -1.45, 1.45);
   if (!p.alive) { p.fall = Math.min(1, p.fall + dt * 2.6); return; }
+  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); p.x = p.aa.x; p.z = p.aa.z; p.speed = 0; p.aimT = 0; p.crouchT = 0; input.jump = false; return; }      // sirviendo la antiaérea
   let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx;
   const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
   const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
   p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
-  const sprint = (k.ShiftLeft || k.ShiftRight || (input.touch && f > 0.92)) && f > 0.5 && !p.crouch && !aiming;
+  const sprint = (k.ShiftLeft || k.ShiftRight || input.padSprint || ((input.touch || input.pad) && f > 0.92)) && f > 0.5 && !p.crouch && !aiming;
   let sp = p.crouch ? 2.1 : sprint ? 6.6 : aiming ? 2.6 : 4.4; if (p.swim) sp *= 0.5;
   const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), tx = (-sy * f + cy * r) * sp, tz = (-cy * f - sy * r) * sp, acc = Math.min(1, (p.onGround ? 12 : 2.5) * dt);
   p.vx += (tx - p.vx) * acc; p.vz += (tz - p.vz) * acc;
   p.x += p.vx * dt; p.z += p.vz * dt;
   resolveCollide(p, 0.38);
-  const gy = groundAt(p.x, p.z), swimming = gy < waterY - 1.15, floor = swimming ? waterY - 1.25 : gy;
+  const gy = groundAt(p.x, p.z, p.y), swimming = gy < waterY - 1.15, floor = swimming ? waterY - 1.25 : gy;
   if (input.jump && p.onGround && !swimming) { p.vy = 4.9; p.onGround = false; p.crouch = false; }
   input.jump = false;
   p.vy -= 13 * dt; p.y += p.vy * dt;
-  if (p.y <= floor || (p.onGround && p.y - floor < 0.5 && p.vy <= 0)) { p.y = floor; p.vy = 0; p.onGround = true; } else p.onGround = false;
+  if (p.y <= floor || (p.onGround && p.y - floor < 0.5 && p.vy <= 0)) {
+    const fall = -p.vy; p.y = floor; p.vy = 0; p.onGround = true;
+    if (fall > 11 && !swimming) applyDamage(p, (fall - 11) * 13, null, false, 'Caída desde lo alto');      // tirarse del campanario duele
+  } else p.onGround = false;
   p.swim = swimming && p.onGround;
   p.speed = Math.hypot(p.vx, p.vz); p.walkPhase += p.speed * dt * 1.9;
   p.crouchT = clamp(p.crouchT + (p.crouch ? 1 : -1) * dt * 7, 0, 1);
@@ -2130,13 +2351,14 @@ const VEH = [
   { t: 'chato', x: 322, z: 56, yaw: Math.PI, res: true }, { t: 'mosca', x: 331, z: 68, yaw: Math.PI },
   { t: 'ford', x: -327, z: 13, yaw: -Math.PI / 2 }, { t: 'ford', x: -327, z: 19.5, yaw: -Math.PI / 2 },
   { t: 't26n', x: -304, z: -2, yaw: -Math.PI / 2, res: true }, { t: 'pz1', x: -296, z: 6, yaw: -Math.PI / 2 },
-  { t: 'fiat', x: -329, z: -72, yaw: 0, res: true }, { t: 'bf109', x: -320, z: -86, yaw: 0 }
+  { t: 'fiat', x: -260, z: -108, yaw: Math.PI / 2, res: true }, { t: 'bf109', x: -272, z: -117, yaw: Math.PI / 2 }
 ];
 const vehicles = [];
 function vehHome(v) {
   const h = v.home; v.x = h.x; v.z = h.z; v.yaw = v.tyaw = h.yaw; v.y = groundAt(v.x, v.z); v.speed = 0; v.steer = 0; v.pitch = v.kind === 'plane' ? 0.16 : 0; v.roll = 0; v.tpitch = 0;
   v.hp = v.def.hp; v.dead = false; v.falling = false; v.air = false; v.idleT = 0; v.fireT = 0; v.mgT = 0; v.bombs = v.def.bombs || 0; v.bombT = 0; v.regenT = 0; v.thr = 1; v.kick = 0; v.smokeT = 0;
-  v.aiOn = false; v.crew.alive = false; v.crew.enemy = null; v.launchT = (h.res && v.team === game.team) ? 75 : rnd(10, 24); v.dx = undefined; v.dz = undefined;
+  if (v.claim) v.claim.goVeh = null;
+  v.claim = null; v.claimT = 0; v.aiOn = false; v.crew.alive = false; v.crew.enemy = null; v.launchT = (h.res && v.team === game.team) ? 40 : rnd(6, 16); v.assistT = 0; v.rollout = false; v.dx = undefined; v.dz = undefined;
   v.ai = { t: Math.random(), tgt: null, tgtV: false, last: null, aimT: 0, backT: 0, backDir: 1, stuckT: 0, px: v.x, pz: v.z, ox: rnd(-13, 13), oz: rnd(-13, 13), sx: 0, sz: 0, flag: null, foe: null, gt: null, egT: 0, egYaw: h.yaw };
 }
 function resetVehicles() {
@@ -2149,10 +2371,44 @@ function resetVehicles() {
   }
 }
 const vehOp = v => v.driver || (v.aiOn ? v.crew : null);
+/* Los bots no aparecen dentro de los vehículos: a uno se le encarga cada vehículo libre y va hasta él a pie.
+   Se elige al soldado vivo más cercano; si no hay ninguno a mano, al siguiente refuerzo, que saldrá de la base. */
+function assignCrew(v) {
+  let best = null, bd = 1e9;
+  for (const s of soldiers) {
+    if (s.isPlayer || s.team !== v.team || s.veh || s.goVeh) continue;
+    const d = s.alive ? Math.hypot(s.x - v.x, s.z - v.z) : 160 + Math.max(0, s.respawnT) * 5;
+    if (s.alive && d > 150) continue;
+    if (d < bd) { bd = d; best = s; }
+  }
+  if (!best) return false;
+  best.goVeh = v; v.claim = best; v.claimT = 80;
+  return true;
+}
+function botBoard(v, s) {
+  s.goVeh = null; v.claim = null; s.veh = v; s.enemy = null; s.crouch = false; s.swim = false;
+  v.driver = s; v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw;
+}
+function exitSpot(v) {
+  const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw), fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), w = v.kind === 'plane' ? 3 : 2.2;
+  for (const [a, b] of [[-w, 0], [w, 0], [0, -4.4], [-w - 0.6, -1], [w + 0.6, -1]]) {
+    const x = v.x + rx * a + fx * b, z = v.z + rz * a + fz * b;
+    if (!insideSolid(x, z, 0.45) && groundAt(x, z) > waterY - 1) return [x, z];
+  }
+  return [v.x - rx * w, v.z - rz * w];
+}
+/* el jugador reclama un vehículo que lleva un bot: el bot se baja y sigue a pie */
+function ejectBot(v) {
+  const s = v.driver; if (!s || s.isPlayer) return;
+  const e = exitSpot(v);
+  s.veh = null; s.goVeh = null; v.driver = null; v.aiOn = false; v.crew.alive = false; v.claim = null;
+  s.x = e[0] + rnd(-0.6, 0.6); s.z = e[1] + rnd(-0.6, 0.6); s.y = groundAt(s.x, s.z); s.sx = s.x; s.sz = s.z; s.stuckT = 0; botPickFlag(s);
+}
+const vehUsable = (v, p) => !v.dead && !v.falling && v.team === p.team && (!v.driver || (!v.driver.isPlayer && !v.air));
 function nearVehicle(p) {
   let best = null, bd = 1e9;
   for (const v of vehicles) {
-    if (v.dead || v.driver || v.aiOn || v.falling || v.team !== p.team) continue;
+    if (!vehUsable(v, p)) continue;
     const d = Math.hypot(v.x - p.x, v.z - p.z);
     if (d < (v.kind === 'plane' ? 5.6 : 4.6) && d < bd) { bd = d; best = v; }
   }
@@ -2160,30 +2416,33 @@ function nearVehicle(p) {
 }
 function useVehicle() {
   const p = P; if (!p || !p.alive || game.state !== 'play') return;
+  if (p.aa) { leaveAA(p); return; }
   if (p.veh) { exitVehicle(p); return; }
-  const v = nearVehicle(p); if (!v) return;
+  const v = nearVehicle(p); if (!v) { const a = nearAA(p); if (a) manAA(p, a); return; }
+  takeVehicle(p, v);
+}
+function takeVehicle(p, v) {
+  if (v.driver && !v.driver.isPlayer) ejectBot(v);
+  if (v.claim) { v.claim.goVeh = null; v.claim = null; }
+  v.aiOn = false; v.crew.alive = false;
   v.driver = p; p.veh = v; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
-  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; v.thr = 1; }
+  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; v.thr = 1; stick.ty = v.yaw; stick.tp = 0.3; game.planeCam = v.yaw; game.planeCamP = 0; }
   if (!game.vehTold[v.type]) { game.vehTold[v.type] = true; pushCard(v.name, v.def.hist); }
-  if (v.kind === 'plane') showHint('Mantén W para despegar. En el aire, el avión sigue hacia donde apuntas con el ratón.');
+  if (v.kind === 'plane') showHint(input.touch ? 'Empuja la palanca hacia delante para despegar. En el aire, arrastra a la derecha con suavidad: arriba sube, abajo baja y a los lados vira.' : input.pad ? (opts.invY ? 'Palanca izquierda adelante para despegar. En el aire, la derecha hacia atrás sube el morro, hacia delante lo baja, y a los lados vira.' : 'Palanca izquierda adelante para despegar. En el aire, la derecha sube, baja y vira.') : (opts.invY ? 'Mantén W para despegar. En el aire, tira del ratón hacia ti para subir y empújalo hacia delante para bajar; a los lados vira. A y D viran de forma continua.' : 'Mantén W para despegar. En el aire, mueve el ratón con suavidad: arriba sube, abajo baja y a los lados vira. A y D viran de forma continua.'));
   SFX.click();
 }
 function exitVehicle(p) {
   const v = p.veh; if (!v) return;
   if (v.kind === 'plane' && (v.air || v.speed > 4)) { showHint('Aterriza y frena (S) antes de bajar del avión.'); return; }
   p.veh = null; v.driver = null; v.idleT = 0; v.launchT = 45;
-  const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw), fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), w = v.kind === 'plane' ? 3 : 2.2;
-  let ex = v.x - rx * w, ez = v.z - rz * w;
-  for (const [a, b] of [[-w, 0], [w, 0], [0, -4.4], [-w - 0.6, -1], [w + 0.6, -1]]) {
-    const x = v.x + rx * a + fx * b, z = v.z + rz * a + fz * b;
-    if (!insideSolid(x, z, 0.45) && groundAt(x, z) > waterY - 1) { ex = x; ez = z; break; }
-  }
+  const es = exitSpot(v), ex = es[0], ez = es[1];
   p.x = ex; p.z = ez; p.y = groundAt(ex, ez); p.vx = p.vy = p.vz = 0; p.onGround = true; p.switchT = 0.4;
   if (v.kind === 'truck') { p.yaw = v.yaw + (game.camOff || 0); p.pitch = 0; }
 }
 function destroyVehicle(v, att) {
   if (v.dead) return;
   v.dead = true; v.deadT = 45; v.speed = 0; v.aiOn = false; v.falling = false; v.air = false; v.crew.alive = false;
+  if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   boomFx(v.x, v.y + 1, v.z, 1.4);
   const d = v.driver; if (d) { d.veh = null; v.driver = null; applyDamage(d, 400, att && att !== d ? att : null, false, 'Vehículo destruido'); }
 }
@@ -2233,7 +2492,7 @@ function vehShot(v, att, ox, oy, oz, dx, dy, dz, spread, dmgS, dmgP, cause) {
   SFX.shot('lmg', ox, oy, oz); v.crew.lastShot = game.time;
   if (ok && att && att.isPlayer) { P.hitT = 0.2; P.hitKill = hit.s && !hv.v ? !hit.s.alive : !!(hv.v && (hv.v.dead || hv.v.falling)); }
 }
-const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0 };
+const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0, turn: null };
 const _va = { x: 0, y: 0, z: 0 }, _vb = { x: 0, y: 0, z: 0 };
 function tankMuzzle(v) {
   const m = world.vm[v.type], c = Math.cos(v.yaw), s = Math.sin(v.yaw), px = m.pivot[0], pz = m.pivot[2];
@@ -2302,7 +2561,7 @@ function planeAI(v, dt, ctl) {
     if (!foe && a.egT <= 0 && (!a.gt || !a.gt.alive)) {
       a.gt = null;
       if (D.bombs && v.bombs > 0 && Math.random() < 0.4) { const tv = vehicles.filter(o => o.team !== v.team && !o.dead && o.kind !== 'plane' && (o.aiOn || o.driver)); if (tv.length) { const o = pick(tv); a.gt = o.driver || o.crew; } }
-      if (!a.gt) { const c = soldiers.filter(s => s.alive && s.team !== v.team && !(s.veh && s.veh.kind === 'plane')); if (c.length) a.gt = pick(c); }
+      if (!a.gt) { const c = soldiers.filter(s => s.alive && s.team !== v.team && !(s.veh && s.veh.kind !== 'truck')); if (c.length) a.gt = pick(c); }
     }
   }
   const alt = v.y - Math.max(groundAt(v.x, v.z), waterY), foe = a.foe && a.foe.air && !a.foe.dead && !a.foe.falling ? a.foe : null;
@@ -2407,27 +2666,47 @@ function crashPlane(v) {
 function updatePlane(v, dt, ctl) {
   const D = v.def, op = vehOp(v);
   if (!v.air) {
-    if (op) { const f = ctl.f; if (f > 0) v.speed += 7.5 * f * dt; else if (f < 0) v.speed += 9 * f * dt; else v.speed -= Math.min(v.speed, 1.5 * dt); v.yaw -= ctl.r * 0.55 * dt * Math.min(1, v.speed / 6); }
+    if (op) {
+      let f = ctl.f;
+      if (v.rollout) { if (v.speed < 15) v.rollout = false; else f = Math.min(f, 0) - 0.45; }       // recién aterrizado: frena solo hasta ir despacio
+      if (f > 0) v.speed += 7.5 * f * dt; else if (f < 0) v.speed += 9 * f * dt; else v.speed -= Math.min(v.speed, 1.5 * dt);
+      v.yaw -= ctl.r * 0.55 * dt * Math.min(1, v.speed / 6);
+    }
     else v.speed -= Math.min(v.speed, 5 * dt);
     v.speed = clamp(v.speed, 0, 30);
     v.x -= Math.sin(v.yaw) * v.speed * dt; v.z -= Math.cos(v.yaw) * v.speed * dt;
     const th = terrainH(v.x, v.z); v.y = groundAt(v.x, v.z);
     v.pitch += ((v.speed > 14 ? 0.03 : 0.16) - v.pitch) * Math.min(1, dt * 3); v.roll *= Math.max(0, 1 - dt * 5);
-    if (v.speed > 2 && Math.random() < 0.3) addPart(v.x + rnd(-1, 1), v.y + 0.3, v.z + rnd(-1, 1), 0, 0.6, 0, 0.8, 2, 0.9, 0.74, 0.65, 0.48, 0.25, 0, 1.2);
+    if (v.speed > 2 && Math.random() < dt * 9) addPart(v.x + rnd(-1, 1), v.y + 0.3, v.z + rnd(-1, 1), 0, 0.6, 0, 0.8, 2, 0.9, 0.74, 0.65, 0.48, 0.25, 0, 1.2);
     if (th < waterY - 0.3 || (v.speed > 5 && insideSolid(v.x, v.z, 0.6))) { crashPlane(v); return; }
-    if (v.speed >= 24 && op) { v.air = true; v.thr = 1; if (op.isPlayer) { P.yaw = v.yaw; P.pitch = 0.28; $('hint').hidden = true; } }
+    if (v.speed >= 24 && op && !v.rollout) {       // despega: da un salto limpio y no puede volver a posarse durante el ascenso inicial
+      v.air = true; v.thr = 1; v.assistT = 4; v.y += 0.35; v.pitch = Math.max(v.pitch, 0.2);
+      if (op.isPlayer) { stick.ty = v.yaw; stick.tp = 0.3; $('hint').hidden = true; }
+    }
     return;
   }
-  let ay = ctl.aimYaw, ap = ctl.aimPitch;
-  if (v.falling || !op) { ap = -1.0; ay = v.yaw + 0.6; }
+  let ay = ctl.aimYaw, ap = ctl.aimPitch, turn = ctl.turn;
+  if (v.falling || !op) { ap = -1.0; ay = v.yaw + 0.6; turn = null; }
   else {
-    if (Math.abs(v.x) > 640 || Math.abs(v.z) > 560) { ay = Math.atan2(v.x, v.z); ap = Math.min(ap, 0.15); }
+    if (v.assistT > 0) { v.assistT -= dt; ap = Math.max(ap, 0.3); }       // los primeros segundos sube solo, para no rozar el suelo al final de la pista
+    if (Math.abs(v.x) > 640 || Math.abs(v.z) > 560) {       // límite del cielo: da la vuelta, y la mirada del piloto con él
+      ay = Math.atan2(v.x, v.z); ap = Math.min(ap, 0.15); turn = null;
+      if (op.isPlayer) { stick.ty = ay; if (!v.turnTold) { v.turnTold = true; showHint('Fin del campo de batalla: el avión da la vuelta solo.'); } }
+    } else v.turnTold = false;
     if (v.y > 250) ap = Math.min(ap, -0.05);
   }
-  const dyaw = angDiff(ay, v.yaw);
-  v.yaw += clamp(dyaw, -D.turn * dt, D.turn * dt);
-  v.pitch += clamp(clamp(ap, -1.15, 1.0) - v.pitch, -1.1 * dt, 1.1 * dt);
-  if (v.falling) v.roll += 2.6 * dt; else v.roll += (clamp(dyaw * 2.2, -1.25, 1.25) - v.roll) * Math.min(1, dt * 4);
+  let rollT;
+  if (turn === null) {       // IA, caída o vuelta en el límite: giro directo
+    const dyaw = angDiff(ay, v.yaw); v.yaw += clamp(dyaw, -D.turn * dt, D.turn * dt); rollT = clamp(dyaw * 2.2, -1.25, 1.25);
+    v.pitch += clamp(clamp(ap, -1.15, 1.0) - v.pitch, -1.1 * dt, 1.1 * dt); v.yawRate = 0; v.pitchRate = 0;
+  } else {                   // jugador: el avión entra y sale de los virajes y de las subidas poco a poco, sin tirones
+    const wantR = clamp(angDiff(ay, v.yaw) * 2.0, -D.turn * 0.9, D.turn * 0.9);
+    v.yawRate = (v.yawRate || 0) + (wantR - (v.yawRate || 0)) * Math.min(1, dt * 3.5); v.yaw += v.yawRate * dt;
+    const wantP = clamp((clamp(ap, -1.15, 1.0) - v.pitch) * 2.2, -0.75, 0.75);
+    v.pitchRate = (v.pitchRate || 0) + (wantP - (v.pitchRate || 0)) * Math.min(1, dt * 4); v.pitch += v.pitchRate * dt;
+    rollT = clamp(v.yawRate / D.turn, -1, 1);
+  }
+  if (v.falling) v.roll += 2.6 * dt; else v.roll += (rollT - v.roll) * Math.min(1, dt * (turn === null ? 4 : 3));
   if (op && !v.falling) v.thr = clamp(v.thr + ctl.f * 0.6 * dt, 0.62, 1);
   v.speed += clamp(D.vmax * (v.falling ? 1 : v.thr) - v.speed, -6 * dt, 7 * dt) - Math.sin(v.pitch) * 10 * dt;
   v.speed = clamp(v.speed, 18, D.vmax * 1.25);
@@ -2447,24 +2726,32 @@ function updatePlane(v, dt, ctl) {
   if ((v.falling || v.hp < D.hp * 0.45) && v.smokeT <= 0) { v.smokeT = v.falling ? 0.04 : 0.12; addPart(v.x, v.y + 1.2, v.z, rnd(-0.5, 0.5), rnd(0, 1), rnd(-0.5, 0.5), 1.2, 3, v.falling ? 2.2 : 1.2, 0.18, 0.17, 0.16, 0.7, 0, 0.5); }
   const g2 = Math.max(groundAt(v.x, v.z), waterY);
   if (v.y <= g2 + 0.05) {
-    if (!v.falling && fy * v.speed > -7 && v.pitch > -0.3 && v.speed < D.vmax * 0.92 && terrainH(v.x, v.z) > waterY + 0.2 && slopeAt(v.x, v.z) < 0.25 && !insideSolid(v.x, v.z, 0.5)) { v.air = false; v.y = g2; v.pitch = 0.03; v.roll = 0; }
+    if (v.assistT > 2 && !v.falling) v.y = g2 + 0.06;      // en el ascenso inicial nunca cuenta como aterrizaje (antes, con muchos fotogramas por segundo, el avión se quedaba pegado a la pista)
+    else if (!v.falling && fy * v.speed > -9 && v.pitch > -0.4 && v.speed < D.vmax * 1.1 && terrainH(v.x, v.z) > waterY + 0.2 && slopeAt(v.x, v.z) < 0.35 && !insideSolid(v.x, v.z, 0.5)) { v.air = false; v.rollout = true; v.y = g2; v.pitch = 0.03; v.roll = 0; }
     else crashPlane(v);
   } else for (const b of gridA[cellOf(v.x, v.z)]) if (v.x > b.x0 && v.x < b.x1 && v.z > b.z0 && v.z < b.z1 && v.y + 1 > b.y0 && v.y < b.y1) { crashPlane(v); break; }
 }
 function updateVehicles(dt) {
   for (const v of vehicles) {
     if (v.dead) { v.deadT -= dt; if (v.deadT <= 0) vehHome(v); continue; }
-    if (!v.driver && !v.aiOn && v.kind !== 'truck' && !v.falling) {
-      const near = P && P.alive && !P.veh && P.team === v.team && Math.hypot(P.x - v.x, P.z - v.z) < 40;
-      if (!near) { v.launchT -= dt; if (v.launchT <= 0) { v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw; } }
+    if (!v.driver && v.kind !== 'truck' && !v.falling) {
+      if (v.claim) {       // ya hay un soldado de camino; si cae por el camino o tarda demasiado, se busca a otro
+        v.claimT -= dt;
+        if (v.claim.goVeh !== v || v.claimT <= 0) { if (v.claim.goVeh === v) v.claim.goVeh = null; v.claim = null; v.launchT = 2; }
+      } else {
+        const wait = v.home.res && P && P.alive && !P.veh && P.team === v.team && Math.hypot(P.x - v.x, P.z - v.z) < 40;      // el reservado espera si andas cerca
+        if (!wait) { v.launchT -= dt; if (v.launchT <= 0 && !assignCrew(v)) v.launchT = 2; }
+      }
     }
     const ctl = _ctl, drv = v.driver;
-    ctl.f = 0; ctl.r = 0; ctl.fire = false; ctl.fire2 = false; ctl.bomb = false; ctl.aimYaw = v.kind === 'tank' ? v.tyaw : v.yaw; ctl.aimPitch = 0;
+    ctl.f = 0; ctl.r = 0; ctl.fire = false; ctl.fire2 = false; ctl.bomb = false; ctl.aimYaw = v.kind === 'tank' ? v.tyaw : v.yaw; ctl.aimPitch = 0; ctl.turn = null;
+    if (v.aiOn && !drv) { v.aiOn = false; v.crew.alive = false; v.launchT = 3; }
     if (drv && drv.isPlayer) {
       if (game.state === 'play') {
         const k = input.keys;
         ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, -1, 1); ctl.r = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1);
         ctl.fire = input.fire; ctl.fire2 = input.aim; ctl.bomb = input.bomb; ctl.aimYaw = drv.yaw; ctl.aimPitch = drv.pitch;
+        if (v.kind === 'plane') { ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.turn = 1; }       // turn = 1 marca el pilotaje suave del jugador
       }
       input.bomb = false;
     } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); }
@@ -2480,7 +2767,7 @@ function updateVehicles(dt) {
       const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
       if (d2 > 13 || d2 < 1e-6 || (a.speed === 0 && b.speed === 0)) continue;
       const d = Math.sqrt(d2), k = (3.6 - d) / d, wa = a.dead || a.speed === 0 ? 0 : b.dead || b.speed === 0 ? 1 : 0.5;
-      a.x -= dx * k * wa; a.z -= dz * k * wa; b.x += dx * k * (1 - wa); b.z += dz * k * (1 - wa); a.speed *= 0.9; b.speed *= 0.9;
+      a.x -= dx * k * wa; a.z -= dz * k * wa; b.x += dx * k * (1 - wa); b.z += dz * k * (1 - wa);
     }
   }
 }
@@ -2499,6 +2786,84 @@ function drawVehicles() {
   }
 }
 
+/* ============ ametralladoras antiaéreas fijas ============ */
+const aaGuns = [];
+function resetAA() {
+  aaGuns.length = 0;
+  for (const h of AAPOS) {
+    const a = { home: h, def: AADEFS[h.t], x: h.x, z: h.z, y: terrainH(h.x, h.z) + 1.42, team: h.team !== undefined ? h.team : -1, yaw: h.t === 'maxim' ? Math.PI / 2 : -Math.PI / 2, pitch: 0.6,
+      fireT: 0, burstT: 0, pauseT: 0, thinkT: Math.random(), tgt: null, driver: null, downT: 0, smokeT: 0 };
+    a.crew = { name: a.def.name, team: a.team, isPlayer: false, isCrew: true, veh: a, alive: true, lastShot: -99, x: a.x, y: a.y, z: a.z, kills: 0 };
+    aaGuns.push(a);
+  }
+}
+function nearAA(p) {
+  for (const a of aaGuns) if (!a.driver && a.downT <= 0 && a.team === p.team && Math.hypot(a.x - p.x, a.z - p.z) < 3.8) return a;
+  return null;
+}
+function manAA(p, a) {
+  a.driver = p; p.aa = a; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
+  if (!game.vehTold[a.home.t]) { game.vehTold[a.home.t] = true; pushCard(a.def.name, a.def.hist); }
+  SFX.click();
+}
+function leaveAA(p) {
+  const a = p.aa; if (!a) return;
+  a.driver = null; p.aa = null; p.switchT = 0.4; input.fire = false;
+  let ex = a.x + Math.sin(a.yaw) * 2.7, ez = a.z + Math.cos(a.yaw) * 2.7;
+  for (let i = 0; i < 8; i++) { const an = a.yaw + i * 0.785, x = a.x + Math.sin(an) * 2.7, z = a.z + Math.cos(an) * 2.7; if (!insideSolid(x, z, 0.45)) { ex = x; ez = z; break; } }
+  p.x = ex; p.z = ez; p.y = groundAt(ex, ez); p.vx = p.vy = p.vz = 0; p.onGround = true; p.pitch = clamp(p.pitch, -1.2, 1.2);
+}
+function aaFire(a, att, spread) {
+  a.fireT = 0.09;
+  const cp = Math.cos(a.pitch), dx = -Math.sin(a.yaw) * cp, dy = Math.sin(a.pitch), dz = -Math.cos(a.yaw) * cp;
+  vehShot(a, att, a.x + dx * 1.15, a.y + dy * 1.15, a.z + dz * 1.15, dx, dy, dz, spread, 38, att.isPlayer ? 11 : 8, a.def.name);
+}
+function updateAA(dt) {
+  for (const a of aaGuns) {
+    if (a.home.flag) a.team = FLAGS.find(f => f.id === a.home.flag).owner;
+    a.crew.team = a.team; a.fireT -= dt;
+    const u = a.driver;
+    if (u && (!u.alive || u.team !== a.team || a.downT > 0)) leaveAA(u);
+    if (a.downT > 0) {       // silenciada por una explosión cercana
+      a.downT -= dt; a.smokeT -= dt; a.pitch += (-0.25 - a.pitch) * Math.min(1, dt * 3);
+      if (a.smokeT <= 0) { a.smokeT = 0.25; addPart(a.x, a.y, a.z, rnd(-0.3, 0.3), rnd(0.8, 1.6), rnd(-0.3, 0.3), 0.8, 1.6, 1.8, 0.2, 0.19, 0.18, 0.5, 0, 0.6); }
+      continue;
+    }
+    if (a.driver) {
+      const p = a.driver; a.yaw = p.yaw; a.pitch = clamp(p.pitch, -0.12, 1.4);
+      if (input.fire && a.fireT <= 0 && game.state === 'play') aaFire(a, p, 0.012);
+      continue;
+    }
+    if (a.team < 0) continue;
+    a.thinkT -= dt;
+    if (a.thinkT <= 0) {
+      a.thinkT = 0.4; let best = null, bd = 380;
+      for (const v of vehicles) {
+        if (v.kind !== 'plane' || !v.air || v.dead || v.falling || v.team === a.team) continue;
+        const d = Math.hypot(v.x - a.x, v.y - a.y, v.z - a.z);
+        if (d < bd && v.y - a.y > d * 0.06 && losClear(a.x, a.y + 0.4, a.z, v.x, v.y + 1.2, v.z)) { bd = d; best = v; }
+      }
+      a.tgt = best;
+    }
+    const t = a.tgt;
+    if (t && t.air && !t.dead && !t.falling) {
+      const dx = t.x - a.x, dy = t.y + 1.2 - a.y, dz = t.z - a.z, wy = Math.atan2(-dx, -dz), wp = Math.atan2(dy, Math.hypot(dx, dz));
+      a.yaw += clamp(angDiff(wy, a.yaw), -1.5 * dt, 1.5 * dt); a.pitch += clamp(wp - a.pitch, -1.2 * dt, 1.2 * dt);
+      if (a.pauseT > 0) a.pauseT -= dt;
+      else if (Math.hypot(angDiff(wy, a.yaw), wp - a.pitch) < 0.1) {
+        a.burstT += dt; if (a.fireT <= 0) aaFire(a, a.crew, 0.07);
+        if (a.burstT > 1.4) { a.burstT = 0; a.pauseT = rnd(0.7, 1.3); }
+      }
+    } else { a.tgt = null; a.yaw += 0.15 * dt; a.pitch += (0.6 - a.pitch) * Math.min(1, dt); }
+  }
+}
+function drawAA() {
+  for (const a of aaGuns) {
+    M4.identity(_vm); M4.translate(_vm, a.x, a.y, a.z); M4.rotY(_vm, a.yaw); M4.rotX(_vm, a.pitch);
+    matState(1, 1, 0.08, a.downT > 0 ? [0.3, 0.28, 0.26] : null); drawMesh(world.aa[a.home.t], _vm);
+  }
+}
+
 /* ============ reglas: conquista, tickets, partes de guerra ============ */
 const BASE_FOV = 75 * Math.PI / 180, FP_FOV = 1.15;
 const game = { state: 'menu', time: 0, team: REP, tickets: [300, 300], diff: 0.55, held: [0, 0], bleedT: 1, bleedAcc: [0, 0], eventT: 45, eventI: 0, floodT: 0, shake: 0, whizzT: 0,
@@ -2508,7 +2873,7 @@ const planes = [], shells = [];
 function startMatch(team) {
   audioInit();
   Object.assign(game, { team, time: 0, tickets: [300, 300], bleedAcc: [0, 0], bleedT: 1, eventT: 45, eventI: 0, floodT: 0, winner: -1, firstDeploy: true, respawnT: 0, selClass: 0, shake: 0, killer: null, camOff: 0, vehTold: {} });
-  resetVehicles();
+  resetVehicles(); resetAA();
   waterY = 0; pasarela.on = true;
   push[0] = push[1] = null; projectiles.length = 0; planes.length = 0; shells.length = 0; parts.length = 0; tracers.length = 0; cards.length = 0; cardNow = null;
   for (const f of FLAGS) {
@@ -2523,7 +2888,7 @@ function startMatch(team) {
   uiResetMatch(); enterDeploy();
 }
 function enterDeploy() {
-  game.state = 'deploy'; input.fire = false; input.aim = false;
+  game.state = 'deploy'; input.fire = false; input.aim = false; game.selVeh = null;
   if (document.pointerLockElement) document.exitPointerLock();
   if (!game.selSpawn || game.selSpawn.owner !== game.team) game.selSpawn = FLAGS.find(f => f.base === game.team);
   uiShowDeploy();
@@ -2531,11 +2896,15 @@ function enterDeploy() {
 function deployPlayer() {
   if (game.respawnT > 0 || game.state !== 'deploy') return;
   let f = game.selSpawn; if (!f || f.owner !== game.team) f = FLAGS.find(x => x.base === game.team);
+  const sv = game.selVeh && vehUsable(game.selVeh, P) && game.selVeh.kind !== 'truck' ? game.selVeh : null;
+  if (sv) f = FLAGS.find(x => x.base === game.team);
   giveLoadout(P, game.selClass); placeAt(P, f);
   let tgt = null, bd = 1e9;
   for (const o of FLAGS) if (o.owner !== game.team) { const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; tgt = o; } }
   P.yaw = tgt ? Math.atan2(-(tgt.x - P.x), -(tgt.z - P.z)) : 0; P.pitch = 0; P.onGround = true;
   game.state = 'play'; game.firstDeploy = false; uiShowPlay(); tryLock();
+  if (sv) { P.x = sv.x; P.z = sv.z; P.y = sv.y; takeVehicle(P, sv); }       // sale ya dentro del vehículo elegido en el mapa
+  game.selVeh = null;
 }
 function pauseGame() {
   if (game.state !== 'play') return;
@@ -2546,6 +2915,7 @@ function pauseGame() {
 function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = 'play'; tryLock(); }
 
 function applyDamage(t, dmg, att, head, cause) {
+  if (att && att.isCrew && att.veh.driver) att = att.veh.driver;       // las bajas de un vehículo se apuntan a quien lo lleva
   if (!t.alive || game.state === 'end' || (t.veh && t.veh.kind !== 'truck')) return;    // el blindaje y la cabina protegen a la dotación
   t.hp -= dmg;
   if (t.isPlayer) {
@@ -2554,6 +2924,7 @@ function applyDamage(t, dmg, att, head, cause) {
   } else if (att && att.alive && att.team !== t.team && !t.enemy) { t.enemy = att; t.aimT = rnd(0.5, 0.9); t.first = true; }
   if (t.hp <= 0) {
     if (t.veh) { t.veh.driver = null; t.veh = null; }
+    if (t.aa) { t.aa.driver = null; t.aa = null; }
     t.alive = false; t.hp = 0; t.deaths++; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.enemy = null; t.respawnT = rnd(7, 11); t.crouch = false;
     game.tickets[t.team] = Math.max(0, game.tickets[t.team] - 1);
     if (att && att !== t && att.team !== t.team) att.kills++;
@@ -2576,6 +2947,7 @@ function explode(x, y, z, radius, dmg, owner, team, cause) {
     if (d < radius) applyDamage(s, dmg * (1 - d / radius) * (s.crouch ? 0.8 : 1), owner, false, cause);
   }
   damageVehicles(x, y, z, radius, dmg, owner, team, cause);
+  if (dmg > 0) for (const a of aaGuns) if ((team < 0 || a.team !== team) && Math.hypot(a.x - x, a.z - z) < Math.min(radius, 7)) a.downT = 25;       // una explosión cercana silencia la antiaérea un rato
 }
 function projHit(p, gh) {
   const y = Math.max(p.y, gh);
@@ -2673,7 +3045,7 @@ function update(dt) {
   game.respawnT -= dt;
   if (game.state === 'play') { updatePlayer(dt); if (!P.alive) { game.deadT -= dt; if (game.deadT <= 0) enterDeploy(); } }
   else if (P.spawned && !P.alive) P.fall = Math.min(1, P.fall + dt * 2.6);
-  updateVehicles(dt);
+  updateVehicles(dt); updateAA(dt);
   for (const s of soldiers) if (!s.isPlayer) updateBot(s, dt);
   separate();
   updateProjectiles(dt); updateEvents(dt); updateFlags(dt); updateTickets(dt); updateParts(dt);
@@ -2697,10 +3069,19 @@ function render(dt) {
   let fov = BASE_FOV, fp = false;
   if ((game.state === 'play' || game.state === 'pause') && P) {
     if (P.alive && P.veh) {
-      const v = P.veh, truck = v.kind === 'truck', plane = v.kind === 'plane', yaw = truck ? v.yaw + game.camOff : P.yaw, pit = truck ? P.pitch - 0.2 : P.pitch - (plane ? 0.05 : 0.1), cp = Math.cos(pit);
+      const v = P.veh, truck = v.kind === 'truck', plane = v.kind === 'plane';
+      if (plane) {       // la cámara sigue al avión con algo de retraso, para que los virajes se vean sin marear
+        game.planeCam = (game.planeCam || 0) + angDiff(v.yaw, game.planeCam || 0) * Math.min(1, dt * 3.5);
+        game.planeCamP = (game.planeCamP || 0) + (v.pitch * 0.6 - (game.planeCamP || 0)) * Math.min(1, dt * 3);
+      }
+      const yaw = truck ? v.yaw + game.camOff : plane ? game.planeCam : P.yaw, pit = truck ? P.pitch - 0.2 : plane ? game.planeCamP - 0.1 : P.pitch - 0.1, cp = Math.cos(pit);
       const back = plane ? 14 : 8.5, up = plane ? 2.8 : truck ? 2.5 : 3.4;
       cam.x = v.x + Math.sin(yaw) * cp * back; cam.z = v.z + Math.cos(yaw) * cp * back; cam.y = Math.max(v.y + up - Math.sin(pit) * back, Math.max(groundAt(cam.x, cam.z), waterY) + 0.7);
       cam.yaw = yaw; cam.pitch = pit;
+    } else if (P.alive && P.aa) {       // tras la ametralladora antiaérea
+      const a = P.aa, cp = Math.cos(P.pitch);
+      cam.x = a.x + Math.sin(P.yaw) * cp * 0.8 + Math.sin(P.yaw) * Math.sin(P.pitch) * 0.3; cam.z = a.z + Math.cos(P.yaw) * cp * 0.8 + Math.cos(P.yaw) * Math.sin(P.pitch) * 0.3;
+      cam.y = a.y - Math.sin(P.pitch) * 0.8 + cp * 0.34; cam.yaw = P.yaw; cam.pitch = P.pitch; fov = BASE_FOV * 0.85;
     } else if (P.alive) {
       const c = camBasis(); cam.x = c.ex; cam.y = c.ey; cam.z = c.ez; cam.yaw = c.yaw; cam.pitch = c.pitch;
       fov = BASE_FOV * lerp(1, P.weps[P.cur].def.zoom, P.aimT); fp = true;
@@ -2730,8 +3111,8 @@ function render(dt) {
   matState(1, 1, 0.5); drawMesh(world.terrain);
   matState(1, 1, 0.1); drawMesh(world.staticMesh); drawMesh(pontoon.mesh); if (pasarela.on) drawMesh(pasarela.mesh);
   matState(1, 1, 0.05);
-  drawVehicles(); matState(1, 1, 0.05);
-  for (const s of soldiers) if (s.spawned && !s.veh && !(fp && s === P)) drawSoldier(s);
+  drawVehicles(); drawAA(); matState(1, 1, 0.05);
+  for (const s of soldiers) if (s.spawned && !s.veh && !s.aa && !(fp && s === P)) drawSoldier(s);
   for (const p of projectiles) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); if (p.kind !== 'shell') M4.rotX(TMP, p.spin); if (p.kind === 'bomb') M4.scale(TMP, 3.2, 7, 3.2); else if (p.kind === 'shell') M4.scale(TMP, 2, 2, 2); drawMesh(world.nade, TMP); }
   for (const p of planes) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); M4.rotY(TMP, Math.PI); drawMesh(world.plane, TMP); }
   matState(0, 1, 0);
@@ -2754,10 +3135,19 @@ function render(dt) {
   }
   drawOverlay(dt);
 }
-let lastT = 0;
+/* El juego avanza según el tiempo real transcurrido, no según los fotogramas. Para que además las reglas se calculen igual en cualquier
+   pantalla, cada paso de simulación dura siempre entre 4 y 20 ms: una pantalla lenta da varios pasos por fotograma y una muy rápida los agrupa. */
+let lastT = 0, simAcc = 0;
 function frame(t) {
-  const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
-  if (game.state === 'play' || game.state === 'deploy') update(dt);
+  const dt = Math.min(0.1, Math.max(0, (t - lastT) / 1000) || 0.016); lastT = t;
+  pollPad(dt);
+  if (game.state === 'play' || game.state === 'deploy') {
+    simAcc += dt;
+    if (simAcc >= 0.004) {
+      const n = Math.ceil(simAcc / 0.02), h = simAcc / n; simAcc = 0;
+      for (let i = 0; i < n && (game.state === 'play' || game.state === 'deploy'); i++) update(h);
+    }
+  } else simAcc = 0;
   if (game.state !== 'menu') { render(dt); uiTick(dt); }
   SFX.engine(game.state === 'play' && !!P && P.alive && !!P.veh, P && P.veh ? (P.veh.kind === 'plane' ? 6 + P.veh.speed * 0.5 : P.veh.speed) : 0);
   requestAnimationFrame(frame);
@@ -2873,11 +3263,15 @@ function drawDeployMap() {
   c.drawImage(topo, 0, 0, 720 * s, 561 * s);
   const blue = cssVar('--blue'), ink = cssVar('--ink'), paper = cssVar('--paper');
   c.fillStyle = blue; for (const o of soldiers) if (o.alive && o.team === game.team) { c.beginPath(); c.arc((o.x - W.X0) * s, (o.z - W.Z0) * s, 2.2, 0, 6.3); c.fill(); }
-  for (const v of vehicles) if (!v.dead && v.team === game.team) vehIcon(c, v, (v.x - W.X0) * s, (v.z - W.Z0) * s, v.aiOn ? blue : ink);
+  for (const v of vehicles) if (!v.dead && v.team === game.team) {
+    const vx = (v.x - W.X0) * s, vy = (v.z - W.Z0) * s;
+    if (v === game.selVeh) { c.strokeStyle = blue; c.lineWidth = 3; c.beginPath(); c.arc(vx, vy, 11, 0, 6.3); c.stroke(); }
+    vehIcon(c, v, vx, vy, v.driver ? blue : ink);
+  }
   c.font = '600 ' + Math.round(clamp(15 * s, 11, 15)) + 'px "Barlow Condensed","Arial Narrow",sans-serif'; c.textAlign = 'center';
   for (const f of FLAGS) {
     const x = (f.x - W.X0) * s, y = (f.z - W.Z0) * s, own = f.owner === game.team;
-    if (own) { c.strokeStyle = blue; c.lineWidth = f === game.selSpawn ? 3.5 : 1.5; c.setLineDash(f === game.selSpawn ? [] : [4, 3]); c.beginPath(); c.arc(x, y, f === game.selSpawn ? 19 : 16, 0, 6.3); c.stroke(); c.setLineDash([]); }
+    if (own) { const sel = f === game.selSpawn && !game.selVeh; c.strokeStyle = blue; c.lineWidth = sel ? 3.5 : 1.5; c.setLineDash(sel ? [] : [4, 3]); c.beginPath(); c.arc(x, y, sel ? 19 : 16, 0, 6.3); c.stroke(); c.setLineDash([]); }
     flagIcon(c, x - 11, y - 8, 22, 15, f.owner);
     const nm = f.name.split(',')[0], tw = c.measureText(nm).width / 2 + 4, lx = clamp(x, tw, r.width - tw); c.lineWidth = 3; c.strokeStyle = paper; c.strokeText(nm, lx, y + 31); c.fillStyle = ink; c.fillText(nm, lx, y + 31);
   }
@@ -2896,16 +3290,30 @@ function uiShowDeploy() {
   $('classes').innerHTML = CLASSES[game.team].map((c, i) => '<button type="button" data-i="' + i + '"><strong>' + c.name + '</strong><span>' + WEAPONS[c.w].name + '</span></button>').join('');
   const u = UNIFORMS[game.team][0]; $('uniNote').textContent = 'Tu uniforme. ' + u.label + ': ' + u.desc.charAt(0).toLowerCase() + u.desc.slice(1);
   $('fact').textContent = pick(FACTS);
-  renderClassCard(); drawDeployMap(); uiDeployTick();
+  renderVehPick.sig = ''; renderClassCard(); drawDeployMap(); uiDeployTick();
+}
+/* carros y cazas del bando en los que se puede salir directamente */
+const vehDeployable = v => v.kind !== 'truck' && P && vehUsable(v, P);
+function renderVehPick(force) {
+  const list = vehicles.filter(v => v.team === game.team && v.kind !== 'truck');
+  const sig = list.map(v => (v === game.selVeh ? 'S' : '') + (v.dead ? 'X' + Math.ceil(v.deadT / 5) : v.falling || (v.air && v.driver) ? 'A' : v.driver ? 'B' + v.driver.name : 'L')).join('|');
+  if (!force && sig === renderVehPick.sig) return;
+  renderVehPick.sig = sig;
+  $('vehPick').innerHTML = list.map(v => {
+    const st = v.dead ? 'destruido; vuelve en ' + Math.ceil(v.deadT / 5) * 5 + ' s' : v.falling || (v.air && v.driver) ? 'en el aire' : v.driver ? 'lo lleva ' + v.driver.name + ', que se bajará' : 'libre en la base';
+    return '<button type="button" data-v="' + vehicles.indexOf(v) + '" aria-pressed="' + (v === game.selVeh) + '"' + (vehDeployable(v) ? '' : ' disabled') + '><strong>' + v.name + '</strong><span>' + st + '</span></button>';
+  }).join('');
 }
 function uiDeployTick() {
   const b = $('btnDeploy'), t = Math.ceil(game.respawnT);
+  if (game.selVeh && !vehDeployable(game.selVeh)) game.selVeh = null;
+  renderVehPick();
   if (game.selSpawn && game.selSpawn.owner !== game.team) game.selSpawn = FLAGS.find(f => f.base === game.team);
-  b.disabled = t > 0; b.textContent = t > 0 ? 'Refuerzos en ' + t + ' s' : 'Desplegar en ' + game.selSpawn.name.split(',')[0];
+  b.disabled = t > 0; b.textContent = t > 0 ? 'Refuerzos en ' + t + ' s' : 'Desplegar en ' + (game.selVeh ? game.selVeh.def.art : game.selSpawn.name.split(',')[0]);
 }
 function uiShowPlay() {
   $('deploy').hidden = true; $('hud').hidden = false; $('ov').hidden = false; $('touch').hidden = !input.touch; hudT = 0;
-  if (!input.touch && !input.locked && input.lockFails < 2) showHint('Haz clic en la escena para apuntar con el ratón. Esc pone el juego en pausa.');
+  if (!input.touch && !input.pad && !input.locked && input.lockFails < 2) showHint('Haz clic en la escena para apuntar con el ratón. Esc pone el juego en pausa.');
   else if (input.touch && !uiShowPlay.told) { uiShowPlay.told = true; showHint(innerHeight > innerWidth ? 'Gira el teléfono: en horizontal se ve y se maneja mejor. En Pausa eliges si apuntas con el giroscopio.' : 'Izquierda: moverte. Derecha: mirar. En Pausa eliges si apuntas con el giroscopio.'); }
 }
 function showHint(t) { const h = $('hint'); h.textContent = t; h.hidden = false; clearTimeout(showHint.t); showHint.t = setTimeout(() => { h.hidden = true; }, 6000); }
@@ -2945,6 +3353,11 @@ function showScore(on) {
   scoreOn = on && game.state === 'play'; $('score').hidden = !scoreOn;
   if (scoreOn) renderScore();
 }
+function uiToMenu() { game.state = 'menu'; for (const id of ['pause', 'end', 'deploy', 'hud', 'ov', 'touch', 'score']) $(id).hidden = true; $('menu').hidden = false; menuProg = 1; drawMenuMap(); }
+function uiPad() {
+  for (const id of ['padMenu', 'padDeploy']) $(id).hidden = !pad.on;
+  $('padState').textContent = pad.on ? 'Mando detectado: ' + pad.id.replace(/\s*\(.*$/, '').slice(0, 40) + '. Start reanuda la partida.' : 'Mando: no detectado. Conéctalo y pulsa cualquier botón.';
+}
 function uiOpts() {
   document.querySelectorAll('[data-gyro]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.gyro === '1') === opts.gyro ? 'true' : 'false'));
   const st = gyro.state, n = $('gyroNote');
@@ -2952,7 +3365,7 @@ function uiOpts() {
     : st === 'denied' ? 'El navegador no ha dado permiso para usar los sensores de movimiento. Sigues con el control tradicional.'
     : st === 'none' ? 'A esta página no le llegan datos del giroscopio en este dispositivo o navegador. Sigues con el control tradicional.'
     : 'Apuntas arrastrando el dedo por la mitad derecha de la pantalla.';
-  $('sens').value = opts.sens; $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ',');
+  $('invY').checked = opts.invY; $('sens').value = opts.sens; $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ',');
 }
 function renderScore(target) {
   const col = team => {
@@ -2978,20 +3391,21 @@ function uiTick(dt) {
     if (p.alive && Math.hypot(p.x - f.x, p.z - f.z) < CAP_R) near = f;
   }
   $('hp').textContent = Math.max(0, Math.ceil(p.hp));
-  const ws = p.weps[p.cur], nv = p.alive && !p.veh ? nearVehicle(p) : null, pr = $('prompt');
-  if (p.veh) {
+  const ws = p.weps[p.cur], nv = p.alive && !p.veh && !p.aa ? (nearVehicle(p) || nearAA(p)) : null, pr = $('prompt');
+  if (p.aa) { $('wName').textContent = p.aa.def.name; $('ammo').textContent = 'Antiaérea'; $('extra').textContent = input.touch ? 'Toca Bajar para dejarla' : input.pad ? 'X para dejarla' : 'E para dejarla'; }
+  else if (p.veh) {
     const v = p.veh, st = Math.max(0, Math.round(v.hp / v.def.hp * 100)) + ' %';
     $('wName').textContent = v.name;
-    if (v.kind === 'truck') { $('ammo').textContent = Math.round(Math.abs(v.speed) * 3.6) + ' km/h'; $('extra').textContent = input.touch ? 'Toca Bajar para apearte' : 'E para bajar'; }
-    else if (v.kind === 'tank') { $('ammo').textContent = v.def.cannon ? (v.fireT > 0 ? 'Cargando' : 'Cañón listo') : 'Ametralladoras'; $('extra').textContent = 'Blindaje ' + st + (v.def.cannon ? (input.touch ? ' · Apuntar: ametralladora' : ' · clic derecho: ametralladora') : ''); }
-    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = (v.air ? 'Altura ' + Math.round(v.y - Math.max(groundAt(v.x, v.z), waterY)) + ' m' : 'En tierra') + ' · estado ' + st + (v.def.bombs ? (input.touch ? ' · Granada: bomba' : ' · G: bomba') : ''); }
+    if (v.kind === 'truck') { $('ammo').textContent = Math.round(Math.abs(v.speed) * 3.6) + ' km/h'; $('extra').textContent = input.touch ? 'Toca Bajar para apearte' : input.pad ? 'X para bajar' : 'E para bajar'; }
+    else if (v.kind === 'tank') { $('ammo').textContent = v.def.cannon ? (v.fireT > 0 ? 'Cargando' : 'Cañón listo') : 'Ametralladoras'; $('extra').textContent = 'Blindaje ' + st + (v.def.cannon ? (input.touch ? ' · Apuntar: ametralladora' : input.pad ? ' · LT: ametralladora' : ' · clic derecho: ametralladora') : ''); }
+    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = (v.air ? 'Altura ' + Math.round(v.y - Math.max(groundAt(v.x, v.z), waterY)) + ' m' : 'En tierra') + ' · estado ' + st + (v.def.bombs ? (input.touch ? ' · Granada: bomba' : input.pad ? ' · A: bomba' : ' · G: bomba') : ''); }
   }
   else {
     $('wName').textContent = ws.def.name; $('ammo').textContent = p.reloadT > 0 ? 'Recargando' : ws.ammo + ' / ' + ws.reserve;
     $('extra').textContent = 'Granadas ' + p.nades + (p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
   }
-  if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art; pr.hidden = false; } else pr.hidden = true;
-  const ub = $('tbUse'); ub.hidden = !(nv || p.veh); ub.textContent = p.veh ? 'Bajar' : 'Subir';
+  if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : input.pad ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; } else pr.hidden = true;
+  const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
   const cap = $('capture');
   if (near) {
     const v = game.team === REP ? near.control : -near.control;
@@ -3001,7 +3415,8 @@ function uiTick(dt) {
   $('dmg').style.opacity = clamp(Math.max(game.dmgT, 0) * 0.75 + (p.alive ? clamp((40 - p.hp) / 80, 0, 0.45) : 0.7), 0, 0.9);
   if (scoreOn) renderScore();
   tagT -= 0.12;
-  if (p.veh) tag = null;
+  if (p.alive && !uiTick.towerTold && !p.veh) { const T = world.tower; if (Math.abs(p.x - T.x) < T.h && Math.abs(p.z - T.z) < T.h && p.y < T.yf + 1) { uiTick.towerTold = true; showHint('Campanario de Sant Pere: sube por la rampa que rodea el pilar hasta las campanas. Desde arriba se domina la plaza.'); } }
+  if (p.veh || p.aa) tag = null;
   else if (p.alive && tagT <= 0) { tagT = 0.12; const c = camBasis(), h = rayWorld(c.ex, c.ey, c.ez, c.fx, c.fy, c.fz, 140, p.team); tag = h.s ? h.s.name : null; }
 }
 function project(x, y, z) {
@@ -3054,8 +3469,8 @@ function drawOverlay() {
       const q = project(gx, gy, gz);
       for (const col of ['rgba(15,17,13,.7)', '#f0edda']) {
         c.strokeStyle = col; c.lineWidth = col[0] === '#' ? 1.5 : 3.5;
-        c.beginPath(); c.moveTo(cx - 5, cy); c.lineTo(cx + 5, cy); c.moveTo(cx, cy - 5); c.lineTo(cx, cy + 5); c.stroke();
-        if (q) { c.beginPath(); c.arc(q[0], q[1], tank ? 13 : 16, 0, 6.3); c.stroke(); if (tank && v.def.cannon && v.fireT > 0) { c.beginPath(); c.arc(q[0], q[1], 19, -1.57, -1.57 + 6.283 * (1 - v.fireT / 3.6)); c.stroke(); } }
+        if (tank) { c.beginPath(); c.moveTo(cx - 5, cy); c.lineTo(cx + 5, cy); c.moveTo(cx, cy - 5); c.lineTo(cx, cy + 5); c.stroke(); }
+        if (q) { c.beginPath(); c.arc(q[0], q[1], tank ? 13 : 11, 0, 6.3); c.stroke(); if (tank && v.def.cannon && v.fireT > 0) { c.beginPath(); c.arc(q[0], q[1], 19, -1.57, -1.57 + 6.283 * (1 - v.fireT / 3.6)); c.stroke(); } }
       }
     }
     if (p.hitT > 0) {
@@ -3085,7 +3500,7 @@ function drawOverlay() {
   }
   for (const v of vehicles) { if (v.dead || v === p.veh || (v.team !== p.team && !(v.aiOn || v.driver))) continue; const vx = mx + (v.x - W.X0) * s, vy = my + (v.z - W.Z0) * s; if (vx > mx && vx < mx + mw && vy > my && vy < my + mh) vehIcon(c, v, vx, vy, v.team !== p.team ? '#c2331f' : v.aiOn ? '#2c5f9c' : '#14160f'); }
   for (const f of FLAGS) flagIcon(c, mx + (f.x - W.X0) * s - 6, my + (f.z - W.Z0) * s - 4, 12, 8, f.owner);
-  const pyaw = p.veh ? p.veh.yaw : p.yaw, px = mx + (p.x - W.X0) * s, py = my + (p.z - W.Z0) * s, fx = -Math.sin(pyaw), fz = -Math.cos(pyaw);
+  const pyaw = p.veh ? p.veh.yaw : p.yaw, px = clamp(mx + (p.x - W.X0) * s, mx + 5, mx + mw - 5), py = clamp(my + (p.z - W.Z0) * s, my + 5, my + mh - 5), fx = -Math.sin(pyaw), fz = -Math.cos(pyaw);
   c.fillStyle = '#fff'; c.strokeStyle = '#14160f'; c.lineWidth = 1.2; c.beginPath();
   c.moveTo(px + fx * 7, py + fz * 7); c.lineTo(px - fx * 4 - fz * 4, py - fz * 4 + fx * 4); c.lineTo(px - fx * 4 + fz * 4, py - fz * 4 - fx * 4); c.closePath(); c.fill(); c.stroke();
   c.textAlign = 'left';
@@ -3101,7 +3516,7 @@ function buildArchive() {
     '<h3>Los dos ejércitos</h3><p><strong>Ejército del Ebro (República).</strong> Unos 80.000 hombres al mando de Juan Modesto, con los cuerpos V de Líster, XV de Tagüeña y XII de Vega. Incluía a las Brigadas Internacionales hasta su retirada en septiembre y a los reclutas de la «quinta del biberón». Escaso de artillería y de aviación, dependía de unos puentes siempre amenazados.</p>' +
     '<p><strong>Ejército sublevado.</strong> El sector lo guarnecía el Cuerpo de Ejército Marroquí del general Yagüe. Franco trajo refuerzos hasta reunir una gran superioridad en artillería y en aviación, con la Legión Cóndor alemana y la Aviazione Legionaria italiana. Combatieron legionarios, regulares marroquíes, requetés, falangistas y soldados de reemplazo.</p>' +
     '<h3>Armas que aparecen en el juego</h3><ul>' + wl + '</ul>' +
-    '<h3>Carros, aviones y camiones</h3><ul>' + ['t26', 't26n', 'pz1', 'mosca', 'chato', 'bf109', 'fiat', 'zis', 'ford'].map(k => '<li><strong>' + VDEF[k].name + '.</strong> ' + VDEF[k].hist + '</li>').join('') + '</ul>' +
+    '<h3>Carros, aviones y camiones</h3><ul>' + ['t26', 't26n', 'pz1', 'mosca', 'chato', 'bf109', 'fiat', 'zis', 'ford'].map(k => '<li><strong>' + VDEF[k].name + '.</strong> ' + VDEF[k].hist + '</li>').join('') + ['maxim', 'hotch'].map(k => '<li><strong>' + AADEFS[k].name + '.</strong> ' + AADEFS[k].hist + '</li>').join('') + '</ul>' +
     '<h3>Uniformes republicanos</h3><ul>' + ul(REP) + '</ul><h3>Uniformes sublevados</h3><ul>' + ul(NAT) + '</ul>' +
     '<h3>Lugares del mapa</h3><ul>' + FLAGS.map(f => '<li><strong>' + f.name + '.</strong> ' + f.hist + '</li>').join('') + '</ul>' +
     '<h3>Desenlace</h3><p>' + AFTERMATH + '</p>' +
@@ -3118,9 +3533,15 @@ function buildArchive() {
   $('classes').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; game.selClass = +b.dataset.i; renderClassCard(); });
   $('deployMap').addEventListener('click', e => {
     const r = e.currentTarget.getBoundingClientRect(), s = r.width / 720, x = (e.clientX - r.left) / s + W.X0, z = (e.clientY - r.top) / s + W.Z0;
-    let best = null, bd = 40 / Math.max(s, 0.3);
+    let best = null, bd = 40 / Math.max(s, 0.3), bv = null, vd = 11 / Math.max(s, 0.3);
+    for (const v of vehicles) { const d = Math.hypot(v.x - x, v.z - z); if (v.team === game.team && vehDeployable(v) && d < vd) { vd = d; bv = v; } }
     for (const f of FLAGS) { const d = Math.hypot(f.x - x, f.z - z); if (f.owner === game.team && d < bd) { bd = d; best = f; } }
-    if (best) { game.selSpawn = best; drawDeployMap(); uiDeployTick(); }
+    if (bv && vd <= bd) { game.selVeh = bv; drawDeployMap(); uiDeployTick(); }
+    else if (best) { game.selSpawn = best; game.selVeh = null; drawDeployMap(); uiDeployTick(); }
+  });
+  $('vehPick').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    const v = vehicles[+b.dataset.v]; game.selVeh = game.selVeh === v ? null : v; renderVehPick(true); drawDeployMap(); uiDeployTick();
   });
   $('btnDeploy').addEventListener('click', () => {
     audioInit();
@@ -3132,10 +3553,12 @@ function buildArchive() {
   $('btnResume').addEventListener('click', resumeGame);
   document.querySelectorAll('[data-gyro]').forEach(b => b.addEventListener('click', () => setGyro(b.dataset.gyro === '1')));
   $('sens').addEventListener('input', e => { opts.sens = clamp(+e.target.value || 1, 0.5, 2); saveOpts(); $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ','); });
+  $('invY').addEventListener('change', e => { opts.invY = e.target.checked; saveOpts(); });
   $('btnScore').addEventListener('click', () => { const el = $('pauseScore'); el.hidden = !el.hidden; if (!el.hidden) renderScore(el); });
+  uiPad();
   if (opts.gyroSaved && !(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')) setGyro(true);
   uiOpts();
-  const toMenu = () => { game.state = 'menu'; for (const id of ['pause', 'end', 'deploy', 'hud', 'ov', 'touch', 'score']) $(id).hidden = true; $('menu').hidden = false; menuProg = 1; drawMenuMap(); };
+  const toMenu = uiToMenu;
   $('btnQuit').addEventListener('click', toMenu); $('btnAgain').addEventListener('click', toMenu);
   addEventListener('resize', () => { if (game.state === 'menu') drawMenuMap(); });
   const retheme = () => { topo = buildTopo(); if (game.state === 'menu') drawMenuMap(); else if (game.state === 'deploy') drawDeployMap(); };
