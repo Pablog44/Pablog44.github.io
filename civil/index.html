@@ -156,6 +156,9 @@ p{margin:0}
 #parte p{font-family:var(--f-type); font-size:.84rem; line-height:1.5}
 #hint{top:24%; left:50%; transform:translateX(-50%); background:var(--plate); padding:.4rem .8rem; font-family:var(--f-body); font-size:.95rem; text-align:center; max-width:min(30rem,86vw)}
 #prompt{top:64%; left:50%; transform:translateX(-50%); background:var(--plate); padding:.3rem .8rem; font-size:1.15rem; font-weight:600; text-align:center; white-space:nowrap}
+#flyHud{bottom:calc(env(safe-area-inset-bottom,0px) + .8rem); left:50%; transform:translateX(-50%); display:grid; justify-items:center; text-align:center; text-shadow:0 1px 3px rgba(15,17,13,.9),0 0 2px rgba(15,17,13,.9); white-space:nowrap}
+#flyHud b{font-size:2.2rem; font-weight:700; line-height:1}
+#flyHud span{font-size:1.05rem; font-weight:600; letter-spacing:.02em}
 #capture{bottom:calc(env(safe-area-inset-bottom,0px) + 5.2rem); left:50%; transform:translateX(-50%); display:grid; gap:.25rem; justify-items:center; background:var(--plate); padding:.35rem .7rem .5rem; font-size:1.1rem; font-weight:600; width:min(22rem,70vw); text-align:center}
 .capbar{width:100%; height:.45rem; background:var(--foe)} .capbar i{display:block; height:100%; background:var(--ally); width:50%}
 #vitals,#weapon{bottom:calc(env(safe-area-inset-bottom,0px) + .7rem); background:var(--plate); padding:.35rem .7rem; display:grid}
@@ -182,12 +185,25 @@ p{margin:0}
 .tb-nade{right:calc(env(safe-area-inset-right,0px) + 9.8rem); bottom:calc(env(safe-area-inset-bottom,0px) + 5.4rem); width:3.2rem; height:3.2rem; font-size:.78rem}
 .tb-swap{right:calc(env(safe-area-inset-right,0px) + 5.4rem); bottom:calc(env(safe-area-inset-bottom,0px) + 10.2rem); width:3.2rem; height:3.2rem; font-size:.82rem}
 .tb-use{right:calc(env(safe-area-inset-right,0px) + 9.6rem); bottom:calc(env(safe-area-inset-bottom,0px) + 9.4rem); width:3.4rem; height:3.4rem; font-size:.9rem; border-color:#ffe08a; color:#ffe08a}
+.tf{display:none}
+body.fly .tf{display:block}
+body.touch.fly #weapon{display:none}
+body.fly .tb-swap,body.fly .tb-nade,body.fly .tb-reload,body.fly .tb-crouch,body.fly .tb-jump,body.fly .tb-aim{display:none}
+/* en el caza: motor a la derecha, como en un tablero; la palanca de vuelo es la de la izquierda */
+.tf-up{right:calc(env(safe-area-inset-right,0px) + 1rem); bottom:calc(env(safe-area-inset-bottom,0px) + 8.6rem); width:5rem; height:5rem; font-size:1.05rem}
+.tf-dn{right:calc(env(safe-area-inset-right,0px) + 1rem); bottom:calc(env(safe-area-inset-bottom,0px) + 2.6rem); width:5rem; height:5rem; font-size:1.05rem}
+.tf-brake{right:calc(env(safe-area-inset-right,0px) + 6.8rem); bottom:calc(env(safe-area-inset-bottom,0px) + 3.2rem); width:3.8rem; height:3.8rem}
+body.fly .tb-use{right:calc(env(safe-area-inset-right,0px) + 6.8rem); bottom:calc(env(safe-area-inset-bottom,0px) + 9.2rem); width:3.8rem; height:3.8rem}
+body.fly .tb-fire{right:calc(env(safe-area-inset-right,0px) + 11.6rem); bottom:calc(env(safe-area-inset-bottom,0px) + 2.2rem)}
+.tf-bomb{right:calc(env(safe-area-inset-right,0px) + 12.2rem); bottom:calc(env(safe-area-inset-bottom,0px) + 7.8rem); width:3.6rem; height:3.6rem}
+.tb-rec{left:calc(50% + 3.2rem); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem; border-color:#ffe08a; color:#ffe08a}
 .tb-pause{left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem}
 body.touch #weapon{right:auto; left:calc(env(safe-area-inset-left,0px) + .7rem); bottom:calc(env(safe-area-inset-bottom,0px) + 4.4rem); text-align:left; padding:.25rem .6rem}
 body.touch #weapon{max-width:9.4rem} body.touch #weapon b{font-size:1.5rem} body.touch #wName{font-size:.8rem; line-height:1.15} body.touch #weapon span:last-child{font-size:.8rem}
 body.touch #capture{bottom:auto; top:58%}
 @media (orientation:landscape){ body.touch #weapon{left:calc(env(safe-area-inset-left,0px) + 9.6rem); bottom:calc(env(safe-area-inset-bottom,0px) + .7rem)} }
 body.touch #prompt{top:50%}
+@media (orientation:portrait){ body.touch #flyHud{bottom:auto; top:calc(env(safe-area-inset-top,0px) + 6rem)} }
 
 #fatal{display:none}
 body.nogl #fatal{display:grid; position:fixed; inset:0; z-index:99; place-items:center; padding:2rem; background:var(--paper); text-align:center; font-size:1.1rem}
@@ -230,6 +246,7 @@ body.nogl #fatal{max-width:none}
   <p id="hint" hidden></p>
   <p id="prompt" hidden></p>
   <div id="capture" hidden><span id="capName"></span><div class="capbar"><i id="capFill"></i></div></div>
+  <div id="flyHud" hidden><b id="flySpd"></b><span id="flyInfo"></span></div>
   <div id="vitals"><b id="hp">100</b><span>salud</span></div>
   <div id="weapon"><span id="wName"></span><b id="ammo"></b><span id="extra"></span></div>
   <div id="dmg"></div>
@@ -237,6 +254,7 @@ body.nogl #fatal{max-width:none}
 
 <div id="touch" hidden>
   <button type="button" data-act="pause" class="tb tb-pause">Pausa</button>
+  <button type="button" data-act="recenter" class="tb tb-rec" id="tbRec" hidden>Centrar</button>
   <button type="button" data-act="swap" class="tb tb-swap">Arma</button>
   <button type="button" data-act="use" class="tb tb-use" id="tbUse" hidden>Subir</button>
   <button type="button" data-act="nade" class="tb tb-nade">Granada</button>
@@ -245,6 +263,10 @@ body.nogl #fatal{max-width:none}
   <button type="button" data-act="jump" class="tb tb-jump">Saltar</button>
   <button type="button" data-act="aim" class="tb tb-aim">Apuntar</button>
   <button type="button" data-act="fire" class="tb tb-fire">Fuego</button>
+  <button type="button" data-act="thrUp" class="tb tf tf-up">Motor +</button>
+  <button type="button" data-act="thrDn" class="tb tf tf-dn">Motor −</button>
+  <button type="button" data-act="brake" class="tb tf tf-brake">Frenos</button>
+  <button type="button" data-act="bomb" class="tb tf tf-bomb" id="tbBomb">Bomba</button>
 </div>
 
 <div id="score" hidden></div>
@@ -298,12 +320,12 @@ body.nogl #fatal{max-width:none}
     <fieldset class="opts">
       <legend>Cómo apuntar en el móvil</legend>
       <div class="seg" role="group" aria-label="Modo de apuntado">
-        <button type="button" data-gyro="1" aria-pressed="false"><strong>Giroscopio y dedo</strong><span>Mueves el teléfono para apuntar y afinas arrastrando.</span></button>
+        <button type="button" data-gyro="1" aria-pressed="false"><strong>Giroscopio y dedo</strong><span>Miras hacia donde apuntes el teléfono, en cualquier dirección, y ajustas arrastrando.</span></button>
         <button type="button" data-gyro="0" aria-pressed="true"><strong>Solo dedo</strong><span>Control tradicional: palanca a la izquierda, mirada a la derecha.</span></button>
       </div>
       <p class="quiet" id="gyroNote" aria-live="polite"></p>
       <label class="sens" for="sens">Sensibilidad al mirar <input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"> <output id="sensOut">1,0</output></label>
-      <label class="chk" for="invY"><input type="checkbox" id="invY" checked> En el avión, mando de vuelo invertido: ratón (o palanca del mando) hacia delante baja el morro, y hacia atrás lo sube. Desmárcalo si prefieres que arriba sea subir.</label>
+      <label class="chk" for="invY"><input type="checkbox" id="invY" checked> En el avión, mando de vuelo invertido: ratón o palanca hacia delante baja el morro, y hacia atrás lo sube. Desmárcalo si prefieres que arriba sea subir.</label>
       <p class="quiet" id="padState"></p>
     </fieldset>
     <div class="links">
@@ -345,7 +367,8 @@ body.nogl #fatal{max-width:none}
       <dt>G</dt><dd>Lanzar granada (estalla al chocar)</dd>
       <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
       <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón mueve la torre: clic izquierdo dispara el cañón y clic derecho la ametralladora.</dd>
-      <dt>Caza</dt><dd>Mantén W para despegar. En el aire, mueve el ratón con suavidad: tirando de él hacia ti sube el morro, empujándolo hacia delante baja (como una palanca de vuelo; se puede cambiar en el menú de pausa) y a los lados vira; si lo dejas quieto, el avión sigue recto como va. A y D (o las flechas) viran de forma continua. W y S dan y quitan gas, clic izquierdo dispara y G o Espacio suelta una bomba. Para bajar, aterriza suave y frena con S.</dd>
+      <dt>Caza</dt><dd>Mantén W para subir el motor y despegar; W y S lo suben y lo bajan (se ve el porcentaje en pantalla) y B frena en tierra. En el aire, mueve el ratón con suavidad: tirando de él hacia ti sube el morro, empujándolo baja y a los lados vira; A y D viran de forma continua. Clic izquierdo dispara y G o Espacio suelta una bomba. Para aterrizar, quita motor, baja suave y frena.</dd>
+      <dt>Caza en el móvil</dt><dd>La palanca de la izquierda pilota el avión. A la derecha están «Motor +» y «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba».</dd>
       <dt>Tab</dt><dd>Marcador</dd>
       <dt>Esc o P</dt><dd>Pausa</dd>
       <dt>Flechas</dt><dd>Girar, por si el navegador no captura el ratón</dd>
@@ -353,7 +376,8 @@ body.nogl #fatal{max-width:none}
     <h3>Con mando</h3>
     <dl class="keys">
       <dt>Palanca izquierda</dt><dd>Moverse; al tope, o pulsándola, corres. En los vehículos acelera, frena y gira.</dd>
-      <dt>Palanca derecha</dt><dd>Mirar y apuntar; en el caza es la palanca de vuelo: sube, baja y vira.</dd>
+      <dt>Palanca derecha</dt><dd>Mirar y apuntar.</dd>
+      <dt>En el caza</dt><dd>La palanca izquierda pilota; RB y LB suben y bajan el motor; LT frena; RT dispara y A suelta la bomba.</dd>
       <dt>RT y LT</dt><dd>Disparar y apuntar por el alza. En el carro, LT dispara la ametralladora.</dd>
       <dt>A, B</dt><dd>Saltar y agacharse. En el caza, A suelta una bomba.</dd>
       <dt>X</dt><dd>Recargar; junto a un vehículo, subir o bajar.</dd>
@@ -363,7 +387,7 @@ body.nogl #fatal{max-width:none}
     <p>Junto a una bandera de tu bando repones munición y granadas y recuperas salud poco a poco.</p>
     <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: arriba hay cuatro vanos con pretil para disparar a cubierto. Saltar desde allí es casi siempre mortal.</p>
     <p>Las casas que el mapa dibuja en hueco se pueden ocupar: entra por la puerta y dispara desde las ventanas. Las balas no dañan a los carros: hacen falta granadas, cañón o bombas.</p>
-    <p class="quiet">En el móvil, arrastra en la mitad izquierda para moverte (hasta el tope, corres) y en la derecha para mirar; los botones hacen el resto. En el menú de pausa eliges si además apuntas moviendo el teléfono con el giroscopio, y ajustas la sensibilidad.</p>
+    <p class="quiet">En el móvil, arrastra en la mitad izquierda para moverte (hasta el tope, corres) y en la derecha para mirar; los botones hacen el resto. En el menú de pausa puedes activar el giroscopio: entonces miras hacia donde apuntes el teléfono, en cualquier dirección, como en una foto de 360°; el dedo sirve para ajustar y el botón «Centrar» fija el horizonte en la postura en que tengas el móvil.</p>
   </div>
 </aside>
 
@@ -1893,7 +1917,7 @@ function drawSoldier(s) {
 }
 
 /* ============ jugador: entrada, armas, cámara ============ */
-const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false };
+const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false, thr: 0, brake: false };
 let P = null;
 /* opciones que se guardan en el dispositivo */
 const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true };      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
@@ -1901,39 +1925,71 @@ const stick = { ty: 0, tp: 0 };      // rumbo e inclinación del morro que el ju
 try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; } catch (e) { }
 function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY })); } catch (e) { } }
 
-/* giroscopio: el giro del teléfono se suma a la mirada, igual que el arrastre del dedo */
-const gyro = { seen: false, t: 0, ux: 0, uy: 1, uz: 0, state: 'off' };
-function onMotion(e) {
-  const r = e.rotationRate; if (!r || r.beta == null) return;
-  gyro.seen = true;
-  const now = e.timeStamp || performance.now(), dt = Math.min(0.05, Math.max(0, (now - gyro.t) / 1000)); gyro.t = now;
-  const ang = (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (window.orientation || 0)) * Math.PI / 180, c = Math.cos(ang), s = Math.sin(ang);
-  /* la vertical real sale de la gravedad; así el giro a izquierda y derecha cuenta igual con el teléfono más o menos tumbado */
-  const g = e.accelerationIncludingGravity; let ux = s, uy = c, uz = 0;
-  if (g && g.x != null) {
-    const l = Math.hypot(g.x, g.y, g.z);
-    if (l > 3) { ux = g.x / l; uy = g.y / l; uz = g.z / l; if (ux * s * 0.7 + uy * c * 0.7 + uz * 0.7 < 0) { ux = -ux; uy = -uy; uz = -uz; } }
-    gyro.ux += (ux - gyro.ux) * 0.2; gyro.uy += (uy - gyro.uy) * 0.2; gyro.uz += (uz - gyro.uz) * 0.2;
-  } else { gyro.ux = ux; gyro.uy = uy; gyro.uz = uz; }
-  if (!opts.gyro || game.state !== 'play' || !dt) return;
-  let wy = r.beta * gyro.ux + r.gamma * gyro.uy + (r.alpha || 0) * gyro.uz, wx = r.beta * c - r.gamma * s;      // grados por segundo
-  if (Math.abs(wx) < 0.6) wx = 0; if (Math.abs(wy) < 0.6) wy = 0;
-  const k = Math.PI / 180 * dt / 0.0023 * opts.sens;
-  input.lookX -= wy * k; input.lookY -= wx * k;
+/* Giroscopio: la orientación real del teléfono marca hacia dónde miras, como en una foto de 360°. Gira el cuerpo o levanta y baja
+   el móvil y la vista va a ese sitio; arrastrar con el dedo desplaza la vista respecto al teléfono para los ajustes. */
+const gyro = { ok: false, listening: false, first: true, yaw: 0, pitch: 0, roll: 0, yawOff: 0, pitchOff: 0, state: 'off' };
+function devEuler(al, be, ga, or) {
+  // mismo convenio que DeviceOrientationControls: Euler(beta, alpha, -gamma, 'YXZ') · giro de -90° en X · giro por la orientación de la pantalla
+  const c1 = Math.cos(be / 2), c2 = Math.cos(al / 2), c3 = Math.cos(-ga / 2), s1 = Math.sin(be / 2), s2 = Math.sin(al / 2), s3 = Math.sin(-ga / 2);
+  let qx = s1 * c2 * c3 + c1 * s2 * s3, qy = c1 * s2 * c3 - s1 * c2 * s3, qz = c1 * c2 * s3 - s1 * s2 * c3, qw = c1 * c2 * c3 + s1 * s2 * s3;
+  const mul = (bx, by, bz, bw) => { const ax = qx, ay = qy, az = qz, aw = qw; qx = ax * bw + aw * bx + ay * bz - az * by; qy = ay * bw + aw * by + az * bx - ax * bz; qz = az * bw + aw * bz + ax * by - ay * bx; qw = aw * bw - ax * bx - ay * by - az * bz; };
+  mul(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+  mul(0, 0, Math.sin(-or / 2), Math.cos(-or / 2));
+  // columnas de la matriz de giro: derecha (r), arriba (u) y adelante (f)
+  const r = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qw * qz), 2 * (qx * qz - qw * qy)];
+  const u = [2 * (qx * qy - qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qw * qx)];
+  const f = [-2 * (qx * qz + qw * qy), -2 * (qy * qz - qw * qx), -(1 - 2 * (qx * qx + qy * qy))];
+  const sy = clamp(f[1], -1, 1), cy = Math.sqrt(Math.max(0, 1 - sy * sy));
+  // rumbo estable aunque mires al suelo o al cielo: mezcla la dirección de la vista con la del borde superior del móvil
+  const hx = f[0] * cy - u[0] * sy, hz = f[2] * cy - u[2] * sy;
+  return { x: Math.asin(sy), y: Math.atan2(-hx, -hz), z: Math.atan2(r[1], u[1]) * clamp((cy - 0.25) / 0.35, 0, 1) };
 }
-addEventListener('devicemotion', onMotion);
+function screenAngle() {
+  const so = window.screen && window.screen.orientation;
+  return (so && typeof so.angle === 'number' ? so.angle : (typeof window.orientation === 'number' ? window.orientation : 0)) * Math.PI / 180;
+}
+function onOrient(e) {
+  if (e.alpha === null || e.alpha === undefined || e.beta === null) return;
+  const k = Math.PI / 180, r = devEuler(e.alpha * k, e.beta * k, (e.gamma || 0) * k, screenAngle());
+  gyro.yaw = r.y; gyro.pitch = r.x; gyro.roll = r.z;
+  if (!gyro.ok) { gyro.ok = true; if (opts.gyro) { gyro.state = 'on'; uiOpts(); if (game.state === 'play') showHint('Giroscopio activo: mueve el teléfono para mirar a cualquier lado.'); } }
+  if (gyro.first && P) { gyro.first = false; gyro.yawOff = P.yaw - gyro.yaw; }
+}
+/* tras un cambio brusco de rumbo (desplegar, subir o bajar de un vehículo) la vista del teléfono se vuelve a casar con la del soldado */
+function gyroSync() { if (gyro.ok && P) gyro.yawOff = P.yaw - gyro.yaw; else gyro.first = true; }
+function gyroRecenter() {
+  if (!gyro.ok || !P) return;
+  gyro.yawOff = P.yaw - gyro.yaw; gyro.pitchOff = -gyro.pitch; showHint('Vista recentrada: así como tienes ahora el teléfono miras al horizonte.');
+}
+/* aplica la orientación del teléfono a la mirada; devuelve false si el giroscopio no está en uso */
+function gyroLook(p, dt, lo, hi, sens) {
+  if (!(opts.gyro && gyro.ok)) { p.roll = (p.roll || 0) * Math.exp(-dt * 6); return false; }
+  gyro.yawOff -= input.lookX * sens; gyro.pitchOff = clamp(gyro.pitchOff - input.lookY * sens, -1.6, 1.6); input.lookX = input.lookY = 0;
+  const gk = 1 - Math.exp(-dt * 24);
+  p.yaw += angDiff(gyro.yaw + gyro.yawOff, p.yaw) * gk;
+  p.pitch += (clamp(gyro.pitch + gyro.pitchOff, lo, hi) - p.pitch) * gk;
+  p.roll = (p.roll || 0) + (clamp(gyro.roll, -0.7, 0.7) - (p.roll || 0)) * gk;
+  return true;
+}
 async function setGyro(on) {
   gyro.state = 'off';
   if (on) {
-    try {
-      if (typeof DeviceMotionEvent === 'undefined') { on = false; gyro.state = 'none'; }
-      else if (typeof DeviceMotionEvent.requestPermission === 'function') { const r = await DeviceMotionEvent.requestPermission(); if (r !== 'granted') { on = false; gyro.state = 'denied'; } }
-    } catch (e) { on = false; gyro.state = 'denied'; }
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE) { on = false; gyro.state = 'none'; }
+    else if (typeof DOE.requestPermission === 'function') {
+      try { const r = await DOE.requestPermission(); if (r !== 'granted') { on = false; gyro.state = 'denied'; } } catch (e) { on = false; gyro.state = 'denied'; }
+    }
   }
   opts.gyro = on; saveOpts();
   if (on) {
-    gyro.state = gyro.seen ? 'on' : 'wait';
-    if (!gyro.seen) setTimeout(() => { if (!opts.gyro) return; if (gyro.seen) gyro.state = 'on'; else { opts.gyro = false; gyro.state = 'none'; saveOpts(); } uiOpts(); }, 2200);
+    if (!gyro.listening) { addEventListener('deviceorientation', onOrient); gyro.listening = true; }
+    gyro.first = true; gyro.pitchOff = 0; gyro.state = gyro.ok ? 'on' : 'wait';
+    if (!gyro.ok) setTimeout(() => {
+      if (!opts.gyro) return;
+      if (gyro.ok) gyro.state = 'on';
+      else { opts.gyro = false; gyro.state = 'none'; saveOpts(); if (game.state === 'play') showHint('A esta página no le llegan datos del giroscopio: sigues con el control táctil.'); }
+      uiOpts();
+    }, 2600);
   }
   uiOpts();
 }
@@ -2000,6 +2056,10 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
   const act = (a, on) => {
     if (a === 'use') { if (on) useVehicle(); return; }
     if (a === 'pause') { if (on) pauseGame(); return; }
+    if (a === 'recenter') { if (on) gyroRecenter(); return; }
+    if (a === 'thrUp' || a === 'thrDn') { input.thr = on ? (a === 'thrUp' ? 1 : -1) : 0; return; }
+    if (a === 'brake') { input.brake = on; return; }
+    if (a === 'bomb') { if (on) input.bomb = true; return; }
     if (P.aa) { if (a === 'fire') input.fire = on; return; }
     if (P.veh) {
       if (P.veh.kind === 'truck') return;
@@ -2063,7 +2123,8 @@ function pollPad(dt) {
     if (hit(6)) input.aim = true; else if (!B(6) && pad.prev[6]) input.aim = false;
     input.padSprint = B(10);
     if (hit(2)) { if (P.veh || P.aa || nearVehicle(P) || nearAA(P)) useVehicle(); else startReload(); }
-    if (P.veh) { if (hit(0) || hit(5)) input.bomb = true; }
+    if (P.veh && P.veh.kind === 'plane') { if (hit(0)) input.bomb = true; input.thr = (B(5) ? 1 : 0) - (B(4) ? 1 : 0); input.brake = B(6); }      // caza: RB y LB, motor; LT, frenos; A, bomba
+    else if (P.veh) { if (hit(0) || hit(5)) input.bomb = true; }
     else if (!P.aa) {
       if (hit(0)) input.jump = true;
       if (hit(1)) P.crouch = !P.crouch;
@@ -2227,14 +2288,18 @@ function updatePlayer(dt) {
        y la inclinación del morro (arriba y abajo) que el avión busca con suavidad. Si dejas quieto el ratón, el avión sigue recto como va. */
     const v = p.veh, inv = opts.invY ? -1 : 1, invD = input.touch ? 1 : inv;      // la inversión vale para ratón, flechas y mando; el dedo y el giroscopio siguen yendo directos
     if (v.air) {
-      const kx = clamp((k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0) + (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1), ky = (k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0);
-      if (input.pad && pad.on) { stick.ty -= pad.rx * Math.abs(pad.rx) * 1.1 * dt; stick.tp = -pad.ry * 0.65 * inv; }
-      else if (!input.locked && !input.touch && input.mx >= 0) {       // ratón sin capturar: cursor en el centro, vuelo recto; hacia un lado, vira; arriba o abajo, sube o baja
+      const kxk = clamp((k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0) + (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0), -1, 1), ky = (k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0);
+      const joy = input.touch || (input.pad && pad.on);       // palanca de vuelo: la táctil de la izquierda o la palanca izquierda del mando
+      if (joy) stick.tp -= input.mvz * Math.abs(input.mvz) * 0.5 * dt * inv;      // la palanca sube o baja el morro poco a poco y al soltarla el avión mantiene la inclinación (inv = -1, invertido: hacia atrás, sube)
+      if (!joy && !input.locked && input.mx >= 0) {       // ratón sin capturar: cursor en el centro, vuelo recto; hacia un lado, vira; arriba o abajo, sube o baja
         const R = Math.min(cw, ch) * 0.42, dzn = q => { const a = Math.abs(q); return a < 0.12 ? 0 : Math.sign(q) * Math.min(1, (a - 0.12) / 0.88); };
         const ox = dzn((input.mx - cw / 2) / R), oy = dzn(-(input.my - ch / 2) / R);
         stick.ty -= ox * Math.abs(ox) * 1.0 * dt; if (!ky) stick.tp = oy * 0.65 * inv;
       } else { stick.ty -= input.lookX * 0.0016; stick.tp -= input.lookY * 0.0016 * invD; }
-      stick.ty -= kx * 0.9 * dt; stick.tp += ky * 0.6 * dt * inv;
+      const side = clamp(kxk + (joy ? input.mvx : 0), -1, 1);
+      if (side) { stick.ty = v.yaw - side * 0.45; stick.turning = true; }       // palanca o teclas a un lado: vira mientras se mantiene, tanto más cuanto más se inclina
+      else if (stick.turning) { stick.turning = false; stick.ty = v.yaw + (v.yawRate || 0) * 0.3; }       // al soltar, endereza enseguida
+      stick.tp += ky * 0.6 * dt * inv;
       stick.ty = v.yaw + clamp(angDiff(stick.ty, v.yaw), -1.2, 1.2);       // la consigna nunca se adelanta demasiado al avión
       stick.tp = clamp(stick.tp, -0.75, 0.75);
     } else { stick.ty = v.yaw; stick.tp = 0.3; }
@@ -2242,7 +2307,8 @@ function updatePlayer(dt) {
   }
   if (p.alive && p.veh) {      // carro: el ratón apunta la torre
     const plane = p.veh.kind === 'plane', lo = plane ? -1.1 : -0.25, hi = plane ? 1.0 : 0.45, sv = plane ? 0.0019 : 0.0023;
-    p.yaw -= input.lookX * sv; p.pitch = clamp(p.pitch - input.lookY * sv, lo, hi); input.lookX = input.lookY = 0; input.jump = false;
+    if (!gyroLook(p, dt, lo, hi, sv)) { p.yaw -= input.lookX * sv; p.pitch = clamp(p.pitch - input.lookY * sv, lo, hi); }
+    input.lookX = input.lookY = 0; input.jump = false;
     if (!input.locked && !input.touch && input.mx >= 0) {
       const ex = input.mx / cw, ey = input.my / ch;
       if (ex < 0.1) p.yaw += (0.1 - ex) * 20 * dt; else if (ex > 0.9) p.yaw -= (ex - 0.9) * 20 * dt;
@@ -2253,7 +2319,8 @@ function updatePlayer(dt) {
     p.aimT = 0; p.crouchT = 0; return;
   }
   const sens = 0.0023 * (1 - 0.5 * (p.aimT || 0) * (1 - (p.weps ? p.weps[p.cur].def.zoom : 1)) * 2);
-  p.yaw -= input.lookX * sens; p.pitch = clamp(p.pitch - input.lookY * sens, -1.45, 1.45); input.lookX = input.lookY = 0;
+  if (!gyroLook(p, dt, -1.45, 1.45, sens)) { p.yaw -= input.lookX * sens; p.pitch = clamp(p.pitch - input.lookY * sens, -1.45, 1.45); }
+  input.lookX = input.lookY = 0;
   if (!input.locked && !input.touch && input.mx >= 0) {   // sin captura del ratón: los bordes de la pantalla siguen girando la vista
     const ex = input.mx / cw, ey = input.my / ch;
     if (ex < 0.1) p.yaw += (0.1 - ex) * 24 * dt; else if (ex > 0.9) p.yaw -= (ex - 0.9) * 24 * dt;
@@ -2387,7 +2454,7 @@ function assignCrew(v) {
 }
 function botBoard(v, s) {
   s.goVeh = null; v.claim = null; s.veh = v; s.enemy = null; s.crouch = false; s.swim = false;
-  v.driver = s; v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw;
+  v.driver = s; v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw; v.thr = 1;
 }
 function exitSpot(v) {
   const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw), fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), w = v.kind === 'plane' ? 3 : 2.2;
@@ -2426,9 +2493,12 @@ function takeVehicle(p, v) {
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   v.aiOn = false; v.crew.alive = false;
   v.driver = p; p.veh = v; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
-  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; v.thr = 1; stick.ty = v.yaw; stick.tp = 0.3; game.planeCam = v.yaw; game.planeCamP = 0; }
+  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) v.thr = 0; stick.ty = v.yaw; stick.tp = 0.3; game.planeCam = v.yaw; game.planeCamP = 0; input.thr = 0; input.brake = false; }
+  gyroSync();
   if (!game.vehTold[v.type]) { game.vehTold[v.type] = true; pushCard(v.name, v.def.hist); }
-  if (v.kind === 'plane') showHint(input.touch ? 'Empuja la palanca hacia delante para despegar. En el aire, arrastra a la derecha con suavidad: arriba sube, abajo baja y a los lados vira.' : input.pad ? (opts.invY ? 'Palanca izquierda adelante para despegar. En el aire, la derecha hacia atrás sube el morro, hacia delante lo baja, y a los lados vira.' : 'Palanca izquierda adelante para despegar. En el aire, la derecha sube, baja y vira.') : (opts.invY ? 'Mantén W para despegar. En el aire, tira del ratón hacia ti para subir y empújalo hacia delante para bajar; a los lados vira. A y D viran de forma continua.' : 'Mantén W para despegar. En el aire, mueve el ratón con suavidad: arriba sube, abajo baja y a los lados vira. A y D viran de forma continua.'));
+  if (v.kind === 'plane') showHint(input.touch ? 'Mantén «Motor +» para despegar. La palanca de la izquierda pilota: ' + (opts.invY ? 'hacia atrás sube el morro, hacia delante lo baja' : 'hacia delante sube, hacia atrás baja') + ', y a los lados vira.'
+    : input.pad ? 'RB sube el motor y LB lo baja. La palanca izquierda pilota; LT frena en tierra.'
+    : 'Mantén W para subir el motor y despegar. En el aire, ' + (opts.invY ? 'tira del ratón hacia ti para subir y empújalo para bajar' : 'mueve el ratón arriba para subir y abajo para bajar') + '; a los lados vira. W y S suben y bajan el motor; B frena en tierra.');
   SFX.click();
 }
 function exitVehicle(p) {
@@ -2437,7 +2507,8 @@ function exitVehicle(p) {
   p.veh = null; v.driver = null; v.idleT = 0; v.launchT = 45;
   const es = exitSpot(v), ex = es[0], ez = es[1];
   p.x = ex; p.z = ez; p.y = groundAt(ex, ez); p.vx = p.vy = p.vz = 0; p.onGround = true; p.switchT = 0.4;
-  if (v.kind === 'truck') { p.yaw = v.yaw + (game.camOff || 0); p.pitch = 0; }
+  if (v.kind !== 'tank') { p.yaw = v.yaw + (v.kind === 'truck' ? (game.camOff || 0) : 0); p.pitch = 0; }
+  gyroSync();
 }
 function destroyVehicle(v, att) {
   if (v.dead) return;
@@ -2492,7 +2563,7 @@ function vehShot(v, att, ox, oy, oz, dx, dy, dz, spread, dmgS, dmgP, cause) {
   SFX.shot('lmg', ox, oy, oz); v.crew.lastShot = game.time;
   if (ok && att && att.isPlayer) { P.hitT = 0.2; P.hitKill = hit.s && !hv.v ? !hit.s.alive : !!(hv.v && (hv.v.dead || hv.v.falling)); }
 }
-const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0, turn: null };
+const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0, turn: null, brake: false };
 const _va = { x: 0, y: 0, z: 0 }, _vb = { x: 0, y: 0, z: 0 };
 function tankMuzzle(v) {
   const m = world.vm[v.type], c = Math.cos(v.yaw), s = Math.sin(v.yaw), px = m.pivot[0], pz = m.pivot[2];
@@ -2666,10 +2737,13 @@ function crashPlane(v) {
 function updatePlane(v, dt, ctl) {
   const D = v.def, op = vehOp(v);
   if (!v.air) {
-    if (op) {
-      let f = ctl.f;
-      if (v.rollout) { if (v.speed < 15) v.rollout = false; else f = Math.min(f, 0) - 0.45; }       // recién aterrizado: frena solo hasta ir despacio
-      if (f > 0) v.speed += 7.5 * f * dt; else if (f < 0) v.speed += 9 * f * dt; else v.speed -= Math.min(v.speed, 1.5 * dt);
+    if (op) {       // en tierra: el motor (0 a 100 %) empuja; los frenos paran
+      v.thr = clamp(v.thr + ctl.f * 0.55 * dt, 0, 1);
+      if (v.rollout && v.speed < 15) v.rollout = false;       // recién aterrizado: frena solo hasta ir despacio
+      const push = v.rollout ? 0 : v.thr, top = 34 * push;
+      if (ctl.brake || v.rollout) v.speed -= Math.min(v.speed, 9 * dt);
+      else if (v.speed < top) v.speed = Math.min(top, v.speed + 7.5 * push * dt);
+      else v.speed -= Math.min(v.speed, 1.5 * dt);
       v.yaw -= ctl.r * 0.55 * dt * Math.min(1, v.speed / 6);
     }
     else v.speed -= Math.min(v.speed, 5 * dt);
@@ -2680,7 +2754,7 @@ function updatePlane(v, dt, ctl) {
     if (v.speed > 2 && Math.random() < dt * 9) addPart(v.x + rnd(-1, 1), v.y + 0.3, v.z + rnd(-1, 1), 0, 0.6, 0, 0.8, 2, 0.9, 0.74, 0.65, 0.48, 0.25, 0, 1.2);
     if (th < waterY - 0.3 || (v.speed > 5 && insideSolid(v.x, v.z, 0.6))) { crashPlane(v); return; }
     if (v.speed >= 24 && op && !v.rollout) {       // despega: da un salto limpio y no puede volver a posarse durante el ascenso inicial
-      v.air = true; v.thr = 1; v.assistT = 4; v.y += 0.35; v.pitch = Math.max(v.pitch, 0.2);
+      v.air = true; v.assistT = 4; v.y += 0.35; v.pitch = Math.max(v.pitch, 0.2);
       if (op.isPlayer) { stick.ty = v.yaw; stick.tp = 0.3; $('hint').hidden = true; }
     }
     return;
@@ -2707,8 +2781,8 @@ function updatePlane(v, dt, ctl) {
     rollT = clamp(v.yawRate / D.turn, -1, 1);
   }
   if (v.falling) v.roll += 2.6 * dt; else v.roll += (rollT - v.roll) * Math.min(1, dt * (turn === null ? 4 : 3));
-  if (op && !v.falling) v.thr = clamp(v.thr + ctl.f * 0.6 * dt, 0.62, 1);
-  v.speed += clamp(D.vmax * (v.falling ? 1 : v.thr) - v.speed, -6 * dt, 7 * dt) - Math.sin(v.pitch) * 10 * dt;
+  if (op && !v.falling) v.thr = clamp(v.thr + ctl.f * 0.55 * dt, 0, 1);
+  v.speed += clamp(D.vmax * (v.falling ? 1 : 0.58 + 0.42 * v.thr) - v.speed, -6 * dt, 7 * dt) - Math.sin(v.pitch) * 10 * dt;       // al ralentí planea despacio, justo por encima de la pérdida, para poder aterrizar
   v.speed = clamp(v.speed, 18, D.vmax * 1.25);
   if (v.speed < 24 && !v.falling) v.pitch -= 0.9 * dt;
   const cp = Math.cos(v.pitch), fx = -Math.sin(v.yaw) * cp, fy = Math.sin(v.pitch), fz = -Math.cos(v.yaw) * cp;
@@ -2727,7 +2801,7 @@ function updatePlane(v, dt, ctl) {
   const g2 = Math.max(groundAt(v.x, v.z), waterY);
   if (v.y <= g2 + 0.05) {
     if (v.assistT > 2 && !v.falling) v.y = g2 + 0.06;      // en el ascenso inicial nunca cuenta como aterrizaje (antes, con muchos fotogramas por segundo, el avión se quedaba pegado a la pista)
-    else if (!v.falling && fy * v.speed > -9 && v.pitch > -0.4 && v.speed < D.vmax * 1.1 && terrainH(v.x, v.z) > waterY + 0.2 && slopeAt(v.x, v.z) < 0.35 && !insideSolid(v.x, v.z, 0.5)) { v.air = false; v.rollout = true; v.y = g2; v.pitch = 0.03; v.roll = 0; }
+    else if (!v.falling && fy * v.speed > -9 && v.pitch > -0.4 && v.speed < D.vmax * 1.1 && terrainH(v.x, v.z) > waterY + 0.2 && slopeAt(v.x, v.z) < 0.35 && !insideSolid(v.x, v.z, 0.5)) { v.air = false; v.rollout = true; v.y = g2; v.pitch = 0.03; v.roll = 0; if (op && op.isPlayer) v.thr = 0; }
     else crashPlane(v);
   } else for (const b of gridA[cellOf(v.x, v.z)]) if (v.x > b.x0 && v.x < b.x1 && v.z > b.z0 && v.z < b.z1 && v.y + 1 > b.y0 && v.y < b.y1) { crashPlane(v); break; }
 }
@@ -2744,14 +2818,17 @@ function updateVehicles(dt) {
       }
     }
     const ctl = _ctl, drv = v.driver;
-    ctl.f = 0; ctl.r = 0; ctl.fire = false; ctl.fire2 = false; ctl.bomb = false; ctl.aimYaw = v.kind === 'tank' ? v.tyaw : v.yaw; ctl.aimPitch = 0; ctl.turn = null;
+    ctl.f = 0; ctl.r = 0; ctl.fire = false; ctl.fire2 = false; ctl.bomb = false; ctl.aimYaw = v.kind === 'tank' ? v.tyaw : v.yaw; ctl.aimPitch = 0; ctl.turn = null; ctl.brake = false;
     if (v.aiOn && !drv) { v.aiOn = false; v.crew.alive = false; v.launchT = 3; }
     if (drv && drv.isPlayer) {
       if (game.state === 'play') {
         const k = input.keys;
         ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, -1, 1); ctl.r = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1);
         ctl.fire = input.fire; ctl.fire2 = input.aim; ctl.bomb = input.bomb; ctl.aimYaw = drv.yaw; ctl.aimPitch = drv.pitch;
-        if (v.kind === 'plane') { ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.turn = 1; }       // turn = 1 marca el pilotaje suave del jugador
+        if (v.kind === 'plane') {       // caza: motor con W y S (o los botones «Motor»), frenos con B; turn = 1 marca el pilotaje suave del jugador
+          ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.turn = 1;
+          ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + input.thr, -1, 1); ctl.brake = !!(k.KeyB || input.brake || (k.KeyS && v.thr <= 0.01));
+        }
       }
       input.bomb = false;
     } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); }
@@ -2803,6 +2880,7 @@ function nearAA(p) {
 }
 function manAA(p, a) {
   a.driver = p; p.aa = a; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
+  gyroSync();
   if (!game.vehTold[a.home.t]) { game.vehTold[a.home.t] = true; pushCard(a.def.name, a.def.hist); }
   SFX.click();
 }
@@ -2902,7 +2980,7 @@ function deployPlayer() {
   let tgt = null, bd = 1e9;
   for (const o of FLAGS) if (o.owner !== game.team) { const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd) { bd = d; tgt = o; } }
   P.yaw = tgt ? Math.atan2(-(tgt.x - P.x), -(tgt.z - P.z)) : 0; P.pitch = 0; P.onGround = true;
-  game.state = 'play'; game.firstDeploy = false; uiShowPlay(); tryLock();
+  game.state = 'play'; game.firstDeploy = false; gyroSync(); uiShowPlay(); tryLock();
   if (sv) { P.x = sv.x; P.z = sv.z; P.y = sv.y; takeVehicle(P, sv); }       // sale ya dentro del vehículo elegido en el mapa
   game.selVeh = null;
 }
@@ -3053,7 +3131,7 @@ function update(dt) {
 
 /* ============ dibujado ============ */
 const VP = M4.create(), PROJ = M4.create(), VIEW = M4.create(), CAMW = M4.create(), FPVP = M4.create(), TMP = M4.create();
-const cam = { x: 0, y: 60, z: 0, yaw: 0, pitch: -0.4 };
+const cam = { x: 0, y: 60, z: 0, yaw: 0, pitch: -0.4, roll: 0 };
 const SUN = (() => { const l = Math.hypot(0.45, 0.8, 0.35); return [0.45 / l, 0.8 / l, 0.35 / l]; })();
 let cw = 0, ch = 0, dpr = 1;
 function resize() {
@@ -3096,7 +3174,9 @@ function render(dt) {
   listener.x = cam.x; listener.y = cam.y; listener.z = cam.z; listener.yaw = cam.yaw;
   const asp = canvas.width / canvas.height;
   M4.perspective(PROJ, fov, asp, 0.15, 3200);
-  M4.identity(VIEW); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z);
+  /* con el giroscopio, la cámara también se ladea con el teléfono para que el horizonte del juego siga nivelado con el real */
+  cam.roll = P && P.alive && (game.state === 'play' || game.state === 'pause') && !(P.veh && P.veh.kind !== 'tank') ? (P.roll || 0) : 0;
+  M4.identity(VIEW); M4.rotZ(VIEW, -cam.roll); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z);
   M4.mul(VP, PROJ, VIEW);
   const fg = world.fog;
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -3130,7 +3210,7 @@ function render(dt) {
     gl.clear(gl.DEPTH_BUFFER_BIT);
     M4.perspective(PROJ, FP_FOV, asp, 0.03, 12); M4.mul(FPVP, PROJ, VIEW); gl.uniformMatrix4fv(U.uVP, false, FPVP);
     matState(1, 1, 0.05);
-    M4.identity(CAMW); M4.translate(CAMW, cam.x, cam.y, cam.z); M4.rotY(CAMW, cam.yaw); M4.rotX(CAMW, cam.pitch);
+    M4.identity(CAMW); M4.translate(CAMW, cam.x, cam.y, cam.z); M4.rotY(CAMW, cam.yaw); M4.rotX(CAMW, cam.pitch); M4.rotZ(CAMW, cam.roll);
     drawFpWeapon(CAMW);
   }
   drawOverlay(dt);
@@ -3285,6 +3365,7 @@ function renderClassCard() {
 function uiShowDeploy() {
   const T = TEAM[game.team];
   $('hud').hidden = true; $('ov').hidden = true; $('touch').hidden = true; $('score').hidden = true; $('pause').hidden = true; $('deploy').hidden = false;
+  document.body.classList.remove('fly'); $('flyHud').hidden = true; input.thr = 0; input.brake = false;
   if (game.firstDeploy) { $('depTitle').textContent = T.army; $('depSub').textContent = T.unit + '. ' + T.brief; }
   else { $('depTitle').textContent = 'Has caído'; $('depSub').textContent = (game.killer ? 'Te alcanzó ' + game.killer.name + (game.killCause ? ' (' + game.killCause.charAt(0).toLowerCase() + game.killCause.slice(1) + ')' : '') + '. ' : game.killCause ? game.killCause + '. ' : '') + 'Elige posición y vuelve al frente.'; }
   $('classes').innerHTML = CLASSES[game.team].map((c, i) => '<button type="button" data-i="' + i + '"><strong>' + c.name + '</strong><span>' + WEAPONS[c.w].name + '</span></button>').join('');
@@ -3314,7 +3395,7 @@ function uiDeployTick() {
 function uiShowPlay() {
   $('deploy').hidden = true; $('hud').hidden = false; $('ov').hidden = false; $('touch').hidden = !input.touch; hudT = 0;
   if (!input.touch && !input.pad && !input.locked && input.lockFails < 2) showHint('Haz clic en la escena para apuntar con el ratón. Esc pone el juego en pausa.');
-  else if (input.touch && !uiShowPlay.told) { uiShowPlay.told = true; showHint(innerHeight > innerWidth ? 'Gira el teléfono: en horizontal se ve y se maneja mejor. En Pausa eliges si apuntas con el giroscopio.' : 'Izquierda: moverte. Derecha: mirar. En Pausa eliges si apuntas con el giroscopio.'); }
+  else if (input.touch && !uiShowPlay.told) { uiShowPlay.told = true; showHint(innerHeight > innerWidth ? 'Gira el teléfono: en horizontal se ve y se maneja mejor. En Pausa puedes activar el giroscopio para mirar moviendo el móvil.' : 'Izquierda: moverte. Derecha: mirar. En Pausa puedes activar el giroscopio para mirar moviendo el móvil.'); }
 }
 function showHint(t) { const h = $('hint'); h.textContent = t; h.hidden = false; clearTimeout(showHint.t); showHint.t = setTimeout(() => { h.hidden = true; }, 6000); }
 function uiResetMatch() {
@@ -3361,7 +3442,7 @@ function uiPad() {
 function uiOpts() {
   document.querySelectorAll('[data-gyro]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.gyro === '1') === opts.gyro ? 'true' : 'false'));
   const st = gyro.state, n = $('gyroNote');
-  n.textContent = opts.gyro ? (gyro.seen ? 'Giroscopio activo. Gira el teléfono para apuntar; el dedo sigue sirviendo para los ajustes finos.' : 'Esperando datos del giroscopio…')
+  n.textContent = opts.gyro ? (gyro.ok ? 'Giroscopio activo. Mueve el teléfono para mirar a cualquier lado, como en una foto de 360°; arrastra con el dedo para ajustar y usa «Centrar» si quieres fijar el horizonte.' : 'Esperando datos del giroscopio…')
     : st === 'denied' ? 'El navegador no ha dado permiso para usar los sensores de movimiento. Sigues con el control tradicional.'
     : st === 'none' ? 'A esta página no le llegan datos del giroscopio en este dispositivo o navegador. Sigues con el control tradicional.'
     : 'Apuntas arrastrando el dedo por la mitad derecha de la pantalla.';
@@ -3398,7 +3479,7 @@ function uiTick(dt) {
     $('wName').textContent = v.name;
     if (v.kind === 'truck') { $('ammo').textContent = Math.round(Math.abs(v.speed) * 3.6) + ' km/h'; $('extra').textContent = input.touch ? 'Toca Bajar para apearte' : input.pad ? 'X para bajar' : 'E para bajar'; }
     else if (v.kind === 'tank') { $('ammo').textContent = v.def.cannon ? (v.fireT > 0 ? 'Cargando' : 'Cañón listo') : 'Ametralladoras'; $('extra').textContent = 'Blindaje ' + st + (v.def.cannon ? (input.touch ? ' · Apuntar: ametralladora' : input.pad ? ' · LT: ametralladora' : ' · clic derecho: ametralladora') : ''); }
-    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = (v.air ? 'Altura ' + Math.round(v.y - Math.max(groundAt(v.x, v.z), waterY)) + ' m' : 'En tierra') + ' · estado ' + st + (v.def.bombs ? (input.touch ? ' · Granada: bomba' : input.pad ? ' · A: bomba' : ' · G: bomba') : ''); }
+    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = 'Estado ' + st + (v.def.bombs && !input.touch ? (input.pad ? ' · A: bomba' : ' · G: bomba') : ''); }
   }
   else {
     $('wName').textContent = ws.def.name; $('ammo').textContent = p.reloadT > 0 ? 'Recargando' : ws.ammo + ' / ' + ws.reserve;
@@ -3406,8 +3487,17 @@ function uiTick(dt) {
   }
   if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : input.pad ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; } else pr.hidden = true;
   const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
+  const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
+  document.body.classList.toggle('fly', fly); fh.hidden = !fly;
+  $('tbRec').hidden = !(opts.gyro && gyro.ok) || fly || !!(p.veh && p.veh.kind === 'truck');
+  if (fly) {
+    const v = p.veh;
+    $('flySpd').textContent = Math.round(v.speed * 3.6) + ' km/h';
+    $('flyInfo').textContent = 'ALTITUD ' + Math.max(0, Math.round(v.y - Math.max(groundAt(v.x, v.z), waterY))) + ' m · MOTOR ' + Math.round(v.thr * 100) + ' %';
+    $('tbBomb').hidden = !v.def.bombs; $('tbBomb').textContent = 'Bomba ' + v.bombs;
+  }
   const cap = $('capture');
-  if (near) {
+  if (near && !fly) {
     const v = game.team === REP ? near.control : -near.control;
     $('capName').textContent = (near.owner === game.team ? (near.contested ? 'Defiende ' : 'En tu poder: ') : 'Tomando ') + near.name;
     $('capFill').style.width = ((v + 1) * 50).toFixed(0) + '%'; cap.hidden = false;
@@ -3556,7 +3646,7 @@ function buildArchive() {
   $('invY').addEventListener('change', e => { opts.invY = e.target.checked; saveOpts(); });
   $('btnScore').addEventListener('click', () => { const el = $('pauseScore'); el.hidden = !el.hidden; if (!el.hidden) renderScore(el); });
   uiPad();
-  if (opts.gyroSaved && !(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')) setGyro(true);
+  if (opts.gyroSaved && window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission !== 'function') setGyro(true);
   uiOpts();
   const toMenu = uiToMenu;
   $('btnQuit').addEventListener('click', toMenu); $('btnAgain').addEventListener('click', toMenu);
