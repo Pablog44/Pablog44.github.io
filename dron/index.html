@@ -137,6 +137,21 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 #bGo:active{transform:translate(2px,3px);box-shadow:2px 2px 0 var(--ink)}
 #bRestart{height:48px;padding:0 18px;font-size:16px;font-weight:600;border:3px solid var(--ink);border-radius:16px;background:var(--paper);box-shadow:3px 3px 0 var(--ink);cursor:pointer;display:none}
 #padInfo{font-size:13px;color:var(--muted)}
+#card{touch-action:pan-y}
+#tune{margin-top:16px;padding-top:14px;border-top:3px dashed rgba(127,120,170,.45)}
+.tuneGrid{display:grid;grid-template-columns:1fr 168px;gap:16px;align-items:start}
+@media (max-width:560px){.tuneGrid{grid-template-columns:1fr}#curveBox{max-width:220px}}
+.sl{display:block;padding:6px 10px 2px;border-radius:12px;border:2px solid transparent;margin-bottom:4px;cursor:pointer}
+.sl.focus{border-color:var(--ink);background:rgba(255,210,63,.28)}
+.sl span{display:flex;justify-content:space-between;gap:8px;font-size:14px;font-weight:600}
+.sl span b{font-variant-numeric:tabular-nums;min-width:48px;text-align:right}
+.sl small{display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:1px}
+.sl input{width:100%;height:28px;margin:2px 0 0;accent-color:#ff6b57;touch-action:none}
+#curveBox{background:var(--paper);border:3px solid var(--ink);border-radius:14px;padding:6px 6px 4px;box-shadow:3px 3px 0 var(--ink)}
+#curveBox h4{margin:0 0 2px;font-size:13px;font-weight:600;text-align:center}
+#curve{display:block;width:100%;height:auto;color:var(--txt)}
+#curveBox p{margin:2px 0 0;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.3}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 0 0;line-height:1.4}
 #result{display:none;margin:0 0 14px;padding:10px 14px;border:3px dashed var(--ink);border-radius:14px;font-size:17px}
 #result b{font-size:22px}
 #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:18px;background:var(--sky);color:#1f1b3a}
@@ -219,6 +234,31 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
       <div class="help" id="help"></div>
     </div>
   </div>
+  <div id="tune">
+    <h3>Ajustes del mando</h3>
+    <div class="tuneGrid">
+      <div>
+        <label class="sl" data-i="0"><span>Suavidad del gas <b id="vThrExpo">65 %</b></span><small>Más alto: el centro del stick responde suave y la potencia fuerte queda para el final</small><input type="range" id="sThrExpo" min="0" max="95" step="5" aria-label="Suavidad del gas"></label>
+        <label class="sl" data-i="1"><span>Sensibilidad de giro <b id="vRate">100 %</b></span><small>Cuánto se inclina y gira el dron con el stick a tope</small><input type="range" id="sRate" min="40" max="150" step="5" aria-label="Sensibilidad de giro"></label>
+        <label class="sl" data-i="2"><span>Zona muerta del mando <b id="vDead">8 %</b></span><small>Ignora pequeños movimientos del stick en reposo</small><input type="range" id="sDead" min="0" max="25" step="1" aria-label="Zona muerta del mando"></label>
+        <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo. Los cambios se guardan solos.</p>
+      </div>
+      <div id="curveBox">
+        <h4>Respuesta del gas</h4>
+        <svg id="curve" viewBox="0 0 150 128" aria-label="Gráfica de la curva de gas">
+          <rect x="22" y="6" width="122" height="100" rx="4" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="1.5"/>
+          <line x1="83" y1="6" x2="83" y2="106" stroke="currentColor" stroke-opacity=".15" stroke-width="1"/>
+          <line id="cvHover" x1="22" x2="144" stroke="#3ddc97" stroke-width="2" stroke-dasharray="4 3"/>
+          <path id="cvLin" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <path id="cvPath" fill="none" stroke="#ff6b57" stroke-width="3" stroke-linecap="round"/>
+          <circle id="cvDot" r="5" fill="#ffd23f" stroke="#1f1b3a" stroke-width="2"/>
+          <text x="83" y="121" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">posición del stick</text>
+          <text x="10" y="56" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7" transform="rotate(-90 10 56)">potencia</text>
+        </svg>
+        <p>Línea roja: tu curva. Gris: sin suavizar. Verde: punto de vuelo estático.</p>
+      </div>
+    </div>
+  </div>
   <div id="goRow"><button id="bGo">Despegar</button><button id="bRestart">Reiniciar vuelo</button><span id="padInfo">Conecta un mando y pulsa cualquier botón.</span></div>
 </div></div>
 <div id="err">No se pudo cargar three.js. Revisa la conexión y recarga la página.</div>
@@ -264,7 +304,7 @@ const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHei
 const hemi = new THREE.HemisphereLight(0xe6f3ff, 0x9a8468, 0.62); scene.add(hemi);
 const amb = new THREE.AmbientLight(0xffffff, 0.2); scene.add(amb);
 const sun = new THREE.DirectionalLight(0xfff0d2, 0.95);
-sun.position.set(9, 13, 10); sun.target.position.set(0, 2.2, 0);
+sun.position.set(9.5, 13, 10); sun.target.position.set(0.5, 2.2, 0);
 sun.castShadow = true;
 sun.shadow.mapSize.set(isMobile?1024:2048, isMobile?1024:2048);
 const sc = sun.shadow.camera; sc.left=-10; sc.right=10; sc.top=10; sc.bottom=-10; sc.near=2; sc.far=45; sc.updateProjectionMatrix();
@@ -465,6 +505,8 @@ MAT.curtCheck = MT(checkerTex('#ffffff','#e05a4f',4,'rgba(0,0,0,0)'), 0.5);
 
 /* ============ Constructor estático ============ */
 let parts = [];
+const EX = 1.0;   // ensanche del ala este (recibidor más ancho)
+let SX = 0;       // desplazamiento x activo mientras se construye el ala este
 const colliders = [];
 const UBOX = new THREE.BoxGeometry(1,1,1);
 const USPH = {}; function sphGeo(seg){ return USPH[seg] || (USPH[seg] = new THREE.SphereGeometry(1, seg, Math.max(6, seg*0.66|0))); }
@@ -473,10 +515,10 @@ const UPLANE = new THREE.PlaneGeometry(1,1);
 const _e = new THREE.Euler(), _qq = new QT(), _pp = new V3(), _ss = new V3();
 function addPart(geo, mat, x,y,z, rx,ry,rz, sx,sy,sz){
   const m = new THREE.Matrix4(); _e.set(rx||0,ry||0,rz||0); _qq.setFromEuler(_e);
-  m.compose(_pp.set(x,y,z), _qq, _ss.set(sx===undefined?1:sx, sy===undefined?1:sy, sz===undefined?1:sz));
+  m.compose(_pp.set(x+SX,y,z), _qq, _ss.set(sx===undefined?1:sx, sy===undefined?1:sy, sz===undefined?1:sz));
   parts.push({geo, mat, m});
 }
-function col(x1,y1,z1,x2,y2,z2){ colliders.push({x1:Math.min(x1,x2), y1:Math.min(y1,y2), z1:Math.min(z1,z2), x2:Math.max(x1,x2), y2:Math.max(y1,y2), z2:Math.max(z1,z2)}); }
+function col(x1,y1,z1,x2,y2,z2){ colliders.push({x1:Math.min(x1,x2)+SX, y1:Math.min(y1,y2), z1:Math.min(z1,z2), x2:Math.max(x1,x2)+SX, y2:Math.max(y1,y2), z2:Math.max(z1,z2)}); }
 function B(x1,y1,z1,x2,y2,z2,mat,collide){
   if(x2<x1){const t=x1;x1=x2;x2=t;} if(y2<y1){const t=y1;y1=y2;y2=t;} if(z2<z1){const t=z1;z1=z2;z2=t;}
   const w=x2-x1,h=y2-y1,d=z2-z1; if(w<1e-4||h<1e-4||d<1e-4) return;
@@ -653,11 +695,11 @@ function tableLamp(x,y,z,f,shade){
   Cyl(x,y,z,0.06,0.075,0.03,MAT.brass,16); Cyl(x,y+0.03,z,0.012,0.012,0.22,MAT.brass,8);
   Cyl(x,y+0.19,z,0.08,0.13,0.17,shade||MAT.shade,18,false,true); Sph(x,y+0.24,z,0.03,MB(0xfff4cc));
   col(x-0.13,y,z-0.13,x+0.13,y+0.36,z+0.13);
-  lamps.push({x,y:y+0.26,z,f,i:0.45});
+  lamps.push({x:x+SX,y:y+0.26,z,f,i:0.45});
 }
 function ceilLight(x,y,z,f,kind){
-  if(kind==='pendant'){ Cyl(x,y-0.75,z,0.006,0.006,0.75,MAT.black,6); Cyl(x,y-0.95,z,0.07,0.24,0.22,MC(0xff6b57,{side:THREE.DoubleSide}),20,false,true); Sph(x,y-0.9,z,0.05,MB(0xfff4cc)); col(x-0.24,y-0.97,z-0.24,x+0.24,y-0.73,z+0.24); lamps.push({x,y:y-0.95,z,f,i:0.8}); }
-  else { Sph(x,y-0.005,z,0.2,MB(0xfff8dc),1,0.28,1); Cyl(x,y-0.012,z,0.22,0.22,0.012,MAT.trim,24); lamps.push({x,y:y-0.12,z,f,i:0.75}); }
+  if(kind==='pendant'){ Cyl(x,y-0.75,z,0.006,0.006,0.75,MAT.black,6); Cyl(x,y-0.95,z,0.07,0.24,0.22,MC(0xff6b57,{side:THREE.DoubleSide}),20,false,true); Sph(x,y-0.9,z,0.05,MB(0xfff4cc)); col(x-0.24,y-0.97,z-0.24,x+0.24,y-0.73,z+0.24); lamps.push({x:x+SX,y:y-0.95,z,f,i:0.8}); }
+  else { Sph(x,y-0.005,z,0.2,MB(0xfff8dc),1,0.28,1); Cyl(x,y-0.012,z,0.22,0.22,0.012,MAT.trim,24); lamps.push({x:x+SX,y:y-0.12,z,f,i:0.75}); }
 }
 function plant(x,y,z,s){ s=s||1; Cyl(x,y,z,0.16*s,0.12*s,0.3*s,MC(0xc8643b),14,true); Cyl(x,y+0.28*s,z,0.15*s,0.15*s,0.02*s,MC(0x4a2f1c),14);
   for(let i=0;i<7;i++){ const a=i/7*Math.PI*2; Sph(x+Math.cos(a)*0.12*s, y+(0.45+rnd()*0.25)*s, z+Math.sin(a)*0.12*s, 0.14*s, MC(pick([0x3f9a4a,0x4cae55,0x2f8a3f])), 1,1.3,1, 8); }
@@ -672,89 +714,102 @@ function ceilingFan(x,z,ceilY,f){
   Cyl(x,ceilY-0.05,z,0.075,0.05,0.05,MAT.brass,16); Cyl(x,ceilY-0.24,z,0.015,0.015,0.2,MAT.brass,8);
   Cyl(x,ceilY-0.36,z,0.13,0.11,0.12,MAT.brass,20); Sph(x,ceilY-0.39,z,0.1,MB(0xfff4d6),1,0.55,1);
   col(x-0.13,ceilY-0.45,z-0.13,x+0.13,ceilY,z+0.13);
-  const g = new THREE.Group(); g.position.set(x,ceilY-0.28,z); scene.add(g);
+  const g = new THREE.Group(); g.position.set(x+SX,ceilY-0.28,z); scene.add(g);
   const bm = new THREE.MeshPhongMaterial({map:texWoodDark, shininess:20});
   for(let i=0;i<5;i++){ const piv=new THREE.Group(); piv.rotation.y=i*Math.PI*2/5; const bl=new THREE.Mesh(UBOX,bm); bl.scale.set(0.5,0.012,0.13); bl.position.set(0.38,0,0); bl.rotation.x=0.12; bl.castShadow=true; piv.add(bl);
     const ir=new THREE.Mesh(UBOX,MAT.brass); ir.scale.set(0.12,0.012,0.04); ir.position.set(0.12,0.004,0); piv.add(ir); g.add(piv); }
-  fans.push({g,x,y:ceilY-0.28,z,R:0.63,omega:11});
-  lamps.push({x,y:ceilY-0.45,z,f,i:0.85});
+  fans.push({g,x:x+SX,y:ceilY-0.28,z,R:0.63,omega:11});
+  lamps.push({x:x+SX,y:ceilY-0.45,z,f,i:0.85});
 }
 
 function buildHouse(){
-  const TE=0.2, TI=0.12, F1=0, C1=2.7, F2=2.9, C2=5.6;
-  // --- losas y suelos
-  B(-6.1,-0.25,-5.1,6.1,-0.012,5.1,MAT.ceil); col(-6.1,-0.4,-5.1,6.1,0,5.1);
+  const TE=0.2, TI=0.12, F1=0, C1=2.7, F2=2.9, C2=5.6, XE=6.1+EX;
+  // --- losas y suelos (la casa mide ahora de x=-6.1 a x=7.1)
+  B(-6.1,-0.25,-5.1,XE,-0.012,5.1,MAT.ceil); col(-6.1,-0.4,-5.1,XE,0,5.1);
   B(-6,-0.012,0,-0.5,0,5,MAT.wood); B(-6,-0.012,-5,-0.5,0,0,MAT.wood);
-  B(-0.5,-0.012,-5,2.2,0,5,MAT.woodDark); B(2.2,-0.012,-2,6,0,5,MAT.tileK); B(2.2,-0.012,-5,6,0,-2,MAT.concrete);
+  B(-0.5,-0.012,-5,2.2+EX,0,5,MAT.woodDark);
+  const ZS=3.8, ZT=ZS-13*0.27;   // escalera: primer peldaño en z=3.8 (1,1 m libre hasta la fachada), llegada en z=0.29
   const s2=(x1,z1,x2,z2)=>{ B(x1,C1,z1,x2,2.888,z2,MAT.ceil); col(x1,C1,z1,x2,F2,z2); };
-  s2(-6.1,-5.1,6.1,0.99); s2(-6.1,0.99,0.8,5.1); s2(2.14,0.99,6.1,5.1); s2(0.8,4.5,2.14,5.1);
+  s2(-6.1,-5.1,XE,ZT); s2(-6.1,ZT,0.8,5.1); s2(2.14,ZT,XE,5.1); s2(0.8,ZS,2.14,5.1);
   const ff=(x1,z1,x2,z2,m)=>B(x1,2.888,z1,x2,F2,z2,m);
-  ff(-6,0,-0.5,5,MAT.carpetBlue); ff(-6,-5,-0.5,0,MAT.woodLight); ff(-0.5,-5,0.8,5,MAT.carpetBeige); ff(0.8,-5,2.2,0.99,MAT.carpetBeige); ff(0.8,4.5,2.2,5,MAT.carpetBeige);
-  ff(2.2,-5,6,-1.5,MAT.tileB); ff(2.2,-1.5,6,5,MAT.carpetGreen);
-  B(-6.1,C2,-5.1,6.1,5.8,5.1,MAT.ceil); col(-6.1,C2,-5.1,6.1,6.2,5.1);
+  ff(-6,0,-0.5,5,MAT.carpetBlue); ff(-6,-5,-0.5,0,MAT.woodLight); ff(-0.5,-5,0.8,5,MAT.carpetBeige); ff(0.8,-5,2.2+EX,ZT,MAT.carpetBeige);
+  ff(0.8,ZS,2.14,5,MAT.carpetBeige); ff(2.14,ZT,2.2+EX,5,MAT.carpetBeige);
+  B(-6.1,C2,-5.1,XE,5.8,5.1,MAT.ceil); col(-6.1,C2,-5.1,XE,6.2,5.1);
 
-  // --- planta baja: exteriores
+  // --- planta baja: oeste y recibidor (ahora 3,7 m de ancho)
   wall('z',5,-6.1,-0.5,F1,C1,TE,MAT.wLiving,MAT.ext,[win(-5.2,-3.9,0.85,2.1,-1,MAT.curtRed,true), win(-2.6,-1.3,0.85,2.1,-1,MAT.curtRed,true)]);
-  wall('z',5,-0.5,2.2,F1,C1,TE,MAT.wHall,MAT.ext,[{a:-0.35,b:0.65,bot:0,top:2.15,k:'front'}]);
-  wall('z',5,2.2,6.1,F1,C1,TE,MAT.wKitchen,MAT.ext,[win(3.3,4.9,1.05,2.05,-1,null,false)]);
+  wall('z',5,-0.5,2.2+EX,F1,C1,TE,MAT.wHall,MAT.ext,[{a:-0.35,b:0.65,bot:0,top:2.15,k:'front'}, win(2.4,3.0,0.9,2.1,-1,null,false)]);
   wall('z',-5,-6.1,-0.5,F1,C1,TE,MAT.ext,MAT.wDining,[win(-4.3,-2.3,0.85,2.1,1,MAT.curtGold,false)]);
-  wall('z',-5,-0.5,2.2,F1,C1,TE,MAT.ext,MAT.wHall,[{a:0.2,b:1.6,bot:0.02,top:2.15,k:'win',side:1}]);
-  wall('z',-5,2.2,6.1,F1,C1,TE,MAT.ext,MAT.wUtility,[win(3.6,4.8,1.2,2.0,1,null,false)]);
+  wall('z',-5,-0.5,2.2+EX,F1,C1,TE,MAT.ext,MAT.wHall,[{a:0.6,b:2.0,bot:0.02,top:2.15,k:'win',side:1}]);
   wall('x',-6,-5.1,0,F1,C1,TE,MAT.ext,MAT.wDining,[win(-3.4,-1.6,0.85,2.1,1,MAT.curtGold,false)]);
   wall('x',-6,0,5.1,F1,C1,TE,MAT.ext,MAT.wLiving,[win(1.4,2.8,1.0,2.1,1,MAT.curtRed,false)]);
-  wall('x',6,-5.1,-2,F1,C1,TE,MAT.wUtility,MAT.ext,[]);
-  wall('x',6,-2,5.1,F1,C1,TE,MAT.wKitchen,MAT.ext,[win(1.2,2.6,1.05,2.05,-1,null,false)]);
-  // interiores
   wall('z',0,-5.9,-0.5,F1,C1,TI,MAT.wDining,MAT.wLiving,[{a:-3.9,b:-1.4,bot:0,top:2.3,k:'arch'}]);
   wall('x',-0.5,-4.9,0,F1,C1,TI,MAT.wDining,MAT.wHall,[door(-3.6,-2.4)]);
   wall('x',-0.5,0,4.9,F1,C1,TI,MAT.wLiving,MAT.wHall,[door(3.2,4.4)]);
+  // --- planta baja: ala este (cocina y lavadero), desplazada EX hacia el este
+  SX=EX;
+  B(2.2,-0.012,-2,6,0,5,MAT.tileK); B(2.2,-0.012,-5,6,0,-2,MAT.concrete);
+  wall('z',5,2.2,6.1,F1,C1,TE,MAT.wKitchen,MAT.ext,[win(3.3,4.9,1.05,2.05,-1,null,false)]);
+  wall('z',-5,2.2,6.1,F1,C1,TE,MAT.ext,MAT.wUtility,[win(3.6,4.8,1.2,2.0,1,null,false)]);
+  wall('x',6,-5.1,-2,F1,C1,TE,MAT.wUtility,MAT.ext,[]);
+  wall('x',6,-2,5.1,F1,C1,TE,MAT.wKitchen,MAT.ext,[win(1.2,2.6,1.05,2.05,-1,null,false)]);
   wall('x',2.2,-4.9,-2,F1,C1,TI,MAT.wHall,MAT.wUtility,[]);
   wall('x',2.2,-2,4.9,F1,C1,TI,MAT.wHall,MAT.wKitchen,[door(-1.6,-0.4)]);
   wall('z',-2,2.2,5.9,F1,C1,TI,MAT.wUtility,MAT.wKitchen,[door(3.4,4.6)]);
+  SX=0;
 
-  // --- planta alta
+  // --- planta alta: oeste y pasillo
   wall('z',5,-6.1,-0.5,F2,C2,TE,MAT.wMaster,MAT.ext,[win(-5,-3.8,0.9,2.1,-1,MAT.curtBlue,true), win(-2.6,-1.4,0.9,2.1,-1,MAT.curtBlue,true)]);
-  wall('z',5,-0.5,2.2,F2,C2,TE,MAT.wHall,MAT.ext,[win(-0.3,0.6,0.9,2.1,-1,null,false)]);
-  wall('z',5,2.2,6.1,F2,C2,TE,MAT.wPlay,MAT.ext,[win(3.4,4.8,0.9,2.1,-1,MAT.curtStar,false)]);
+  wall('z',5,-0.5,2.2+EX,F2,C2,TE,MAT.wHall,MAT.ext,[win(-0.3,0.6,0.9,2.1,-1,null,false), win(2.4,3.0,0.9,2.1,-1,null,false)]);
   wall('z',-5,-6.1,-0.5,F2,C2,TE,MAT.ext,MAT.wKid,[win(-4,-2.4,0.9,2.1,1,MAT.curtGreen,false)]);
-  wall('z',-5,-0.5,2.2,F2,C2,TE,MAT.ext,MAT.wHall,[win(-0.35,0.45,0.9,2.1,1,null,false)]);
-  wall('z',-5,2.2,6.1,F2,C2,TE,MAT.ext,MAT.wBath,[win(3.6,4.6,1.3,2.1,1,null,false,true)]);
+  wall('z',-5,-0.5,2.2+EX,F2,C2,TE,MAT.ext,MAT.wHall,[win(-0.35,0.45,0.9,2.1,1,null,false), win(2.4,3.0,0.9,2.1,1,null,false)]);
   wall('x',-6,-5.1,0,F2,C2,TE,MAT.ext,MAT.wKid,[win(-3.2,-1.8,0.9,2.1,1,MAT.curtGreen,false)]);
   wall('x',-6,0,5.1,F2,C2,TE,MAT.ext,MAT.wMaster,[win(3.9,4.7,0.9,2.1,1,null,false)]);
-  wall('x',6,-5.1,-1.5,F2,C2,TE,MAT.wBath,MAT.ext,[]);
-  wall('x',6,-1.5,5.1,F2,C2,TE,MAT.wPlay,MAT.ext,[win(1,2.5,0.9,2.1,-1,MAT.curtStar,false)]);
   wall('z',0,-5.9,-0.5,F2,C2,TI,MAT.wKid,MAT.wMaster,[door(-5,-4)]);
   wall('x',-0.5,-4.9,0,F2,C2,TI,MAT.wKid,MAT.wHall,[door(-1.7,-0.6)]);
   wall('x',-0.5,0,4.9,F2,C2,TI,MAT.wMaster,MAT.wHall,[door(3.4,4.4)]);
+  // --- planta alta: ala este (baño y cuarto de juegos)
+  SX=EX;
+  ff(2.2,-5,6,-1.5,MAT.tileB); ff(2.2,-1.5,6,5,MAT.carpetGreen);
+  wall('z',5,2.2,6.1,F2,C2,TE,MAT.wPlay,MAT.ext,[win(3.4,4.8,0.9,2.1,-1,MAT.curtStar,false)]);
+  wall('z',-5,2.2,6.1,F2,C2,TE,MAT.ext,MAT.wBath,[win(3.6,4.6,1.3,2.1,1,null,false,true)]);
+  wall('x',6,-5.1,-1.5,F2,C2,TE,MAT.wBath,MAT.ext,[]);
+  wall('x',6,-1.5,5.1,F2,C2,TE,MAT.wPlay,MAT.ext,[win(1,2.5,0.9,2.1,-1,MAT.curtStar,false)]);
   wall('x',2.2,-4.9,-1.5,F2,C2,TI,MAT.wHall,MAT.wBath,[door(-3,-2)]);
   wall('x',2.2,-1.5,4.9,F2,C2,TI,MAT.wHall,MAT.wPlay,[door(-1.3,-0.2)]);
   wall('z',-1.5,2.2,5.9,F2,C2,TI,MAT.wBath,MAT.wPlay,[]);
+  SX=0;
 
-  // --- escalera (13 peldaños, de z=4.5 hacia el norte)
-  const NS=13, SH=F2/NS, SD=0.27, Z0=4.5, SX1=0.8, SX2=2.14;
+  // --- escalera exenta en el centro del recibidor (13 peldaños, de z=ZS hacia el norte)
+  const NS=13, SH=F2/NS, SD=0.27, Z0=ZS, SX1=0.8, SX2=2.14;
+  const DZ1=Z0-2.15, DZ2=Z0-1.45;   // puerta del trastero bajo la escalera
   for(let i=0;i<NS;i++){
     const zb=Z0-i*SD, za=Z0-(i+1)*SD, top=(i+1)*SH;
     B(SX1,0,za,SX2,top-0.035,zb,MAT.paint);
-    B(SX1-0.02,top-0.035,za,SX2,top,zb+0.025,MAT.woodDark);
+    B(SX1-0.02,top-0.035,za,SX2+0.02,top,zb+0.025,MAT.woodDark);
     B(SX1+0.25,top,za,SX2-0.25,top+0.006,zb+0.02,MAT.runner);
     col(SX1,0,za,SX2,top,zb);
-    for(const fz of [0.25,0.75]){ const z=za+SD*fz; B(0.812,top,z-0.014,0.84,top+0.9,z+0.014,MAT.paint); }
-    col(0.8,top,za,0.855,top+0.95,zb);
+    for(const fz of [0.25,0.75]){ const z=za+SD*fz; B(0.812,top,z-0.014,0.84,top+0.9,z+0.014,MAT.paint); B(2.1,top,z-0.014,2.128,top+0.9,z+0.014,MAT.paint); }
+    col(0.8,top,za,0.855,top+0.95,zb); col(2.085,top,za,2.14,top+0.95,zb);
   }
-  // pasamanos inclinado
+  // zanca lateral a ambos lados
+  for(const x of [SX1-0.03, SX2]){ for(let i=0;i<NS;i++){ const zb=Z0-i*SD, za=Z0-(i+1)*SD, top=(i+1)*SH; let yb=Math.max(0,top-0.32); if(x<1 && zb>DZ1-0.02 && za<DZ2+0.02) yb=Math.max(yb,1.27); if(top-0.035>yb) B(x,yb,za,x+0.03,top-0.035,zb,MAT.trim); } }
+  // pasamanos inclinados
   const slope=Math.atan2(SH,SD), hy0=SH+0.92, hz0=Z0-SD*0.5, hy1=F2+0.92, hz1=Z0-SD*(NS-0.5);
   const hl=Math.hypot(hy1-hy0,hz1-hz0);
   addPart(UBOX,MAT.woodDark,0.826,(hy0+hy1)/2,(hz0+hz1)/2,slope,0,0,0.07,0.05,hl+0.1);
-  addPart(UBOX,MAT.woodDark,2.1,(hy0+hy1)/2-0.05,(hz0+hz1)/2,slope,0,0,0.04,0.04,hl);
-  B(0.78,0,4.5,0.87,1.12,4.6,MAT.woodDark,true); Sph(0.825,1.16,4.55,0.055,MAT.woodDark);
+  addPart(UBOX,MAT.woodDark,2.114,(hy0+hy1)/2,(hz0+hz1)/2,slope,0,0,0.07,0.05,hl+0.1);
+  for(const x of [0.825,2.114]){ B(x-0.045,0,Z0,x+0.045,1.12,Z0+0.1,MAT.woodDark,true); Sph(x,1.16,Z0+0.05,0.055,MAT.woodDark); }
   // puerta de trastero bajo la escalera
-  B(0.78,0,2.35,0.8,1.25,3.05,MAT.doorInt); Sph(0.77,0.62,2.45,0.022,MAT.brass);
-  // barandilla planta alta
-  col(0.72,F2,0.99,0.8,F2+0.95,4.56); col(0.8,F2,4.5,2.14,F2+0.95,4.58);
-  B(0.72,F2+0.9,0.99,0.82,F2+0.96,4.58,MAT.woodDark); B(0.72,F2+0.9,4.48,2.14,F2+0.96,4.58,MAT.woodDark);
-  B(0.72,F2,0.95,0.82,F2+1.05,1.05,MAT.woodDark,true);
-  for(let z=1.08; z<4.5; z+=0.12) B(0.755,F2,z-0.012,0.785,F2+0.9,z+0.012,MAT.paint);
-  for(let x=0.9; x<2.14; x+=0.12) B(x-0.012,F2,4.515,x+0.012,F2+0.9,4.545,MAT.paint);
+  B(0.78,0,DZ1,0.8,1.25,DZ2,MAT.doorInt); Sph(0.77,0.62,DZ1+0.1,0.022,MAT.brass);
+  // barandilla planta alta alrededor del hueco (oeste, sur y este)
+  const ZN=ZT, ZSo=Z0;
+  col(0.72,F2,ZN,0.8,F2+0.95,ZSo+0.06); col(0.8,F2,ZSo,2.14,F2+0.95,ZSo+0.08); col(2.14,F2,ZN,2.22,F2+0.95,ZSo+0.08);
+  B(0.72,F2+0.9,ZN,0.82,F2+0.96,ZSo+0.08,MAT.woodDark); B(0.72,F2+0.9,ZSo-0.02,2.22,F2+0.96,ZSo+0.08,MAT.woodDark); B(2.12,F2+0.9,ZN,2.22,F2+0.96,ZSo+0.08,MAT.woodDark);
+  B(0.72,F2,ZN-0.04,0.82,F2+1.05,ZN+0.06,MAT.woodDark,true); B(2.12,F2,ZN-0.04,2.22,F2+1.05,ZN+0.06,MAT.woodDark,true);
+  B(0.72,F2,ZSo-0.02,0.82,F2+1.05,ZSo+0.08,MAT.woodDark); B(2.12,F2,ZSo-0.02,2.22,F2+1.05,ZSo+0.08,MAT.woodDark);
+  for(let z=ZN+0.09; z<ZSo-0.04; z+=0.12){ B(0.755,F2,z-0.012,0.785,F2+0.9,z+0.012,MAT.paint); B(2.155,F2,z-0.012,2.185,F2+0.9,z+0.012,MAT.paint); }
+  for(let x=0.9; x<2.1; x+=0.12) B(x-0.012,F2,ZSo+0.015,x+0.012,F2+0.9,ZSo+0.045,MAT.paint);
 }
 
 function furnish(){
@@ -833,10 +888,18 @@ function furnish(){
   B(-0.44,0,-4.4,-0.05,0.45,-3.75,MAT.furnWood,true); B(-0.4,0.02,-4.35,-0.25,0.12,-4.1,MC(0x333333)); B(-0.4,0.02,-4.0,-0.25,0.1,-3.8,MC(0xff6b57));
   Cyl(0.72,0,4.75,0.1,0.1,0.45,MC(0x3d6fd1),14,true); CylR(0.77,0.6,4.75,0.012,0.012,0.4,MC(0x1f1b3a),6,0,0,0.2); CylR(0.67,0.6,4.73,0.012,0.012,0.4,MC(0xffd23f),6,0.1,0,-0.2);
   B(-0.25,0,4.55,0.55,0.012,4.9,MC(0x7a5a3a));
-  ceilLight(0.15,2.7,-2.2,0); ceilLight(0.15,2.7,3.6,0);
+  ceilLight(0.15,2.7,-2.2,0); ceilLight(0.15,2.7,3.6,0); ceilLight(2.68,2.7,1.8,0);
+  // nuevo hueco al este de la escalera: consola, lámpara, planta y cuadros
+  B(2.8,0,1.6,3.14,0.78,3.0,MAT.furnWood,true); B(2.78,0.78,1.58,3.14,0.81,3.02,MAT.furnDark);
+  for(const z of [1.65,2.32]) { B(2.785,0.12,z,2.8,0.66,z+0.63,MAT.furnLight); Sph(2.775,0.4,z+0.31,0.018,MAT.brass); }
+  tableLamp(2.97,0.81,1.85,0); Cyl(2.97,0.81,2.75,0.07,0.05,0.16,MC(0xff6b57),12); for(let i=0;i<3;i++) Sph(2.97+(i-1)*0.04,1.0,2.75,0.04,MC(pick([0xffd23f,0xffffff,0x3d7dd8])),1,1,1,8);
+  B(2.85,0.81,2.2,3.05,0.84,2.45,MC(0x3ddc97));
+  plant(2.72,0,4.4,0.9);
+  frames('x',3.14,-1,[[2.3,1.6,0.5,0.38],[3.5,1.55,0.3,0.4],[0.6,1.6,0.3,0.4]]);
   frames('x',-0.44,1,[[-1.9,1.55,0.3,0.4],[2.2,1.6,0.4,0.3]]);
 
-  /* ---------- COCINA (x 2.2..6, z -2..5) ---------- */
+  /* ---------- COCINA (x 2.2..6 + EX, z -2..5) ---------- */
+  SX=EX;
   const cab=MC(0xfff4dc), top=MC(0x3a3a44,{shininess:60,specular:0x555555});
   // encimera este
   B(5.35,0,0.2,5.94,0.86,2.9,cab,true); B(5.35,0,3.6,5.94,0.86,4.94,cab,true); B(5.3,0.86,0.15,5.94,0.9,2.9,top,true); B(5.3,0.86,3.6,5.94,0.9,4.94,top,true);
@@ -884,6 +947,7 @@ function furnish(){
   B(5.7,0,-2.4,5.9,1.5,-2.35,MC(0xa5a5a5)); CylR(5.8,0.8,-2.2,0.012,0.012,1.5,MC(0xffd23f),6,0.15,0,0);
   ceilLight(4.1,2.7,-3.5,0);
 
+  SX=0;
   /* ---------- DORMITORIO PRINCIPAL (x -6..-0.5, z 0..5) ---------- */
   Rug(-4.4,2.5,F2,2.6,2.6,rugTex('#e9e0cf','#6f86b8','#b85c5c'));
   bed(-4.78,2.5,F2,1,1.8,2.1,MAT.furnDark,MC(0xfafafa),MC(0x5b7dd6),MC(0xffffff));
@@ -934,9 +998,14 @@ function furnish(){
   B(0.2,5.595,-3.4,0.9,5.6,-2.8,MC(0xeeeeee));
   ceilLight(0.15,5.6,-2.4,1); ceilLight(0.15,5.6,2.8,1);
   frames('x',-0.44,1,[[-2.0,F2+1.5,0.3,0.4],[1.8,F2+1.5,0.4,0.3],[2.5,F2+1.55,0.3,0.4]]);
-  frames('x',2.14,-1,[[-4.0,F2+1.5,0.4,0.3]]);
+  frames('x',2.14+EX,-1,[[-4.0,F2+1.5,0.4,0.3],[2.0,F2+1.5,0.4,0.3],[3.6,F2+1.55,0.3,0.4]]);
+  ceilLight(2.68,5.6,2.6,1);
+  plant(1.0,F2,4.55,0.7); B(1.5,F2,4.62,2.1,F2+0.42,4.88,MAT.furnWood,true); for(let i=0;i<5;i++) B(1.56+i*0.1,F2+0.42,4.66,1.63+i*0.1,F2+0.42+0.18+rnd()*0.08,4.84,MC(pick(BOOKCOL)));
+  frames('z',4.9,-1,[[1.8,F2+1.55,0.5,0.36]]);
+  plant(2.7,F2,0.4,0.7);
 
-  /* ---------- BAÑO (x 2.2..6, z -5..-1.5) ---------- */
+  /* ---------- BAÑO (x 2.2..6 + EX, z -5..-1.5) ---------- */
+  SX=EX;
   const enamel = MC(0xffffff,{shininess:90,specular:0x888888});
   B(4.3,F2,-4.94,5.94,F2+0.08,-4.18,enamel,true);
   B(4.3,F2,-4.94,5.94,F2+0.55,-4.86,enamel,true); B(4.3,F2,-4.26,5.94,F2+0.55,-4.18,enamel,true);
@@ -990,9 +1059,10 @@ function furnish(){
   col(2.35,5.2,3.05,2.9,5.6,3.6);
   Pic('z',4.9,-1,5.45,F2+1.55,0.6,0.45,picAbstract(),MC(0xff6b57));
   ceilLight(4.1,5.6,1.8,1);
+  SX=0;
 }
 function buildTrain(){
-  trainGroup = new THREE.Group(); trainGroup.position.set(3.4,2.9+0.02,1.6); scene.add(trainGroup);
+  trainGroup = new THREE.Group(); trainGroup.position.set(3.4+EX,2.9+0.02,1.6); scene.add(trainGroup);
   const cols=[0xff6b57,0xffd23f,0x3ddc97,0x3d7dd8];
   for(let i=0;i<4;i++){ const a=-i*0.32; const car=new THREE.Mesh(UBOX, MC(cols[i])); car.scale.set(0.09,0.08,0.16); car.position.set(Math.cos(a)*0.72,0.05,Math.sin(a)*0.72*0.6); car.rotation.y=-a; car.castShadow=true; trainGroup.add(car);
     if(i===0){ const ch=new THREE.Mesh(cylGeo(0.02,0.02,8,false),MAT.black); ch.scale.set(1,0.06,1); ch.position.set(Math.cos(a)*0.72,0.12,Math.sin(a)*0.72*0.6); trainGroup.add(ch); } }
@@ -1024,7 +1094,7 @@ function car(x,z,rot,color){
 function buildExterior(){
   const Y=-0.3;
   B(-70,Y-0.2,-70,70,Y,70,MAT.grass);
-  B(-6.25,Y,-5.25,6.25,-0.01,5.25,MAT.concrete);
+  B(-6.25,Y,-5.25,6.25+EX,-0.01,5.25,MAT.concrete);
   // porche y camino
   B(-0.8,Y,5.1,1.1,-0.02,6.3,MAT.sidewalk); B(-0.6,Y,6.3,0.9,-0.16,6.6,MAT.sidewalk);
   B(-0.25,Y,6.6,0.55,Y+0.02,16,MAT.sidewalk);
@@ -1033,9 +1103,9 @@ function buildExterior(){
   for(let x=-68;x<70;x+=4) B(x,Y+0.006,22.3,x+2,Y+0.012,22.5,MC(0xfff3b0));
   B(-70,Y,27,70,Y+0.12,27.2,MC(0xbdb8ad)); B(-70,Y,27.2,70,Y+0.03,28.8,MAT.sidewalk);
   // entrada de coches y coche
-  B(7,Y,2,10,Y+0.025,16,MAT.sidewalk); car(8.5,9,0,0x6fb3e8);
+  B(8,Y,2,11,Y+0.025,16,MAT.sidewalk); car(9.5,9,0,0x6fb3e8);
   // setos delanteros
-  for(const x0 of [-6,1.4]) B(x0,Y,6.2,x0+4.6,0.5,6.9,MC(0x3f8f45));
+  for(const x0 of [-6,2.0]) B(x0,Y,6.2,x0+4.6,0.5,6.9,MC(0x3f8f45));
   Sph(-7,0.3,6.5,0.8,MC(0xe86aa5),1,0.7,1,10); Sph(3.2,0.2,7.4,0.5,MC(0xffd23f),1,0.7,1,10);
   // buzón
   Cyl(-1.4,Y,15.6,0.04,0.04,1.1,MC(0x6b4a2f),6); B(-1.62,0.8,15.4,-1.18,1.1,15.9,MC(0x3d7dd8)); B(-1.2,0.95,15.55,-1.17,1.25,15.6,MC(0xff3b2f));
@@ -1059,7 +1129,7 @@ function buildExterior(){
   Cyl(5,Y,-8,0.03,0.03,0.9,MC(0x333333),6); Sph(5,0.75,-8,0.35,MC(0x222222),1,0.7,1,12);
   Cyl(8,Y,-6,0.05,0.05,0.72,MC(0xffffff),8); Cyl(8,0.42,-6,0.7,0.7,0.04,MC(0xffffff),20); Cyl(8,0.46,-6,0.03,0.03,2,MC(0xdddddd),6); Cone(8,2.1,-6,1.3,0.5,MC(0xff6b57),10);
   // árboles
-  for(const [x,z,s] of [[-11,9,1.2],[13,-9,1.4],[-12,-10,1.1],[-9,-3,0.9],[11,4,1.0],[-5,12,0.8],[14,12,1.3],[-18,14,1.5],[18,-2,1.2],[0,-12,1.3],[-20,-6,1.4],[22,10,1.1]]) tree(x,z,s);
+  for(const [x,z,s] of [[-11,9,1.2],[13,-9,1.4],[-12,-10,1.1],[-9,-3,0.9],[13,3.5,1.0],[-5,12,0.8],[14,12,1.3],[-18,14,1.5],[18,-2,1.2],[0,-12,1.3],[-20,-6,1.4],[22,10,1.1]]) tree(x,z,s);
   // vecinos
   neighborHouse(-24,0,10,9,5.5,0xa8d8ea,0x8c3b3b,1);
   neighborHouse(24,0,10,9,5.5,0xf6c177,0x3b5b8c,1);
@@ -1128,8 +1198,14 @@ function buildDroneMesh(){
 /* ============ Física ============ */
 const SUB = 1/240;
 const DR = { m:0.32, I:0.0016, twr:4.0, kd1:0.05, kd2:0.011, hk:0.10, tau:0.035,
-  rateMax:11.0, yawMax:4.2, expo:0.42, angKp:10, rateK:36, aMax:170, aMaxYaw:35, mu:0.5 };
+  rateMax:11.0, yawMax:4.2, expo:0.42, angKp:10, rateK:50, aMax:170, aMaxYaw:35, mu:0.5 };
 const HOVER_T = DR.m*G;
+// Ajustes del mando (se guardan en el navegador)
+const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25) };
+// Curva de gas: plana alrededor del centro del stick (vuelo estático) y empinada solo al final del recorrido
+function thrCurve(s){ const e=SET.thrExpo/100, mid=0.5; s=clamp(s,0,1); const d=s-mid, u=d/(d>0?1-mid:mid); return mid + d*(1-e+e*u*u); }
+// Misma suavidad para la subida en modo Principiante (centro = mantener altura)
+function climbCurve(c){ const e=SET.thrExpo/100; c=clamp(c,-1,1); return c*(1-e+e*c*c); }
 const CONTACTS = [[0.068,0.034,0.068,0.048],[-0.068,0.034,0.068,0.048],[0.068,0.034,-0.068,0.048],[-0.068,0.034,-0.068,0.048],[0,0.016,0,0.028],[0,0.03,0,0.03],[0,0.012,-0.047,0.018]];
 const START = new V3(-2.4, 0.0145, 2.9);
 const drone = { pos:START.clone(), vel:new V3(), q:new QT(), w:new V3(), thrust:0, spin:0, battery:1, armed:false, crashed:false, damage:0,
@@ -1168,8 +1244,9 @@ function physStep(dt, inp){
   let tCmd=0;
   if(d.armed){
     if(flightMode==='acro'){
-      _wd.set(-rc(inp.pitch,DR.expo)*DR.rateMax, -rc(inp.yaw,0.2)*DR.yawMax, -rc(inp.roll,DR.expo)*DR.rateMax);
-      tCmd = d.maxT*inp.thr*inp.thr;
+      const rs=SET.rate/100;
+      _wd.set(-rc(inp.pitch,DR.expo)*DR.rateMax*rs, -rc(inp.yaw,0.2)*DR.yawMax*rs, -rc(inp.roll,DR.expo)*DR.rateMax*rs);
+      const tc=thrCurve(inp.thr); tCmd = d.maxT*tc*tc;
     } else {
       const psi = headingOf(d.q);
       let th, ph; const beginner = flightMode==='beginner';
@@ -1177,20 +1254,21 @@ function physStep(dt, inp){
         const sp=Math.sin(psi), cp=Math.cos(psi);
         const vF = -d.vel.x*sp - d.vel.z*cp, vR = d.vel.x*cp - d.vel.z*sp;
         const amax = G*Math.tan(25*D2R);
-        const aF = clamp(2.6*(inp.pitch*2.8 - vF), -amax, amax), aR = clamp(2.6*(inp.roll*2.8 - vR), -amax, amax);
+        const vmax = 2.8*SET.rate/100;
+        const aF = clamp(2.6*(inp.pitch*vmax - vF), -amax, amax), aR = clamp(2.6*(inp.roll*vmax - vR), -amax, amax);
         th = Math.atan(aF/G); ph = Math.atan(aR/G);
-      } else { th = inp.pitch*50*D2R; ph = inp.roll*50*D2R; }
+      } else { const amx=clamp(50*SET.rate/100,20,70)*D2R; th = inp.pitch*amx; ph = inp.roll*amx; }
       _qy.setFromAxisAngle(AX_Y, psi); _qp.setFromAxisAngle(AX_X, -th); _qr.setFromAxisAngle(AX_Z, -ph);
       _qd.copy(_qy).multiply(_qp).multiply(_qr);
       _qe.copy(d.q).conjugate().multiply(_qd);
       const sgn = _qe.w<0 ? -1 : 1;
-      _wd.set(clamp(2*sgn*_qe.x*DR.angKp,-9,9), -rc(inp.yaw,0.2)*DR.yawMax*(beginner?0.75:1), clamp(2*sgn*_qe.z*DR.angKp,-9,9));
+      _wd.set(clamp(2*sgn*_qe.x*DR.angKp,-9,9), -rc(inp.yaw,0.2)*DR.yawMax*(beginner?0.75:1)*SET.rate/100, clamp(2*sgn*_qe.z*DR.angKp,-9,9));
       if(beginner){
-        const climb = Math.abs(inp.climb)<0.08 ? 0 : inp.climb;
+        const climb = Math.abs(inp.climb)<0.08 ? 0 : climbCurve(inp.climb);
         const vzT = climb>0 ? climb*1.6 : climb*1.25;
-        if(d.grounded && climb < 0.15){ tCmd = HOVER_T*0.12; }
+        if(d.grounded && inp.climb < 0.15){ tCmd = HOVER_T*0.12; }
         else { const az = 5.5*(vzT - d.vel.y); tCmd = DR.m*(G + az)/Math.max(0.55, _up.y); }
-      } else tCmd = d.maxT*inp.thr*inp.thr;
+      } else { const tc=thrCurve(inp.thr); tCmd = d.maxT*tc*tc; }
     }
     tCmd = clamp(tCmd, d.maxT*0.025, d.maxT);
     const k=DR.rateK;
@@ -1309,9 +1387,9 @@ function segHit(o, t, pad){
 
 /* ============ Aros ============ */
 const RINGS = [
-  [-2.65,1.30,0.0,'z'], [-3.2,1.40,-2.5,'z'], [-0.5,1.05,-3.0,'x'], [2.2,1.05,-1.0,'x'], [4.72,1.35,1.5,'z'],
-  [2.78,1.25,1.5,'z'], [0.15,1.30,2.5,'z'], [1.47,2.55,2.4,'z'], [-0.5,3.95,-1.15,'x'], [-2.6,4.2,-1.4,'x'],
-  [-4.5,3.95,0.0,'z'], [-2.6,4.1,1.6,'x'], [-0.5,3.95,3.9,'x'], [2.2,3.95,-0.75,'x'], [3.5,4.2,2.2,'z']
+  [-2.65,1.30,0.0,'z'], [-3.2,1.40,-2.5,'z'], [-0.5,1.05,-3.0,'x'], [2.2+EX,1.05,-1.0,'x'], [4.72+EX,1.35,1.5,'z'],
+  [2.78+EX,1.25,1.5,'z'], [0.15,1.30,2.5,'z'], [1.47,2.55,1.7,'z'], [-0.5,3.95,-1.15,'x'], [-2.6,4.2,-1.4,'x'],
+  [-4.5,3.95,0.0,'z'], [-2.6,4.1,1.6,'x'], [-0.5,3.95,3.9,'x'], [2.2+EX,3.95,-0.75,'x'], [3.5+EX,4.2,2.2,'z']
 ];
 const RING_R = 0.45;
 const rings = [];
@@ -1425,7 +1503,7 @@ function bindZone(zone, S, isLeft){
 bindZone($('zoneL'), sticks.L, true); bindZone($('zoneR'), sticks.R, false);
 for(const el of [canvas,$('zoneL'),$('zoneR')]) el.addEventListener('contextmenu', e=>e.preventDefault());
 
-function dz(v){ const D=0.08, a=Math.abs(v); return a<D ? 0 : Math.sign(v)*(a-D)/(1-D); }
+function dz(v){ const D=SET.dead/100, a=Math.abs(v); return a<D ? 0 : Math.sign(v)*(a-D)/(1-D); }
 function pollPad(){
   let pads=[]; try{ pads = navigator.getGamepads ? navigator.getGamepads() : []; }catch(e){}
   let p=null; if(pads) for(const x of pads){ if(x && x.connected){ p=x; break; } }
@@ -1439,7 +1517,13 @@ function pollPad(){
 }
 function onPadButton(i){
   lastSrc='gp'; initAudio();
-  if(state!=='play'){ if(i===0||i===9) startGame(); else if(i===3) cycleMode(); else if(i===1 && state==='pause'){ resetFlight(); startGame(); } return; }
+  if(state!=='play'){
+    if(i===12){ focusSlider(slFocus<=0 ? SL.length-1 : slFocus-1); return; }
+    if(i===13){ focusSlider((slFocus+1)%SL.length); return; }
+    if(i===14||i===15){ if(slFocus<0) focusSlider(0); const o=SL[slFocus]; setSetting(slFocus, SET[o.k]+(i===15?o.step:-o.step)); sfxBeep(i===15?740:560,0.04); return; }
+    if(i===0||i===9) startGame(); else if(i===3) cycleMode(); else if(i===1 && state==='pause'){ resetFlight(); startGame(); }
+    return;
+  }
   if(i===0) toggleArm(); else if(i===1) resetFlight(); else if(i===2||i===5) cycleCam(); else if(i===3) cycleMode(); else if(i===9||i===8) togglePause();
 }
 function readInput(dt){
@@ -1572,7 +1656,7 @@ function postPhysics(dt){
   if(d.armed && flightMode==='beginner' && d.grounded && input.climb<-0.5){ d.landT+=dt; if(d.landT>0.9){ d.armed=false; d.autoArmOK=false; d.landT=0; sfxBeep(420,0.12); toast('Aterrizado'); } } else d.landT=0;
   // reposo sin motores
   if(!d.armed && d.grounded && d.vel.lengthSq()<0.01 && d.w.lengthSq()<0.2){ d.vel.multiplyScalar(0.5); d.w.multiplyScalar(0.5); }
-  if(d.pos.y<-1.5 || Math.abs(d.pos.x)>7 || Math.abs(d.pos.z)>6 || d.pos.y>6.5){ resetFlight(); toast('El dron salió de la casa. Reiniciado'); }
+  if(d.pos.y<-1.5 || d.pos.x<-7 || d.pos.x>8 || Math.abs(d.pos.z)>6 || d.pos.y>6.5){ resetFlight(); toast('El dron salió de la casa. Reiniciado'); }
 }
 function updateTurbulence(dt){
   const d=drone;
@@ -1580,7 +1664,7 @@ function updateTurbulence(dt){
   const clr=clearance(d.pos), near = clr<0.3 ? 1-clr/0.3 : 0;
   let pw=0; if(d.armed && _up.y>0.6 && d.vel.y<-1.0 && d.thrust>HOVER_T*0.7) pw=Math.min(1,(-d.vel.y-1)/2.5);
   const wl=windAt(d.pos,_wind).length();
-  const sigma = 4 + 30*d.damage + 12*near + 45*pw + 20*wl;
+  const sigma = 2 + 30*d.damage + 8*near + 45*pw + 20*wl;
   const a=Math.exp(-9*dt), s=sigma*Math.sqrt(1-a*a);
   const gss=()=> (rnd()+rnd()+rnd()+rnd()-2)*1.73;
   d.noise.x=d.noise.x*a+gss()*s; d.noise.z=d.noise.z*a+gss()*s; d.noise.y=d.noise.y*a+gss()*s*0.3;
@@ -1756,7 +1840,8 @@ const HELP = {
     <tr><td>Stick derecho</td><td>Cabeceo y alabeo: avanzar, retroceder y moverte de lado.</td></tr>
     <tr><td>A</td><td>Armar o parar motores (en modo manual, con el stick izquierdo abajo)</td></tr>
     <tr><td>B / X / Y</td><td>Reiniciar, cambiar cámara, cambiar modo</td></tr>
-    <tr><td>Start</td><td>Pausa</td></tr></table>
+    <tr><td>Start</td><td>Pausa</td></tr>
+    <tr><td>Ajustes</td><td>Más abajo puedes suavizar el gas para que la potencia fuerte quede al final del stick</td></tr></table>
     <p>Distribución «modo 2», como una emisora de radiocontrol. Funciona con mandos Xbox, PlayStation y la mayoría de mandos que reconoce el navegador.</p>`,
   kb: `<table>
     <tr><td>W / S</td><td>Subir y bajar (en Ángulo y Acro sube o baja el gas; Mayús lo cambia más rápido)</td></tr>
@@ -1766,6 +1851,26 @@ const HELP = {
     <tr><td>C / M / R</td><td>Cámara, modo de vuelo, reiniciar</td></tr>
     <tr><td>P o Esc</td><td>Pausa</td></tr></table>`
 };
+/* ---------- Ajustes del mando ---------- */
+const SL=[{k:'thrExpo',id:'sThrExpo',v:'vThrExpo',min:0,max:95,step:5},{k:'rate',id:'sRate',v:'vRate',min:40,max:150,step:5},{k:'dead',id:'sDead',v:'vDead',min:0,max:25,step:1}];
+let slFocus=-1;
+const CV={x0:22,x1:144,y0:106,y1:6};
+const cvX=s=>CV.x0+s*(CV.x1-CV.x0), cvY=f=>CV.y0-clamp(f,0,1)*(CV.y0-CV.y1);
+function drawCurve(){
+  let p='', l='';
+  for(let i=0;i<=60;i++){ const s=i/60, t=thrCurve(s); p+=(i?'L':'M')+cvX(s).toFixed(1)+' '+cvY(t*t).toFixed(1); l+=(i?'L':'M')+cvX(s).toFixed(1)+' '+cvY(s*s).toFixed(1); }
+  $('cvPath').setAttribute('d',p); $('cvLin').setAttribute('d',l);
+  const hy=cvY(1/DR.twr).toFixed(1); $('cvHover').setAttribute('y1',hy); $('cvHover').setAttribute('y2',hy);
+}
+function updateCurveDot(){ const s=clamp(input.thr,0,1), t=thrCurve(s); const dot=$('cvDot'); dot.setAttribute('cx',cvX(s).toFixed(1)); dot.setAttribute('cy',cvY(t*t).toFixed(1)); }
+function setSetting(i,val){
+  const o=SL[i]; val=clamp(Math.round(val/o.step)*o.step,o.min,o.max);
+  SET[o.k]=val; store.set(o.k,val); $(o.id).value=String(val); $(o.v).textContent=val+' %';
+  if(o.k==='thrExpo') drawCurve();
+}
+function focusSlider(i){ slFocus=i; document.querySelectorAll('.sl').forEach(el=>el.classList.toggle('focus', +el.dataset.i===i)); }
+SL.forEach((o,i)=>{ $(o.id).addEventListener('input',e=>{ setSetting(i,+e.target.value); focusSlider(i); }); setSetting(i,SET[o.k]); });
+
 function selectTab(t){ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('sel',b.dataset.t===t)); $('help').innerHTML=HELP[t]; }
 function updatePadInfo(){ $('padInfo').textContent = gp.connected ? 'Mando conectado: '+gp.name.replace(/\(.*?\)/g,'').trim().slice(0,40) : 'Conecta un mando y pulsa cualquier botón.'; }
 function showMenu(){
@@ -1829,6 +1934,7 @@ function frame(now){
     checkRings(prevPos, d.pos);
     if(racing) raceT+=dt;
   }
+  if(state!=='play') updateCurveDot();
   animate(dt, now); updateDroneVisual(dt, now); updateCamera(dt); updateLights(); updateHUD(dt); updateAudio();
   renderer.render(scene, camera);
 }
