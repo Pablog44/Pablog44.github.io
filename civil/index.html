@@ -129,6 +129,16 @@ p{margin:0}
 .tl{list-style:none; margin:0; padding:0; display:grid; gap:.5rem}
 .tl li{display:grid; grid-template-columns:8.2rem 1fr; gap:.9rem}
 .tl time{font-family:var(--f-type); font-size:.9rem; color:var(--red); padding-top:.1rem}
+.pcgrid{display:grid; gap:.3rem}
+.pcrow{display:grid; grid-template-columns:1fr auto auto auto; gap:.3rem .6rem; align-items:center; padding:.3rem 0; border-bottom:1px solid var(--rule)}
+.pcrow b{font-family:var(--f-disp); font-weight:600; font-size:1.02rem; text-align:right}
+.pcrow b.un{font-weight:400; color:var(--ink-soft)}
+.pcrow button{padding:.2rem .6rem; font-size:.9rem}
+.pcrow button:disabled{opacity:.4; cursor:default}
+.pcrow.on{background:rgba(127,176,232,.18); outline:1.5px solid var(--blue); outline-offset:2px}
+.pcask{font-weight:600; min-height:1.4em; color:var(--blue)}
+.pclive{font-family:var(--f-mono, ui-monospace, monospace); font-size:.8rem; color:var(--ink-soft); overflow-wrap:anywhere}
+@media (max-width:30rem){ .pcrow{grid-template-columns:1fr auto auto} .pcrow span{grid-column:1 / -1} }
 .keys{display:grid; grid-template-columns:auto 1fr; gap:.45rem 1.1rem; margin:0}
 .keys dt{font-family:var(--f-disp); font-weight:600; font-size:1.1rem; white-space:nowrap}
 .keys dd{margin:0}
@@ -181,6 +191,7 @@ p{margin:0}
 .tb-aim{right:calc(env(safe-area-inset-right,0px) + 6.2rem); bottom:calc(env(safe-area-inset-bottom,0px) + 1.6rem)}
 .tb-jump{right:calc(env(safe-area-inset-right,0px) + 1.4rem); bottom:calc(env(safe-area-inset-bottom,0px) + 8.4rem)}
 .tb-crouch{right:calc(env(safe-area-inset-right,0px) + 5.6rem); bottom:calc(env(safe-area-inset-bottom,0px) + 6rem)}
+.tb-prone{right:calc(env(safe-area-inset-right,0px) + 13.4rem); bottom:calc(env(safe-area-inset-bottom,0px) + 5.4rem); width:3.2rem; height:3.2rem; font-size:.78rem}
 .tb-reload{right:calc(env(safe-area-inset-right,0px) + 10.4rem); bottom:calc(env(safe-area-inset-bottom,0px) + 1.6rem); width:3.2rem; height:3.2rem; font-size:.78rem}
 .tb-nade{right:calc(env(safe-area-inset-right,0px) + 9.8rem); bottom:calc(env(safe-area-inset-bottom,0px) + 5.4rem); width:3.2rem; height:3.2rem; font-size:.78rem}
 .tb-swap{right:calc(env(safe-area-inset-right,0px) + 5.4rem); bottom:calc(env(safe-area-inset-bottom,0px) + 10.2rem); width:3.2rem; height:3.2rem; font-size:.82rem}
@@ -188,7 +199,7 @@ p{margin:0}
 .tf{display:none}
 body.fly .tf{display:block}
 body.touch.fly #weapon{display:none}
-body.fly .tb-swap,body.fly .tb-nade,body.fly .tb-reload,body.fly .tb-crouch,body.fly .tb-jump,body.fly .tb-aim{display:none}
+body.fly .tb-swap,body.fly .tb-nade,body.fly .tb-reload,body.fly .tb-crouch,body.fly .tb-prone,body.fly .tb-jump,body.fly .tb-aim{display:none}
 /* en el caza: motor a la derecha, como en un tablero; la palanca de vuelo es la de la izquierda */
 .tf-up{right:calc(env(safe-area-inset-right,0px) + 1rem); bottom:calc(env(safe-area-inset-bottom,0px) + 8.6rem); width:5rem; height:5rem; font-size:1.05rem}
 .tf-dn{right:calc(env(safe-area-inset-right,0px) + 1rem); bottom:calc(env(safe-area-inset-bottom,0px) + 2.6rem); width:5rem; height:5rem; font-size:1.05rem}
@@ -196,6 +207,10 @@ body.fly .tb-swap,body.fly .tb-nade,body.fly .tb-reload,body.fly .tb-crouch,body
 body.fly .tb-use{right:calc(env(safe-area-inset-right,0px) + 6.8rem); bottom:calc(env(safe-area-inset-bottom,0px) + 9.2rem); width:3.8rem; height:3.8rem}
 body.fly .tb-fire{right:calc(env(safe-area-inset-right,0px) + 11.6rem); bottom:calc(env(safe-area-inset-bottom,0px) + 2.2rem)}
 .tf-bomb{right:calc(env(safe-area-inset-right,0px) + 12.2rem); bottom:calc(env(safe-area-inset-bottom,0px) + 7.8rem); width:3.6rem; height:3.6rem}
+.tf-rl,.tf-rr{bottom:calc(env(safe-area-inset-bottom,0px) + .8rem); width:4.2rem; height:4.2rem; font-size:.82rem; border-color:#ffe08a; color:#ffe08a}
+.tf-rl{left:calc(50% - 4.7rem)} .tf-rr{left:calc(50% + .5rem)}
+body.touch #flyHud{bottom:calc(env(safe-area-inset-bottom,0px) + 5.5rem)}
+@media (orientation:portrait){ .tf-rl,.tf-rr{left:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 14.6rem); width:3.9rem; height:3.9rem} .tf-rl{right:calc(env(safe-area-inset-right,0px) + 5.4rem)} .tf-rr{right:calc(env(safe-area-inset-right,0px) + 1rem)} }
 .tb-rec{left:calc(50% + 3.2rem); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem; border-color:#ffe08a; color:#ffe08a}
 .tb-pause{left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem}
 body.touch #weapon{right:auto; left:calc(env(safe-area-inset-left,0px) + .7rem); bottom:calc(env(safe-area-inset-bottom,0px) + 4.4rem); text-align:left; padding:.25rem .6rem}
@@ -260,6 +275,7 @@ body.nogl #fatal{max-width:none}
   <button type="button" data-act="nade" class="tb tb-nade">Granada</button>
   <button type="button" data-act="reload" class="tb tb-reload">Recargar</button>
   <button type="button" data-act="crouch" class="tb tb-crouch">Agachar</button>
+  <button type="button" data-act="prone" class="tb tb-prone">Tumbar</button>
   <button type="button" data-act="jump" class="tb tb-jump">Saltar</button>
   <button type="button" data-act="aim" class="tb tb-aim">Apuntar</button>
   <button type="button" data-act="fire" class="tb tb-fire">Fuego</button>
@@ -267,6 +283,8 @@ body.nogl #fatal{max-width:none}
   <button type="button" data-act="thrDn" class="tb tf tf-dn">Motor −</button>
   <button type="button" data-act="brake" class="tb tf tf-brake">Frenos</button>
   <button type="button" data-act="bomb" class="tb tf tf-bomb" id="tbBomb">Bomba</button>
+  <button type="button" data-act="rudL" class="tb tf tf-rl">◄ Timón</button>
+  <button type="button" data-act="rudR" class="tb tf tf-rr">Timón ►</button>
 </div>
 
 <div id="score" hidden></div>
@@ -283,6 +301,7 @@ body.nogl #fatal{max-width:none}
     <div class="links">
       <button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button>
       <button type="button" class="link" data-open="controls">Ver los controles</button>
+      <button type="button" class="link" data-open="padcfg">Configurar mando o joystick</button>
     </div>
     <p id="padMenu" class="quiet" hidden>Mando detectado. LB empieza con la República y RB con los sublevados.</p>
     <p class="note">Recreación didáctica. La batalla del Ebro costó decenas de miles de vidas en los dos bandos; el juego no toma partido por ninguno.</p>
@@ -332,6 +351,7 @@ body.nogl #fatal{max-width:none}
       <button type="button" class="link" id="btnScore">Ver el marcador</button>
       <button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button>
       <button type="button" class="link" data-open="controls">Ver los controles</button>
+      <button type="button" class="link" data-open="padcfg">Configurar mando o joystick</button>
       <button type="button" class="link" id="btnQuit">Abandonar la partida</button>
     </div>
     <div id="pauseScore" hidden></div>
@@ -353,6 +373,23 @@ body.nogl #fatal{max-width:none}
   <div id="archBody" class="sheet-body"></div>
 </aside>
 
+<aside id="padcfg" class="sheet small" hidden role="dialog" aria-label="Configurar mando o joystick">
+  <div class="sheet-head"><h2>Mando o joystick</h2><button type="button" class="close">Cerrar</button></div>
+  <div class="sheet-body">
+    <p id="pcDev"></p>
+    <div id="pcBody" hidden>
+      <p class="quiet">Pulsa «Cambiar» en una acción y, a continuación, el botón o el eje que quieras usar. Se guarda para este dispositivo.</p>
+      <p id="pcAsk" class="pcask" role="status" aria-live="polite"></p>
+      <p id="pcLive" class="pclive" aria-hidden="true"></p>
+      <h3>En el avión</h3>
+      <div id="pcP" class="pcgrid"></div>
+      <h3>A pie, en el carro y en el camión</h3>
+      <div id="pcG" class="pcgrid"></div>
+      <p><button type="button" id="pcReset">Restablecer el reparto de serie</button></p>
+    </div>
+  </div>
+</aside>
+
 <aside id="controls" class="sheet small" hidden role="dialog" aria-label="Controles">
   <div class="sheet-head"><h2>Controles</h2><button type="button" class="close">Cerrar</button></div>
   <div class="sheet-body">
@@ -361,14 +398,15 @@ body.nogl #fatal{max-width:none}
       <dt>Ratón</dt><dd>Mirar. Clic izquierdo dispara; clic derecho apunta por el alza.</dd>
       <dt>Mayús</dt><dd>Correr</dd>
       <dt>C</dt><dd>Agacharse: apuntas mejor y te ven menos</dd>
+      <dt>Z</dt><dd>Tumbarse: apuntas bastante mejor y es muy difícil que te den, pero solo avanzas a rastras. Con un fusil ametrallador (DP-27 o Breda 30) el arma se apoya en el bípode y casi no se desvía ni retrocede. Z o Espacio para levantarte</dd>
       <dt>Espacio</dt><dd>Saltar</dd>
       <dt>R</dt><dd>Recargar</dd>
       <dt>1, 2 o Q</dt><dd>Cambiar entre arma larga y pistola</dd>
       <dt>G</dt><dd>Lanzar granada (estalla al chocar)</dd>
       <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
-      <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón mueve la torre: clic izquierdo dispara el cañón y clic derecho la ametralladora.</dd>
-      <dt>Caza</dt><dd>Mantén W para subir el motor y despegar; W y S lo suben y lo bajan (se ve el porcentaje en pantalla) y B frena en tierra. En el aire, mueve el ratón con suavidad: tirando de él hacia ti sube el morro, empujándolo baja y a los lados vira; A y D viran de forma continua. Clic izquierdo dispara y G o Espacio suelta una bomba. Para aterrizar, quita motor, baja suave y frena.</dd>
-      <dt>Caza en el móvil</dt><dd>La palanca de la izquierda pilota el avión. A la derecha están «Motor +» y «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba».</dd>
+      <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón apunta la torre, también bastante hacia arriba y hacia abajo. La cruz del centro es el punto al que apuntas; el círculo marca dónde caería el disparo con la pieza como está y, cuando alcanza la cruz, se pone amarillo. El cañón corrige solo la caída del proyectil, así que el disparo cae donde marca la cruz; debajo se lee la distancia. Clic izquierdo dispara el cañón y el derecho la ametralladora (en el Panzer I, los dos disparan las ametralladoras).</dd>
+      <dt>Caza</dt><dd>Mandos de avión. W y S suben y bajan el motor (se ve el porcentaje en pantalla) y B frena en tierra. El ratón es la palanca: a los lados inclina las alas (alabeo) y adelante y atrás mueve el morro (cabeceo); por defecto, tirando hacia ti sube. Para virar, inclina las alas hacia ese lado y tira de la palanca. A y D son el timón: deslizan el morro despacio a izquierda y derecha, y guían el avión en tierra. Las flechas hacen también de palanca. Clic izquierdo dispara y G o Espacio suelta una bomba.</dd>
+      <dt>Caza en el móvil</dt><dd>La palanca de la izquierda es la palanca de vuelo (alabeo y cabeceo). El timón son dos botones aparte, «◄ Timón» y «Timón ►». A la derecha están «Motor +», «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba».</dd>
       <dt>Tab</dt><dd>Marcador</dd>
       <dt>Esc o P</dt><dd>Pausa</dd>
       <dt>Flechas</dt><dd>Girar, por si el navegador no captura el ratón</dd>
@@ -377,9 +415,10 @@ body.nogl #fatal{max-width:none}
     <dl class="keys">
       <dt>Palanca izquierda</dt><dd>Moverse; al tope, o pulsándola, corres. En los vehículos acelera, frena y gira.</dd>
       <dt>Palanca derecha</dt><dd>Mirar y apuntar.</dd>
-      <dt>En el caza</dt><dd>La palanca izquierda pilota; RB y LB suben y bajan el motor; LT frena; RT dispara y A suelta la bomba.</dd>
+      <dt>En el caza</dt><dd>La palanca izquierda inclina las alas y cabecea; L1 y R1 son el timón; R2 y L2 suben y bajan el motor (L2 frena en tierra); A dispara, B suelta la bomba y X baja del avión.</dd>
+      <dt>Joystick de vuelo</dt><dd>También vale un joystick: la palanca da alabeo y cabeceo, el giro de la palanca es el timón, la palanca de gases es el motor (al mínimo, en tierra, frena) y el gatillo dispara. Si en tu modelo los ejes o los botones no coinciden, o quieres usarlo también a pie o en el carro, asígnalos en «Configurar mando o joystick», en el menú o en la pausa.</dd>
       <dt>RT y LT</dt><dd>Disparar y apuntar por el alza. En el carro, LT dispara la ametralladora.</dd>
-      <dt>A, B</dt><dd>Saltar y agacharse. En el caza, A suelta una bomba.</dd>
+      <dt>A, B</dt><dd>Saltar y agacharse. Pulsar la palanca derecha (R3) es tumbarse.</dd>
       <dt>X</dt><dd>Recargar; junto a un vehículo, subir o bajar.</dd>
       <dt>Y, RB</dt><dd>Cambiar de arma y lanzar granada.</dd>
       <dt>Start, Select</dt><dd>Pausa y marcador.</dd>
@@ -1680,7 +1719,7 @@ function placeAt(s, f) {
     if (!insideSolid(tx, tz, 0.7) && terrainH(tx, tz) > 0.4) { x = tx; z = tz; break; }
   }
   s.x = x; s.z = z; s.y = groundAt(x, z); s.vx = s.vy = s.vz = 0;
-  s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
+  s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
   s.sx = x; s.sz = z; s.stuckT = 0; s.avoidT = 0; s.atFlagT = 0;
 }
 const ownedSpawns = team => FLAGS.filter(f => f.owner === team);
@@ -1755,7 +1794,7 @@ function navPoint(s) {
 function canSee(s, e, ey) {
   const dx = e.x - s.x, dz = e.z - s.z;
   if (dx * dx + dz * dz > VIEW2) return false;
-  return losClear(s.x, ey, s.z, e.x, e.y + (e.crouch ? 0.75 : 1.25), e.z);
+  return losClear(s.x, ey, s.z, e.x, e.y + (e.prone ? 0.32 : e.crouch ? 0.75 : 1.25), e.z);
 }
 const _cand = [];
 function botThink(s) {
@@ -1805,12 +1844,13 @@ function botFire(s, e, d, moving) {
   if (s.ammo <= 0) { s.reloadT = w.reload; return; }
   s.ammo--; s.lastShot = game.time;
   let p = w.botAcc * Math.exp(-d / w.botRange);
-  if (e.crouch) p *= 0.7; if (e.speed > 4.8) p *= 0.72; if (moving) p *= 0.55; if (e.swim) p *= 0.6;
+  if (e.prone) p *= 0.45; else if (e.crouch) p *= 0.7;       // a un tumbado cuesta mucho más darle
+  if (e.speed > 4.8) p *= 0.72; if (moving) p *= 0.55; if (e.swim) p *= 0.6;
   if (s.first) { p *= 0.5; s.first = false; }
   if (e.isPlayer) p *= game.diff * (e.veh ? 0.6 : 1);
   const mx = s.x - Math.sin(s.yaw) * 0.9, mz = s.z - Math.cos(s.yaw) * 0.9, my = s.y + (s.crouch ? 1.0 : 1.38);
   const hit = Math.random() < p;
-  let tx = e.x, ty = e.y + (e.crouch ? 0.7 : 1.15) + rnd(-0.3, 0.3), tz = e.z;
+  let tx = e.x, ty = e.y + (e.prone ? 0.3 + rnd(-0.1, 0.15) : (e.crouch ? 0.7 : 1.15) + rnd(-0.3, 0.3)), tz = e.z;
   if (!hit) {
     const a = rnd(0, 6.283), r = rnd(0.7, 2.6); tx += Math.cos(a) * r; tz += Math.sin(a) * r; ty += rnd(-0.8, 1.2);
     const k = 1 + rnd(8, 30) / Math.max(d, 1); tx = mx + (tx - mx) * k; ty = my + (ty - my) * k; tz = mz + (tz - mz) * k;
@@ -1917,11 +1957,11 @@ function drawSoldier(s) {
 }
 
 /* ============ jugador: entrada, armas, cámara ============ */
-const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false, thr: 0, brake: false };
+const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, everLocked: false, skipUntil: 0, mAvg: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false, thr: 0, brake: false, rud: 0, thrAbs: -1, flyPad: false };
 let P = null;
 /* opciones que se guardan en el dispositivo */
 const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true };      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
-const stick = { ty: 0, tp: 0 };      // rumbo e inclinación del morro que el jugador le pide al caza
+const stick = { ty: 0, tp: 0, tr: 0 };      // rumbo, cabeceo y alabeo que el jugador le pide al caza
 try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; } catch (e) { }
 function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY })); } catch (e) { } }
 
@@ -1995,20 +2035,29 @@ async function setGyro(on) {
 }
 const projectiles = [];
 
+/* Captura del ratón. Si el navegador la concede aunque sea una vez, se vuelve a pedir en cada clic: un rechazo suelto (por ejemplo,
+   al reanudar justo después de pulsar Esc) no significa que no se pueda. Solo se da por imposible si falla tres veces sin haber
+   funcionado nunca; entonces, y solo entonces, se usa el modo sin captura. */
+const lockOff = () => !input.everLocked && input.lockFails >= 3;
+function lockFailed(id) {       // cada intento fallido cuenta una sola vez, llegue el aviso por donde llegue
+  if (id !== input.lockTry || input.locked || input.lockCounted === id) return;
+  input.lockCounted = id; input.lockFails++;
+  if (game.state === 'play' && lockOff() && !input.lockTold) { input.lockTold = true; showHint('Aquí el navegador no deja capturar el ratón. Mueve el cursor para mirar; para seguir girando, apriétalo contra el borde de la pantalla. También sirven las flechas.'); }
+}
 function tryLock() {
-  if (input.touch || input.locked || input.lockFails >= 2) return;
-  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => { }); } catch (e) { input.lockFails++; }
+  if (input.touch || input.locked || lockOff()) return;
+  const id = input.lockTry = (input.lockTry || 0) + 1;
+  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => lockFailed(id)); } catch (e) { lockFailed(id); }
+  setTimeout(() => lockFailed(id), 1200);       // por si el navegador ni concede la captura ni avisa de que la niega
 }
 document.addEventListener('pointerlockchange', () => {
   const now = document.pointerLockElement === canvas;
   if (input.locked && !now && game.state === 'play') pauseGame();
-  input.locked = now;
-  if (now) { $('hint').hidden = true; input.lockFails = 0; }
+  input.locked = now; input.skipUntil = performance.now() + 180; input.mAvg = 0;       // al capturar o soltar llegan saltos falsos del cursor: se ignoran un instante
+  if (now) { $('hint').hidden = true; input.lockFails = 0; input.everLocked = true; }
 });
-document.addEventListener('pointerlockerror', () => {
-  input.lockFails++;
-  if (game.state === 'play' && input.lockFails === 2) showHint('Aquí el navegador no deja capturar el ratón. Mueve el cursor para mirar: al acercarlo a un borde la vista sigue girando. También sirven las flechas.');
-});
+document.addEventListener('pointerlockerror', () => lockFailed(input.lockTry));
+
 addEventListener('keydown', e => {
   if (game.state === 'play' && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault();
   if (e.repeat) return;
@@ -2023,7 +2072,8 @@ addEventListener('keydown', e => {
       case 'Digit2': switchWeapon(1); break;
       case 'KeyQ': switchWeapon(1 - P.cur); break;
       case 'KeyG': playerNade(); break;
-      case 'KeyC': P.crouch = !P.crouch; break;
+      case 'KeyC': setStance(P, P.prone || !P.crouch ? 1 : 0); break;
+      case 'KeyZ': setStance(P, P.prone ? 0 : 2); break;
       case 'Space': input.jump = true; break;
       case 'Tab': showScore(true); break;
       case 'Escape': case 'KeyP': pauseGame(); break;
@@ -2038,12 +2088,24 @@ addEventListener('keyup', e => { input.keys[e.code] = false; if (e.code === 'Tab
 addEventListener('blur', () => { input.keys = {}; input.fire = false; input.aim = false; });
 document.addEventListener('mousemove', e => {
   if (game.state !== 'play' || input.touch) return;
-  input.lookX += (e.movementX || 0) * opts.sens; input.lookY += (e.movementY || 0) * opts.sens; input.mx = e.clientX; input.my = e.clientY;
+  input.mx = e.clientX; input.my = e.clientY;
+  const mx = e.movementX || 0, my = e.movementY || 0, mag = Math.hypot(mx, my);
+  if (performance.now() < (input.skipUntil || 0)) return;
+  /* Salto falso: un único evento enorme en medio de movimientos normales (fallo conocido de los navegadores con el ratón capturado, y
+     también al volver el cursor a la ventana). Se descarta; si de verdad estás moviendo el ratón tan deprisa, el siguiente ya pasa. */
+  const avg = input.mAvg || 0;
+  if (mag > 140 && mag > 6 * (avg + 10)) { input.mAvg = avg * 0.75 + 15; return; }
+  input.mAvg = avg * 0.75 + mag * 0.25;
+  input.lookX += clamp(mx, -350, 350) * opts.sens; input.lookY += clamp(my, -350, 350) * opts.sens;
+  if (mag > 3) input.flyPad = false;       // si mueves el ratón, el avión vuelve a obedecer al ratón
 });
+document.documentElement.addEventListener('mouseenter', () => { input.skipUntil = performance.now() + 60; input.mAvg = 0; });
+addEventListener('focus', () => { input.skipUntil = performance.now() + 120; input.mAvg = 0; });
 document.addEventListener('mousedown', e => {
   if (game.state !== 'play' || input.touch) return;
   audioInit();
-  if (e.button === 0) { input.fire = true; input.fireQ = 0.3; if (!input.locked) tryLock(); }
+  if (!input.locked) tryLock();
+  if (e.button === 0) { input.fire = true; input.fireQ = 0.3; }
   if (e.button === 2) input.aim = true;
 });
 document.addEventListener('mouseup', e => { if (e.button === 0) input.fire = false; if (e.button === 2) input.aim = false; });
@@ -2059,6 +2121,7 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
     if (a === 'recenter') { if (on) gyroRecenter(); return; }
     if (a === 'thrUp' || a === 'thrDn') { input.thr = on ? (a === 'thrUp' ? 1 : -1) : 0; return; }
     if (a === 'brake') { input.brake = on; return; }
+    if (a === 'rudL' || a === 'rudR') { input.rud = on ? (a === 'rudL' ? -1 : 1) : 0; return; }
     if (a === 'bomb') { if (on) input.bomb = true; return; }
     if (P.aa) { if (a === 'fire') input.fire = on; return; }
     if (P.veh) {
@@ -2071,7 +2134,8 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
     else if (a === 'aim') { input.aim = !input.aim; }
     else if (a === 'reload') startReload();
     else if (a === 'jump') input.jump = true;
-    else if (a === 'crouch') P.crouch = !P.crouch;
+    else if (a === 'crouch') setStance(P, P.prone || !P.crouch ? 1 : 0);
+    else if (a === 'prone') setStance(P, P.prone ? 0 : 2);
     else if (a === 'nade') playerNade();
     else if (a === 'swap') switchWeapon(1 - P.cur);
     else if (a === 'pause') pauseGame();
@@ -2089,7 +2153,12 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (joy && t.identifier === joy.id) { input.mvx = clamp((t.clientX - joy.x) / 50, -1, 1); input.mvz = clamp((t.clientY - joy.y) / 50, -1, 1); }
-      if (look && t.identifier === look.id) { input.lookX += (t.clientX - look.x) * 2.4 * opts.sens; input.lookY += (t.clientY - look.y) * 2.4 * opts.sens; look.x = t.clientX; look.y = t.clientY; }
+      if (look && t.identifier === look.id) {
+        const dx = t.clientX - look.x, dy = t.clientY - look.y, mag = Math.hypot(dx, dy); look.x = t.clientX; look.y = t.clientY;
+        if (mag > 220 || (look.n > 0 && mag > 110 && mag > 6 * ((look.avg || 0) + 8))) continue;       // salto falso del navegador
+        look.n = (look.n || 0) + 1; look.avg = (look.avg || 0) * 0.7 + mag * 0.3;
+        input.lookX += dx * 2.4 * opts.sens; input.lookY += dy * 2.4 * opts.sens;
+      }
     }
   }, { passive: false });
   const end = e => {
@@ -2103,55 +2172,130 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
 })();
 
 /* ---- mando (API Gamepad, disposición estándar tipo Xbox o PlayStation) ---- */
-const pad = { on: false, id: '', prev: [], move: false, rx: 0, ry: 0 };
+/* ============ mando o joystick (Gamepad API) ============
+   Vale cualquier dispositivo que el navegador presente como mando: un mando de dos palancas o un joystick de vuelo con su palanca de
+   gases. Cada acción está ligada a un botón o a un eje; hay un reparto de serie para cada tipo y todo se puede reasignar en
+   «Configurar mando o joystick». El reparto se guarda por dispositivo. */
+const PAD_BTN = [
+  ['fire', 'Disparar', 'g'], ['aim', 'Apuntar · ametralladora del carro', 'g'], ['jump', 'Saltar', 'g'], ['crouch', 'Agacharse', 'g'], ['prone', 'Tumbarse', 'g'], ['reload', 'Recargar', 'g'],
+  ['use', 'Subir, bajar o usar', 'g'], ['swap', 'Cambiar de arma', 'g'], ['nade', 'Granada', 'g'], ['sprint', 'Correr', 'g'], ['pause', 'Pausa', 'g'], ['score', 'Marcador', 'g'],
+  ['pfire', 'Disparar', 'p'], ['pbomb', 'Soltar bomba', 'p'], ['thrUp', 'Motor +', 'p'], ['thrDn', 'Motor −', 'p'], ['rudL', 'Timón a la izquierda', 'p'], ['rudR', 'Timón a la derecha', 'p'], ['brake', 'Frenos', 'p']
+];
+const PAD_AX = [
+  ['mvx', 'Moverse a los lados · girar el vehículo', 'g', 'muévelo a la derecha'], ['mvy', 'Avanzar y retroceder', 'g', 'empújalo hacia delante'],
+  ['lkx', 'Mirar a los lados', 'g', 'muévelo a la derecha'], ['lky', 'Mirar arriba y abajo', 'g', 'muévelo hacia ti (abajo)'],
+  ['roll', 'Alabeo: inclinar las alas', 'p', 'muévelo a la derecha'], ['pitch', 'Cabeceo: subir y bajar el morro', 'p', 'tira hacia ti'],
+  ['rud', 'Timón con un eje (giro de la palanca o pedales)', 'p', 'gíralo a la derecha'], ['thr', 'Motor con un eje (palanca de gases)', 'p', 'llévala al máximo']
+];
+const pad = { on: false, id: '', key: '', idx: -1, prev: [], pax: [], move: false, map: null, std: true, learn: null, liveT: 0, nb: 0, na: 0 };
+function padDefaults(gp) {
+  const nb = gp.buttons.length, n = gp.axes.length, bb = i => i < nb ? i : -1;
+  if (gp.mapping === 'standard' || (n === 4 && nb >= 10)) return { std: true,       // mando de dos palancas
+    b: { fire: 7, aim: 6, jump: 0, crouch: 1, prone: 11, reload: 2, use: 2, swap: 3, nade: 5, sprint: 10, pause: 9, score: 8, pfire: 0, pbomb: 1, thrUp: 7, thrDn: 6, rudL: 4, rudR: 5, brake: 6 },
+    a: { mvx: [0, 1], mvy: [1, -1], lkx: [2, 1], lky: [3, 1], roll: [0, 1], pitch: [1, 1], rud: [-1, 1], thr: [-1, 1] } };
+  /* joystick de vuelo: palanca en los ejes 1 y 2; el giro suele ser el eje 6 (o el 3) y la palanca de gases el 7 (o el 4). De serie solo
+     lleva el avión y el disparo; lo demás sigue con teclado y ratón hasta que se asigne. */
+  const tw = n > 5 ? 5 : n > 2 ? 2 : -1, sl = n > 6 ? 6 : (n > 3 && tw === 2) ? 3 : -1;
+  return { std: false,
+    b: { fire: bb(0), aim: bb(1), jump: -1, crouch: -1, prone: -1, reload: -1, use: bb(2), swap: -1, nade: -1, sprint: -1, pause: -1, score: -1, pfire: bb(0), pbomb: bb(1), thrUp: -1, thrDn: -1, rudL: -1, rudR: -1, brake: bb(3) },
+    a: { mvx: [-1, 1], mvy: [-1, 1], lkx: [-1, 1], lky: [-1, 1], roll: [0, 1], pitch: [1, 1], rud: [tw, 1], thr: [sl, -1] } };
+}
+function padLoad(gp) {
+  const def = padDefaults(gp); pad.std = def.std; pad.map = def; pad.key = (gp.id || 'mando').slice(0, 70) + '|' + gp.axes.length + '|' + gp.buttons.length;
+  try { const all = JSON.parse(localStorage.getItem('ebro1938pad') || '{}'), m = all[pad.key];
+    if (m && m.b && m.a) { for (const k in def.b) if (typeof m.b[k] === 'number') def.b[k] = m.b[k]; for (const k in def.a) if (Array.isArray(m.a[k])) def.a[k] = [m.a[k][0] | 0, m.a[k][1] < 0 ? -1 : 1]; }
+  } catch (e) { }
+}
+function padSave() { try { const all = JSON.parse(localStorage.getItem('ebro1938pad') || '{}'); all[pad.key] = { b: pad.map.b, a: pad.map.a }; localStorage.setItem('ebro1938pad', JSON.stringify(all)); } catch (e) { } }
+function padReset() { const l = navigator.getGamepads ? navigator.getGamepads() : []; const gp = l[pad.idx]; if (!gp) return; pad.map = padDefaults(gp); padSave(); }
 function pollPad(dt) {
-  let gp = null;
-  try { const l = navigator.getGamepads ? navigator.getGamepads() : []; for (const g of l) if (g && g.connected !== false && g.buttons && g.buttons.length >= 10 && (!gp || (g.mapping === 'standard' && gp.mapping !== 'standard'))) gp = g; } catch (e) { return; }
-  if (!gp) { if (pad.on) { pad.on = false; input.pad = false; input.padSprint = false; if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; } uiPad(); } return; }
-  const B = i => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > 0.5); }, hit = i => B(i) && !pad.prev[i];
+  let list; try { list = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { pad.blocked = true; return; }
+  /* se usa el último dispositivo que el jugador haya tocado */
+  let gp = null, first = null;
+  for (let i = 0; i < list.length; i++) {
+    const g = list[i]; if (!g || g.connected === false || !g.buttons || !g.axes || g.axes.length < 2) continue;
+    if (!first || (g.mapping === 'standard' && first.mapping !== 'standard')) first = g;
+    if (i === pad.idx) { gp = g; continue; }
+    let act = false; for (const b of g.buttons) if (b.pressed) { act = true; break; }
+    const pa = pad.oth || (pad.oth = {}), old = pa[i]; if (old) for (let k = 0; k < g.axes.length && !act; k++) if (Math.abs(g.axes[k] - old[k]) > 0.4) act = true;
+    pa[i] = Array.from(g.axes);
+    if (act) { gp = g; pad.idx = -2; break; }
+  }
+  if (!gp) gp = first;
+  if (!gp) { if (pad.on) { pad.on = false; pad.idx = -1; input.pad = false; input.flyPad = false; input.padSprint = false; input.thrAbs = -1; if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; } uiPad(); } return; }
+  if (!pad.on || pad.idx !== gp.index) { pad.on = true; pad.idx = gp.index; pad.id = gp.id || 'mando'; pad.prev = []; pad.pax = Array.from(gp.axes); pad.nb = gp.buttons.length; pad.na = gp.axes.length; padLoad(gp); uiPad(); }
+  const M = pad.map, B = i => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > 0.5); }, hit = i => i >= 0 && B(i) && !pad.prev[i];
+  const PB = id => { const i = M.b[id]; return i >= 0 && B(i); }, PH = id => hit(M.b[id]), PR = id => { const i = M.b[id]; return i >= 0 && !B(i) && !!pad.prev[i]; };
   const dz = v => Math.abs(v) < 0.16 ? 0 : (v - Math.sign(v) * 0.16) / 0.84;
-  const lx = dz(gp.axes[0] || 0), ly = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
-  pad.rx = rx; pad.ry = ry;
-  let any = !!(lx || ly || rx || ry); for (let i = 0; i < gp.buttons.length && !any; i++) any = B(i);
-  if (!pad.on) { pad.on = true; pad.id = gp.id || 'mando'; uiPad(); }
+  const AX = id => { const m = M.a[id]; return m && m[0] >= 0 ? dz(clamp((gp.axes[m[0]] || 0) * m[1], -1, 1)) : 0; };
+  const done = () => { for (let i = 0; i < gp.buttons.length; i++) pad.prev[i] = B(i); for (let i = 0; i < gp.axes.length; i++) pad.pax[i] = gp.axes[i]; };
+  /* asignación en curso: el primer botón pulsado o el primer eje que se mueva con decisión queda ligado a la acción */
+  if (pad.learn) {
+    const L = pad.learn; L.t -= dt || 0.016;
+    if (L.kind === 'b') { for (let i = 0; i < gp.buttons.length; i++) if (hit(i)) { M.b[L.id] = i; pad.learn = null; padSave(); break; } }
+    else for (let i = 0; i < gp.axes.length; i++) { const d = gp.axes[i] - (L.base[i] || 0); if (Math.abs(d) > 0.55) { M.a[L.id] = [i, d < 0 ? -1 : 1]; pad.learn = null; padSave(); break; } }
+    if (pad.learn && L.t <= 0) pad.learn = null;
+    if (!pad.learn) renderPadCfg();
+    done(); return;
+  }
+  if (!$('padcfg').hidden) {       // con el panel de configuración abierto el mando no actúa sobre el juego: solo se muestra lo que hace
+    pad.liveT -= dt || 0.016;
+    if (pad.liveT <= 0) { pad.liveT = 0.1; const bs = []; for (let i = 0; i < gp.buttons.length; i++) if (B(i)) bs.push(i + 1);
+      $('pcLive').textContent = 'Ejes: ' + Array.from(gp.axes).map((v, i) => (i + 1) + ': ' + (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2)).join('  ') + ' · Botones pulsados: ' + (bs.length ? bs.join(', ') : 'ninguno'); }
+    done(); return;
+  }
+  const st = game.state, inPlane = !!(st === 'play' && P && P.veh && P.veh.kind === 'plane');
+  const ax = inPlane ? AX('roll') : AX('mvx'), ay = inPlane ? AX('pitch') : -AX('mvy'), rx = AX('lkx'), ry = AX('lky');
+  let any = !!(ax || ay || rx || ry); for (let i = 0; i < gp.buttons.length && !any; i++) any = B(i);
   if (any) input.pad = true;
-  const st = game.state;
   if (st === 'play' && P) {
-    if (lx || ly) { input.mvx = lx; input.mvz = ly; pad.move = true; } else if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
+    if (ax || ay) { input.mvx = ax; input.mvz = ay; pad.move = true; } else if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
     input.lookX += rx * Math.abs(rx) * 3.0 * dt / 0.0023 * opts.sens; input.lookY += ry * Math.abs(ry) * 2.1 * dt / 0.0023 * opts.sens;
-    if (hit(7)) { input.fire = true; input.fireQ = 0.3; audioInit(); } else if (!B(7) && pad.prev[7]) input.fire = false;
-    if (hit(6)) input.aim = true; else if (!B(6) && pad.prev[6]) input.aim = false;
-    input.padSprint = B(10);
-    if (hit(2)) { if (P.veh || P.aa || nearVehicle(P) || nearAA(P)) useVehicle(); else startReload(); }
-    if (P.veh && P.veh.kind === 'plane') { if (hit(0)) input.bomb = true; input.thr = (B(5) ? 1 : 0) - (B(4) ? 1 : 0); input.brake = B(6); }      // caza: RB y LB, motor; LT, frenos; A, bomba
-    else if (P.veh) { if (hit(0) || hit(5)) input.bomb = true; }
-    else if (!P.aa) {
-      if (hit(0)) input.jump = true;
-      if (hit(1)) P.crouch = !P.crouch;
-      if (hit(3) || hit(14) || hit(15)) switchWeapon(1 - P.cur);
-      if (hit(5)) playerNade();
+    input.padSprint = PB('sprint');
+    if (PH('use') && (P.veh || P.aa || nearVehicle(P) || nearAA(P))) useVehicle(); else if (PH('reload') && !P.veh && !P.aa) startReload();
+    if (inPlane) {       // caza: palanca, alabeo y cabeceo; timón y motor con botones o con sus ejes (giro de la palanca, palanca de gases)
+      const ta = M.a.thr, ru = AX('rud');
+      if (ax || ay || ru || PB('pfire') || PB('thrUp') || PB('thrDn') || PB('rudL') || PB('rudR') || (ta[0] >= 0 && Math.abs((gp.axes[ta[0]] || 0) - (pad.pax[ta[0]] || 0)) > 0.02)) input.flyPad = true;
+      if (PH('pfire')) { input.fire = true; audioInit(); } else if (PR('pfire')) input.fire = false;
+      if (PH('pbomb')) input.bomb = true;
+      input.thr = (PB('thrUp') ? 1 : 0) - (PB('thrDn') ? 1 : 0); input.brake = PB('brake');
+      input.rud = clamp((PB('rudR') ? 1 : 0) - (PB('rudL') ? 1 : 0) + ru, -1, 1);
+      input.thrAbs = ta[0] >= 0 ? clamp(((gp.axes[ta[0]] || 0) * ta[1] + 1) / 2, 0, 1) : -1;
+    } else {
+      input.thrAbs = -1;
+      if (PH('fire')) { input.fire = true; input.fireQ = 0.3; audioInit(); } else if (PR('fire')) input.fire = false;
+      if (PH('aim')) input.aim = true; else if (PR('aim')) input.aim = false;
+      if (P.veh) { if (PH('jump') || PH('nade')) input.bomb = true; }
+      else if (!P.aa) {
+        if (PH('jump')) input.jump = true;
+        if (PH('crouch')) setStance(P, P.prone || !P.crouch ? 1 : 0);
+        if (PH('prone')) setStance(P, P.prone ? 0 : 2);
+        if (PH('swap') || (pad.std && (hit(14) || hit(15)))) switchWeapon(1 - P.cur);
+        if (PH('nade')) playerNade();
+      }
     }
-    if (B(8) !== !!pad.prev[8]) showScore(B(8));
-    if (hit(9)) pauseGame();
+    const sc = M.b.score; if (sc >= 0 && B(sc) !== !!pad.prev[sc]) showScore(B(sc));
+    if (PH('pause')) pauseGame();
   } else {
     if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
-    if (st === 'pause') { if (hit(9) || hit(1)) { if (!$('archive').hidden) $('archive').hidden = true; else if (!$('controls').hidden) $('controls').hidden = true; else resumeGame(); } }
+    const ok = PH('jump') || PH('fire') || PH('pfire'), back = PH('crouch') || PH('pbomb');
+    if (st === 'pause') { if (PH('pause') || back) { if (!$('archive').hidden) $('archive').hidden = true; else if (!$('controls').hidden) $('controls').hidden = true; else resumeGame(); } }
     else if (st === 'deploy') {
-      if (hit(0)) { audioInit(); deployPlayer(); }
-      if (hit(14) || hit(15)) { game.selClass = (game.selClass + (hit(15) ? 1 : 3)) % 4; renderClassCard(); }
-      if (hit(12) || hit(13)) {       // recorre posiciones y, después, los carros y cazas disponibles
+      if (ok) { audioInit(); deployPlayer(); }
+      if (pad.std && (hit(14) || hit(15))) { game.selClass = (game.selClass + (hit(15) ? 1 : 3)) % 4; renderClassCard(); }
+      if (pad.std && (hit(12) || hit(13))) {       // recorre posiciones y, después, los carros y cazas disponibles
         const own = FLAGS.filter(f => f.owner === game.team).concat(vehicles.filter(v => v.team === game.team && vehDeployable(v))), i = own.indexOf(game.selVeh || game.selSpawn), nx = own[(i + (hit(13) ? 1 : own.length - 1)) % own.length];
         if (nx.def) game.selVeh = nx; else { game.selVeh = null; game.selSpawn = nx; }
         drawDeployMap(); uiDeployTick();
       }
     }
-    else if (st === 'end') { if (hit(0)) uiToMenu(); }
+    else if (st === 'end') { if (ok) uiToMenu(); }
     else if (st === 'menu') {
-      if (hit(1)) { $('archive').hidden = true; $('controls').hidden = true; }
-      else if (hit(4)) startMatch(REP); else if (hit(5)) startMatch(NAT);
+      if (back) { $('archive').hidden = true; $('controls').hidden = true; }
+      else if (pad.std && hit(4)) startMatch(REP); else if (pad.std && hit(5)) startMatch(NAT);
     }
   }
-  for (let i = 0; i < gp.buttons.length; i++) pad.prev[i] = B(i);
+  done();
 }
 addEventListener('gamepadconnected', () => { try { pollPad(0); } catch (e) { } });
 
@@ -2220,7 +2364,7 @@ function camBasis() {
   const p = P, yaw = p.yaw, pit = clamp(p.pitch + p.recoil, -1.5, 1.5), sy = Math.sin(yaw), cy = Math.cos(yaw), sp = Math.sin(pit), cp = Math.cos(pit);
   _cb.fx = -sy * cp; _cb.fy = sp; _cb.fz = -cy * cp; _cb.rx = cy; _cb.ry = 0; _cb.rz = -sy; _cb.ux = sy * sp; _cb.uy = cp; _cb.uz = cy * sp;
   const bob = p.onGround ? Math.abs(Math.sin(p.walkPhase * 0.5)) * 0.045 * Math.min(1, p.speed / 5) : 0;
-  _cb.ex = p.x; _cb.ey = p.y + (p.swim ? 1.62 : lerp(1.62, 1.08, p.crouchT)) + bob; _cb.ez = p.z; _cb.yaw = yaw; _cb.pitch = pit;
+  _cb.ex = p.x; _cb.ey = p.y + (p.swim ? 1.62 : lerp(lerp(1.62, 1.08, p.crouchT), 0.36, p.proneT || 0)) + bob * (1 - (p.proneT || 0) * 0.7); _cb.ez = p.z; _cb.yaw = yaw; _cb.pitch = pit;
   return _cb;
 }
 /* rayo contra terreno, edificios y soldados enemigos */
@@ -2244,16 +2388,34 @@ function rayWorld(ox, oy, oz, dx, dy, dz, maxT, team) {
     const sx = ox - s.x, sz = oz - s.z, b = sx * dx + sz * dz, c = sx * sx + sz * sz - 0.1;
     const disc = b * b - a * c; if (disc < 0) continue;
     const t = (-b - Math.sqrt(disc)) / a; if (t < 0 || t >= res.t) continue;
-    const y = oy + dy * t - s.y, top = s.swim ? 1.75 : lerp(1.75, 1.22, s.crouchT);
+    const y = oy + dy * t - s.y, top = s.swim ? 1.75 : lerp(lerp(1.75, 1.22, s.crouchT), 0.55, s.proneT || 0);
     if (y < (s.swim ? 1.2 : 0) || y > top) continue;
     res.t = t; res.s = s; res.head = y > top - 0.28; res.kind = 'soldier';
   }
   return res;
 }
+/* posturas: 0 de pie, 1 agachado, 2 tumbado */
+function setStance(p, st) {
+  if (!p.alive || p.veh || p.aa || p.swim) return;
+  const was = !!p.prone;
+  p.prone = st === 2; p.crouch = st === 1;
+  if (p.prone !== was) {       // tumbarse y levantarse lleva un momento, con el arma baja
+    p.switchT = Math.max(p.switchT, 0.38); input.aim = false;
+    if (p.prone && p.isPlayer && !game.proneTold) { game.proneTold = true; const lmg = p.weps[p.cur].def.kind === 'lmg';
+      showHint(lmg ? 'Tumbado, la ametralladora se apoya en el bípode: apenas se desvía ni retrocede. Z o Espacio para levantarte.' : 'Tumbado apuntas mejor y te ven menos, pero solo avanzas a rastras. Z o Espacio para levantarte.'); }
+  }
+}
+/* dispersión actual del arma del jugador. Agachado mejora un poco; tumbado, bastante, y con una ametralladora sobre el bípode, muchísimo */
+function playerSpread(p, w) {
+  const pt = p.proneT || 0, bip = w.kind === 'lmg' ? pt : 0;
+  let s = lerp(w.hip, w.ads, p.aimT) + (p.speed / 6.6) * 0.022 * (1 - p.aimT * 0.5) + p.spreadAdd * (1 - bip * 0.8) + (p.onGround ? 0 : 0.05);
+  if (pt > 0) s *= lerp(1, w.kind === 'lmg' ? 0.2 : 0.55, pt); else if (p.crouch) s *= 0.75;
+  if (pt > 0.03 && pt < 0.97) s += 0.03;       // a medio tumbarse o levantarse no se acierta
+  return s;
+}
 function playerFire(ws) {
   const p = P, w = ws.def; ws.ammo--; p.fireT = w.rate; p.lastShot = game.time; input.fireQ = 0;
-  let spread = lerp(w.hip, w.ads, p.aimT) + (p.speed / 6.6) * 0.022 * (1 - p.aimT * 0.5) + p.spreadAdd + (p.onGround ? 0 : 0.05);
-  if (p.crouch) spread *= 0.75;
+  let spread = playerSpread(p, w);
   const c = camBasis(), a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * spread, sx = Math.cos(a) * r, sy = Math.sin(a) * r;
   let dx = c.fx + c.rx * sx + c.ux * sy, dy = c.fy + c.ry * sx + c.uy * sy, dz = c.fz + c.rz * sx + c.uz * sy; const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l;
   const hit = rayWorld(c.ex, c.ey, c.ez, dx, dy, dz, 420, p.team), hv = rayVehicles(c.ex, c.ey, c.ez, dx, dy, dz, hit.t, null);
@@ -2271,77 +2433,94 @@ function playerFire(ws) {
     applyDamage(hit.s, dmg, p, hit.head, w.name); p.hitT = 0.22; p.hitKill = !hit.s.alive; SFX.hit();
     addPart(hx, hy, hz, 0, 0.6, 0, 0.3, 1, 0.35, 0.6, 0.52, 0.4, 0.5, 0, 2);
   } else if (hit.kind) puff(hx, hy, hz, hit.kind === 'water');
-  p.kick = 1; p.recoil += w.kick; p.pitch = clamp(p.pitch + w.kick * 0.3, -1.45, 1.45); p.yaw += rnd(-1, 1) * w.kick * 0.25;
+  const rk = p.prone ? (w.kind === 'lmg' ? 0.2 : 0.6) : 1;       // tumbado el arma retrocede menos; con bípode, casi nada
+  p.kick = rk; p.recoil = Math.min(0.09, p.recoil + w.kick * rk);       // el retroceso sacude la vista un instante, pero no mueve la puntería: la mira vuelve a donde apuntabas
   if (w.auto) p.spreadAdd = Math.min(0.045, p.spreadAdd + 0.005);
   if (w.kind === 'rifle') { p.boltT = w.rate; if (ws.ammo > 0) setTimeout(() => { if (game.state === 'play') SFX.bolt(); }, 280); }
 }
+/* Sin captura del ratón (cuando el navegador no la permite), el cursor topa con el borde de la ventana y no se puede seguir girando.
+   Solo en ese caso, y solo con el cursor apretado contra el mismo borde, la vista sigue girando despacio. Nunca gira sola por tener
+   el cursor cerca de un borde, y si el ratón se puede capturar no hace nada. */
+function edgeLook(p, dt, lo, hi) {
+  if (input.locked || input.touch || input.mx < 0 || !lockOff()) return;
+  const zx = Math.max(10, cw * 0.025), zy = Math.max(10, ch * 0.025);
+  if (input.mx < zx) p.yaw += (1 - input.mx / zx) * 1.2 * dt; else if (input.mx > cw - zx) p.yaw -= (1 - (cw - input.mx) / zx) * 1.2 * dt;
+  if (input.my < zy) p.pitch = clamp(p.pitch + (1 - input.my / zy) * 0.5 * dt, lo, hi); else if (input.my > ch - zy) p.pitch = clamp(p.pitch - (1 - (ch - input.my) / zy) * 0.5 * dt, lo, hi);
+}
 function updatePlayer(dt) {
   const p = P, k = input.keys;
+  if (!isFinite(p.yaw)) p.yaw = 0; if (!isFinite(p.pitch)) p.pitch = 0;       // la vista nunca puede quedar en un valor imposible
+  if (p.yaw > 50 || p.yaw < -50) { const w = Math.round(p.yaw / 6.283185307) * 6.283185307; p.yaw -= w; if (gyro.ok) gyro.yawOff -= w; }
+  if (!isFinite(input.lookX) || !isFinite(input.lookY)) input.lookX = input.lookY = 0;
   if (p.alive && p.veh && p.veh.kind === 'truck') {      // al volante: el ratón gira la cámara alrededor del camión
     game.camOff -= input.lookX * 0.0023; p.pitch = clamp(p.pitch - input.lookY * 0.0023, -0.5, 0.3); input.lookX = input.lookY = 0; input.jump = false;
     game.camOff += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.9 * dt;
     if (Math.abs(p.veh.speed) > 2) game.camOff *= Math.max(0, 1 - dt * 0.9);
-    p.aimT = 0; p.crouchT = 0; return;
+    p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
   if (p.alive && p.veh && p.veh.kind === 'plane') {
-    /* Caza. El ratón no mueve la vista ni actúa como una palanca que se queda inclinada: cada movimiento desplaza un poco el rumbo (a los lados)
-       y la inclinación del morro (arriba y abajo) que el avión busca con suavidad. Si dejas quieto el ratón, el avión sigue recto como va. */
-    const v = p.veh, inv = opts.invY ? -1 : 1, invD = input.touch ? 1 : inv;      // la inversión vale para ratón, flechas y mando; el dedo y el giroscopio siguen yendo directos
+    /* Caza con mandos de avión. La palanca (ratón, palanca táctil o palanca izquierda del mando) da alabeo y cabeceo; el timón va aparte
+       (A y D, dos botones en el móvil, L1 y R1 en el mando). Para virar se inclinan las alas y se tira de la palanca; el timón solo
+       desliza el morro despacio, para afinar la puntería o corregir en el despegue. */
+    const v = p.veh, pullSign = opts.invY ? 1 : -1;      // invertido (por defecto): palanca hacia atrás, morro arriba
     if (v.air) {
-      const kxk = clamp((k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0) + (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0), -1, 1), ky = (k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0);
-      const joy = input.touch || (input.pad && pad.on);       // palanca de vuelo: la táctil de la izquierda o la palanca izquierda del mando
-      if (joy) stick.tp -= input.mvz * Math.abs(input.mvz) * 0.5 * dt * inv;      // la palanca sube o baja el morro poco a poco y al soltarla el avión mantiene la inclinación (inv = -1, invertido: hacia atrás, sube)
-      if (!joy && !input.locked && input.mx >= 0) {       // ratón sin capturar: cursor en el centro, vuelo recto; hacia un lado, vira; arriba o abajo, sube o baja
+      const joy = input.touch || (pad.on && input.flyPad);       // palanca táctil, o el mando o joystick si es lo último que has movido
+      let pull = 0, rollIn = false;       // pull: cabeceo pedido en este paso, en el eje del propio avión
+      if (joy) {         // palanca que vuelve al centro: a los lados inclina las alas (y al soltarla se nivelan); adelante y atrás, cabeceo
+        stick.tr = -input.mvx * 1.2; rollIn = true;
+        pull += input.mvz * Math.abs(input.mvz) * 0.75 * dt * pullSign;
+      } else if (!input.locked && input.mx >= 0 && lockOff()) {       // ratón imposible de capturar: la posición del cursor respecto al centro es la palanca
         const R = Math.min(cw, ch) * 0.42, dzn = q => { const a = Math.abs(q); return a < 0.12 ? 0 : Math.sign(q) * Math.min(1, (a - 0.12) / 0.88); };
-        const ox = dzn((input.mx - cw / 2) / R), oy = dzn(-(input.my - ch / 2) / R);
-        stick.ty -= ox * Math.abs(ox) * 1.0 * dt; if (!ky) stick.tp = oy * 0.65 * inv;
-      } else { stick.ty -= input.lookX * 0.0016; stick.tp -= input.lookY * 0.0016 * invD; }
-      const side = clamp(kxk + (joy ? input.mvx : 0), -1, 1);
-      if (side) { stick.ty = v.yaw - side * 0.45; stick.turning = true; }       // palanca o teclas a un lado: vira mientras se mantiene, tanto más cuanto más se inclina
-      else if (stick.turning) { stick.turning = false; stick.ty = v.yaw + (v.yawRate || 0) * 0.3; }       // al soltar, endereza enseguida
-      stick.tp += ky * 0.6 * dt * inv;
-      stick.ty = v.yaw + clamp(angDiff(stick.ty, v.yaw), -1.2, 1.2);       // la consigna nunca se adelanta demasiado al avión
-      stick.tp = clamp(stick.tp, -0.75, 0.75);
-    } else { stick.ty = v.yaw; stick.tp = 0.3; }
-    input.lookX = input.lookY = 0; input.jump = false; p.yaw = v.yaw; p.pitch = v.pitch; p.aimT = 0; p.crouchT = 0; return;
+        const ox = dzn((input.mx - cw / 2) / R), oy = dzn((input.my - ch / 2) / R);
+        stick.tr = -ox * 1.2; rollIn = true; pull += oy * Math.abs(oy) * 0.75 * dt * pullSign;
+      } else {           // ratón capturado: cada movimiento inclina o cabecea un poco y el avión conserva la postura
+        if (input.lookX) rollIn = true;
+        stick.tr -= input.lookX * 0.0024; pull += input.lookY * 0.0016 * pullSign;
+      }
+      const kr = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0), kp = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0);       // las flechas hacen de palanca
+      if (kr) { stick.tr -= kr * 1.4 * dt; rollIn = true; }
+      pull += kp * 0.6 * dt * pullSign;
+      stick.tr = clamp(stick.tr, -1.3, 1.3);
+      if (!rollIn && Math.abs(stick.tr) < 0.14) stick.tr *= Math.max(0, 1 - dt * 2);       // casi nivelado: termina de nivelar solo
+      const rud = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.rud, -1, 1), cr = Math.cos(v.roll), sr = Math.sin(v.roll);
+      stick.tp += pull * cr - (1 - cr) * 0.1 * dt;       // con las alas inclinadas, tirar hace virar en vez de subir, y el morro tiende a caer
+      stick.ty += pull * sr / Math.max(0.45, Math.cos(v.pitch)) + sr * 0.5 * v.def.turn * dt - rud * 0.4 * dt;       // viraje por inclinación, más el timón
+      stick.ty = v.yaw + clamp(angDiff(stick.ty, v.yaw), -0.8, 0.8);       // la consigna nunca se adelanta demasiado al avión
+      stick.tp = clamp(stick.tp, -0.9, 0.9);
+    } else { stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; }
+    input.lookX = input.lookY = 0; input.jump = false; p.yaw = v.yaw; p.pitch = v.pitch; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
   if (p.alive && p.veh) {      // carro: el ratón apunta la torre
-    const plane = p.veh.kind === 'plane', lo = plane ? -1.1 : -0.25, hi = plane ? 1.0 : 0.45, sv = plane ? 0.0019 : 0.0023;
+    const plane = false, lo = -0.55, hi = 0.62, sv = 0.0021;       // la mirilla puede subir y bajar bastante más que antes
     if (!gyroLook(p, dt, lo, hi, sv)) { p.yaw -= input.lookX * sv; p.pitch = clamp(p.pitch - input.lookY * sv, lo, hi); }
     input.lookX = input.lookY = 0; input.jump = false;
-    if (!input.locked && !input.touch && input.mx >= 0) {
-      const ex = input.mx / cw, ey = input.my / ch;
-      if (ex < 0.1) p.yaw += (0.1 - ex) * 20 * dt; else if (ex > 0.9) p.yaw -= (ex - 0.9) * 20 * dt;
-      if (ey < 0.08) p.pitch = clamp(p.pitch + (0.08 - ey) * 12 * dt, lo, hi); else if (ey > 0.92) p.pitch = clamp(p.pitch - (ey - 0.92) * 12 * dt, lo, hi);
-    }
+    edgeLook(p, dt, lo, hi);
     p.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.6 * dt; p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.1 * dt, lo, hi);
     if (plane && !p.veh.air) { p.yaw += angDiff(p.veh.yaw, p.yaw) * Math.min(1, dt * 3); }
-    p.aimT = 0; p.crouchT = 0; return;
+    p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
   const sens = 0.0023 * (1 - 0.5 * (p.aimT || 0) * (1 - (p.weps ? p.weps[p.cur].def.zoom : 1)) * 2);
   if (!gyroLook(p, dt, -1.45, 1.45, sens)) { p.yaw -= input.lookX * sens; p.pitch = clamp(p.pitch - input.lookY * sens, -1.45, 1.45); }
   input.lookX = input.lookY = 0;
-  if (!input.locked && !input.touch && input.mx >= 0) {   // sin captura del ratón: los bordes de la pantalla siguen girando la vista
-    const ex = input.mx / cw, ey = input.my / ch;
-    if (ex < 0.1) p.yaw += (0.1 - ex) * 24 * dt; else if (ex > 0.9) p.yaw -= (ex - 0.9) * 24 * dt;
-    if (ey < 0.08) p.pitch = clamp(p.pitch + (0.08 - ey) * 14 * dt, -1.45, 1.45); else if (ey > 0.92) p.pitch = clamp(p.pitch - (ey - 0.92) * 14 * dt, -1.45, 1.45);
-  }
+  edgeLook(p, dt, -1.45, 1.45);
   p.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.9 * dt;
   p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.2 * dt, -1.45, 1.45);
   if (!p.alive) { p.fall = Math.min(1, p.fall + dt * 2.6); return; }
-  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); p.x = p.aa.x; p.z = p.aa.z; p.speed = 0; p.aimT = 0; p.crouchT = 0; input.jump = false; return; }      // sirviendo la antiaérea
+  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); p.x = p.aa.x; p.z = p.aa.z; p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
   let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx;
   const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
   const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
   p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
-  const sprint = (k.ShiftLeft || k.ShiftRight || input.padSprint || ((input.touch || input.pad) && f > 0.92)) && f > 0.5 && !p.crouch && !aiming;
-  let sp = p.crouch ? 2.1 : sprint ? 6.6 : aiming ? 2.6 : 4.4; if (p.swim) sp *= 0.5;
+  if (p.swim) p.prone = false;
+  const sprint = (k.ShiftLeft || k.ShiftRight || input.padSprint || ((input.touch || input.pad) && f > 0.92)) && f > 0.5 && !p.crouch && !p.prone && !aiming;
+  let sp = p.prone ? (aiming ? 0.6 : 1.05) : p.crouch ? 2.1 : sprint ? 6.6 : aiming ? 2.6 : 4.4; if (p.swim) sp *= 0.5;
   const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), tx = (-sy * f + cy * r) * sp, tz = (-cy * f - sy * r) * sp, acc = Math.min(1, (p.onGround ? 12 : 2.5) * dt);
   p.vx += (tx - p.vx) * acc; p.vz += (tz - p.vz) * acc;
   p.x += p.vx * dt; p.z += p.vz * dt;
   resolveCollide(p, 0.38);
   const gy = groundAt(p.x, p.z, p.y), swimming = gy < waterY - 1.15, floor = swimming ? waterY - 1.25 : gy;
-  if (input.jump && p.onGround && !swimming) { p.vy = 4.9; p.onGround = false; p.crouch = false; }
+  if (input.jump && p.prone) setStance(p, 0);       // tumbado, saltar es levantarse
+  else if (input.jump && p.onGround && !swimming && (p.proneT || 0) < 0.1) { p.vy = 4.9; p.onGround = false; p.crouch = false; }
   input.jump = false;
   p.vy -= 13 * dt; p.y += p.vy * dt;
   if (p.y <= floor || (p.onGround && p.y - floor < 0.5 && p.vy <= 0)) {
@@ -2351,6 +2530,7 @@ function updatePlayer(dt) {
   p.swim = swimming && p.onGround;
   p.speed = Math.hypot(p.vx, p.vz); p.walkPhase += p.speed * dt * 1.9;
   p.crouchT = clamp(p.crouchT + (p.crouch ? 1 : -1) * dt * 7, 0, 1);
+  p.proneT = clamp((p.proneT || 0) + (p.prone ? 1 : -1) * dt * 2.7, 0, 1);
   p.aimPitch = p.pitch;
   /* junto a una bandera propia: municionamiento y cura */
   p.supT = (p.supT || 0) - dt;
@@ -2379,10 +2559,10 @@ function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));
-  const mv = Math.min(1, p.speed / 5) * (1 - a * 0.85), ph = p.walkPhase * 0.5;
+  const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
   const pist = w.kind === 'pistol' ? -0.12 : 0;
   const x = lerp(0.19, 0, a) + Math.sin(ph) * 0.008 * mv, y = lerp(-0.19, -0.0245, a) + Math.abs(Math.cos(ph)) * 0.008 * mv - rel * 0.2 - p.switchT * 0.5 - bolt * 0.02 * (1 - a);
-  const z = lerp(-0.48, -0.32, a) + pist + p.kick * 0.035 * (w.auto ? 0.5 : 1);
+  const z = lerp(-0.48, -0.32, a) + pist + p.kick * 0.035 * (w.auto ? 0.5 : 1) - pt * 0.03 * (1 - a);
   M4.copy(_fp, camWorld); M4.translate(_fp, x, y, z);
   M4.rotY(_fp, lerp(0.03, 0, a)); M4.rotX(_fp, p.kick * 0.03 * (w.auto ? 0.4 : 1) - rel * 0.6 - p.switchT * 0.8); M4.rotZ(_fp, -bolt * 0.22 - rel * 0.3);
   drawMesh(ws.mesh, _fp);
@@ -2492,19 +2672,21 @@ function takeVehicle(p, v) {
   if (v.driver && !v.driver.isPlayer) ejectBot(v);
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   v.aiOn = false; v.crew.alive = false;
-  v.driver = p; p.veh = v; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
-  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) v.thr = 0; stick.ty = v.yaw; stick.tp = 0.3; game.planeCam = v.yaw; game.planeCamP = 0; input.thr = 0; input.brake = false; }
+  v.driver = p; p.veh = v; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
+  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) v.thr = 0; stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; game.planeCam = v.yaw; game.planeCamP = 0; input.thr = 0; input.brake = false; input.rud = 0; }
   gyroSync();
   if (!game.vehTold[v.type]) { game.vehTold[v.type] = true; pushCard(v.name, v.def.hist); }
-  if (v.kind === 'plane') showHint(input.touch ? 'Mantén «Motor +» para despegar. La palanca de la izquierda pilota: ' + (opts.invY ? 'hacia atrás sube el morro, hacia delante lo baja' : 'hacia delante sube, hacia atrás baja') + ', y a los lados vira.'
-    : input.pad ? 'RB sube el motor y LB lo baja. La palanca izquierda pilota; LT frena en tierra.'
-    : 'Mantén W para subir el motor y despegar. En el aire, ' + (opts.invY ? 'tira del ratón hacia ti para subir y empújalo para bajar' : 'mueve el ratón arriba para subir y abajo para bajar') + '; a los lados vira. W y S suben y bajan el motor; B frena en tierra.');
+  if (v.kind === 'tank') showHint('La cruz del centro es el punto al que apuntas. El círculo marca dónde caería el disparo: cuando alcanza la cruz y se pone amarillo, ' + (v.def.cannon ? 'el cañonazo cae justo ahí.' : 'las ametralladoras dan justo ahí.'));
+  if (v.kind === 'plane') showHint(input.touch ? 'Mantén «Motor +» para despegar. La palanca inclina las alas y sube o baja el morro; para virar, inclina y tira. Los dos botones de «Timón» van aparte.'
+    : input.pad ? 'R2 sube el motor y L2 lo baja. La palanca izquierda inclina las alas y cabecea; L1 y R1 son el timón; A dispara y B suelta la bomba.'
+    : 'Mantén W para subir el motor y despegar. El ratón es la palanca: a los lados inclina las alas y ' + (opts.invY ? 'hacia ti sube el morro' : 'hacia delante sube el morro') + '. Para virar, inclina y tira. A y D son el timón.');
   SFX.click();
 }
 function exitVehicle(p) {
   const v = p.veh; if (!v) return;
   if (v.kind === 'plane' && (v.air || v.speed > 4)) { showHint('Aterriza y frena (S) antes de bajar del avión.'); return; }
   p.veh = null; v.driver = null; v.idleT = 0; v.launchT = 45;
+  if (p.isPlayer) { input.fire = false; input.aim = false; input.thr = 0; input.rud = 0; input.brake = false; }
   const es = exitSpot(v), ex = es[0], ez = es[1];
   p.x = ex; p.z = ez; p.y = groundAt(ex, ez); p.vx = p.vy = p.vz = 0; p.onGround = true; p.switchT = 0.4;
   if (v.kind !== 'tank') { p.yaw = v.yaw + (v.kind === 'truck' ? (game.camOff || 0) : 0); p.pitch = 0; }
@@ -2563,8 +2745,32 @@ function vehShot(v, att, ox, oy, oz, dx, dy, dz, spread, dmgS, dmgP, cause) {
   SFX.shot('lmg', ox, oy, oz); v.crew.lastShot = game.time;
   if (ok && att && att.isPlayer) { P.hitT = 0.2; P.hitKill = hit.s && !hv.v ? !hit.s.alive : !!(hv.v && (hv.v.dead || hv.v.falling)); }
 }
-const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0, turn: null, brake: false };
+const _ctl = { f: 0, r: 0, fire: false, fire2: false, bomb: false, aimYaw: 0, aimPitch: 0, turn: null, brake: false, roll: 0 };
 const _va = { x: 0, y: 0, z: 0 }, _vb = { x: 0, y: 0, z: 0 };
+/* elevación de la pieza del carro y caída del proyectil (170 m/s, gravedad 6) */
+const GUN_LO = -0.3, GUN_HI = 0.5, SHELL_V = 170, SHELL_G = 6;
+/* cámara del carro: detrás y por encima, mirando exactamente hacia donde apunta el jugador */
+const _tv = { x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0 };
+function tankView(v, p) {
+  const yaw = p.yaw, pit = p.pitch, cp = Math.cos(pit), o = _tv;
+  o.x = v.x + Math.sin(yaw) * cp * 8.5; o.z = v.z + Math.cos(yaw) * cp * 8.5;
+  o.y = Math.max(v.y + 3.9 - Math.sin(pit) * 8.5, Math.max(groundAt(o.x, o.z), waterY) + 0.7);
+  o.dx = -Math.sin(yaw) * cp; o.dy = Math.sin(pit); o.dz = -Math.cos(yaw) * cp;
+  return o;
+}
+/* Puntería del jugador: se busca el punto del mundo que hay justo bajo la mirilla del centro de la pantalla y la pieza se orienta
+   hacia él desde la boca del cañón, con la elevación extra que compensa la caída del proyectil. Así el disparo cae donde marca la mirilla. */
+function tankAim(v, p, ctl) {
+  const c = tankView(v, p), t0 = 7;       // el rayo empieza pasado el propio carro
+  const ox = c.x + c.dx * t0, oy = c.y + c.dy * t0, oz = c.z + c.dz * t0;
+  const hit = rayWorld(ox, oy, oz, c.dx, c.dy, c.dz, 450, v.team), hv = rayVehicles(ox, oy, oz, c.dx, c.dy, c.dz, hit.t, v);
+  const t = Math.max(9, hv.v ? hv.t : hit.t) + t0, m = tankMuzzle(v);       // el punto apuntado queda siempre por delante de la boca del cañón
+  v.aimX = c.x + c.dx * t; v.aimY = c.y + c.dy * t; v.aimZ = c.z + c.dz * t;
+  const ax = v.aimX - m[0], ay = v.aimY - m[1], az = v.aimZ - m[2], d = Math.hypot(ax, az) || 1;
+  v.aimD = Math.hypot(d, ay);
+  ctl.aimYaw = p.yaw + clamp(angDiff(Math.atan2(-ax, -az), p.yaw), -0.22, 0.22);       // la corrección por la posición de la cámara es pequeña; jamás un giro brusco
+  ctl.aimPitch = clamp(Math.atan2(ay, d), p.pitch - 0.35, p.pitch + 0.5) + (v.def.cannon ? Math.atan(0.5 * SHELL_G * d / (SHELL_V * SHELL_V)) : 0);
+}
 function tankMuzzle(v) {
   const m = world.vm[v.type], c = Math.cos(v.yaw), s = Math.sin(v.yaw), px = m.pivot[0], pz = m.pivot[2];
   return [v.x + px * c + pz * s, v.y + m.pivot[1] + m.muzzle, v.z - px * s + pz * c];
@@ -2614,7 +2820,7 @@ function tankAI(v, dt, ctl) {
     ctl.aimYaw = Math.atan2(-dx, -dz); ctl.aimPitch = Math.atan2(ty - (v.y + 1.9) + 3 * tt * tt, d);
     a.aimT -= dt;
     const al = Math.abs(angDiff(ctl.aimYaw, v.tyaw));
-    if (a.aimT <= 0 && D.cannon && v.fireT <= 0 && al < 0.04 && (a.tgtV || d > 16) && Math.abs(v.tpitch - clamp(ctl.aimPitch, -0.14, 0.4)) < 0.03) { ctl.fire = true; a.sx = rnd(-3, 3); a.sz = rnd(-3, 3); }
+    if (a.aimT <= 0 && D.cannon && v.fireT <= 0 && al < 0.04 && (a.tgtV || d > 16) && Math.abs(v.tpitch - clamp(ctl.aimPitch, GUN_LO, GUN_HI)) < 0.03) { ctl.fire = true; a.sx = rnd(-3, 3); a.sz = rnd(-3, 3); }
     if (!a.tgtV && a.aimT <= 0 && al < 0.1 && d < 140 && crew.fireT <= 0) { crew.yaw = v.tyaw; botFire(crew, tgt, d, Math.abs(v.speed) > 1.5); }
   } else { ctl.aimYaw = v.yaw; ctl.aimPitch = 0; }
 }
@@ -2701,7 +2907,7 @@ function updateGround(v, dt, ctl) {
   if (tank) {
     v.fireT -= dt; v.mgT -= dt; v.kick = Math.max(0, v.kick - dt * 4);
     if (op) {
-      v.tyaw += clamp(angDiff(ctl.aimYaw, v.tyaw), -1.0 * dt, 1.0 * dt); v.tpitch += clamp(clamp(ctl.aimPitch, -0.14, 0.4) - v.tpitch, -0.7 * dt, 0.7 * dt);
+      v.tyaw += clamp(angDiff(ctl.aimYaw, v.tyaw), -1.3 * dt, 1.3 * dt); v.tpitch += clamp(clamp(ctl.aimPitch, GUN_LO, GUN_HI) - v.tpitch, -1.0 * dt, 1.0 * dt);
       const cp = Math.cos(v.tpitch), dx = -Math.sin(v.tyaw) * cp, dy = Math.sin(v.tpitch), dz = -Math.cos(v.tyaw) * cp, m = tankMuzzle(v);
       if (D.cannon && ctl.fire && v.fireT <= 0) {
         v.fireT = 3.6; v.kick = 1;
@@ -2712,7 +2918,14 @@ function updateGround(v, dt, ctl) {
         SFX.cannon(mx, my, mz); v.crew.lastShot = game.time;
         if (op.isPlayer) game.shake = Math.max(game.shake, 0.5);
       }
-      if ((D.cannon ? ctl.fire2 : (ctl.fire || ctl.fire2)) && v.mgT <= 0 && op.isPlayer) { v.mgT = D.mgRate; vehShot(v, op, m[0] + dx * 1.3, m[1] + dy * 1.3, m[2] + dz * 1.3, dx, dy, dz, 0.014, 34, 10, D.mgName); }
+      if ((D.cannon ? ctl.fire2 : (ctl.fire || ctl.fire2)) && v.mgT <= 0 && op.isPlayer) {
+        v.mgT = D.mgRate;
+        let mx = dx, my = dy, mz = dz;       // la ametralladora no tiene caída: con la torre ya encarada, dispara recta al punto de la mirilla
+        if (v.aimD && Math.abs(angDiff(ctl.aimYaw, v.tyaw)) < 0.05 && Math.abs(clamp(ctl.aimPitch, GUN_LO, GUN_HI) - v.tpitch) < 0.05) {
+          const ax = v.aimX - m[0], ay = v.aimY - m[1], az = v.aimZ - m[2], l = Math.hypot(ax, ay, az) || 1; mx = ax / l; my = ay / l; mz = az / l;
+        }
+        vehShot(v, op, m[0] + mx * 1.3, m[1] + my * 1.3, m[2] + mz * 1.3, mx, my, mz, 0.008, 34, 10, D.mgName);
+      }
     }
   }
   /* soldados: se apartan o son arrollados */
@@ -2755,7 +2968,7 @@ function updatePlane(v, dt, ctl) {
     if (th < waterY - 0.3 || (v.speed > 5 && insideSolid(v.x, v.z, 0.6))) { crashPlane(v); return; }
     if (v.speed >= 24 && op && !v.rollout) {       // despega: da un salto limpio y no puede volver a posarse durante el ascenso inicial
       v.air = true; v.assistT = 4; v.y += 0.35; v.pitch = Math.max(v.pitch, 0.2);
-      if (op.isPlayer) { stick.ty = v.yaw; stick.tp = 0.3; $('hint').hidden = true; }
+      if (op.isPlayer) { stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; $('hint').hidden = true; }
     }
     return;
   }
@@ -2765,7 +2978,7 @@ function updatePlane(v, dt, ctl) {
     if (v.assistT > 0) { v.assistT -= dt; ap = Math.max(ap, 0.3); }       // los primeros segundos sube solo, para no rozar el suelo al final de la pista
     if (Math.abs(v.x) > 640 || Math.abs(v.z) > 560) {       // límite del cielo: da la vuelta, y la mirada del piloto con él
       ay = Math.atan2(v.x, v.z); ap = Math.min(ap, 0.15); turn = null;
-      if (op.isPlayer) { stick.ty = ay; if (!v.turnTold) { v.turnTold = true; showHint('Fin del campo de batalla: el avión da la vuelta solo.'); } }
+      if (op.isPlayer) { stick.ty = ay; stick.tr = 0; if (!v.turnTold) { v.turnTold = true; showHint('Fin del campo de batalla: el avión da la vuelta solo.'); } }
     } else v.turnTold = false;
     if (v.y > 250) ap = Math.min(ap, -0.05);
   }
@@ -2778,9 +2991,10 @@ function updatePlane(v, dt, ctl) {
     v.yawRate = (v.yawRate || 0) + (wantR - (v.yawRate || 0)) * Math.min(1, dt * 3.5); v.yaw += v.yawRate * dt;
     const wantP = clamp((clamp(ap, -1.15, 1.0) - v.pitch) * 2.2, -0.75, 0.75);
     v.pitchRate = (v.pitchRate || 0) + (wantP - (v.pitchRate || 0)) * Math.min(1, dt * 4); v.pitch += v.pitchRate * dt;
-    rollT = clamp(v.yawRate / D.turn, -1, 1);
+    const wantRo = clamp(((ctl.roll || 0) - v.roll) * 4, -2.4, 2.4);       // el alabeo lo manda la palanca
+    v.rollRate = (v.rollRate || 0) + (wantRo - (v.rollRate || 0)) * Math.min(1, dt * 6); v.roll += v.rollRate * dt;
   }
-  if (v.falling) v.roll += 2.6 * dt; else v.roll += (rollT - v.roll) * Math.min(1, dt * (turn === null ? 4 : 3));
+  if (v.falling) v.roll += 2.6 * dt; else if (turn === null) v.roll += (rollT - v.roll) * Math.min(1, dt * 4);
   if (op && !v.falling) v.thr = clamp(v.thr + ctl.f * 0.55 * dt, 0, 1);
   v.speed += clamp(D.vmax * (v.falling ? 1 : 0.58 + 0.42 * v.thr) - v.speed, -6 * dt, 7 * dt) - Math.sin(v.pitch) * 10 * dt;       // al ralentí planea despacio, justo por encima de la pérdida, para poder aterrizar
   v.speed = clamp(v.speed, 18, D.vmax * 1.25);
@@ -2825,9 +3039,14 @@ function updateVehicles(dt) {
         const k = input.keys;
         ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, -1, 1); ctl.r = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1);
         ctl.fire = input.fire; ctl.fire2 = input.aim; ctl.bomb = input.bomb; ctl.aimYaw = drv.yaw; ctl.aimPitch = drv.pitch;
+        if (v.kind === 'tank') tankAim(v, drv, ctl);
         if (v.kind === 'plane') {       // caza: motor con W y S (o los botones «Motor»), frenos con B; turn = 1 marca el pilotaje suave del jugador
-          ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.turn = 1;
+          ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.roll = stick.tr; ctl.turn = 1;
+          ctl.r = clamp(ctl.r + input.rud, -1, 1);       // en tierra, el timón también guía el avión
           ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + input.thr, -1, 1); ctl.brake = !!(k.KeyB || input.brake || (k.KeyS && v.thr <= 0.01));
+          if (pad.on && input.flyPad && input.thrAbs >= 0) {       // palanca de gases del joystick: su posición es el motor; al mínimo, en tierra, frena
+            v.thr += clamp(input.thrAbs - v.thr, -1.5 * dt, 1.5 * dt); ctl.f = 0; if (!v.air && input.thrAbs < 0.04) ctl.brake = true;
+          }
         }
       }
       input.bomb = false;
@@ -2857,7 +3076,7 @@ function drawVehicles() {
     else if (v.kind === 'plane') drawMesh(world.vm[v.type], _vm);
     else {
       const m = world.vm[v.type]; drawMesh(m.hull, _vm);
-      M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.6); M4.translate(_vm, 0, 0, v.kick * 0.12);
+      M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
       drawMesh(m.turret, _vm);
     }
   }
@@ -2879,7 +3098,7 @@ function nearAA(p) {
   return null;
 }
 function manAA(p, a) {
-  a.driver = p; p.aa = a; p.crouch = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
+  a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
   gyroSync();
   if (!game.vehTold[a.home.t]) { game.vehTold[a.home.t] = true; pushCard(a.def.name, a.def.hist); }
   SFX.click();
@@ -3003,7 +3222,7 @@ function applyDamage(t, dmg, att, head, cause) {
   if (t.hp <= 0) {
     if (t.veh) { t.veh.driver = null; t.veh = null; }
     if (t.aa) { t.aa.driver = null; t.aa = null; }
-    t.alive = false; t.hp = 0; t.deaths++; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.enemy = null; t.respawnT = rnd(7, 11); t.crouch = false;
+    t.alive = false; t.hp = 0; t.deaths++; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.enemy = null; t.respawnT = rnd(7, 11); t.crouch = false; t.prone = false;
     game.tickets[t.team] = Math.max(0, game.tickets[t.team] - 1);
     if (att && att !== t && att.team !== t.team) att.kills++;
     addFeed(att, t, cause, head);
@@ -3022,7 +3241,7 @@ function explode(x, y, z, radius, dmg, owner, team, cause) {
   for (const s of soldiers) {
     if (!s.alive || (team >= 0 && s.team === team && s !== owner)) continue;
     const d = Math.hypot(s.x - x, s.y + 0.9 - y, s.z - z);
-    if (d < radius) applyDamage(s, dmg * (1 - d / radius) * (s.crouch ? 0.8 : 1), owner, false, cause);
+    if (d < radius) applyDamage(s, dmg * (1 - d / radius) * (s.prone ? 0.6 : s.crouch ? 0.8 : 1), owner, false, cause);
   }
   damageVehicles(x, y, z, radius, dmg, owner, team, cause);
   if (dmg > 0) for (const a of aaGuns) if ((team < 0 || a.team !== team) && Math.hypot(a.x - x, a.z - z) < Math.min(radius, 7)) a.downT = 25;       // una explosión cercana silencia la antiaérea un rato
@@ -3152,10 +3371,12 @@ function render(dt) {
         game.planeCam = (game.planeCam || 0) + angDiff(v.yaw, game.planeCam || 0) * Math.min(1, dt * 3.5);
         game.planeCamP = (game.planeCamP || 0) + (v.pitch * 0.6 - (game.planeCamP || 0)) * Math.min(1, dt * 3);
       }
-      const yaw = truck ? v.yaw + game.camOff : plane ? game.planeCam : P.yaw, pit = truck ? P.pitch - 0.2 : plane ? game.planeCamP - 0.1 : P.pitch - 0.1, cp = Math.cos(pit);
-      const back = plane ? 14 : 8.5, up = plane ? 2.8 : truck ? 2.5 : 3.4;
-      cam.x = v.x + Math.sin(yaw) * cp * back; cam.z = v.z + Math.cos(yaw) * cp * back; cam.y = Math.max(v.y + up - Math.sin(pit) * back, Math.max(groundAt(cam.x, cam.z), waterY) + 0.7);
-      cam.yaw = yaw; cam.pitch = pit;
+      if (v.kind === 'tank') { const c = tankView(v, P); cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = P.yaw; cam.pitch = P.pitch; }       // el centro de la pantalla es exactamente donde apuntas
+      else {
+        const yaw = truck ? v.yaw + game.camOff : game.planeCam, pit = truck ? P.pitch - 0.2 : game.planeCamP - 0.1, cp = Math.cos(pit), back = plane ? 14 : 8.5, up = plane ? 2.8 : 2.5;
+        cam.x = v.x + Math.sin(yaw) * cp * back; cam.z = v.z + Math.cos(yaw) * cp * back; cam.y = Math.max(v.y + up - Math.sin(pit) * back, Math.max(groundAt(cam.x, cam.z), waterY) + 0.7);
+        cam.yaw = yaw; cam.pitch = pit;
+      }
     } else if (P.alive && P.aa) {       // tras la ametralladora antiaérea
       const a = P.aa, cp = Math.cos(P.pitch);
       cam.x = a.x + Math.sin(P.yaw) * cp * 0.8 + Math.sin(P.yaw) * Math.sin(P.pitch) * 0.3; cam.z = a.z + Math.cos(P.yaw) * cp * 0.8 + Math.cos(P.yaw) * Math.sin(P.pitch) * 0.3;
@@ -3394,7 +3615,7 @@ function uiDeployTick() {
 }
 function uiShowPlay() {
   $('deploy').hidden = true; $('hud').hidden = false; $('ov').hidden = false; $('touch').hidden = !input.touch; hudT = 0;
-  if (!input.touch && !input.pad && !input.locked && input.lockFails < 2) showHint('Haz clic en la escena para apuntar con el ratón. Esc pone el juego en pausa.');
+  if (!input.touch && !input.pad && !input.locked && !lockOff()) showHint('Haz clic en la escena para capturar el ratón y apuntar con él. Esc pone el juego en pausa.');
   else if (input.touch && !uiShowPlay.told) { uiShowPlay.told = true; showHint(innerHeight > innerWidth ? 'Gira el teléfono: en horizontal se ve y se maneja mejor. En Pausa puedes activar el giroscopio para mirar moviendo el móvil.' : 'Izquierda: moverte. Derecha: mirar. En Pausa puedes activar el giroscopio para mirar moviendo el móvil.'); }
 }
 function showHint(t) { const h = $('hint'); h.textContent = t; h.hidden = false; clearTimeout(showHint.t); showHint.t = setTimeout(() => { h.hidden = true; }, 6000); }
@@ -3435,9 +3656,32 @@ function showScore(on) {
   if (scoreOn) renderScore();
 }
 function uiToMenu() { game.state = 'menu'; for (const id of ['pause', 'end', 'deploy', 'hud', 'ov', 'touch', 'score']) $(id).hidden = true; $('menu').hidden = false; menuProg = 1; drawMenuMap(); }
+const STD_BTN = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'L2', 'R2', 'Select', 'Start', 'L3', 'R3', 'Cruceta ↑', 'Cruceta ↓', 'Cruceta ←', 'Cruceta →'];
+const STD_AX = ['Palanca izquierda ↔', 'Palanca izquierda ↕', 'Palanca derecha ↔', 'Palanca derecha ↕'];
 function uiPad() {
-  for (const id of ['padMenu', 'padDeploy']) $(id).hidden = !pad.on;
-  $('padState').textContent = pad.on ? 'Mando detectado: ' + pad.id.replace(/\s*\(.*$/, '').slice(0, 40) + '. Start reanuda la partida.' : 'Mando: no detectado. Conéctalo y pulsa cualquier botón.';
+  for (const id of ['padMenu', 'padDeploy']) $(id).hidden = !(pad.on && pad.std);
+  const name = pad.on ? pad.id.replace(/\s*\(.*$/, '').slice(0, 44) : '';
+  $('padState').textContent = pad.on ? (pad.std ? 'Mando detectado: ' : 'Joystick detectado: ') + name + '.' : 'Mando o joystick: no detectado. Conéctalo y pulsa cualquiera de sus botones.';
+  if (!$('padcfg').hidden) renderPadCfg();
+}
+function padBindName(kind, v) {
+  if (kind === 'b') return v < 0 ? 'sin asignar' : pad.std && STD_BTN[v] ? STD_BTN[v] : 'Botón ' + (v + 1);
+  return v[0] < 0 ? 'sin asignar' : (pad.std && STD_AX[v[0]] ? STD_AX[v[0]] : 'Eje ' + (v[0] + 1)) + (v[1] < 0 ? ', invertido' : '');
+}
+function renderPadCfg() {
+  const dev = $('pcDev'), ask = $('pcAsk');
+  if (!pad.on || !pad.map) {
+    dev.textContent = pad.blocked ? 'El navegador no deja a esta página usar mandos.' : 'No se detecta ningún mando ni joystick. Conéctalo y pulsa cualquiera de sus botones: los navegadores no lo muestran hasta entonces. Si sigue sin aparecer, puede que esta página incrustada no tenga permiso para usar mandos.';
+    $('pcLive').textContent = ''; ask.textContent = ''; $('pcG').innerHTML = ''; $('pcP').innerHTML = ''; $('pcBody').hidden = true; return;
+  }
+  $('pcBody').hidden = false;
+  dev.textContent = (pad.std ? 'Mando: ' : 'Joystick: ') + pad.id.replace(/\s*\(.*$/, '').slice(0, 60) + ' · ' + pad.na + ' ejes y ' + pad.nb + ' botones.' + (pad.std ? '' : ' De serie solo lleva asignado el avión y el disparo; el resto sigue con teclado y ratón hasta que lo asignes aquí.');
+  const L = pad.learn;
+  ask.textContent = L ? (L.kind === 'b' ? 'Pulsa el botón para «' + L.label + '»…' : 'Para «' + L.label + '»: ' + L.how + '…') : '';
+  const row = (kind, id, label) => { const v = kind === 'b' ? pad.map.b[id] : pad.map.a[id], on = L && L.kind === kind && L.id === id, un = kind === 'b' ? v < 0 : v[0] < 0;
+    return '<div class="pcrow' + (on ? ' on' : '') + '"><span>' + label + '</span><b' + (un ? ' class="un"' : '') + '>' + (on ? 'esperando…' : padBindName(kind, v)) + '</b><button type="button" data-bind="' + kind + ':' + id + '">' + (on ? 'Cancelar' : 'Cambiar') + '</button><button type="button" data-clear="' + kind + ':' + id + '"' + (un ? ' disabled' : '') + '>Quitar</button></div>'; };
+  for (const [g, el] of [['g', 'pcG'], ['p', 'pcP']])
+    $(el).innerHTML = PAD_AX.filter(a => a[2] === g).map(a => row('a', a[0], a[1])).join('') + PAD_BTN.filter(b => b[2] === g).map(b => row('b', b[0], b[1])).join('');
 }
 function uiOpts() {
   document.querySelectorAll('[data-gyro]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.gyro === '1') === opts.gyro ? 'true' : 'false'));
@@ -3483,9 +3727,11 @@ function uiTick(dt) {
   }
   else {
     $('wName').textContent = ws.def.name; $('ammo').textContent = p.reloadT > 0 ? 'Recargando' : ws.ammo + ' / ' + ws.reserve;
-    $('extra').textContent = 'Granadas ' + p.nades + (p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
+    $('extra').textContent = 'Granadas ' + p.nades + (p.prone ? (ws.def.kind === 'lmg' ? ' · tumbado, bípode apoyado' : ' · tumbado') : p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
   }
-  if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : input.pad ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; } else pr.hidden = true;
+  if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : input.pad ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; }
+  else if (!input.touch && !input.locked && !lockOff() && !(input.pad && pad.on)) { pr.textContent = 'Haz clic para capturar el ratón'; pr.hidden = false; }       // sin captura no se apunta bien: se avisa siempre
+  else pr.hidden = true;
   const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
   const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
   document.body.classList.toggle('fly', fly); fh.hidden = !fly;
@@ -3544,7 +3790,7 @@ function drawOverlay() {
     /* punto de mira */
     const ws = p.weps[p.cur], w = ws.def;
     if (p.aimT < 0.6 && p.reloadT <= 0 && !p.veh) {
-      const g = 5 + (lerp(w.hip, w.ads, p.aimT) + (p.speed / 6.6) * 0.022 + p.spreadAdd) * ch / (2 * Math.tan(game.fov / 2));
+      const g = 5 + playerSpread(p, w) * ch / (2 * Math.tan(game.fov / 2));
       c.globalAlpha = 1 - p.aimT / 0.6;
       for (const col of ['rgba(15,17,13,.7)', '#f0edda']) {
         c.strokeStyle = col; c.lineWidth = col[0] === '#' ? 1.5 : 3.5; c.beginPath();
@@ -3552,16 +3798,23 @@ function drawOverlay() {
       }
       c.globalAlpha = 1;
     }
-    if (p.veh && p.veh.kind !== 'truck') {
-      const v = p.veh, tank = v.kind === 'tank'; let gx, gy, gz;
-      if (tank) { const m = tankMuzzle(v), cp = Math.cos(v.tpitch); gx = m[0] - Math.sin(v.tyaw) * cp * 140; gy = m[1] + Math.sin(v.tpitch) * 140; gz = m[2] - Math.cos(v.tyaw) * cp * 140; }
-      else { const cp = Math.cos(v.pitch); gx = v.x - Math.sin(v.yaw) * cp * 200; gy = v.y + 1.25 + Math.sin(v.pitch) * 200; gz = v.z - Math.cos(v.yaw) * cp * 200; }
-      const q = project(gx, gy, gz);
-      for (const col of ['rgba(15,17,13,.7)', '#f0edda']) {
-        c.strokeStyle = col; c.lineWidth = col[0] === '#' ? 1.5 : 3.5;
-        if (tank) { c.beginPath(); c.moveTo(cx - 5, cy); c.lineTo(cx + 5, cy); c.moveTo(cx, cy - 5); c.lineTo(cx, cy + 5); c.stroke(); }
-        if (q) { c.beginPath(); c.arc(q[0], q[1], tank ? 13 : 11, 0, 6.3); c.stroke(); if (tank && v.def.cannon && v.fireT > 0) { c.beginPath(); c.arc(q[0], q[1], 19, -1.57, -1.57 + 6.283 * (1 - v.fireT / 3.6)); c.stroke(); } }
+    if (p.veh && p.veh.kind === 'tank') {
+      /* Mirilla del carro: la cruz del centro es el punto al que apuntas. El círculo marca dónde caería el disparo con la pieza como está
+         ahora; mientras la torre gira va detrás de la cruz y, cuando la alcanza, se pone amarillo: el disparo cae en la cruz. */
+      const v = p.veh, m = tankMuzzle(v), cp = Math.cos(v.tpitch), D = v.aimD || 120, tt = D / SHELL_V;
+      const q = project(m[0] - Math.sin(v.tyaw) * cp * D, m[1] + Math.sin(v.tpitch) * D - (v.def.cannon ? 0.5 * SHELL_G * tt * tt : 0), m[2] - Math.cos(v.tyaw) * cp * D);
+      const on = !!q && Math.hypot(q[0] - cx, q[1] - cy) < 9, ready = !v.def.cannon || v.fireT <= 0;
+      for (const col of ['rgba(15,17,13,.75)', on ? '#ffe08a' : '#f0edda']) {
+        c.strokeStyle = col; c.lineWidth = col[0] === '#' ? 1.6 : 3.6; c.beginPath();
+        c.moveTo(cx - 16, cy); c.lineTo(cx - 5, cy); c.moveTo(cx + 5, cy); c.lineTo(cx + 16, cy); c.moveTo(cx, cy - 16); c.lineTo(cx, cy - 5); c.moveTo(cx, cy + 5); c.lineTo(cx, cy + 16); c.stroke();
+        c.fillStyle = col; c.fillRect(cx - 1, cy - 1, 2, 2);
+        if (q) { c.beginPath(); c.arc(q[0], q[1], 9, 0, 6.3); c.stroke(); if (!ready) { c.beginPath(); c.arc(q[0], q[1], 14, -1.57, -1.57 + 6.283 * (1 - v.fireT / 3.6)); c.stroke(); } }
       }
+      c.font = '600 13px ' + FONT; const txt = Math.round(D) + ' m' + (ready ? '' : ' · cargando');
+      c.fillStyle = 'rgba(15,17,13,.8)'; c.fillText(txt, cx + 1, cy + 37); c.fillStyle = on && ready ? '#ffe08a' : '#f0edda'; c.fillText(txt, cx, cy + 36);
+    } else if (p.veh && p.veh.kind === 'plane') {
+      const v = p.veh, cp = Math.cos(v.pitch), q = project(v.x - Math.sin(v.yaw) * cp * 200, v.y + 1.25 + Math.sin(v.pitch) * 200, v.z - Math.cos(v.yaw) * cp * 200);
+      if (q) for (const col of ['rgba(15,17,13,.7)', '#f0edda']) { c.strokeStyle = col; c.lineWidth = col[0] === '#' ? 1.5 : 3.5; c.beginPath(); c.arc(q[0], q[1], 11, 0, 6.3); c.stroke(); }
     }
     if (p.hitT > 0) {
       c.strokeStyle = p.hitKill ? FOE : '#fff'; c.lineWidth = 2; c.globalAlpha = clamp(p.hitT / 0.2, 0, 1); c.beginPath();
@@ -3617,7 +3870,17 @@ function buildArchive() {
 (function boot() {
   topo = buildTopo(); buildArchive();
   document.querySelectorAll('.side').forEach(b => b.addEventListener('click', () => startMatch(+b.dataset.team)));
-  const open = id => () => { $(id).hidden = false; $(id).querySelector('.close').focus(); };
+  const open = id => () => { $(id).hidden = false; if (id === 'padcfg') renderPadCfg(); $(id).querySelector('.close').focus(); };
+  $('padcfg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !pad.map) return;
+    if (b.dataset.bind) {
+      const [kind, id] = b.dataset.bind.split(':');
+      if (pad.learn && pad.learn.kind === kind && pad.learn.id === id) pad.learn = null;
+      else { const d = (kind === 'b' ? PAD_BTN : PAD_AX).find(q => q[0] === id); let base = []; try { const g = navigator.getGamepads()[pad.idx]; if (g) base = Array.from(g.axes); } catch (err) { } pad.learn = { kind, id, label: d[1], how: d[3] || '', base, t: 10 }; }
+      renderPadCfg();
+    } else if (b.dataset.clear) { const [kind, id] = b.dataset.clear.split(':'); if (kind === 'b') pad.map.b[id] = -1; else pad.map.a[id] = [-1, 1]; pad.learn = null; padSave(); renderPadCfg(); }
+    else if (b.id === 'pcReset') { pad.learn = null; padReset(); renderPadCfg(); }
+  });
   document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', open(b.dataset.open)));
   document.querySelectorAll('.close').forEach(b => b.addEventListener('click', () => { b.closest('.sheet').hidden = true; }));
   $('classes').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; game.selClass = +b.dataset.i; renderClassCard(); });
