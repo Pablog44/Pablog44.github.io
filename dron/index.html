@@ -106,12 +106,17 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
 #bArm:active{transform:translateX(-50%) translate(2px,2px);box-shadow:1px 2px 0 var(--ink)}
 #rotHint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;font-weight:600;display:none;text-align:center;max-width:80%}
 body.touch .zone,body.touch .stick,body.touch #bArm{display:block}
-body.touch #telemetry{padding:4px 10px;gap:8px}
-body.touch #telemetry div{min-width:40px}
-body.touch #telemetry .num{font-size:15px}
-body.touch #thrBar{height:26px}
-body.touch #bArm{height:58px;min-width:150px;font-size:21px;border-radius:29px}
-body.touch #bArm:active{transform:translateX(-50%) translate(2px,2px)}
+body.touch #telemetry{padding:2px 8px 1px;gap:9px;font-size:10px;border-width:2px;border-radius:10px;box-shadow:2px 2px 0 var(--ink);opacity:.9}
+body.touch #telemetry div{min-width:0}
+body.touch #telemetry div:last-child{display:none}
+body.touch #telemetry .num{font-size:12px;line-height:1.15}
+body.touch #telemetry span{font-size:9px;line-height:1.15}
+body.touch #thrBar{height:13px;width:7px;border-width:1.5px}
+body.touch #bArm{height:32px;min-width:0;padding:0 14px;font-size:14px;font-weight:600;border-width:2px;border-radius:16px;box-shadow:2px 2px 0 var(--ink)}
+body.touch #bArm:active{transform:translateX(-50%) translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+#floorTxt{font-size:14px}
+#bFull{display:none}
+body.canfs #bFull{display:flex}
 body:not(.touch) .sl-touch{display:none}
 
 /* ---------- Menu ---------- */
@@ -201,6 +206,8 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
     <button class="tbtn" id="bSound" title="Sonido" aria-label="Activar o silenciar sonido">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9.5h4l5-4v13l-5-4H4z"/><path id="sndWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    <button class="tbtn" id="bFull" title="Pantalla completa" aria-label="Pantalla completa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     <button class="tbtn" id="bPause" title="Pausa (P)" aria-label="Pausa y ayuda">
       <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
   </div>
@@ -209,7 +216,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
     <div><b id="spdTxt" class="num">0</b><span>km/h</span></div>
     <div><b id="altTxt" class="num">0,0</b><span>altura m</span></div>
     <div><div id="thrBar"><i id="thrFill"></i></div><span id="thrTxt">0 %</span></div>
-    <div><b id="floorTxt" class="num" style="font-size:14px">Planta baja</b><span>dónde</span></div>
+    <div><b id="floorTxt" class="num">Planta baja</b><span>dónde</span></div>
   </div>
 
   <div id="toast" class="sticker"></div>
@@ -1207,7 +1214,7 @@ function buildDroneMesh(){
 const SUB = 1/240;
 const DR = { m:0.32, I:0.0016, twr:4.0, kd1:0.05, kd2:0.011, hk:0.10, tau:0.035,
   rateMax:11.0, yawMax:4.2, expo:0.42, angKp:10, rateK:50, aMax:170, aMaxYaw:35, mu:0.5 };
-const HOVER_T = DR.m*G;
+const HOVER_T = DR.m*G, T_NOM = HOVER_T*DR.twr;   // T_NOM: empuje máximo nominal (centro del gas = vuelo estático)
 // Ajustes del mando (se guardan en el navegador)
 const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25), touchSize: clamp(+store.get('touchSize',100)||100,50,100) };
 // Acro ángulo: autonivelado que se desvanece al mover el stick (a partir del 85 % de recorrido es Acro puro)
@@ -1268,7 +1275,7 @@ function physStep(dt, inp){
           _wd.z += clamp(2*sgn*_qe.z*HZ.kp,-HZ.maxRate,HZ.maxRate)*lw;
         }
       }
-      const tc=thrCurve(inp.thr); tCmd = d.maxT*tc*tc;
+      const tc=thrCurve(inp.thr); tCmd = Math.min(d.maxT, T_NOM*tc*tc);
     } else {
       const psi = headingOf(d.q);
       let th, ph; const beginner = flightMode==='beginner';
@@ -1290,7 +1297,7 @@ function physStep(dt, inp){
         const vzT = climb>0 ? climb*1.6 : climb*1.25;
         if(d.grounded && inp.climb < 0.15){ tCmd = HOVER_T*0.12; }
         else { const az = 5.5*(vzT - d.vel.y); tCmd = DR.m*(G + az)/Math.max(0.55, _up.y); }
-      } else { const tc=thrCurve(inp.thr); tCmd = d.maxT*tc*tc; }
+      } else { const tc=thrCurve(inp.thr); tCmd = Math.min(d.maxT, T_NOM*tc*tc); }
     }
     tCmd = clamp(tCmd, d.maxT*0.025, d.maxT);
     const k=DR.rateK;
@@ -1312,9 +1319,11 @@ function physStep(dt, inp){
   windAt(d.pos,_wind);
   _rel.copy(d.vel).sub(_wind);
   const sp=_rel.length();
-  _F.copy(_up).multiplyScalar(d.thrust*ge);
+  // el empuje de la hélice baja al subir (entra aire más rápido) y sube al bajar: amortigua el movimiento vertical
+  const along=_rel.dot(_up), inflow=clamp(1-0.07*along, 0.6, 1.25);
+  _F.copy(_up).multiplyScalar(d.thrust*ge*inflow);
   _F.addScaledVector(_rel, -(DR.kd1 + DR.kd2*sp));
-  const along=_rel.dot(_up); _tmp.copy(_rel).addScaledVector(_up,-along);
+  _tmp.copy(_rel).addScaledVector(_up,-along);
   _F.addScaledVector(_tmp, -DR.hk*(d.thrust/HOVER_T));
   _F.y -= DR.m*G;
   d.vel.addScaledVector(_F, dt/DR.m);
@@ -1486,7 +1495,7 @@ const kb = {}, kbs = {yaw:0,pitch:0,roll:0,climb:0};
 let kbThr = 0, lastSrc = isTouch ? 'touch' : 'kb';
 const gp = {connected:false, lx:0, ly:0, rx:0, ry:0, prev:[], pad:null, name:''};
 const sticks = {L:{id:null,sx:0,sy:0,x:0,y:0,thr0:0}, R:{id:null,sx:0,sy:0,x:0,y:0}};
-let touchThr = 0;
+let thrHold = true;   // táctil: motores al ralentí tras armar, hasta que se sube el stick izquierdo
 const approach = (v,t,r)=> v<t ? Math.min(t,v+r) : Math.max(t,v-r);
 
 window.addEventListener('keydown', e=>{
@@ -1514,7 +1523,7 @@ function layoutSticks(){
   const hr=$('hudIn').getBoundingClientRect(), W=hr.width, H=hr.height, land=W>=H;
   const m=Math.round(clamp(Math.min(W,H)*0.03,10,22));
   // apaisado: cada stick llena su mitad dejando un pasillo central para el botón y la telemetría
-  let S = land ? Math.min((W-2*m-240)/2, H-104-m, 480) : Math.min((W-3*m)/2, H*0.4, 380);
+  let S = land ? Math.min((W-2*m-190)/2, H-104-m, 480) : Math.min((W-3*m)/2, H*0.4, 380);
   S = Math.round(Math.max(96, S*SET.touchSize/100));
   const kn=Math.round(clamp(S*0.34,44,130)), Rr=Math.round((S-kn)/2);
   Object.assign(STK,{S,kn,R:Rr,m});
@@ -1525,24 +1534,23 @@ function layoutSticks(){
     STK.rest[side] = { x: side==='L' ? hr.left+m+S/2 : hr.right-m-S/2, y: hr.bottom-m-S/2 };
   }
   const tel=$('telemetry'); tel.style.bottom = isTouch ? m+'px' : '';
-  const th = isTouch && land ? (tel.offsetHeight||56) : 0;
-  $('bArm').style.bottom = (land ? m+th+14 : m+S+30)+'px';
+  const th = isTouch && land ? (tel.offsetHeight||32) : 0;
+  $('bArm').style.bottom = (land ? m+th+8 : m+S+10)+'px';
 }
 function bindZone(zone, S, isLeft){
   const side = isLeft ? 'L' : 'R';
   zone.addEventListener('pointerdown', e=>{
     if(S.id!==null) return; S.id=e.pointerId; try{ zone.setPointerCapture(e.pointerId); }catch(_){}
-    S.sx=e.clientX; S.sy=e.clientY; S.x=0; S.y=0; if(isLeft) S.thr0=touchThr; lastSrc='touch'; initAudio();
-    // la base aparece bajo el dedo; con gas manual se coloca para que la bola (nivel de gas) quede bajo el dedo
-    const rest=STK.rest[side]; let cy=e.clientY; if(isLeft && flightMode!=='beginner') cy += (2*S.thr0-1)*STK.R;
-    const b=stEl[side]; b.classList.add('active'); b.style.transform=`translate(${(e.clientX-rest.x).toFixed(1)}px,${(cy-rest.y).toFixed(1)}px)`;
+    S.sx=e.clientX; S.sy=e.clientY; S.x=0; S.y=0; lastSrc='touch'; initAudio();
+    // la base aparece centrada bajo el dedo
+    const rest=STK.rest[side];
+    const b=stEl[side]; b.classList.add('active'); b.style.transform=`translate(${(e.clientX-rest.x).toFixed(1)}px,${(e.clientY-rest.y).toFixed(1)}px)`;
     e.preventDefault();
   });
   zone.addEventListener('pointermove', e=>{
     if(e.pointerId!==S.id) return; const R=STK.R;
     const dx=(e.clientX-S.sx)/R, dy=(e.clientY-S.sy)/R;
     S.x=clamp(dx,-1,1); S.y=clamp(-dy,-1,1);
-    if(isLeft && flightMode!=='beginner') touchThr=clamp(S.thr0 - dy/2, 0, 1);
     e.preventDefault();
   });
   const end=e=>{ if(e.pointerId!==S.id) return; S.id=null; S.x=0; S.y=0; const b=stEl[side]; b.classList.remove('active'); b.style.transform=''; };
@@ -1580,8 +1588,11 @@ function readInput(dt){
   if(ky||kp||kr||kt) lastSrc='kb';
   kbs.yaw=approach(kbs.yaw,ky*0.85,dt*5); kbs.pitch=approach(kbs.pitch,kp*0.8,dt*4); kbs.roll=approach(kbs.roll,kr*0.8,dt*4); kbs.climb=approach(kbs.climb,kt,dt*5);
   kbThr=clamp(kbThr + kt*dt*((k('ShiftLeft')||k('ShiftRight'))?1.1:0.5), 0, 1);
+  if(!drone.armed) thrHold=true;
+  else if(lastSrc!=='touch') thrHold=false;
+  else if(thrHold && sticks.L.id!==null && sticks.L.y>0.12) thrHold=false;
   if(lastSrc==='gp' && gp.connected){ input.yaw=gp.lx; input.climb=-gp.ly; input.thr=clamp((1-gp.ly)/2,0,1); input.pitch=-gp.ry; input.roll=gp.rx; }
-  else if(lastSrc==='touch'){ input.yaw=sticks.L.x; input.climb=sticks.L.y; input.thr=touchThr; input.pitch=sticks.R.y; input.roll=sticks.R.x; }
+  else if(lastSrc==='touch'){ input.yaw=sticks.L.x; input.climb=sticks.L.y; input.thr = thrHold ? 0 : clamp(0.5+0.5*sticks.L.y,0,1); input.pitch=sticks.R.y; input.roll=sticks.R.x; }
   else { input.yaw=kbs.yaw; input.climb=kbs.climb; input.thr=kbThr; input.pitch=kbs.pitch; input.roll=kbs.roll; }
 }
 
@@ -1644,21 +1655,21 @@ function toggleArm(){
   if(_up.y<0.35){ toast('El dron está volcado. Pulsa reiniciar'); return; }
   if(flightMode!=='beginner' && input.thr>0.08){ toast('Baja el acelerador del todo para armar'); return; }
   d.armed=true; d.crashed=false; d.w.set(0,0,0); sfxBeep(880,0.09); tone(1175,0.1,0.11,'square',0.08);
-  toast(flightMode==='beginner' ? 'Armado. Sube el stick izquierdo para despegar' : 'Armado', 1800);
+  thrHold=true;
+  toast((flightMode==='beginner' || lastSrc==='touch') ? 'Armado. Sube el stick izquierdo para despegar' : 'Armado', 1800);
 }
 function setMode(m){
   flightMode=m; store.set('mode',m);
   document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('sel', b.dataset.m===m));
   $('modeChip').textContent=MODENAME[m];
   $('stLlbl').textContent = m==='beginner' ? 'Subir y girar' : 'Gas y girar';
-  if(m!=='beginner' && lastSrc==='touch' && drone.armed) touchThr = clamp(Math.sqrt(drone.thrust/Math.max(1e-6,drone.maxT)),0,1);
 }
 function cycleMode(){ const m=MODES[(MODES.indexOf(flightMode)+1)%MODES.length]; setMode(m); if(state==='play') toast('Modo '+MODENAME[m]); }
 function cycleCam(){ camMode=CAMS[(CAMS.indexOf(camMode)+1)%CAMS.length]; store.set('cam',camMode); $('camLbl').textContent=CAMNAME[camMode]; cam.init=false; if(state==='play') toast('Cámara: '+CAMNAME[camMode],900); }
 function resetFlight(){
   const d=drone;
   d.pos.copy(START); d.vel.set(0,0,0); d.q.set(0,0,0,1); d.w.set(0,0,0); d.thrust=0; d.spin=0; d.battery=1; d.armed=false; d.crashed=false; d.damage=0;
-  d.noise.set(0,0,0); d.fanCool=0; d.hitCool=0; d.landT=0; d.autoArmOK=true; touchThr=0; kbThr=0;
+  d.noise.set(0,0,0); d.fanCool=0; d.hitCool=0; d.landT=0; d.autoArmOK=true; thrHold=true; kbThr=0;
   nextRing=0; raceT=0; racing=false; raceDone=false; refreshRings();
   cam.init=false; cam.yaw=0; $('result').style.display='none';
   if(state==='play') toast('Listo para despegar',1100);
@@ -1700,8 +1711,9 @@ function postPhysics(dt){
     if(d.battery<0.2 && !d.lowWarned){ d.lowWarned=true; toast('Batería baja: aterriza pronto',2000); tone(660,0.15,0,'square',0.08); tone(660,0.15,0.25,'square',0.08); }
   }
   if(d.battery>0.25) d.lowWarned=false;
-  // aterrizaje en principiante: mantener abajo para parar motores
-  if(d.armed && flightMode==='beginner' && d.grounded && input.climb<-0.5){ d.landT+=dt; if(d.landT>0.9){ d.armed=false; d.autoArmOK=false; d.landT=0; sfxBeep(420,0.12); toast('Aterrizado'); } } else d.landT=0;
+  // aterrizaje: en el suelo, mantener el stick abajo para parar motores (Principiante, o gas manual en táctil)
+  const landCmd = flightMode==='beginner' ? input.climb<-0.5 : (lastSrc==='touch' && !thrHold && sticks.L.id!==null && input.thr<0.12);
+  if(d.armed && d.grounded && landCmd){ d.landT+=dt; if(d.landT>0.9){ d.armed=false; d.autoArmOK=false; d.landT=0; sfxBeep(420,0.12); toast('Aterrizado'); } } else d.landT=0;
   // reposo sin motores
   if(!d.armed && d.grounded && d.vel.lengthSq()<0.01 && d.w.lengthSq()<0.2){ d.vel.multiplyScalar(0.5); d.w.multiplyScalar(0.5); }
   if(d.pos.y<-1.5 || d.pos.x<-7 || d.pos.x>8 || Math.abs(d.pos.z)>6 || d.pos.y>6.5){ resetFlight(); toast('El dron salió de la casa. Reiniciado'); }
@@ -1829,8 +1841,7 @@ function updateHUD(dt){
   if(rotHintT>0){ rotHintT-=dt; if(rotHintT<=0) el.rotHint.style.display='none'; }
   if(isTouch){
     const R=STK.R;
-    const ly = flightMode==='beginner' ? sticks.L.y : touchThr*2-1;
-    el.knobL.style.transform=`translate(${(sticks.L.x*R).toFixed(1)}px,${(-ly*R).toFixed(1)}px)`;
+    el.knobL.style.transform=`translate(${(sticks.L.x*R).toFixed(1)}px,${(-sticks.L.y*R).toFixed(1)}px)`;
     el.knobR.style.transform=`translate(${(sticks.R.x*R).toFixed(1)}px,${(-sticks.R.y*R).toFixed(1)}px)`;
   }
   updateMarker();
@@ -1879,10 +1890,11 @@ function updateMarker(){
 /* ============ Menú ============ */
 const HELP = {
   touch: `<table>
-    <tr><td>Stick izquierdo</td><td>Arriba y abajo para subir y bajar. Izquierda y derecha para girar. En los modos con gas manual (Ángulo, Acro ángulo y Acro) es el gas y se queda donde lo sueltes.</td></tr>
+    <tr><td>Stick izquierdo</td><td>Arriba y abajo para subir y bajar. Izquierda y derecha para girar. En los modos con gas manual (Ángulo, Acro ángulo y Acro) es el gas: al soltarlo vuelve al centro, que es el punto en el que el dron se queda flotando.</td></tr>
     <tr><td>Stick derecho</td><td>Inclina el dron para avanzar, retroceder y moverte de lado.</td></tr>
-    <tr><td>Armar</td><td>Arranca o para los motores. En Principiante también arranca al subir el stick izquierdo.</td></tr></table>
-    <p>Los sticks ocupan casi toda la pantalla y aparecen justo donde apoyas el dedo, en cualquier punto de su mitad. Cuanto más grandes, más recorrido y más precisión. Su tamaño se ajusta más abajo.</p>`,
+    <tr><td>Armar</td><td>Arranca o para los motores. En Principiante también arranca al subir el stick izquierdo.</td></tr>
+    <tr><td>Aterrizar</td><td>Ya en el suelo, mantén el stick izquierdo abajo un segundo y los motores se paran solos.</td></tr></table>
+    <p>Los dos sticks aparecen justo donde apoyas el dedo y vuelven solos al centro al soltarlos. Su tamaño se ajusta más abajo. Al despegar, el juego pasa a pantalla completa si el navegador lo permite.</p>`,
   pad: `<table>
     <tr><td>Stick izquierdo</td><td>Gas o subir y bajar, y girar. Con gas manual (Ángulo, Acro ángulo y Acro) el centro del stick equivale al 50 % de gas, cerca del punto de vuelo estático.</td></tr>
     <tr><td>Stick derecho</td><td>Cabeceo y alabeo: avanzar, retroceder y moverte de lado.</td></tr>
@@ -1921,6 +1933,23 @@ function setSetting(i,val){
 function focusSlider(i){ slFocus=i; document.querySelectorAll('.sl').forEach(el=>el.classList.toggle('focus', +el.dataset.i===i)); }
 SL.forEach((o,i)=>{ $(o.id).addEventListener('input',e=>{ setSetting(i,+e.target.value); focusSlider(i); }); setSetting(i,SET[o.k]); });
 
+/* ---------- Pantalla completa (en móvil se activa al empezar a jugar) ---------- */
+const fsEl = document.documentElement;
+const isFs = ()=> !!(document.fullscreenElement || document.webkitFullscreenElement);
+const canFs = ()=> !!(fsEl && (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) && document.fullscreenEnabled!==false;
+function enterFs(){
+  if(!canFs() || isFs()) return;
+  const lock=()=>{ try{ const o=window.screen && window.screen.orientation; if(o && o.lock){ const p=o.lock('landscape'); if(p && p.catch) p.catch(()=>{}); } }catch(e){} };
+  try{
+    const p = fsEl.requestFullscreen ? fsEl.requestFullscreen({navigationUI:'hide'}) : fsEl.webkitRequestFullscreen();
+    if(p && p.then) p.then(lock, ()=>{}); else lock();
+  }catch(e){}
+}
+function exitFs(){ try{ const f=document.exitFullscreen||document.webkitExitFullscreen; if(f){ const p=f.call(document); if(p && p.catch) p.catch(()=>{}); } }catch(e){} }
+if(canFs()) document.body.classList.add('canfs');
+$('bFull').addEventListener('click',()=>{ if(isFs()) exitFs(); else enterFs(); });
+for(const ev of ['fullscreenchange','webkitfullscreenchange']) document.addEventListener(ev,()=>setTimeout(onResize,120));
+
 function selectTab(t){ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('sel',b.dataset.t===t)); $('help').innerHTML=HELP[t]; }
 function updatePadInfo(){ $('padInfo').textContent = gp.connected ? 'Mando conectado: '+gp.name.replace(/\(.*?\)/g,'').trim().slice(0,40) : 'Conecta un mando y pulsa cualquier botón.'; }
 function showMenu(){
@@ -1931,13 +1960,13 @@ function showMenu(){
 }
 function hideMenu(){ $('menu').classList.add('hidden'); }
 function startGame(){
-  initAudio();
+  initAudio(); if(isMobile) enterFs();
   if(state==='menu') resetFlight();
   if(raceDone && state==='pause'){ resetFlight(); }
   state='play'; hideMenu(); try{ canvas.focus({preventScroll:true}); }catch(e){}
   cam.init=false; last=performance.now(); acc=0; layoutSticks();
   if(isMobile && window.innerHeight>window.innerWidth){ el.rotHint.style.display='block'; rotHintT=4; }
-  if(!drone.armed) toast(flightMode==='beginner' ? (lastSrc==='touch' ? 'Sube el stick izquierdo para despegar' : lastSrc==='gp' ? 'Pulsa A o sube el stick izquierdo' : 'Pulsa Espacio o W para despegar') : (lastSrc==='gp' ? 'Stick izquierdo abajo y pulsa A para armar' : lastSrc==='touch' ? 'Pulsa Armar con el gas abajo' : 'Pulsa Espacio para armar'), 2400);
+  if(!drone.armed) toast(flightMode==='beginner' ? (lastSrc==='touch' ? 'Sube el stick izquierdo para despegar' : lastSrc==='gp' ? 'Pulsa A o sube el stick izquierdo' : 'Pulsa Espacio o W para despegar') : (lastSrc==='gp' ? 'Stick izquierdo abajo y pulsa A para armar' : lastSrc==='touch' ? 'Pulsa Armar y sube el stick izquierdo' : 'Pulsa Espacio para armar'), 2400);
 }
 function togglePause(){
   if(state==='play'){ state='pause'; $('result').style.display = raceDone ? 'block' : 'none'; showMenu(); }
