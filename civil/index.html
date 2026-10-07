@@ -168,6 +168,7 @@ p{margin:0}
 #prompt{top:64%; left:50%; transform:translateX(-50%); background:var(--plate); padding:.3rem .8rem; font-size:1.15rem; font-weight:600; text-align:center; white-space:nowrap}
 #flyHud{bottom:calc(env(safe-area-inset-bottom,0px) + .8rem); left:50%; transform:translateX(-50%); display:grid; justify-items:center; text-align:center; text-shadow:0 1px 3px rgba(15,17,13,.9),0 0 2px rgba(15,17,13,.9); white-space:nowrap}
 #flyHud b{font-size:2.2rem; font-weight:700; line-height:1}
+#flyHud em{font-style:normal; font-weight:700; font-size:1.25rem; color:#ff7a5c}
 #flyHud span{font-size:1.05rem; font-weight:600; letter-spacing:.02em}
 #capture{bottom:calc(env(safe-area-inset-bottom,0px) + 5.2rem); left:50%; transform:translateX(-50%); display:grid; gap:.25rem; justify-items:center; background:var(--plate); padding:.35rem .7rem .5rem; font-size:1.1rem; font-weight:600; width:min(22rem,70vw); text-align:center}
 .capbar{width:100%; height:.45rem; background:var(--foe)} .capbar i{display:block; height:100%; background:var(--ally); width:50%}
@@ -209,7 +210,8 @@ body.fly .tb-fire{right:calc(env(safe-area-inset-right,0px) + 11.6rem); bottom:c
 .tf-bomb{right:calc(env(safe-area-inset-right,0px) + 12.2rem); bottom:calc(env(safe-area-inset-bottom,0px) + 7.8rem); width:3.6rem; height:3.6rem}
 .tf-rl,.tf-rr{bottom:calc(env(safe-area-inset-bottom,0px) + .8rem); width:4.2rem; height:4.2rem; font-size:.82rem; border-color:#ffe08a; color:#ffe08a}
 .tf-rl{left:calc(50% - 4.7rem)} .tf-rr{left:calc(50% + .5rem)}
-body.touch #flyHud{bottom:calc(env(safe-area-inset-bottom,0px) + 5.5rem)}
+body.touch #flyHud{bottom:auto; top:calc(env(safe-area-inset-top,0px) + 5.5rem)}
+body.touch #flyHud b{font-size:1.5rem} body.touch #flyHud span{font-size:.9rem}
 @media (orientation:portrait){ .tf-rl,.tf-rr{left:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 14.6rem); width:3.9rem; height:3.9rem} .tf-rl{right:calc(env(safe-area-inset-right,0px) + 5.4rem)} .tf-rr{right:calc(env(safe-area-inset-right,0px) + 1rem)} }
 .tb-rec{left:calc(50% + 3.2rem); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem; border-color:#ffe08a; color:#ffe08a}
 .tb-pause{left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 3.3rem); border-radius:0; width:auto; height:auto; padding:.15rem .7rem}
@@ -261,7 +263,7 @@ body.nogl #fatal{max-width:none}
   <p id="hint" hidden></p>
   <p id="prompt" hidden></p>
   <div id="capture" hidden><span id="capName"></span><div class="capbar"><i id="capFill"></i></div></div>
-  <div id="flyHud" hidden><b id="flySpd"></b><span id="flyInfo"></span></div>
+  <div id="flyHud" hidden><b id="flySpd"></b><span id="flyInfo"></span><em id="flyWarn" hidden>¡PÉRDIDA! Baja el morro</em></div>
   <div id="vitals"><b id="hp">100</b><span>salud</span></div>
   <div id="weapon"><span id="wName"></span><b id="ammo"></b><span id="extra"></span></div>
   <div id="dmg"></div>
@@ -405,8 +407,9 @@ body.nogl #fatal{max-width:none}
       <dt>G</dt><dd>Lanzar granada (estalla al chocar)</dd>
       <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
       <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón apunta la torre, también bastante hacia arriba y hacia abajo. La cruz del centro es el punto al que apuntas; el círculo marca dónde caería el disparo con la pieza como está y, cuando alcanza la cruz, se pone amarillo. El cañón corrige solo la caída del proyectil, así que el disparo cae donde marca la cruz; debajo se lee la distancia. Clic izquierdo dispara el cañón y el derecho la ametralladora (en el Panzer I, los dos disparan las ametralladoras).</dd>
-      <dt>Caza</dt><dd>Mandos de avión. W y S suben y bajan el motor (se ve el porcentaje en pantalla) y B frena en tierra. El ratón es la palanca: a los lados inclina las alas (alabeo) y adelante y atrás mueve el morro (cabeceo); por defecto, tirando hacia ti sube. Para virar, inclina las alas hacia ese lado y tira de la palanca. A y D son el timón: deslizan el morro despacio a izquierda y derecha, y guían el avión en tierra. Las flechas hacen también de palanca. Clic izquierdo dispara y G o Espacio suelta una bomba.</dd>
-      <dt>Caza en el móvil</dt><dd>La palanca de la izquierda es la palanca de vuelo (alabeo y cabeceo). El timón son dos botones aparte, «◄ Timón» y «Timón ►». A la derecha están «Motor +», «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba».</dd>
+      <dt>Caza</dt><dd>W y S suben y bajan el motor. A y D (o el ratón a los lados) inclinan las alas: el avión vira hacia el lado al que se inclina. Las flechas ↓ y ↑ (o el ratón adelante y atrás) mueven el morro; por defecto, hacia atrás sube. Z y C son el timón y Espacio los frenos. Para despegar, da motor y, a unos 80 o 95 km/h según el avión, tira hacia atrás. Si subes demasiado el morro o te quedas sin velocidad entras en pérdida: el morro cae y el avión se hunde; bájalo y da motor. Para aterrizar, llega despacio, con las alas niveladas y sin caer a plomo. Clic izquierdo dispara y G suelta una bomba.</dd>
+      <dt>Caza en el móvil</dt><dd>La palanca de la izquierda da alabeo y cabeceo. A la derecha, «Motor +» y «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba»; abajo, los dos botones de timón. Arrastrar por la derecha gira la cámara alrededor del avión.</dd>
+      <dt>Cada caza vuela distinto</dt><dd>Los biplanos (Chato y Fiat CR.32) son lentos, despegan antes y viran muy cerrado. Los monoplanos (Mosca y Bf 109) son más rápidos, necesitan más velocidad para sostenerse y viran más abierto; el Mosca alabea vivísimo y el Bf 109 es el que más corre.</dd>
       <dt>Tab</dt><dd>Marcador</dd>
       <dt>Esc o P</dt><dd>Pausa</dd>
       <dt>Flechas</dt><dd>Girar, por si el navegador no captura el ratón</dd>
@@ -415,7 +418,7 @@ body.nogl #fatal{max-width:none}
     <dl class="keys">
       <dt>Palanca izquierda</dt><dd>Moverse; al tope, o pulsándola, corres. En los vehículos acelera, frena y gira.</dd>
       <dt>Palanca derecha</dt><dd>Mirar y apuntar.</dd>
-      <dt>En el caza</dt><dd>La palanca izquierda inclina las alas y cabecea; L1 y R1 son el timón; R2 y L2 suben y bajan el motor (L2 frena en tierra); A dispara, B suelta la bomba y X baja del avión.</dd>
+      <dt>En el caza</dt><dd>La palanca izquierda da alabeo y cabeceo; L1 y R1 son el timón; R2 y L2 suben y bajan el motor; A dispara, B suelta la bomba y X baja del avión. La palanca derecha gira la cámara.</dd>
       <dt>Joystick de vuelo</dt><dd>También vale un joystick: la palanca da alabeo y cabeceo, el giro de la palanca es el timón, la palanca de gases es el motor (al mínimo, en tierra, frena) y el gatillo dispara. Si en tu modelo los ejes o los botones no coinciden, o quieres usarlo también a pie o en el carro, asígnalos en «Configurar mando o joystick», en el menú o en la pausa.</dd>
       <dt>RT y LT</dt><dd>Disparar y apuntar por el alza. En el carro, LT dispara la ametralladora.</dd>
       <dt>A, B</dt><dd>Saltar y agacharse. Pulsar la palanca derecha (R3) es tumbarse.</dd>
@@ -424,7 +427,8 @@ body.nogl #fatal{max-width:none}
       <dt>Start, Select</dt><dd>Pausa y marcador.</dd>
     </dl>
     <p>Junto a una bandera de tu bando repones munición y granadas y recuperas salud poco a poco.</p>
-    <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: arriba hay cuatro vanos con pretil para disparar a cubierto. Saltar desde allí es casi siempre mortal.</p>
+    <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: la rampa desemboca en el piso de campanas por un hueco con barandilla, y arriba hay cuatro vanos con pretil para disparar. Saltar desde allí es casi siempre mortal. De vez en cuando sube también algún soldado del bando que tiene el pueblo, uno o como mucho dos: conviene mirar al campanario antes de cruzar la plaza.</p>
+    <p>Los soldados, sobre todo los ametralladores, se echan a veces cuerpo a tierra en mitad de un tiroteo: ofrecen menos blanco y apuntan mejor, pero no se mueven hasta levantarse.</p>
     <p>Las casas que el mapa dibuja en hueco se pueden ocupar: entra por la puerta y dispara desde las ventanas. Las balas no dañan a los carros: hacen falta granadas, cañón o bombas.</p>
     <p class="quiet">En el móvil, arrastra en la mitad izquierda para moverte (hasta el tope, corres) y en la derecha para mirar; los botones hacen el resto. En el menú de pausa puedes activar el giroscopio: entonces miras hacia donde apuntes el teléfono, en cualquier dirección, como en una foto de 360°; el dedo sirve para ajustar y el botón «Centrar» fija el horizonte en la postura en que tengas el móvil.</p>
   </div>
@@ -563,8 +567,11 @@ class Geo {
     }
   }
   /* tejado a dos aguas */
-  gable(x0, x1, z0, z1, y, rh, col, alongX, colEnd) {
+  /* Tejado a dos aguas. Es un prisma cerrado: además de los dos faldones y los dos hastiales lleva la cara de abajo, para que por el
+     vuelo del alero no se vea el interior hueco del tejado entre este y el muro. (noBase lo deja abierto: restos de tejado en ruinas.) */
+  gable(x0, x1, z0, z1, y, rh, col, alongX, colEnd, noBase) {
     const ref = [(x0 + x1) / 2, y, (z0 + z1) / 2], ce = colEnd || col;
+    if (!noBase) { const yb = y - 0.012, cb = [ce[0] * 0.6, ce[1] * 0.56, ce[2] * 0.52]; this.quad([x0, yb, z0], [x1, yb, z0], [x1, yb, z1], [x0, yb, z1], cb, [ref[0], y + rh, ref[2]]); }
     if (alongX) {
       const zm = (z0 + z1) / 2, a = [x0, y, z0], b = [x1, y, z0], c = [x1, y, z1], d = [x0, y, z1], e = [x0, y + rh, zm], f = [x1, y + rh, zm];
       this.quad(a, b, f, e, col, ref); this.quad(d, c, f, e, col, ref); this.tri(a, d, e, ce, ref); this.tri(b, c, f, ce, ref);
@@ -1222,11 +1229,12 @@ const world = { houses: [] };
     /* cabecera con ábside y un resto de tejado */
     piece(x, z - L2 + t / 2, 2 * W2 - 2 * t, t, yf - 4, yf + H, cw); g.box(x, yf + H / 2, z - L2 + t + 0.012, 2 * W2 - 2 * t, H, 0.024, lin);
     piece(x, z - L2 - 1.4, 6.4, 2.8, yf - 4, yf + 6.6, shade(cw, 0.95)); g.gable(x - 3.4, x + 3.4, z - L2 - 3, z - L2, yf + 6.6, 1.5, ROOF[0], false, cw);
-    g.gable(x - W2 - 0.2, x + W2 + 0.2, z - L2 - 0.1, z - L2 + 4.2, yf + H, 2.6, ROOF[1], false, cw); addAABB(x - W2, x + W2, yf + H, yf + H + 1.6, z - L2, z - L2 + 4.2);
+    g.gable(x - W2 - 0.2, x + W2 + 0.2, z - L2 - 0.1, z - L2 + 4.2, yf + H, 2.6, ROOF[1], false, cw, true); addAABB(x - W2, x + W2, yf + H, yf + H + 1.6, z - L2, z - L2 + 4.2);
     /* fachada: portada con pilastras, óculo y remate escalonado */
     const fz = z + L2 - t / 2;
     piece(x - 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x + 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x, fz, 2.2, t, yf + 3.7, yf + H + 1.2, cw);
-    g.box(x, yf + H / 2, fz - t / 2 - 0.012, 2 * W2 - 2 * t, H, 0.024, lin);
+    { const li = fz - t / 2 - 0.012, wl = W2 - t - 1.1;       // forro interior de la fachada, en tres paños que dejan libre el hueco de la puerta
+      g.box(x - 1.1 - wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x + 1.1 + wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x, yf + (3.7 + H) / 2, li, 2.2, H - 3.7, 0.024, lin); }
     g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
     g.box(x, yf + H + 1.25, fz + 0.1, 2 * W2 + 0.3, 0.3, t + 0.3, STN);
     for (const sd of [-1, 1]) { g.box(x + sd * 1.55, yf + 2.2, fz + t / 2 + 0.12, 0.55, 4.4, 0.3, STN); g.box(x + sd * 4.9, yf + (H + 1.2) / 2, fz + t / 2 + 0.1, 0.8, H + 1.2, 0.25, shade(cw, 0.94)); }
@@ -1238,7 +1246,7 @@ const world = { houses: [] };
     piece(x, z - 3.5, 2 * W2 - 2 * t, 0.7, yf + 8.1, yf + 8.9, shade(cw, 0.95)); piece(x - 2.6, z + 3.2, 3.8, 0.7, yf + 7.9, yf + 8.7, shade(cw, 0.95));
     for (const az of [-3.5, 3.2]) for (const sd of [-1, 1]) g.box(x + sd * (W2 - t - 0.25), yf + 4, z + az, 0.5, 8, 0.8, shade(cw, 0.9));
     piece(x, z - L2 + 2.4, 2.6, 1.2, yf, yf + 1.1, STN); g.box(x, yf + 0.1, z - L2 + 3.4, 4.2, 0.2, 1.2, shade(STN, 0.85));
-    for (let i = 0; i < 16; i++) { const s = rr(0.35, 1.0), rx = x + rr(-W2 + 1.4, W2 - 1.4), rz = z + rr(-L2 + 4.5, L2 - 2.5); g.box(rx, yf + s * 0.3, rz, s * rr(1, 1.8), s * 0.6, s, shade(i % 4 ? cw : ROOF[0], rr(0.6, 0.92))); }
+    for (let i = 0; i < 16; i++) { const s = rr(0.35, 1.0), rx = x + rr(-W2 + 1.4, W2 - 1.4), rz = z + rr(-L2 + 4.5, L2 - 2.5); g.box(rx, yf + s * 0.11, rz, s * rr(1, 1.8), s * 0.22, s, shade(i % 4 ? cw : ROOF[0], rr(0.6, 0.92))); }       // cascotes a ras de suelo: se pisan, no se atraviesan
     piece(x + 2.6, z + 1.5, 2.2, 1.4, yf, yf + 0.85, shade(cw, 0.72)); piece(x - 2.8, z - 6, 1.8, 2.2, yf, yf + 0.7, shade(cw, 0.7));
     g.limb([x - 3.6, yf + 0.3, z + 6.5], [x + 1.2, yf + 1.5, z + 4.4], 0.26, 0.26, shade(WOOD, 0.8)); g.limb([x + 1, yf + 0.25, z - 1], [x + 3.8, yf + 0.25, z - 3], 0.24, 0.24, shade(WOOD, 0.75));
     /* campanario: muros, puerta al sur, pilar central y rampa que sube en espiral */
@@ -1251,7 +1259,7 @@ const world = { houses: [] };
     g.box(tx, yf - 2.03, tz + h + 0.6, 1.9, 4, 1.2, STONE); addFloor(tx - 0.95, tx + 0.95, tz + h, tz + h + 1.2, yf - 0.03);
     g.box(tx - 0.72, yf + 1.1, tz + h + 0.5, 0.07, 2.2, 1.1, WOOD);
     const pa = 0.8, rise = 1.1, rw = ih - pa, rc = pa + rw / 2, RAMP = shade(WOOD, 1.25), LAND = shade(WOOD, 1.05);
-    piece(tx, tz, 2 * pa, 2 * pa, yf, yf + BF, shade(cw, 0.8));
+    g.box(tx, yf + (BF - 0.22) / 2, tz, 2 * pa, BF - 0.22, 2 * pa, shade(cw, 0.8)); addAABB(tx - pa, tx + pa, yf, yf + BF, tz - pa, tz + pa);       // pilar central (su cabeza queda bajo el entablado)
     for (let k = 0; k < 12; k++) {
       const b0 = yf + k * rise, b1 = b0 + rise, sd = k % 4;
       if (sd === 0) { addLevel(tx + pa, tx + ih, tz - pa, tz + pa, b1, 0, -rise / (2 * pa)); g.limb([tx + rc, b0 - 0.08, tz + pa], [tx + rc, b1 - 0.08, tz - pa], rw, 0.16, RAMP); addLevel(tx + pa, tx + ih, tz - ih, tz - pa, b1); g.box(tx + rc, b1 - 0.08, tz - rc, rw, 0.16, rw, LAND); }
@@ -1259,24 +1267,115 @@ const world = { houses: [] };
       else if (sd === 2) { addLevel(tx - ih, tx - pa, tz - pa, tz + pa, b0, 0, rise / (2 * pa)); g.limb([tx - rc, b0 - 0.08, tz - pa], [tx - rc, b1 - 0.08, tz + pa], rw, 0.16, RAMP); addLevel(tx - ih, tx - pa, tz + pa, tz + ih, b1); g.box(tx - rc, b1 - 0.08, tz + rc, rw, 0.16, rw, LAND); }
       else { addLevel(tx - pa, tx + pa, tz + pa, tz + ih, b0, rise / (2 * pa), 0); g.limb([tx - pa, b0 - 0.08, tz + rc], [tx + pa, b1 - 0.08, tz + rc], 0.16, rw, RAMP); if (k < 11) { addLevel(tx + pa, tx + ih, tz + pa, tz + ih, b1); g.box(tx + rc, b1 - 0.08, tz + rc, rw, 0.16, rw, LAND); } }
     }
-    /* piso de campanas, con el hueco por donde llega la rampa */
-    addLevel(tx - ih, tx + ih, tz - ih, tz + pa, yf + BF); addLevel(tx + pa, tx + ih, tz + pa, tz + ih, yf + BF);
-    g.box(tx, yf + BF - 0.1, tz - (ih - pa) / 2, 2 * ih, 0.2, ih + pa, LAND); g.box(tx + rc, yf + BF - 0.1, tz + rc, rw, 0.2, rw, LAND);
-    g.box(tx, yf + BF - 0.2, tz, 2 * h + 0.36, 0.34, 2 * h + 0.36, STN);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) piece(tx + sx * (h - 0.45), tz + sz * (h - 0.45), 0.9, 0.9, yf + BF, yf + TOP, tw);
+    const band = (cy, hh, out) => {       // moldura que rodea la torre solo por fuera: nunca invade el hueco interior
+      const w = out + 0.06, c = h + out - w / 2;
+      g.box(tx, cy, tz - c, 2 * (h + out), hh, w, STN); g.box(tx, cy, tz + c, 2 * (h + out), hh, w, STN); g.box(tx - c, cy, tz, w, hh, 2 * (h + out), STN); g.box(tx + c, cy, tz, w, hh, 2 * (h + out), STN);
+    };
+    /* Piso de campanas. El hueco de la escalera es una L bien visible: toda la banda oeste, por donde sube el último tramo largo,
+       y el centro de la banda sur, por donde la rampa final desemboca en la esquina sureste. Lo rodea una barandilla de madera. */
+    addLevel(tx - ih, tx + ih, tz - ih, tz - pa, yf + BF); addLevel(tx - pa, tx + ih, tz - pa, tz + pa, yf + BF); addLevel(tx + pa, tx + ih, tz + pa, tz + ih, yf + BF);
+    const PLK = shade(WOOD, 1.38), PLK2 = shade(WOOD, 1.22), by = yf + BF;
+    g.box(tx, by - 0.1, tz - rc, 2 * ih, 0.2, rw, PLK); g.box(tx + (ih - pa) / 2, by - 0.1, tz, ih + pa, 0.2, 2 * pa, PLK2); g.box(tx + rc, by - 0.1, tz + rc, rw, 0.2, rw, PLK);
+    for (let i = 0; i < 6; i++) g.box(tx - ih + 0.35 + i * 0.7, by + 0.005, tz - rc, 0.03, 0.01, rw, shade(WOOD, 0.8));       // juntas de los tablones
+    const frm = shade(WOOD, 0.7);       // marco del hueco
+    g.box(tx - pa, by - 0.02, tz, 0.12, 0.26, 2 * pa, frm); g.box(tx, by - 0.02, tz + pa, 2 * pa, 0.26, 0.12, frm); g.box(tx - rc, by - 0.02, tz - pa, rw, 0.26, 0.12, frm); g.box(tx + pa, by - 0.02, tz + rc, 0.12, 0.26, rw, frm);
+    const rail = (x0, z0, x1, z1) => {       // barandilla: pasamanos, larguero y postes; cierra el paso para no caer al hueco
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 0.8)) + 1;
+      g.limb([x0, by + 0.92, z0], [x1, by + 0.92, z1], 0.09, 0.07, frm); g.limb([x0, by + 0.5, z0], [x1, by + 0.5, z1], 0.05, 0.05, frm);
+      for (let i = 0; i < n; i++) { const t = i / (n - 1); g.box(lerp(x0, x1, t), by + 0.46, lerp(z0, z1, t), 0.07, 0.92, 0.07, frm); }
+      addAABB(Math.min(x0, x1) - 0.05, Math.max(x0, x1) + 0.05, by, by + 0.95, Math.min(z0, z1) - 0.05, Math.max(z0, z1) + 0.05);
+    };
+    rail(tx - pa, tz - pa, tx - pa, tz + pa); rail(tx - pa, tz + pa, tx + pa, tz + pa); rail(tx - ih, tz - pa, tx - pa, tz - pa);
+    band(by - 0.2, 0.34, 0.18);
+    /* cuerpo de campanas: pilares de esquina, pretiles con albardilla y vanos rematados en arco */
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { piece(tx + sx * (h - 0.45), tz + sz * (h - 0.45), 0.9, 0.9, by, yf + TOP, tw); g.box(tx + sx * (h - 0.45), yf + TOP - 0.95, tz + sz * (h - 0.45), 1.02, 0.16, 1.02, STN); }
     for (const sd of [-1, 1]) {
-      piece(tx, tz + sd * (h - 0.2), 2 * h - 1.8, 0.4, yf + BF, yf + BF + 1.0, tw); piece(tx + sd * (h - 0.2), tz, 0.4, 2 * h - 1.8, yf + BF, yf + BF + 1.0, tw);
-      piece(tx, tz + sd * (h - 0.25), 2 * h - 1.8, 0.5, yf + TOP - 0.7, yf + TOP, tw); piece(tx + sd * (h - 0.25), tz, 0.5, 2 * h - 1.8, yf + TOP - 0.7, yf + TOP, tw);
+      piece(tx, tz + sd * (h - 0.2), 2 * h - 1.8, 0.4, by, by + 0.9, tw); piece(tx + sd * (h - 0.2), tz, 0.4, 2 * h - 1.8, by, by + 0.9, tw);       // pretil a la altura de la cintura: deja tirar hacia abajo, a la plaza
+      g.box(tx, by + 0.93, tz + sd * (h - 0.2), 2 * h - 1.7, 0.08, 0.56, STN); g.box(tx + sd * (h - 0.2), by + 0.93, tz, 0.56, 0.08, 2 * h - 1.7, STN);
+      piece(tx, tz + sd * (h - 0.25), 2 * h - 1.8, 0.5, yf + TOP - 0.55, yf + TOP, tw); piece(tx + sd * (h - 0.25), tz, 0.5, 2 * h - 1.8, yf + TOP - 0.55, yf + TOP, tw);
+      for (const k of [-1, 1]) {       // arranques del arco: dos escalones en cada esquina alta del vano
+        g.box(tx + k * (h - 1.25), yf + TOP - 0.8, tz + sd * (h - 0.25), 0.7, 0.5, 0.5, tw); g.box(tx + k * (h - 1.08), yf + TOP - 1.2, tz + sd * (h - 0.25), 0.36, 0.4, 0.5, tw);
+        g.box(tx + sd * (h - 0.25), yf + TOP - 0.8, tz + k * (h - 1.25), 0.5, 0.5, 0.7, tw); g.box(tx + sd * (h - 0.25), yf + TOP - 1.2, tz + k * (h - 1.08), 0.5, 0.4, 0.36, tw);
+      }
+      g.box(tx, yf + TOP - 0.3, tz + sd * (h + 0.02), 0.5, 0.5, 0.1, STN); g.box(tx + sd * (h + 0.02), yf + TOP - 0.3, tz, 0.1, 0.5, 0.5, STN);       // claves de los arcos
     }
-    g.box(tx, yf + 16.25, tz, 0.16, 0.16, 2 * h - 0.9, WOOD); g.blob(tx, yf + 15.72, tz, 0.44, 0.5, 0.44, hex(0x6b5a2e), 7, 4, 0, null, 0); g.box(tx, yf + 15.2, tz, 0.1, 0.16, 0.1, DARK);
-    g.box(tx, yf + TOP + 0.17, tz, 2 * h + 0.6, 0.34, 2 * h + 0.6, STN); addAABB(tx - h, tx + h, yf + TOP, yf + TOP + 1.8, tz - h, tz + h);
-    const e = h + 0.25, ry = yf + TOP + 0.34, ap = [tx, ry + 3.3, tz], rf = [tx, ry, tz];
-    g.tri([tx - e, ry, tz - e], [tx + e, ry, tz - e], ap, ROOF[1], rf); g.tri([tx + e, ry, tz - e], [tx + e, ry, tz + e], ap, ROOF[0], rf);
-    g.tri([tx + e, ry, tz + e], [tx - e, ry, tz + e], ap, ROOF[1], rf); g.tri([tx - e, ry, tz + e], [tx - e, ry, tz - e], ap, ROOF[0], rf);
-    g.box(tx, ry + 3.7, tz, 0.1, 0.9, 0.1, DARK); g.box(tx, ry + 3.9, tz, 0.5, 0.1, 0.1, DARK);
-    for (const yy of [5, 9.5]) { g.box(tx + h + 0.02, yf + yy, tz, 0.06, 1.3, 0.4, DARK); g.box(tx, yf + yy, tz + h + 0.02, 0.4, 1.3, 0.06, DARK); }
+    /* dos campanas colgadas de su yugo de madera */
+    const BRZ = hex(0x6b5a2e);
+    g.box(tx, yf + 16.0, tz - 0.2, 2 * h - 0.9, 0.2, 0.2, WOOD); g.box(tx - 0.3, yf + 16.0, tz - 0.2, 0.2, 0.2, 2 * h - 0.9, WOOD);
+    g.blob(tx + 0.75, yf + 15.42, tz - 0.2, 0.46, 0.52, 0.46, BRZ, 8, 4, 0, null, 0); g.box(tx + 0.75, yf + 14.86, tz - 0.2, 0.1, 0.18, 0.1, DARK); g.box(tx + 0.75, yf + 15.85, tz - 0.2, 0.5, 0.14, 0.14, WOOD);
+    g.blob(tx - 0.3, yf + 15.55, tz - 1.1, 0.3, 0.36, 0.3, shade(BRZ, 1.15), 7, 4, 0, null, 0); g.box(tx - 0.3, yf + 15.17, tz - 1.1, 0.07, 0.12, 0.07, DARK);
+    /* cornisa, linterna ochavada, chapitel y veleta */
+    g.box(tx, yf + TOP + 0.12, tz, 2 * h + 0.5, 0.24, 2 * h + 0.5, STN); g.box(tx, yf + TOP + 0.33, tz, 2 * h + 0.9, 0.18, 2 * h + 0.9, shade(STN, 0.93));
+    addAABB(tx - h, tx + h, yf + TOP, yf + TOP + 2.6, tz - h, tz + h);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const px = tx + sx * (h - 0.1), pz = tz + sz * (h - 0.1); g.box(px, yf + TOP + 0.7, pz, 0.34, 0.56, 0.34, STN); g.blob(px, yf + TOP + 1.14, pz, 0.2, 0.22, 0.2, STN, 6, 3, 0, null, 0); }
+    const ly = yf + TOP + 0.42, om = M4.create(); M4.translate(om, tx, 0, tz); M4.rotY(om, Math.PI / 8);
+    g.with(om, () => {
+      g.cyl(0, ly + 0.95, 0, 1.75, 1.75, 1.9, 8, tw, true); g.cyl(0, ly + 1.98, 0, 1.95, 1.95, 0.16, 8, STN, true);
+      g.cyl(0, ly + 3.0, 0, 1.9, 0.12, 1.9, 8, ROOF[1], true);
+    });
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, m = M4.create(); M4.translate(m, tx, 0, tz); M4.rotY(m, a); g.with(m, () => { g.box(0, ly + 1.0, 1.63, 0.5, 1.0, 0.06, DARK); g.box(0, ly + 1.56, 1.63, 0.62, 0.12, 0.08, STN); }); }
+    g.blob(tx, ly + 4.02, tz, 0.17, 0.17, 0.17, DARK, 6, 3, 0, null, 0); g.box(tx, ly + 4.7, tz, 0.07, 1.2, 0.07, DARK); g.box(tx, ly + 4.95, tz, 0.6, 0.07, 0.07, DARK);
+    g.limb([tx, ly + 4.38, tz], [tx + 0.55, ly + 4.38, tz + 0.1], 0.04, 0.2, DARK);
+    /* fuste: esquinales de sillería, impostas, saeteras y un reloj en la cara que da a la plaza */
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let q = 0; q < 9; q++) {
+      const qy = yf + 0.5 + q * 1.42, lx = q % 2 ? 0.7 : 0.46, lz = q % 2 ? 0.46 : 0.7, px = tx + sx * (h + 0.02), pz = tz + sz * (h + 0.02);       // dos placas finas por fuera, una en cada cara de la esquina
+      g.box(px - sx * lx / 2, qy, pz, lx, 0.62, 0.07, STN); g.box(px, qy, pz - sz * lz / 2, 0.07, 0.62, lz, STN);
+    }
+    for (const yy of [4.35, 8.7]) band(yf + yy, 0.2, 0.08);
+    for (const yy of [2.9, 6.6]) { g.box(tx + h + 0.02, yf + yy, tz - 0.4, 0.06, 1.3, 0.34, DARK); g.box(tx - 0.5, yf + yy, tz - h - 0.02, 0.34, 1.3, 0.06, DARK); }
+    g.box(tx + 1.5, yf + 6.4, tz + h + 0.02, 0.34, 1.3, 0.06, DARK);
+    for (const [cx2, cz2, ang] of [[tx, tz + h + 0.03, 0], [tx + h + 0.03, tz, Math.PI / 2]]) {
+      const m = M4.create(); M4.translate(m, cx2, yf + 10.9, cz2); M4.rotY(m, ang); M4.rotX(m, Math.PI / 2);
+      g.with(m, () => { g.cyl(0, 0, 0, 0.98, 0.98, 0.1, 14, STN, true); g.cyl(0, 0.03, 0, 0.82, 0.82, 0.1, 14, hex(0xe9e2cf), true); });
+      const m2 = M4.create(); M4.translate(m2, cx2, yf + 10.9, cz2); M4.rotY(m2, ang);
+      g.with(m2, () => { g.limb([0, 0, 0.1], [0.32, 0.38, 0.1], 0.06, 0.03, DARK); g.limb([0, 0, 0.1], [-0.18, 0.62, 0.1], 0.045, 0.03, DARK); g.box(0, 0, 0.1, 0.1, 0.1, 0.04, DARK);
+        for (let q = 0; q < 12; q++) { const a = q * Math.PI / 6; g.box(Math.sin(a) * 0.7, Math.cos(a) * 0.7, 0.09, q % 3 ? 0.04 : 0.07, q % 3 ? 0.04 : 0.14, 0.02, DARK); } });
+    }
+    /* puerta de la torre: marco de piedra y hoja abierta */
+    g.box(tx - 0.78, yf + 1.15, tz + h + 0.06, 0.26, 2.3, 0.16, STN); g.box(tx + 0.78, yf + 1.15, tz + h + 0.06, 0.26, 2.3, 0.16, STN); g.box(tx, yf + 2.42, tz + h + 0.06, 1.9, 0.3, 0.2, STN);
+    /* ---- fachada: rosetón, hornacina con imagen, volutas, pináculos, portón y escalinata ---- */
+    const fo = fz + t / 2;
+    { const m = M4.create(); M4.translate(m, x, yf + 7.1, fo + 0.06); M4.rotX(m, Math.PI / 2);
+      g.with(m, () => { g.cyl(0, 0, 0, 1.25, 1.25, 0.12, 14, STN, true); g.cyl(0, 0.03, 0, 0.98, 0.98, 0.12, 14, hex(0x1d2126), true); g.cyl(0, 0.06, 0, 0.22, 0.22, 0.12, 8, STN, true); });
+      for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4; g.limb([x + Math.sin(a) * 0.2, yf + 7.1 + Math.cos(a) * 0.2, fo + 0.14], [x + Math.sin(a) * 0.98, yf + 7.1 + Math.cos(a) * 0.98, fo + 0.14], 0.07, 0.05, STN); } }
+    g.box(x, yf + 5.6, fo + 0.02, 0.9, 1.3, 0.06, hex(0x2a2622)); g.box(x, yf + 6.32, fo + 0.1, 1.1, 0.14, 0.22, STN); g.box(x, yf + 4.98, fo + 0.12, 1.1, 0.12, 0.26, STN);
+    g.box(x, yf + 5.45, fo + 0.12, 0.3, 0.8, 0.16, hex(0xcfc6ae)); g.blob(x, yf + 6.0, fo + 0.12, 0.13, 0.15, 0.12, hex(0xcfc6ae), 6, 3, 0, null, 0);
+    for (const sd of [-1, 1]) {
+      g.blob(x + sd * 4.25, yf + H + 1.95, fz, 0.62, 0.62, 0.34, cw, 8, 4, 0, null, 0); g.blob(x + sd * 2.5, yf + H + 3.15, fz, 0.48, 0.48, 0.32, cw, 8, 4, 0, null, 0); g.blob(x + sd * 1.05, yf + H + 4.1, fz, 0.34, 0.34, 0.3, cw, 7, 4, 0, null, 0);
+      g.box(x + sd * 5.2, yf + H + 1.75, fz, 0.42, 0.9, 0.42, STN); g.cyl(x + sd * 5.2, yf + H + 2.6, fz, 0.3, 0.02, 0.8, 4, STN); g.blob(x + sd * 5.2, yf + H + 3.08, fz, 0.13, 0.13, 0.13, STN, 6, 3, 0, null, 0);
+      g.box(x + sd * 1.55, yf + 0.25, fo + 0.16, 0.7, 0.5, 0.4, STN); g.box(x + sd * 1.55, yf + 4.3, fo + 0.16, 0.72, 0.2, 0.42, STN);
+      g.box(x + sd * 1.16, yf + 1.8, fo + 0.55, 0.08, 3.5, 1.0, shade(WOOD, 0.85)); g.box(x + sd * 1.2, yf + 1.2, fo + 0.55, 0.04, 0.12, 0.9, DARK); g.box(x + sd * 1.2, yf + 2.6, fo + 0.55, 0.04, 0.12, 0.9, DARK);       // hojas del portón, abiertas
+    }
+    for (let q = 0; q < 2; q++) { const d = 1.5 + q * 0.55; g.box(x, yf - 2.03 - 0.14 * (q + 1), z + L2 + d + 0.28, 4.2 + q * 0.9, 4, 0.56, shade(STONE, 1 - q * 0.05)); addFloor(x - 2.1 - q * 0.45, x + 2.1 + q * 0.45, z + L2 + d, z + L2 + d + 0.56, yf - 0.03 - 0.14 * (q + 1)); }
+    /* ---- nave: recercos de los ventanales, cerchas que aún aguantan, retablo, bancos rotos y una campana caída ---- */
+    for (const sd of [-1, 1]) for (const wz of [-5, 0, 5]) {
+      const wx = x + sd * (W2 + 0.03);
+      g.box(wx, yf + 4.3, z + wz, 0.1, 0.2, 1.7, STN); g.box(wx, yf + 5.9, z + wz - 0.72, 0.1, 3.0, 0.16, STN); g.box(wx, yf + 5.9, z + wz + 0.72, 0.1, 3.0, 0.16, STN);
+      g.box(x + sd * (W2 - t - 0.02), yf + 4.3, z + wz, 0.06, 0.16, 1.5, shade(cw, 0.8));
+    }
+    for (const bz of [7.2, 4.0]) {       // dos cerchas junto a la fachada: tirante y pares
+      const m = M4.create(); M4.translate(m, x, yf + H + 0.15, z + bz);
+      g.with(m, () => { g.box(0, 0, 0, 2 * W2 - 0.4, 0.26, 0.26, shade(WOOD, 0.8)); g.limb([-W2 + 0.3, 0.1, 0], [0, 2.3, 0], 0.2, 0.2, shade(WOOD, 0.75)); g.limb([W2 - 0.3, 0.1, 0], [bz > 5 ? 0 : 1.6, bz > 5 ? 2.3 : 1.35, 0], 0.2, 0.2, shade(WOOD, 0.75)); g.box(0, 1.1, 0, 0.18, 2.1, 0.18, shade(WOOD, 0.7)); });
+    }
+    addAABB(x - W2, x + W2, yf + H, yf + H + 0.4, z + 3.8, z + 4.2); addAABB(x - W2, x + W2, yf + H, yf + H + 0.4, z + 7.0, z + 7.4);
+    piece(x, z - L2 + 1.15, 4.2, 0.5, yf, yf + 4.6, shade(cw, 0.86)); g.box(x, yf + 4.75, z - L2 + 1.15, 4.6, 0.3, 0.7, STN); g.box(x, yf + 5.5, z - L2 + 1.15, 2.2, 1.2, 0.4, shade(cw, 0.86)); g.box(x, yf + 6.4, z - L2 + 1.15, 0.14, 0.9, 0.14, hex(0x8a6f2e)); g.box(x, yf + 6.55, z - L2 + 1.15, 0.6, 0.14, 0.14, hex(0x8a6f2e));
+    g.box(x, yf + 2.6, z - L2 + 1.42, 1.3, 2.4, 0.06, hex(0x2a2622)); for (const sd of [-1, 1]) g.box(x + sd * 1.45, yf + 2.3, z - L2 + 1.42, 0.5, 4.2, 0.1, hex(0x8a6f2e));
+    for (const [bx, bz2, ang] of [[-2.9, 5.6, 0.1], [2.7, 6.4, -0.2], [-2.6, 2.6, 1.2], [3.0, -1.0, 0.05], [-3.1, -2.6, -0.08]]) {
+      const m = M4.create(); M4.translate(m, x + bx, yf, z + bz2); M4.rotY(m, ang); if (ang > 1) M4.rotZ(m, 1.35);
+      g.with(m, () => { g.box(0, 0.42, 0, 2.2, 0.08, 0.42, shade(WOOD, 1.05)); g.box(0, 0.75, 0.2, 2.2, 0.6, 0.06, shade(WOOD, 0.95)); g.box(-1.0, 0.22, 0, 0.08, 0.44, 0.4, shade(WOOD, 0.85)); g.box(1.0, 0.22, 0, 0.08, 0.44, 0.4, shade(WOOD, 0.85)); });
+    }
+    { const m = M4.create(); M4.translate(m, x + 1.1, yf + 0.42, z + 0.4); M4.rotZ(m, 1.25); M4.rotY(m, 0.4); g.with(m, () => { g.blob(0, 0, 0, 0.5, 0.56, 0.5, BRZ, 8, 4, 0, null, 0); g.box(0, 0.6, 0, 0.7, 0.16, 0.16, WOOD); }); addCircle(x + 1.1, z + 0.4, 0.55); }
+    /* ---- pequeño cementerio tras la cabecera ---- */
+    for (const [cx2, cz2, hh] of [[-3.2, -5.6, 1.0], [-1.6, -6.3, 0.8], [0.4, -5.4, 1.15], [2.3, -6.4, 0.9], [3.6, -5.2, 0.75], [-4.4, -7.0, 0.85]]) {
+      const px = x + cx2, pz = z - L2 + cz2, py = terrainH(px, pz);
+      g.box(px, py + hh / 2, pz, 0.12, hh, 0.12, STONE); g.box(px, py + hh * 0.72, pz, 0.5, 0.12, 0.12, STONE); g.box(px, py + 0.06, pz + 0.55, 0.7, 0.12, 1.3, shade(STONE, 0.9));
+    }
+    stoneWall(x - 5.6, z - L2 - 9.2, x + 5.2, z - L2 - 9.2); stoneWall(x - 5.9, z - L2 - 9, x - 5.9, z - L2 - 4.6);
     addBotBox(x - W2, tx + h, z - L2 - 3, z + L2);
-    world.tower = { x: tx, z: tz, h, yf, top: yf + BF };
+    { const C = { SE: [tx + rc, tz + rc], NE: [tx + rc, tz - rc], NW: [tx - rc, tz - rc], SW: [tx - rc, tz + rc] }, path = [[tx, tz + h + 3.2], [tx, tz + h - 0.3], C.SE];
+      for (let k = 0; k < 3; k++) path.push(C.NE, C.NW, C.SW, C.SE);
+      path.push([tx + rc, tz - 0.1]);
+      world.tower = { x: tx, z: tz, h, yf, top: yf + BF, path, spots: [[tx + 1.82, tz - 0.3, -Math.PI / 2], [tx + 0.3, tz - 1.82, 0], [tx + 1.3, tz + 1.82, Math.PI]] }; }       // pegados al pretil del este, del norte y del sur
     world.houses.push([x, z, 11, 20, 1], [tx, tz, 5.2, 5.2, 1], [x, z - L2 - 1.4, 6.4, 2.8]); noGo.push([x, z, 14], [tx, tz, 8]);
   })();
   [[-30, 4, 8, 7, 6, 1], [-14, 12, 7, 9, 6.5, 0], [-6, 26, 8, 7, 5.5, 1], [-8, 44, 9, 7, 6, 0], [-22, 56, 8, 8, 6, 1], [-40, 56, 7, 9, 6.5, 0], [-56, 50, 8, 7, 5.5, 1],
@@ -1328,7 +1427,7 @@ const world = { houses: [] };
    [-322, 52, 8, 8, 6], [-306, 48, 8, 7, 6], [-290, 44, 7, 7, 5.5], [-284, -2, 7, 8, 6]]
     .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: (a[0] === -298 && a[1] === -14) ? 's' : (a[0] === -296) ? 'n' : (a[0] === -284) ? 'e' : 0 }));
   house(-304, -46, 22, 12, 8, { wall: hex(0xe6dfcc), chimney: false, open: 's' });        // bodega cooperativa
-  (function tower() { const x = -340, z = 12, y = terrainH(x, z); g.box(x, y + 7, z, 5, 18, 5, cw); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1]); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
+  (function tower() { const x = -340, z = 12, y = terrainH(x, z); g.box(x, y + 7, z, 5, 18, 5, cw); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
   parapet(-286, 22, 5, false); parapet(-288, 0, 4, false); parapet(-300, 16, 4.5, true); crate(-308, 14, 0.9); crate(-316, 4, 0.8); crate(-314, 5, 0.7);
 
   /* ---- Ribera izquierda: campamento y barcas ---- */
@@ -1525,7 +1624,7 @@ const world = { houses: [] };
     for (const sd of [-1, 1]) { tg.box(sd * 0.92, 0.98, -2.1, 0.5, 0.1, 1.25, dk); tg.box(sd * 0.78, 1.22, -2.74, 0.2, 0.2, 0.12, hex(0xd8d2b0)); tg.box(sd * 0.985, 1.8, -0.95, 0.04, 0.5, 0.7, glass); tg.box(sd * 1.05, 1.35, 1.25, 0.07, 0.6, 3.0, wd); }
     tg.box(0, 1.45, -0.95, 1.95, 1.5, 1.2, body); tg.box(0, 2.24, -0.95, 2.0, 0.08, 1.3, shade(body, 0.8)); tg.box(0, 1.8, -1.565, 1.6, 0.55, 0.04, glass);
     tg.box(0, 0.98, 1.25, 2.15, 0.14, 3.0, wd); tg.box(0, 1.35, 2.73, 2.15, 0.6, 0.07, wd); tg.box(0, 1.35, -0.23, 2.15, 0.6, 0.07, wd);
-    if (team === NAT) { const cv = hex(0xb5aa88); tg.gable(-1.09, 1.09, -0.26, 2.76, 1.95, 0.6, cv, false, shade(cv, 0.85)); for (const sd of [-1, 1]) tg.box(sd * 1.07, 1.8, 1.25, 0.04, 0.34, 3.02, cv); }
+    if (team === NAT) { const cv = hex(0xb5aa88); tg.gable(-1.09, 1.09, -0.26, 2.76, 1.95, 0.6, cv, false, shade(cv, 0.85), true); for (const sd of [-1, 1]) tg.box(sd * 1.07, 1.8, 1.25, 0.04, 0.34, 3.02, cv); }
     const wheel = (x, z, wdt) => { const m = M4.create(); M4.translate(m, x, 0.46, z); M4.rotZ(m, Math.PI / 2); tg.with(m, () => tg.cyl(0, 0, 0, 0.46, 0.46, wdt, 10, dk, true)); };
     wheel(-0.95, -2.1, 0.26); wheel(0.95, -2.1, 0.26); wheel(-0.9, 1.7, 0.5); wheel(0.9, 1.7, 0.5);
     return makeMesh(tg.a);
@@ -1719,7 +1818,7 @@ function placeAt(s, f) {
     if (!insideSolid(tx, tz, 0.7) && terrainH(tx, tz) > 0.4) { x = tx; z = tz; break; }
   }
   s.x = x; s.z = z; s.y = groundAt(x, z); s.vx = s.vy = s.vz = 0;
-  s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
+  s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; s.tower = null; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
   s.sx = x; s.sz = z; s.stuckT = 0; s.avoidT = 0; s.atFlagT = 0;
 }
 const ownedSpawns = team => FLAGS.filter(f => f.owner === team);
@@ -1798,7 +1897,7 @@ function canSee(s, e, ey) {
 }
 const _cand = [];
 function botThink(s) {
-  const ey = s.y + (s.crouch ? 1.0 : 1.5);
+  const ey = s.y + (s.prone ? 0.42 : s.crouch ? 1.0 : 1.5);
   let e = s.enemy;
   if (e && (!e.alive || !canSee(s, e, ey))) e = null;
   if (!e) {
@@ -1846,9 +1945,10 @@ function botFire(s, e, d, moving) {
   let p = w.botAcc * Math.exp(-d / w.botRange);
   if (e.prone) p *= 0.45; else if (e.crouch) p *= 0.7;       // a un tumbado cuesta mucho más darle
   if (e.speed > 4.8) p *= 0.72; if (moving) p *= 0.55; if (e.swim) p *= 0.6;
+  if (s.prone) p *= 1.3;       // cuerpo a tierra se apunta mejor
   if (s.first) { p *= 0.5; s.first = false; }
   if (e.isPlayer) p *= game.diff * (e.veh ? 0.6 : 1);
-  const mx = s.x - Math.sin(s.yaw) * 0.9, mz = s.z - Math.cos(s.yaw) * 0.9, my = s.y + (s.crouch ? 1.0 : 1.38);
+  const mx = s.x - Math.sin(s.yaw) * 0.9, mz = s.z - Math.cos(s.yaw) * 0.9, my = s.y + (s.prone ? 0.34 : s.crouch ? 1.0 : 1.38);
   const hit = Math.random() < p;
   let tx = e.x, ty = e.y + (e.prone ? 0.3 + rnd(-0.1, 0.15) : (e.crouch ? 0.7 : 1.15) + rnd(-0.3, 0.3)), tz = e.z;
   if (!hit) {
@@ -1881,6 +1981,7 @@ function updateBot(s, dt) {
     if (v.dead || v.driver || v.claim !== s) s.goVeh = null;
     else { s.dx = v.x; s.dz = v.z; if (Math.hypot(v.x - s.x, v.z - s.z) < (v.kind === 'plane' ? 5.2 : 4.6)) { botBoard(v, s); return; } }
   }
+  if (s.tower && towerBot(s, dt)) return;
   const w = s.wpn, e = s.enemy;
   let mvx = 0, mvz = 0, spd = 0, wantYaw = s.yaw, nav = null;
   if (s.reloadT > 0) { s.reloadT -= dt; if (s.reloadT <= 0) s.ammo = w.mag; }
@@ -1889,16 +1990,20 @@ function updateBot(s, dt) {
     const ex = e.x - s.x, ez = e.z - s.z, d = Math.hypot(ex, ez) || 0.01;
     wantYaw = Math.atan2(-ex, -ez);
     s.aimPitch = Math.atan2((e.y + 1.1) - (s.y + 1.4), d);
-    if (w.kind === 'smg' && d > 14 && d < 48) { mvx = ex / d; mvz = ez / d; spd = 3.9; s.crouch = false; }
-    else if (d > 95) { nav = navPoint(s); spd = 3.0; s.crouch = false; }
+    if (w.kind === 'smg' && d > 14 && d < 48) { mvx = ex / d; mvz = ez / d; spd = 3.9; s.crouch = false; s.prone = false; }
+    else if (d > 95) { nav = navPoint(s); spd = 3.0; s.crouch = false; s.prone = false; }
     else {
       s.strafeT -= dt;
-      if (s.strafeT <= 0) { s.strafeT = rnd(0.8, 2.4); s.strafe = Math.random() < 0.45 ? 0 : (Math.random() < 0.5 ? -1 : 1); s.crouch = s.strafe === 0 && Math.random() < (w.kind === 'lmg' ? 0.8 : 0.45); }
+      if (s.strafeT <= 0) {
+        s.strafeT = rnd(0.8, 2.4); s.strafe = Math.random() < 0.45 ? 0 : (Math.random() < 0.5 ? -1 : 1); s.crouch = s.strafe === 0 && Math.random() < (w.kind === 'lmg' ? 0.8 : 0.45); s.prone = false;
+        /* de vez en cuando, en un tiroteo a distancia, se echa cuerpo a tierra un rato: sobre todo los ametralladores, a veces un fusilero */
+        if (s.strafe === 0 && !s.tower && !s.swim && d > 26 && Math.random() < (w.kind === 'lmg' ? 0.45 : w.kind === 'rifle' ? 0.16 : 0.05)) { s.prone = true; s.crouch = false; s.strafeT = rnd(3.5, 7); }
+      }
       if (s.strafe) { mvx = -ez / d * s.strafe; mvz = ex / d * s.strafe; spd = 1.5; }
     }
     s.aimT -= dt;
     if (s.aimT <= 0 && s.fireT <= 0 && s.reloadT <= 0 && Math.abs(angDiff(wantYaw, s.yaw)) < 0.25) botFire(s, e, d, spd > 2);
-  } else { s.aimPitch = 0; nav = navPoint(s); spd = 4.5; }
+  } else { s.aimPitch = 0; nav = navPoint(s); spd = 4.5; s.prone = false; }
   if (nav) {
     const dx = nav.x - s.x, dz = nav.z - s.z, d = Math.hypot(dx, dz) || 0.001;
     if (nav.final && d < 2.2) {
@@ -1910,12 +2015,17 @@ function updateBot(s, dt) {
     s.avoidT -= dt; const px = -mvz * s.avoidDir, pz = mvx * s.avoidDir;
     mvx = mvx * 0.15 + px; mvz = mvz * 0.15 + pz; const l = Math.hypot(mvx, mvz) || 1; mvx /= l; mvz /= l;
   }
-  if (s.swim) spd *= 0.5; if (s.crouch) spd = Math.min(spd, 2);
+  if (s.swim) { spd *= 0.5; s.prone = false; } if (s.crouch) spd = Math.min(spd, 2);
+  if (s.prone || (s.proneT || 0) > 0.25) spd = 0;       // cuerpo a tierra, o levantándose: no avanza
   const ox = s.x, oz = s.z;
-  s.x += mvx * spd * dt; s.z += mvz * spd * dt;
-  resolveCollide(s, 0.38, true);
-  const gy = groundAt(s.x, s.z);
-  if (gy < waterY - 1.15) { s.y = waterY - 1.25; s.swim = true; } else { s.y = gy; s.swim = false; }
+  if (s.tower && s.tower.phase === 'top') {       // arriba, en el campanario: quieto en su vano, vigilando hacia fuera
+    spd = 0; s.crouch = s.reloadT > 0; if (!e) wantYaw = s.tower.yaw;
+  } else {
+    s.x += mvx * spd * dt; s.z += mvz * spd * dt;
+    resolveCollide(s, 0.38, true);
+    const gy = groundAt(s.x, s.z);
+    if (gy < waterY - 1.15) { s.y = waterY - 1.25; s.swim = true; } else { s.y = gy; s.swim = false; }
+  }
   s.speed = Math.hypot(s.x - ox, s.z - oz) / Math.max(dt, 1e-4);
   if (spd > 0) {
     s.stuckT += dt;
@@ -1927,12 +2037,67 @@ function updateBot(s, dt) {
   s.yaw += clamp(angDiff(wantYaw, s.yaw), -7 * dt, 7 * dt);
   s.walkPhase += s.speed * dt * 1.9;
   s.crouchT = clamp(s.crouchT + (s.crouch ? 1 : -1) * dt * 6, 0, 1);
+  s.proneT = clamp((s.proneT || 0) + (s.prone ? 1 : -1) * dt * 2.4, 0, 1);
+}
+/* ============ centinelas del campanario ============
+   De vez en cuando, uno o como mucho dos soldados del bando que tiene Corbera suben al campanario de Sant Pere: van andando hasta
+   la puerta de la torre, suben la rampa, se apostan un rato en un vano y luego bajan. Arriba se comportan como cualquier otro
+   (ven, apuntan y disparan), pero sin moverse de su sitio. */
+const towerOcc = [];
+function towerDuty(dt) {
+  for (let i = towerOcc.length - 1; i >= 0; i--) if (!towerOcc[i].alive || !towerOcc[i].tower) { if (towerOcc[i].tower) towerOcc[i].tower = null; towerOcc.splice(i, 1); }
+  game.towerT = (game.towerT === undefined ? rnd(40, 80) : game.towerT) - dt;
+  if (game.towerT > 0) return;
+  game.towerT = rnd(60, 110);
+  const T = world.tower, C = FLAGS.find(f => f.id === 'C');
+  if (C.owner < 0 || towerOcc.length >= 2 || Math.random() > (towerOcc.length ? 0.2 : 0.5)) return;
+  let best = null, bd = 70;
+  for (const s of soldiers) {
+    if (s.isPlayer || !s.alive || s.team !== C.owner || s.veh || s.goVeh || s.tower || s.enemy || s.swim) continue;
+    const d = Math.hypot(s.x - T.path[0][0], s.z - T.path[0][1]) - (s.wpn.kind === 'rifle' ? 12 : 0);       // mejor un fusilero
+    if (d < bd) { bd = d; best = s; }
+  }
+  if (!best) return;
+  const used = towerOcc.map(o => o.tower.spot), free = T.spots.map((q, i) => i).filter(i => !used.includes(i));
+  const spot = free[Math.floor(Math.random() * free.length)];
+  best.tower = { phase: 'go', i: 1, spot, yaw: T.spots[spot][2], t: 45, topT: rnd(45, 95) };
+  best.prone = false; towerOcc.push(best);
+}
+/* devuelve true mientras lleva al soldado por la escalera (y entonces updateBot no hace nada más) */
+function towerBot(s, dt) {
+  const T = world.tower, tw = s.tower, P0 = T.path[0];
+  if (tw.phase === 'go') {       // de camino a la puerta, con la navegación normal
+    tw.t -= dt; s.dx = P0[0]; s.dz = P0[1];
+    if (tw.t <= 0 || s.swim) { s.tower = null; return false; }
+    if (Math.hypot(s.x - P0[0], s.z - P0[1]) < 2.6 && !s.enemy) { tw.phase = 'up'; tw.i = 1; s.prone = false; s.crouch = false; }
+    return false;       // hasta llegar se mueve como cualquiera
+  }
+  if (tw.phase === 'top') {
+    tw.topT -= dt;
+    if (tw.topT <= 0 && !s.enemy) { tw.phase = 'down'; tw.i = T.path.length - 1; return true; }
+    return false;       // arriba: percepción y disparo normales, sin moverse (lo impone updateBot)
+  }
+  /* subiendo o bajando: sigue los puntos de la rampa */
+  const up = tw.phase === 'up', spot = T.spots[tw.spot];
+  const tgt = up && tw.i >= T.path.length ? spot : T.path[Math.max(0, Math.min(T.path.length - 1, tw.i))];
+  const dx = tgt[0] - s.x, dz = tgt[1] - s.z, d = Math.hypot(dx, dz), stepLen = 2.8 * dt;
+  s.enemy = null; s.crouch = false; s.prone = false; s.aimPitch = 0;
+  if (d <= stepLen + 0.05) {
+    s.x = tgt[0]; s.z = tgt[1];
+    if (up) { if (tw.i >= T.path.length) { tw.phase = 'top'; s.yaw = tw.yaw; } else tw.i++; }
+    else if (--tw.i < 0) { s.tower = null; s.retargetT = 0; return false; }
+  } else { s.x += dx / d * stepLen; s.z += dz / d * stepLen; s.yaw += clamp(angDiff(Math.atan2(-dx, -dz), s.yaw), -8 * dt, 8 * dt); }
+  s.y = groundAt(s.x, s.z, s.y); s.swim = false;
+  s.speed = d > stepLen ? 2.8 : 0; s.walkPhase += s.speed * dt * 1.9; s.stuckT = 0; s.sx = s.x; s.sz = s.z;
+  s.crouchT = clamp(s.crouchT - dt * 6, 0, 1); s.proneT = clamp((s.proneT || 0) - dt * 2.4, 0, 1);
+  if (s.reloadT > 0) { s.reloadT -= dt; if (s.reloadT <= 0) s.ammo = s.wpn.mag; }
+  return true;
 }
 function separate() {
   for (let i = 0; i < soldiers.length; i++) {
     const a = soldiers[i]; if (!a.alive) continue;
     for (let j = i + 1; j < soldiers.length; j++) {
-      const b = soldiers[j]; if (!b.alive) continue;
+      const b = soldiers[j]; if (!b.alive || (a.tower && a.tower.phase !== 'go') || (b.tower && b.tower.phase !== 'go')) continue;       // a los del campanario no se les empuja
       const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
       if (d2 < 0.49 && d2 > 1e-6) {
         const d = Math.sqrt(d2), k = (0.7 - d) / d * 0.5;
@@ -1943,15 +2108,17 @@ function separate() {
 }
 const _m = M4.create(), _a = M4.create();
 function drawSoldier(s) {
+  const pt = s.alive ? (s.proneT || 0) : 0;
   M4.identity(_m); M4.translate(_m, s.x, s.y + (s.alive ? 0 : 0.12 * s.fall), s.z); M4.rotY(_m, s.yaw);
   if (!s.alive) M4.rotX(_m, s.fall * 1.52 * s.fallDir);
+  else if (pt > 0) { M4.translate(_m, 0, 0.2 * pt, 0.72 * pt); M4.rotX(_m, -1.47 * pt); }       // tumbado boca abajo, con la cabeza hacia donde mira
   const hip = lerp(0.85, 0.55, s.crouchT), sw = s.alive ? Math.sin(s.walkPhase) * Math.min(1, s.speed / 4) * 0.75 : 0.25, ls = lerp(1, 0.64, s.crouchT);
   M4.copy(_a, _m); M4.translate(_a, -0.1, hip, 0); M4.rotX(_a, sw); M4.scale(_a, 1, ls, 1); drawMesh(s.legM, _a);
   M4.copy(_a, _m); M4.translate(_a, 0.1, hip, 0); M4.rotX(_a, -sw); M4.scale(_a, 1, ls, 1); drawMesh(s.legM, _a);
   M4.copy(_a, _m); M4.translate(_a, 0, hip, 0); M4.rotX(_a, -(s.speed > 3 ? 0.14 : 0.03) - s.crouchT * 0.18); drawMesh(s.torsoM, _a);
   M4.translate(_a, 0, 0.55, 0);
   if (!s.alive) { M4.rotX(_a, -1.1); }
-  else if (s.enemy || s.isPlayer) M4.rotX(_a, s.aimPitch + (s.speed > 3 ? 0.14 : 0.03));
+  else if (s.enemy || s.isPlayer || pt > 0.5) M4.rotX(_a, s.aimPitch * (1 - pt) + (s.speed > 3 ? 0.14 : 0.03) + 1.5 * pt);       // tumbado, los brazos y el arma van hacia delante, a ras de suelo
   else { M4.rotX(_a, -0.5); M4.rotY(_a, 0.32); }
   drawMesh(s.armsM, _a);
 }
@@ -1961,7 +2128,6 @@ const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0,
 let P = null;
 /* opciones que se guardan en el dispositivo */
 const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true };      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
-const stick = { ty: 0, tp: 0, tr: 0 };      // rumbo, cabeceo y alabeo que el jugador le pide al caza
 try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; } catch (e) { }
 function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY })); } catch (e) { } }
 
@@ -2063,7 +2229,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   input.keys[e.code] = true; input.pad = false;
   if (game.state === 'play') {
-    if (P.veh && (e.code === 'KeyG' || e.code === 'Space')) { input.bomb = true; return; }
+    if (P.veh && (e.code === 'KeyG' || (e.code === 'Space' && P.veh.kind !== 'plane'))) { input.bomb = true; return; }       // en el caza, Espacio son los frenos
     if ((P.veh || P.aa) && !['KeyE', 'KeyF', 'Tab', 'Escape', 'KeyP'].includes(e.code)) return;
     switch (e.code) {
       case 'KeyE': case 'KeyF': useVehicle(); break;
@@ -2459,35 +2625,27 @@ function updatePlayer(dt) {
     p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
   if (p.alive && p.veh && p.veh.kind === 'plane') {
-    /* Caza con mandos de avión. La palanca (ratón, palanca táctil o palanca izquierda del mando) da alabeo y cabeceo; el timón va aparte
-       (A y D, dos botones en el móvil, L1 y R1 en el mando). Para virar se inclinan las alas y se tira de la palanca; el timón solo
-       desliza el morro despacio, para afinar la puntería o corregir en el despegue. */
-    const v = p.veh, pullSign = opts.invY ? 1 : -1;      // invertido (por defecto): palanca hacia atrás, morro arriba
-    if (v.air) {
-      const joy = input.touch || (pad.on && input.flyPad);       // palanca táctil, o el mando o joystick si es lo último que has movido
-      let pull = 0, rollIn = false;       // pull: cabeceo pedido en este paso, en el eje del propio avión
-      if (joy) {         // palanca que vuelve al centro: a los lados inclina las alas (y al soltarla se nivelan); adelante y atrás, cabeceo
-        stick.tr = -input.mvx * 1.2; rollIn = true;
-        pull += input.mvz * Math.abs(input.mvz) * 0.75 * dt * pullSign;
-      } else if (!input.locked && input.mx >= 0 && lockOff()) {       // ratón imposible de capturar: la posición del cursor respecto al centro es la palanca
-        const R = Math.min(cw, ch) * 0.42, dzn = q => { const a = Math.abs(q); return a < 0.12 ? 0 : Math.sign(q) * Math.min(1, (a - 0.12) / 0.88); };
-        const ox = dzn((input.mx - cw / 2) / R), oy = dzn((input.my - ch / 2) / R);
-        stick.tr = -ox * 1.2; rollIn = true; pull += oy * Math.abs(oy) * 0.75 * dt * pullSign;
-      } else {           // ratón capturado: cada movimiento inclina o cabecea un poco y el avión conserva la postura
-        if (input.lookX) rollIn = true;
-        stick.tr -= input.lookX * 0.0024; pull += input.lookY * 0.0016 * pullSign;
-      }
-      const kr = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0), kp = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0);       // las flechas hacen de palanca
-      if (kr) { stick.tr -= kr * 1.4 * dt; rollIn = true; }
-      pull += kp * 0.6 * dt * pullSign;
-      stick.tr = clamp(stick.tr, -1.3, 1.3);
-      if (!rollIn && Math.abs(stick.tr) < 0.14) stick.tr *= Math.max(0, 1 - dt * 2);       // casi nivelado: termina de nivelar solo
-      const rud = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.rud, -1, 1), cr = Math.cos(v.roll), sr = Math.sin(v.roll);
-      stick.tp += pull * cr - (1 - cr) * 0.1 * dt;       // con las alas inclinadas, tirar hace virar en vez de subir, y el morro tiende a caer
-      stick.ty += pull * sr / Math.max(0.45, Math.cos(v.pitch)) + sr * 0.5 * v.def.turn * dt - rud * 0.4 * dt;       // viraje por inclinación, más el timón
-      stick.ty = v.yaw + clamp(angDiff(stick.ty, v.yaw), -0.8, 0.8);       // la consigna nunca se adelanta demasiado al avión
-      stick.tp = clamp(stick.tp, -0.9, 0.9);
-    } else { stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; }
+    /* Caza: aquí solo se recogen los mandos; la física está en flyPlayer(). Mismo reparto y mismas sensibilidades que la avioneta del
+       «Gran Timo Escurialense»: W y S, motor; A y D, alabeo; flechas arriba y abajo, cabeceo; Z y C, timón; Espacio, frenos; y el
+       ratón mueve directamente el morro (arriba y abajo) y las alas (a los lados), a 0,0032 radianes por píxel. */
+    const v = p.veh, I = flyIn, inv = opts.invY ? 1 : -1;       // invertido (por defecto): hacia atrás sube el morro
+    const joy = input.touch || (pad.on && input.flyPad);       // palanca táctil, o el mando o joystick si es lo último que has movido
+    let jx = joy ? input.mvx : 0, jy = joy ? input.mvz : 0;       // palanca: jx a la derecha, jy hacia atrás
+    if (!joy && !input.locked && input.mx >= 0 && lockOff()) {       // ratón imposible de capturar: el cursor hace de palanca alrededor del centro
+      const R = Math.min(cw, ch) * 0.42, dzn = q => { const a = Math.abs(q); return a < 0.12 ? 0 : Math.sign(q) * Math.min(1, (a - 0.12) / 0.88); };
+      jx = dzn((input.mx - cw / 2) / R); jy = dzn((input.my - ch / 2) / R);
+    }
+    I.thr = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + input.thr, -1, 1);
+    I.thrAbs = pad.on && input.flyPad && input.thrAbs >= 0 ? input.thrAbs : -1;
+    I.pitch = clamp(((k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0) + jy) * inv, -1, 1);
+    I.roll = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0) + jx, -1, 1);
+    I.yaw = clamp((k.KeyC ? 1 : 0) - (k.KeyZ ? 1 : 0) + input.rud, -1, 1);
+    I.brake = !!(k.Space || k.KeyB || input.brake);
+    if (joy) {       // con palanca, arrastrar a la derecha (o la otra palanca del mando) gira la cámara alrededor del avión un momento
+      I.pm = I.rm = 0;
+      if (Math.abs(input.lookX) > 0.01) { game.planeOrb = clamp((game.planeOrb || 0) - input.lookX * 0.0023, -2.6, 2.6); game.planeOrbT = 1.5; }
+    } else { I.pm = input.lookY * 0.0032 * inv; I.rm = input.lookX * 0.0032; }
+    if ((game.planeOrbT = (game.planeOrbT || 0) - dt) <= 0) game.planeOrb = lerp(game.planeOrb || 0, 0, Math.min(1, dt * 2));
     input.lookX = input.lookY = 0; input.jump = false; p.yaw = v.yaw; p.pitch = v.pitch; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
   if (p.alive && p.veh) {      // carro: el ratón apunta la torre
@@ -2583,13 +2741,13 @@ const VDEF = {
   pz1: { kind: 'tank', team: NAT, name: 'Panzer I', art: 'el Panzer I', verb: 'tripular', hp: 480, vmax: 9.5, cannon: false, mgRate: 0.055, mgName: 'Ametralladoras MG 13',
     mg: { name: 'Ametralladoras MG 13', kind: 'lmg', dmg: 32, rate: 0.08, auto: true, botAcc: 0.3, botRange: 90, mag: 1e9, reload: 0 },
     hist: 'Carro ligero alemán de la Legión Cóndor, armado solo con dos ametralladoras; en España lo llamaron «negrillo». Frente al cañón del T-26 estaba indefenso, lo que llevó a los alemanes a replantear sus carros antes de la guerra mundial.' },
-  mosca: { kind: 'plane', team: REP, name: 'Polikarpov I-16 «Mosca»', art: 'el I-16 «Mosca»', verb: 'pilotar', hp: 120, vmax: 50, turn: 0.95, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras ShKAS',
+  mosca: { kind: 'plane', team: REP, name: 'Polikarpov I-16 «Mosca»', art: 'el I-16 «Mosca»', verb: 'pilotar', hp: 225, vmax: 50, turn: 0.95, fl: { roll: 2.7, turn: 1.2, pitch: 1.0, vs: [15, 29] }, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras ShKAS',
     hist: 'Caza soviético y primer monoplano de tren retráctil que entró en servicio en el mundo. Los republicanos lo llamaron «Mosca» y sus enemigos, «Rata». Rápido y nervioso, era un caza puro: no llevaba bombas.' },
-  chato: { kind: 'plane', team: REP, name: 'Polikarpov I-15 «Chato»', art: 'el I-15 «Chato»', verb: 'pilotar', hp: 120, vmax: 42, turn: 1.2, bombs: 4, mgRate: 0.075, mgDmg: 40, mgPlane: 12, spread: 0.014, mgName: 'Ametralladoras PV-1',
+  chato: { kind: 'plane', team: REP, name: 'Polikarpov I-15 «Chato»', art: 'el I-15 «Chato»', verb: 'pilotar', hp: 225, vmax: 42, turn: 1.2, fl: { roll: 2.1, turn: 1.5, pitch: 1.05, vs: [12, 24] }, bombs: 4, mgRate: 0.075, mgDmg: 40, mgPlane: 12, spread: 0.014, mgName: 'Ametralladoras PV-1',
     hist: 'Caza biplano soviético, lento pero muy maniobrero, que también se fabricó bajo licencia en Cataluña. Podía llevar bombas ligeras bajo las alas para atacar a las tropas en tierra.' },
-  bf109: { kind: 'plane', team: NAT, name: 'Messerschmitt Bf 109', art: 'el Bf 109', verb: 'pilotar', hp: 120, vmax: 52, turn: 0.92, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras MG 17',
+  bf109: { kind: 'plane', team: NAT, name: 'Messerschmitt Bf 109', art: 'el Bf 109', verb: 'pilotar', hp: 225, vmax: 52, turn: 0.92, fl: { roll: 2.0, turn: 1.1, pitch: 0.9, vs: [15, 30] }, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras MG 17',
     hist: 'Caza alemán de la Legión Cóndor, que lo estrenó en España. Sobre el Ebro, pilotos como Werner Mölders ensayaron con él las formaciones abiertas que la Luftwaffe usaría en la guerra mundial. Era un caza puro, sin bombas.' },
-  fiat: { kind: 'plane', team: NAT, name: 'Fiat CR.32 «Chirri»', art: 'el Fiat CR.32', verb: 'pilotar', hp: 120, vmax: 43, turn: 1.15, bombs: 4, mgRate: 0.085, mgDmg: 48, mgPlane: 15, spread: 0.014, mgName: 'Ametralladoras Breda de 12,7 mm',
+  fiat: { kind: 'plane', team: NAT, name: 'Fiat CR.32 «Chirri»', art: 'el Fiat CR.32', verb: 'pilotar', hp: 225, vmax: 43, turn: 1.15, fl: { roll: 1.9, turn: 1.4, pitch: 1.0, vs: [12, 24] }, bombs: 4, mgRate: 0.085, mgDmg: 48, mgPlane: 15, spread: 0.014, mgName: 'Ametralladoras Breda de 12,7 mm',
     hist: 'Caza biplano italiano, el más numeroso de la aviación sublevada. Robusto, maniobrero y armado con dos ametralladoras pesadas de 12,7 mm; admitía además bombas ligeras.' }
 };
 const VEH = [
@@ -2673,18 +2831,19 @@ function takeVehicle(p, v) {
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   v.aiOn = false; v.crew.alive = false;
   v.driver = p; p.veh = v; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
-  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) v.thr = 0; stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; game.planeCam = v.yaw; game.planeCamP = 0; input.thr = 0; input.brake = false; input.rud = 0; }
+  if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) { v.thr = 0; v.pitch = 0; v.gp = 0.15; } v.sink = 0; v.graceT = 0; game.pcam = null; game.planeOrb = 0; input.thr = 0; input.brake = false; input.rud = 0; }
   gyroSync();
   if (!game.vehTold[v.type]) { game.vehTold[v.type] = true; pushCard(v.name, v.def.hist); }
   if (v.kind === 'tank') showHint('La cruz del centro es el punto al que apuntas. El círculo marca dónde caería el disparo: cuando alcanza la cruz y se pone amarillo, ' + (v.def.cannon ? 'el cañonazo cae justo ahí.' : 'las ametralladoras dan justo ahí.'));
-  if (v.kind === 'plane') showHint(input.touch ? 'Mantén «Motor +» para despegar. La palanca inclina las alas y sube o baja el morro; para virar, inclina y tira. Los dos botones de «Timón» van aparte.'
-    : input.pad ? 'R2 sube el motor y L2 lo baja. La palanca izquierda inclina las alas y cabecea; L1 y R1 son el timón; A dispara y B suelta la bomba.'
-    : 'Mantén W para subir el motor y despegar. El ratón es la palanca: a los lados inclina las alas y ' + (opts.invY ? 'hacia ti sube el morro' : 'hacia delante sube el morro') + '. Para virar, inclina y tira. A y D son el timón.');
+  if (v.kind === 'plane') { const kmh = Math.round((v.def.fl.vs[0] + 0.8 * (v.def.fl.vs[1] - v.def.fl.vs[0])) * 3.6 / 5) * 5, back = opts.invY ? 'hacia atrás' : 'hacia delante';
+    showHint(input.touch ? 'Mantén «Motor +». A unos ' + kmh + ' km/h tira de la palanca ' + back + ' para despegar. La palanca inclina las alas para girar y mueve el morro; si lo subes demasiado entrarás en pérdida.'
+    : input.pad ? 'R2 y L2, motor. Palanca izquierda: a los lados, alabeo para girar; ' + back + ', sube el morro. L1 y R1, timón. Despega a unos ' + kmh + ' km/h tirando de la palanca.'
+    : 'W y S, motor. A y D o el ratón, alabeo para girar. Flechas ↓ ↑ o el ratón, morro (' + back + ' sube). Z y C, timón. Espacio, frenos. Despega a unos ' + kmh + ' km/h tirando ' + back + '; si subes demasiado el morro entrarás en pérdida.'); }
   SFX.click();
 }
 function exitVehicle(p) {
   const v = p.veh; if (!v) return;
-  if (v.kind === 'plane' && (v.air || v.speed > 4)) { showHint('Aterriza y frena (S) antes de bajar del avión.'); return; }
+  if (v.kind === 'plane' && (v.air || v.speed > 4)) { showHint('Aterriza y frena (Espacio) antes de bajar del avión.'); return; }
   p.veh = null; v.driver = null; v.idleT = 0; v.launchT = 45;
   if (p.isPlayer) { input.fire = false; input.aim = false; input.thr = 0; input.rud = 0; input.brake = false; }
   const es = exitSpot(v), ex = es[0], ez = es[1];
@@ -2712,7 +2871,11 @@ function damageVehicles(x, y, z, radius, dmg, owner, team, cause) {
     if (v.dead || v.falling || (team >= 0 && v.team === team)) continue;
     const d = Math.hypot(v.x - x, v.y + 1 - y, v.z - z), R = radius + 2;
     if (d >= R) continue;
-    const f = v.kind === 'tank' ? (cause === GRENADE.name ? 0.45 : cause === 'Cañón de 45 mm' ? 2.1 : 1.1) : v.kind === 'plane' ? 1.5 : 1;
+    if (v.kind === 'tank' && cause === GRENADE.name) {       // una bomba de mano no perfora el blindaje: solo si estalla pegada al carro le quita una décima parte de su resistencia
+      if (d < 4.2) hitVehicle(v, v.def.hp * 0.1, owner, cause);
+      continue;
+    }
+    const f = v.kind === 'tank' ? (cause === 'Cañón de 45 mm' ? 2.1 : 1.1) : v.kind === 'plane' ? 1.5 : 1;
     hitVehicle(v, dmg * (1 - d / R) * f, owner, cause);
   }
 }
@@ -2947,8 +3110,80 @@ function crashPlane(v) {
   const gy = Math.max(groundAt(v.x, v.z), waterY); v.y = gy;
   destroyVehicle(v, null); explode(v.x, gy + 0.5, v.z, 8, 130, null, -1, 'Avión estrellado');
 }
+function planeArms(v, dt, ctl, op, fx, fy, fz) {
+  const D = v.def;
+  v.mgT -= dt; v.bombT -= dt;
+  if (op && !v.falling) {
+    if (ctl.fire && v.mgT <= 0 && v.air) { v.mgT = D.mgRate; vehShot(v, op, v.x + fx * 3.5, v.y + 1.25 + fy * 3.5, v.z + fz * 3.5, fx, fy, fz, D.spread, D.mgDmg, D.mgPlane, D.mgName); }
+    if (ctl.bomb && v.bombs > 0 && v.bombT <= 0 && v.air) {
+      v.bombs--; v.bombT = 0.45;
+      projectiles.push({ kind: 'bomb', x: v.x, y: v.y + 0.3, z: v.z, vx: fx * v.speed, vy: fy * v.speed - 2, vz: fz * v.speed, owner: op, team: v.team, fromV: v, spin: 0 });
+    }
+    if (D.bombs && v.bombs < D.bombs) { v.regenT += dt; if (v.regenT > 20) { v.regenT = 0; v.bombs++; } }
+  }
+  v.smokeT -= dt;
+  if ((v.falling || v.hp < D.hp * 0.45) && v.smokeT <= 0) { v.smokeT = v.falling ? 0.04 : 0.12; addPart(v.x, v.y + 1.2, v.z, rnd(-0.5, 0.5), rnd(0, 1), rnd(-0.5, 0.5), 1.2, 3, v.falling ? 2.2 : 1.2, 0.18, 0.17, 0.16, 0.7, 0, 0.5); }
+}
+/* ============ pilotaje del jugador ============
+   Modelo de vuelo de la avioneta del «Gran Timo Escurialense», con sus mismas sensibilidades, adaptado a cada caza:
+   - El motor (0 a 100 %) empuja contra una resistencia que crece con el cuadrado de la velocidad; subir el morro frena y bajarlo acelera.
+   - La sustentación depende de la velocidad: por debajo de la de pérdida el morro cae y el avión se hunde.
+   - La palanca da cabeceo y alabeo; el avión vira por tener las alas inclinadas (viraje coordinado) y el timón solo lo desliza.
+   - Para despegar hay que ganar velocidad y tirar de la palanca; para aterrizar, llegar despacio, nivelado y sin hundirse.
+   Lo que cambia de un caza a otro (def.fl): viveza del alabeo, lo cerrado que vira, mando de cabeceo y velocidades de pérdida; el
+   empuje sale de la velocidad máxima de cada uno. */
+const flyIn = { thr: 0, thrAbs: -1, pitch: 0, roll: 0, yaw: 0, pm: 0, rm: 0, brake: false };
+function flyPlayer(v, dt, ctl, op) {
+  const D = v.def, F = D.fl, I = flyIn, thrust = 0.0048 * D.vmax * D.vmax + 0.12;
+  if (I.thrAbs >= 0) v.thr = clamp(I.thrAbs, 0, 1); else v.thr = clamp(v.thr + I.thr * dt * 0.7, 0, 1);
+  const lift = clamp((v.speed - F.vs[0]) / (F.vs[1] - F.vs[0]), 0, 1); v.lift = lift;
+  const drag = 0.0048 * v.speed * v.speed + (v.air ? 0.12 : 0.5 + (I.brake ? 7 : 0));
+  v.speed = clamp(v.speed + (thrust * v.thr - drag - 9.8 * Math.sin(v.pitch)) * dt, 0, D.vmax * 1.6);
+  let R = -v.roll;       // alabeo: positivo, alas a la derecha
+  if (!v.air) {
+    const steer = clamp(I.yaw + I.roll, -1, 1);
+    v.yaw -= steer * dt * (v.speed < 2 ? 0.6 : Math.min(1.1, 0.25 + 3 / Math.max(v.speed, 3)));
+    R = lerp(R, 0, Math.min(1, dt * 6));
+    if ((I.pitch > 0 || I.pm > 0) && lift > 0.55) v.pitch = Math.min(0.32, v.pitch + Math.max(0, I.pitch) * 0.9 * dt + Math.max(0, I.pm));
+    else v.pitch = lerp(v.pitch, 0, Math.min(1, dt * 3));
+    v.gp = lerp(v.gp || 0, v.speed > 14 ? 0 : 0.15, Math.min(1, dt * 3));       // patín de cola: la cola se levanta al coger velocidad
+    if (v.speed > 2 && Math.random() < dt * 9) addPart(v.x + rnd(-1, 1), v.y + 0.3, v.z + rnd(-1, 1), 0, 0.6, 0, 0.8, 2, 0.9, 0.74, 0.65, 0.48, 0.25, 0, 1.2);
+    if (lift > 0.8 && v.pitch > 0.1) { v.air = true; v.sink = 0; v.y += 0.3; v.graceT = 0.6; v.gp = 0; v.landTold = false; $('hint').hidden = true; }
+  } else {
+    const au = clamp(v.speed / 28, 0.35, 1.2);       // con poca velocidad los mandos responden menos
+    v.pitch = clamp(v.pitch + (I.pitch * 0.95 * F.pitch * dt + I.pm) * au, -1.05, 1.05);
+    R = clamp(R + (I.roll * F.roll * dt + I.rm) * au, -1.35, 1.35);
+    if (Math.abs(I.roll) < 0.05 && Math.abs(I.rm) < 0.0005) R = lerp(R, 0, Math.min(1, dt * 0.9));       // sin tocar el alabeo, las alas se van nivelando solas
+    v.yaw -= (9.8 * Math.tan(R) / Math.max(v.speed, 12)) * dt * F.turn + I.yaw * 0.45 * dt;
+    if (lift < 1) v.pitch -= (1 - lift) * 0.9 * dt;
+    v.sink = lerp(v.sink || 0, -(1 - lift) * 14, Math.min(1, dt * 1.2));
+  }
+  v.roll = -R;
+  const cp = Math.cos(v.pitch), fx = -Math.sin(v.yaw) * cp, fy = Math.sin(v.pitch), fz = -Math.cos(v.yaw) * cp;
+  const vyv = v.air ? fy * v.speed + (v.sink || 0) : 0; v.vyv = vyv;
+  v.x += fx * v.speed * dt; v.z += fz * v.speed * dt; v.y += vyv * dt;
+  if (Math.abs(v.x) > 640 || Math.abs(v.z) > 560) {       // fin del campo de batalla
+    if (v.air) { v.yaw += angDiff(Math.atan2(v.x, v.z), v.yaw) * Math.min(1, dt * 1.6); if (!v.turnTold) { v.turnTold = true; showHint('Fin del campo de batalla: el avión vuelve hacia el frente.'); } }
+    else { v.x = clamp(v.x, -640, 640); v.z = clamp(v.z, -560, 560); v.speed = 0; }
+  } else v.turnTold = false;
+  if (v.y > 320) { v.y = 320; v.pitch = Math.min(v.pitch, 0); }
+  const th = terrainH(v.x, v.z), gy = Math.max(groundAt(v.x, v.z), waterY);
+  if (!v.air) {
+    v.y = groundAt(v.x, v.z);
+    if (th < waterY - 0.3 || (v.speed > 5 && insideSolid(v.x, v.z, 0.6))) { crashPlane(v); return; }
+  } else {
+    v.graceT = (v.graceT || 0) - dt;
+    if (v.y <= gy + 0.05) {
+      if (v.graceT > 0) v.y = gy + 0.06;       // recién despegado no cuenta como toma de tierra
+      else if (vyv < -7.5 || Math.abs(R) > 0.5 || v.pitch < -0.3 || v.speed > D.vmax * 1.2 || th <= waterY + 0.2 || slopeAt(v.x, v.z) >= 0.4 || insideSolid(v.x, v.z, 0.5)) { v.y = gy; crashPlane(v); return; }
+      else { v.air = false; v.y = gy; v.pitch = clamp(v.pitch, 0, 0.2); v.sink = 0; v.roll = 0; if (!v.landTold) { v.landTold = true; showHint('¡En tierra! Quita motor, frena y, ya parado, baja del avión.'); } }
+    } else for (const b of gridA[cellOf(v.x, v.z)]) if (v.x > b.x0 && v.x < b.x1 && v.z > b.z0 && v.z < b.z1 && v.y + 1 > b.y0 && v.y < b.y1) { crashPlane(v); return; }
+  }
+  planeArms(v, dt, ctl, op, fx, fy, fz);
+}
 function updatePlane(v, dt, ctl) {
   const D = v.def, op = vehOp(v);
+  if (op && op.isPlayer && !v.falling) { flyPlayer(v, dt, ctl, op); return; }
   if (!v.air) {
     if (op) {       // en tierra: el motor (0 a 100 %) empuja; los frenos paran
       v.thr = clamp(v.thr + ctl.f * 0.55 * dt, 0, 1);
@@ -2968,7 +3203,6 @@ function updatePlane(v, dt, ctl) {
     if (th < waterY - 0.3 || (v.speed > 5 && insideSolid(v.x, v.z, 0.6))) { crashPlane(v); return; }
     if (v.speed >= 24 && op && !v.rollout) {       // despega: da un salto limpio y no puede volver a posarse durante el ascenso inicial
       v.air = true; v.assistT = 4; v.y += 0.35; v.pitch = Math.max(v.pitch, 0.2);
-      if (op.isPlayer) { stick.ty = v.yaw; stick.tp = 0.3; stick.tr = 0; $('hint').hidden = true; }
     }
     return;
   }
@@ -2978,7 +3212,6 @@ function updatePlane(v, dt, ctl) {
     if (v.assistT > 0) { v.assistT -= dt; ap = Math.max(ap, 0.3); }       // los primeros segundos sube solo, para no rozar el suelo al final de la pista
     if (Math.abs(v.x) > 640 || Math.abs(v.z) > 560) {       // límite del cielo: da la vuelta, y la mirada del piloto con él
       ay = Math.atan2(v.x, v.z); ap = Math.min(ap, 0.15); turn = null;
-      if (op.isPlayer) { stick.ty = ay; stick.tr = 0; if (!v.turnTold) { v.turnTold = true; showHint('Fin del campo de batalla: el avión da la vuelta solo.'); } }
     } else v.turnTold = false;
     if (v.y > 250) ap = Math.min(ap, -0.05);
   }
@@ -3001,17 +3234,7 @@ function updatePlane(v, dt, ctl) {
   if (v.speed < 24 && !v.falling) v.pitch -= 0.9 * dt;
   const cp = Math.cos(v.pitch), fx = -Math.sin(v.yaw) * cp, fy = Math.sin(v.pitch), fz = -Math.cos(v.yaw) * cp;
   v.x += fx * v.speed * dt; v.y += fy * v.speed * dt; v.z += fz * v.speed * dt;
-  v.mgT -= dt; v.bombT -= dt;
-  if (op && !v.falling) {
-    if (ctl.fire && v.mgT <= 0) { v.mgT = D.mgRate; vehShot(v, op, v.x + fx * 3.5, v.y + 1.25 + fy * 3.5, v.z + fz * 3.5, fx, fy, fz, D.spread, D.mgDmg, D.mgPlane, D.mgName); }
-    if (ctl.bomb && v.bombs > 0 && v.bombT <= 0) {
-      v.bombs--; v.bombT = 0.45;
-      projectiles.push({ kind: 'bomb', x: v.x, y: v.y + 0.3, z: v.z, vx: fx * v.speed, vy: fy * v.speed - 2, vz: fz * v.speed, owner: op, team: v.team, fromV: v, spin: 0 });
-    }
-    if (D.bombs && v.bombs < D.bombs) { v.regenT += dt; if (v.regenT > 20) { v.regenT = 0; v.bombs++; } }
-  }
-  v.smokeT -= dt;
-  if ((v.falling || v.hp < D.hp * 0.45) && v.smokeT <= 0) { v.smokeT = v.falling ? 0.04 : 0.12; addPart(v.x, v.y + 1.2, v.z, rnd(-0.5, 0.5), rnd(0, 1), rnd(-0.5, 0.5), 1.2, 3, v.falling ? 2.2 : 1.2, 0.18, 0.17, 0.16, 0.7, 0, 0.5); }
+  planeArms(v, dt, ctl, op, fx, fy, fz);
   const g2 = Math.max(groundAt(v.x, v.z), waterY);
   if (v.y <= g2 + 0.05) {
     if (v.assistT > 2 && !v.falling) v.y = g2 + 0.06;      // en el ascenso inicial nunca cuenta como aterrizaje (antes, con muchos fotogramas por segundo, el avión se quedaba pegado a la pista)
@@ -3040,14 +3263,6 @@ function updateVehicles(dt) {
         ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, -1, 1); ctl.r = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx, -1, 1);
         ctl.fire = input.fire; ctl.fire2 = input.aim; ctl.bomb = input.bomb; ctl.aimYaw = drv.yaw; ctl.aimPitch = drv.pitch;
         if (v.kind === 'tank') tankAim(v, drv, ctl);
-        if (v.kind === 'plane') {       // caza: motor con W y S (o los botones «Motor»), frenos con B; turn = 1 marca el pilotaje suave del jugador
-          ctl.aimYaw = stick.ty; ctl.aimPitch = stick.tp; ctl.roll = stick.tr; ctl.turn = 1;
-          ctl.r = clamp(ctl.r + input.rud, -1, 1);       // en tierra, el timón también guía el avión
-          ctl.f = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + input.thr, -1, 1); ctl.brake = !!(k.KeyB || input.brake || (k.KeyS && v.thr <= 0.01));
-          if (pad.on && input.flyPad && input.thrAbs >= 0) {       // palanca de gases del joystick: su posición es el motor; al mínimo, en tierra, frena
-            v.thr += clamp(input.thrAbs - v.thr, -1.5 * dt, 1.5 * dt); ctl.f = 0; if (!v.air && input.thrAbs < 0.04) ctl.brake = true;
-          }
-        }
       }
       input.bomb = false;
     } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); }
@@ -3070,7 +3285,7 @@ function updateVehicles(dt) {
 const _vm = M4.create();
 function drawVehicles() {
   for (const v of vehicles) {
-    M4.identity(_vm); M4.translate(_vm, v.x, v.y, v.z); M4.rotY(_vm, v.yaw); M4.rotX(_vm, v.pitch); M4.rotZ(_vm, v.roll);
+    M4.identity(_vm); M4.translate(_vm, v.x, v.y, v.z); M4.rotY(_vm, v.yaw); M4.rotX(_vm, v.pitch + (v.kind === 'plane' && !v.air ? (v.gp || 0) : 0)); M4.rotZ(_vm, v.roll);
     matState(1, 1, 0.08, v.dead ? [0.22, 0.2, 0.18] : null);
     if (v.kind === 'truck') drawMesh(world.truck[v.team], _vm);
     else if (v.kind === 'plane') drawMesh(world.vm[v.type], _vm);
@@ -3170,7 +3385,7 @@ const planes = [], shells = [];
 function startMatch(team) {
   audioInit();
   Object.assign(game, { team, time: 0, tickets: [300, 300], bleedAcc: [0, 0], bleedT: 1, eventT: 45, eventI: 0, floodT: 0, winner: -1, firstDeploy: true, respawnT: 0, selClass: 0, shake: 0, killer: null, camOff: 0, vehTold: {} });
-  resetVehicles(); resetAA();
+  resetVehicles(); resetAA(); towerOcc.length = 0;
   waterY = 0; pasarela.on = true;
   push[0] = push[1] = null; projectiles.length = 0; planes.length = 0; shells.length = 0; parts.length = 0; tracers.length = 0; cards.length = 0; cardNow = null;
   for (const f of FLAGS) {
@@ -3342,7 +3557,7 @@ function update(dt) {
   game.respawnT -= dt;
   if (game.state === 'play') { updatePlayer(dt); if (!P.alive) { game.deadT -= dt; if (game.deadT <= 0) enterDeploy(); } }
   else if (P.spawned && !P.alive) P.fall = Math.min(1, P.fall + dt * 2.6);
-  updateVehicles(dt); updateAA(dt);
+  updateVehicles(dt); updateAA(dt); towerDuty(dt);
   for (const s of soldiers) if (!s.isPlayer) updateBot(s, dt);
   separate();
   updateProjectiles(dt); updateEvents(dt); updateFlags(dt); updateTickets(dt); updateParts(dt);
@@ -3367,13 +3582,18 @@ function render(dt) {
   if ((game.state === 'play' || game.state === 'pause') && P) {
     if (P.alive && P.veh) {
       const v = P.veh, truck = v.kind === 'truck', plane = v.kind === 'plane';
-      if (plane) {       // la cámara sigue al avión con algo de retraso, para que los virajes se vean sin marear
-        game.planeCam = (game.planeCam || 0) + angDiff(v.yaw, game.planeCam || 0) * Math.min(1, dt * 3.5);
-        game.planeCamP = (game.planeCamP || 0) + (v.pitch * 0.6 - (game.planeCamP || 0)) * Math.min(1, dt * 3);
+      if (plane) {
+        const cpv = Math.cos(v.pitch), yc = v.yaw + (game.planeOrb || 0), dist = 13 + v.speed * 0.07;
+        const tx = v.x + Math.sin(yc) * cpv * dist, tz = v.z + Math.cos(yc) * cpv * dist, ty = Math.max(v.y + 4.2 - Math.sin(v.pitch) * dist * 0.7, Math.max(groundAt(tx, tz), waterY) + 1.6);
+        const pc = game.pcam || (game.pcam = { x: tx, y: ty, z: tz }), kc = Math.min(1, dt * 4.5);
+        pc.x = lerp(pc.x, tx, kc); pc.y = lerp(pc.y, ty, kc); pc.z = lerp(pc.z, tz, kc);
+        const lx = v.x - Math.sin(v.yaw) * cpv * 14 - pc.x, ly = v.y + 1.8 + Math.sin(v.pitch) * 14 - pc.y, lz = v.z - Math.cos(v.yaw) * cpv * 14 - pc.z;
+        cam.x = pc.x; cam.y = pc.y; cam.z = pc.z; cam.yaw = Math.atan2(-lx, -lz); cam.pitch = Math.atan2(ly, Math.hypot(lx, lz));
+        game.planeFov = lerp(game.planeFov || 1.2, (64 + Math.min(16, v.speed * 0.14)) * Math.PI / 180, Math.min(1, dt * 3)); fov = game.planeFov;       // el campo de visión se abre con la velocidad
       }
-      if (v.kind === 'tank') { const c = tankView(v, P); cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = P.yaw; cam.pitch = P.pitch; }       // el centro de la pantalla es exactamente donde apuntas
+      else if (v.kind === 'tank') { const c = tankView(v, P); cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = P.yaw; cam.pitch = P.pitch; }       // el centro de la pantalla es exactamente donde apuntas
       else {
-        const yaw = truck ? v.yaw + game.camOff : game.planeCam, pit = truck ? P.pitch - 0.2 : game.planeCamP - 0.1, cp = Math.cos(pit), back = plane ? 14 : 8.5, up = plane ? 2.8 : 2.5;
+        const yaw = v.yaw + game.camOff, pit = P.pitch - 0.2, cp = Math.cos(pit), back = 8.5, up = 2.5;
         cam.x = v.x + Math.sin(yaw) * cp * back; cam.z = v.z + Math.cos(yaw) * cp * back; cam.y = Math.max(v.y + up - Math.sin(pit) * back, Math.max(groundAt(cam.x, cam.z), waterY) + 0.7);
         cam.yaw = yaw; cam.pitch = pit;
       }
@@ -3739,6 +3959,7 @@ function uiTick(dt) {
   if (fly) {
     const v = p.veh;
     $('flySpd').textContent = Math.round(v.speed * 3.6) + ' km/h';
+    $('flyWarn').hidden = !(v.air && !v.falling && v.driver === p && (v.lift === undefined ? 1 : v.lift) < 0.75);
     $('flyInfo').textContent = 'ALTITUD ' + Math.max(0, Math.round(v.y - Math.max(groundAt(v.x, v.z), waterY))) + ' m · MOTOR ' + Math.round(v.thr * 100) + ' %';
     $('tbBomb').hidden = !v.def.bombs; $('tbBomb').textContent = 'Bomba ' + v.bombs;
   }
@@ -3769,7 +3990,7 @@ function drawOverlay() {
   for (const s of soldiers) {
     if (!s.alive || s.team !== p.team || s === p) continue;
     const d = Math.hypot(s.x - p.x, s.z - p.z); if (d > 150) continue;
-    const q = project(s.x, s.y + lerp(2.05, 1.6, s.crouchT), s.z); if (!q) continue;
+    const q = project(s.x, s.y + lerp(lerp(2.05, 1.6, s.crouchT), 0.95, s.proneT || 0), s.z); if (!q) continue;
     c.globalAlpha = clamp(1.25 - d / 150, 0.3, 0.9); c.fillStyle = ALLY;
     c.beginPath(); c.moveTo(q[0] - 4.5, q[1] - 8); c.lineTo(q[0] + 4.5, q[1] - 8); c.lineTo(q[0], q[1]); c.closePath(); c.fill();
     if (d < 22 || Math.hypot(q[0] - cx, q[1] - cy) < 46) { c.fillStyle = 'rgba(15,17,13,.75)'; c.fillText(s.name, q[0] + 1, q[1] - 12); c.fillStyle = ALLY; c.fillText(s.name, q[0], q[1] - 13); }
