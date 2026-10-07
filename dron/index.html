@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -88,23 +89,30 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
 #fpvRec{position:absolute;right:16px;bottom:70px;color:#fff;font-weight:600;text-shadow:0 1px 2px #000;font-size:13px}
 
 /* sticks */
-.zone{position:absolute;top:70px;bottom:0;width:50%;pointer-events:auto;display:none}
+.zone{position:absolute;top:64px;bottom:0;width:50%;pointer-events:auto;display:none}
 #zoneL{left:0}#zoneR{right:0}
-.stick{position:absolute;bottom:18px;width:136px;height:136px;border-radius:26px;border:3px solid rgba(31,27,58,.55);background:var(--glass);display:none;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.stick{position:absolute;bottom:18px;width:136px;height:136px;border-radius:24%;border:3px solid rgba(31,27,58,.5);background:var(--glass);display:none;opacity:.55;
+  transition:transform .22s cubic-bezier(.2,.8,.3,1),opacity .2s;will-change:transform}
+.stick.active{transition:opacity .1s;opacity:.95}
+.stick .ring{position:absolute;inset:14%;border-radius:50%;border:2px dashed rgba(31,27,58,.28)}
 .stick::before,.stick::after{content:"";position:absolute;background:rgba(31,27,58,.28)}
-.stick::before{left:50%;top:10px;bottom:10px;width:2px;margin-left:-1px}
-.stick::after{top:50%;left:10px;right:10px;height:2px;margin-top:-1px}
+.stick::before{left:50%;top:8%;bottom:8%;width:2px;margin-left:-1px}
+.stick::after{top:50%;left:8%;right:8%;height:2px;margin-top:-1px}
 #stL{left:22px}#stR{right:22px}
-.knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:var(--sun);border:3px solid var(--ink);box-shadow:2px 3px 0 var(--ink);z-index:1}
-.stick small{position:absolute;left:0;right:0;top:-22px;text-align:center;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.knob{position:absolute;left:50%;top:50%;width:var(--kn,54px);height:var(--kn,54px);margin:calc(var(--kn,54px) / -2) 0 0 calc(var(--kn,54px) / -2);border-radius:50%;background:var(--sun);border:3px solid var(--ink);box-shadow:2px 3px 0 var(--ink);z-index:1}
+.stick small{position:absolute;left:0;right:0;top:5%;text-align:center;font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap}
 #bArm{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);pointer-events:auto;height:50px;min-width:120px;font-size:18px;font-weight:700;border:3px solid var(--ink);border-radius:25px;box-shadow:3px 4px 0 var(--ink);background:var(--mint);color:var(--ink);cursor:pointer;display:none}
 #bArm.armed{background:var(--tomato);color:#fff}
 #bArm:active{transform:translateX(-50%) translate(2px,2px);box-shadow:1px 2px 0 var(--ink)}
 #rotHint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;font-weight:600;display:none;text-align:center;max-width:80%}
 body.touch .zone,body.touch .stick,body.touch #bArm{display:block}
-body.touch #telemetry{padding:5px 10px;gap:10px}
+body.touch #telemetry{padding:4px 10px;gap:8px}
+body.touch #telemetry div{min-width:40px}
 body.touch #telemetry .num{font-size:15px}
 body.touch #thrBar{height:26px}
+body.touch #bArm{height:58px;min-width:150px;font-size:21px;border-radius:29px}
+body.touch #bArm:active{transform:translateX(-50%) translate(2px,2px)}
+body:not(.touch) .sl-touch{display:none}
 
 /* ---------- Menu ---------- */
 #menu{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;
@@ -162,8 +170,6 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
   #status{padding:6px 9px;min-width:180px;font-size:12px}
   #status .stats{font-size:12px;gap:8px}
   .tbtn{min-width:40px;height:40px}
-  .stick{width:118px;height:118px}
-  #bArm{bottom:70px;height:44px}
   #card{padding:14px 16px}
   #sub{margin:6px 0 10px;font-size:14px}
 }
@@ -209,8 +215,8 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
   <div id="toast" class="sticker"></div>
 
   <div class="zone" id="zoneL"></div><div class="zone" id="zoneR"></div>
-  <div class="stick" id="stL"><small id="stLlbl">Subir y girar</small><div class="knob"></div></div>
-  <div class="stick" id="stR"><small>Avanzar y ladear</small><div class="knob"></div></div>
+  <div class="stick" id="stL"><small id="stLlbl">Subir y girar</small><div class="ring"></div><div class="knob"></div></div>
+  <div class="stick" id="stR"><small>Avanzar y ladear</small><div class="ring"></div><div class="knob"></div></div>
   <button id="bArm">Armar</button>
   <div id="rotHint" class="sticker">Gira el móvil en horizontal para ver mejor la casa</div>
 </div></div>
@@ -225,6 +231,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
       <div class="modes">
         <button class="mode" data-m="beginner"><b>Principiante</b><span>Mantiene altura y frena solo. Suelta los sticks y se queda quieto.</span></button>
         <button class="mode" data-m="angle"><b>Ángulo</b><span>Se autonivela, pero el acelerador es manual como en un dron real.</span></button>
+        <button class="mode" data-m="horizon"><b>Acro ángulo</b><span>Giras y das volteretas como en Acro, y al soltar el stick el dron se nivela solo.</span></button>
         <button class="mode" data-m="acro"><b>Acro</b><span>Controlas la velocidad de giro. Nada se nivela solo: vuelo FPV puro.</span></button>
       </div>
     </div>
@@ -241,6 +248,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
         <label class="sl" data-i="0"><span>Suavidad del gas <b id="vThrExpo">65 %</b></span><small>Más alto: el centro del stick responde suave y la potencia fuerte queda para el final</small><input type="range" id="sThrExpo" min="0" max="95" step="5" aria-label="Suavidad del gas"></label>
         <label class="sl" data-i="1"><span>Sensibilidad de giro <b id="vRate">100 %</b></span><small>Cuánto se inclina y gira el dron con el stick a tope</small><input type="range" id="sRate" min="40" max="150" step="5" aria-label="Sensibilidad de giro"></label>
         <label class="sl" data-i="2"><span>Zona muerta del mando <b id="vDead">8 %</b></span><small>Ignora pequeños movimientos del stick en reposo</small><input type="range" id="sDead" min="0" max="25" step="1" aria-label="Zona muerta del mando"></label>
+        <label class="sl sl-touch" data-i="3"><span>Tamaño de los sticks táctiles <b id="vTouch">100 %</b></span><small>Al 100 % ocupan todo el hueco libre de la pantalla. Más grandes, más precisos</small><input type="range" id="sTouch" min="50" max="100" step="5" aria-label="Tamaño de los sticks táctiles"></label>
         <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo. Los cambios se guardan solos.</p>
       </div>
       <div id="curveBox">
@@ -1201,7 +1209,9 @@ const DR = { m:0.32, I:0.0016, twr:4.0, kd1:0.05, kd2:0.011, hk:0.10, tau:0.035,
   rateMax:11.0, yawMax:4.2, expo:0.42, angKp:10, rateK:50, aMax:170, aMaxYaw:35, mu:0.5 };
 const HOVER_T = DR.m*G;
 // Ajustes del mando (se guardan en el navegador)
-const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25) };
+const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25), touchSize: clamp(+store.get('touchSize',100)||100,50,100) };
+// Acro ángulo: autonivelado que se desvanece al mover el stick (a partir del 85 % de recorrido es Acro puro)
+const HZ = { kp:8, maxRate:7, fade:0.85 };
 // Curva de gas: plana alrededor del centro del stick (vuelo estático) y empinada solo al final del recorrido
 function thrCurve(s){ const e=SET.thrExpo/100, mid=0.5; s=clamp(s,0,1); const d=s-mid, u=d/(d>0?1-mid:mid); return mid + d*(1-e+e*u*u); }
 // Misma suavidad para la subida en modo Principiante (centro = mantener altura)
@@ -1243,9 +1253,21 @@ function physStep(dt, inp){
   d.maxT = HOVER_T*DR.twr*batteryFactor()*(1-0.28*d.damage)*(d.battery<=0.001 ? 0.2 : 1);
   let tCmd=0;
   if(d.armed){
-    if(flightMode==='acro'){
+    if(flightMode==='acro' || flightMode==='horizon'){
       const rs=SET.rate/100;
       _wd.set(-rc(inp.pitch,DR.expo)*DR.rateMax*rs, -rc(inp.yaw,0.2)*DR.yawMax*rs, -rc(inp.roll,DR.expo)*DR.rateMax*rs);
+      if(flightMode==='horizon'){
+        // cuanto menos stick, más fuerte tira el dron hacia la horizontal (manteniendo su rumbo)
+        const st=Math.max(Math.abs(inp.pitch),Math.abs(inp.roll));
+        const lw=Math.pow(clamp(1-st/HZ.fade,0,1),1.5);
+        if(lw>0){
+          _qd.setFromAxisAngle(AX_Y, headingOf(d.q));
+          _qe.copy(d.q).conjugate().multiply(_qd);
+          const sgn=_qe.w<0?-1:1;
+          _wd.x += clamp(2*sgn*_qe.x*HZ.kp,-HZ.maxRate,HZ.maxRate)*lw;
+          _wd.z += clamp(2*sgn*_qe.z*HZ.kp,-HZ.maxRate,HZ.maxRate)*lw;
+        }
+      }
       const tc=thrCurve(inp.thr); tCmd = d.maxT*tc*tc;
     } else {
       const psi = headingOf(d.q);
@@ -1446,7 +1468,7 @@ let trainAng = 0;
 /* ============ Estado de juego ============ */
 let state = 'menu';
 const CAMS = ['chase','fpv','pilot'], CAMNAME = {chase:'Seguir', fpv:'FPV', pilot:'Piloto'};
-const MODES = ['beginner','angle','acro'], MODENAME = {beginner:'Principiante', angle:'Ángulo', acro:'Acro'};
+const MODES = ['beginner','angle','horizon','acro'], MODENAME = {beginner:'Principiante', angle:'Ángulo', horizon:'Acro ángulo', acro:'Acro'};
 let camMode = store.get('cam','chase'); if(!CAMS.includes(camMode)) camMode='chase';
 if(!MODES.includes(flightMode)) flightMode='beginner';
 let flashA = 0, toastT = 0, hudT = 0, tvT = 0, rotHintT = 0;
@@ -1484,20 +1506,46 @@ window.addEventListener('keydown', e=>{
 window.addEventListener('keyup', e=>{ kb[e.code]=false; });
 window.addEventListener('blur', ()=>{ for(const k in kb) kb[k]=false; });
 
-function stickRadius(){ return Math.max(36, $('stL').clientWidth*0.36); }
+/* Sticks táctiles: ocupan todo el hueco libre; recorrido grande = más precisión */
+const STK = {S:136, kn:54, R:41, m:12, rest:{L:{x:0,y:0},R:{x:0,y:0}}};
+const stEl = {L:$('stL'), R:$('stR')};
+function stickRadius(){ return STK.R; }
+function layoutSticks(){
+  const hr=$('hudIn').getBoundingClientRect(), W=hr.width, H=hr.height, land=W>=H;
+  const m=Math.round(clamp(Math.min(W,H)*0.03,10,22));
+  // apaisado: cada stick llena su mitad dejando un pasillo central para el botón y la telemetría
+  let S = land ? Math.min((W-2*m-240)/2, H-104-m, 480) : Math.min((W-3*m)/2, H*0.4, 380);
+  S = Math.round(Math.max(96, S*SET.touchSize/100));
+  const kn=Math.round(clamp(S*0.34,44,130)), Rr=Math.round((S-kn)/2);
+  Object.assign(STK,{S,kn,R:Rr,m});
+  for(const side of ['L','R']){
+    const e=stEl[side]; e.style.width=S+'px'; e.style.height=S+'px'; e.style.bottom=m+'px';
+    e.style.left = side==='L' ? m+'px' : 'auto'; e.style.right = side==='R' ? m+'px' : 'auto';
+    e.style.setProperty('--kn', kn+'px');
+    STK.rest[side] = { x: side==='L' ? hr.left+m+S/2 : hr.right-m-S/2, y: hr.bottom-m-S/2 };
+  }
+  const tel=$('telemetry'); tel.style.bottom = isTouch ? m+'px' : '';
+  const th = isTouch && land ? (tel.offsetHeight||56) : 0;
+  $('bArm').style.bottom = (land ? m+th+14 : m+S+30)+'px';
+}
 function bindZone(zone, S, isLeft){
+  const side = isLeft ? 'L' : 'R';
   zone.addEventListener('pointerdown', e=>{
     if(S.id!==null) return; S.id=e.pointerId; try{ zone.setPointerCapture(e.pointerId); }catch(_){}
-    S.sx=e.clientX; S.sy=e.clientY; S.x=0; S.y=0; if(isLeft) S.thr0=touchThr; lastSrc='touch'; initAudio(); e.preventDefault();
-  });
-  zone.addEventListener('pointermove', e=>{
-    if(e.pointerId!==S.id) return; const R=stickRadius();
-    const dx=(e.clientX-S.sx)/R, dy=(e.clientY-S.sy)/R;
-    S.x=clamp(dx,-1,1); S.y=clamp(-dy,-1,1);
-    if(isLeft && flightMode!=='beginner') touchThr=clamp(S.thr0 - dy/2.2, 0, 1);
+    S.sx=e.clientX; S.sy=e.clientY; S.x=0; S.y=0; if(isLeft) S.thr0=touchThr; lastSrc='touch'; initAudio();
+    // la base aparece bajo el dedo; con gas manual se coloca para que la bola (nivel de gas) quede bajo el dedo
+    const rest=STK.rest[side]; let cy=e.clientY; if(isLeft && flightMode!=='beginner') cy += (2*S.thr0-1)*STK.R;
+    const b=stEl[side]; b.classList.add('active'); b.style.transform=`translate(${(e.clientX-rest.x).toFixed(1)}px,${(cy-rest.y).toFixed(1)}px)`;
     e.preventDefault();
   });
-  const end=e=>{ if(e.pointerId!==S.id) return; S.id=null; S.x=0; S.y=0; };
+  zone.addEventListener('pointermove', e=>{
+    if(e.pointerId!==S.id) return; const R=STK.R;
+    const dx=(e.clientX-S.sx)/R, dy=(e.clientY-S.sy)/R;
+    S.x=clamp(dx,-1,1); S.y=clamp(-dy,-1,1);
+    if(isLeft && flightMode!=='beginner') touchThr=clamp(S.thr0 - dy/2, 0, 1);
+    e.preventDefault();
+  });
+  const end=e=>{ if(e.pointerId!==S.id) return; S.id=null; S.x=0; S.y=0; const b=stEl[side]; b.classList.remove('active'); b.style.transform=''; };
   zone.addEventListener('pointerup',end); zone.addEventListener('pointercancel',end); zone.addEventListener('lostpointercapture',end);
 }
 bindZone($('zoneL'), sticks.L, true); bindZone($('zoneR'), sticks.R, false);
@@ -1689,7 +1737,7 @@ function updateCamera(dt){
   if(camMode==='fpv'){
     droneMesh.g.visible=false;
     _cA.set(0,0.022,-0.05).applyQuaternion(d.q).add(d.pos); camera.position.copy(_cA);
-    const tilt = flightMode==='acro' ? 24 : flightMode==='angle' ? 12 : 5;
+    const tilt = flightMode==='acro' ? 24 : flightMode==='horizon' ? 18 : flightMode==='angle' ? 12 : 5;
     _qy.setFromAxisAngle(AX_X, tilt*D2R); camera.quaternion.copy(d.q).multiply(_qy);
     setFov(102);
   } else if(camMode==='chase'){
@@ -1780,7 +1828,7 @@ function updateHUD(dt){
   if(toastT>0){ toastT-=dt; if(toastT<=0) $('toast').classList.remove('show'); }
   if(rotHintT>0){ rotHintT-=dt; if(rotHintT<=0) el.rotHint.style.display='none'; }
   if(isTouch){
-    const R=stickRadius()*0.85;
+    const R=STK.R;
     const ly = flightMode==='beginner' ? sticks.L.y : touchThr*2-1;
     el.knobL.style.transform=`translate(${(sticks.L.x*R).toFixed(1)}px,${(-ly*R).toFixed(1)}px)`;
     el.knobR.style.transform=`translate(${(sticks.R.x*R).toFixed(1)}px,${(-sticks.R.y*R).toFixed(1)}px)`;
@@ -1831,12 +1879,12 @@ function updateMarker(){
 /* ============ Menú ============ */
 const HELP = {
   touch: `<table>
-    <tr><td>Stick izquierdo</td><td>Arriba y abajo para subir y bajar. Izquierda y derecha para girar. En Ángulo y Acro es el gas y se queda donde lo sueltes.</td></tr>
+    <tr><td>Stick izquierdo</td><td>Arriba y abajo para subir y bajar. Izquierda y derecha para girar. En los modos con gas manual (Ángulo, Acro ángulo y Acro) es el gas y se queda donde lo sueltes.</td></tr>
     <tr><td>Stick derecho</td><td>Inclina el dron para avanzar, retroceder y moverte de lado.</td></tr>
     <tr><td>Armar</td><td>Arranca o para los motores. En Principiante también arranca al subir el stick izquierdo.</td></tr></table>
-    <p>Cada stick toma como centro el punto donde apoyas el dedo, así que puedes tocar en cualquier parte de su mitad de pantalla.</p>`,
+    <p>Los sticks ocupan casi toda la pantalla y aparecen justo donde apoyas el dedo, en cualquier punto de su mitad. Cuanto más grandes, más recorrido y más precisión. Su tamaño se ajusta más abajo.</p>`,
   pad: `<table>
-    <tr><td>Stick izquierdo</td><td>Gas o subir y bajar, y girar. En Ángulo y Acro el centro del stick equivale al 50 % de gas, cerca del punto de vuelo estático.</td></tr>
+    <tr><td>Stick izquierdo</td><td>Gas o subir y bajar, y girar. Con gas manual (Ángulo, Acro ángulo y Acro) el centro del stick equivale al 50 % de gas, cerca del punto de vuelo estático.</td></tr>
     <tr><td>Stick derecho</td><td>Cabeceo y alabeo: avanzar, retroceder y moverte de lado.</td></tr>
     <tr><td>A</td><td>Armar o parar motores (en modo manual, con el stick izquierdo abajo)</td></tr>
     <tr><td>B / X / Y</td><td>Reiniciar, cambiar cámara, cambiar modo</td></tr>
@@ -1844,7 +1892,7 @@ const HELP = {
     <tr><td>Ajustes</td><td>Más abajo puedes suavizar el gas para que la potencia fuerte quede al final del stick</td></tr></table>
     <p>Distribución «modo 2», como una emisora de radiocontrol. Funciona con mandos Xbox, PlayStation y la mayoría de mandos que reconoce el navegador.</p>`,
   kb: `<table>
-    <tr><td>W / S</td><td>Subir y bajar (en Ángulo y Acro sube o baja el gas; Mayús lo cambia más rápido)</td></tr>
+    <tr><td>W / S</td><td>Subir y bajar (con gas manual sube o baja el gas; Mayús lo cambia más rápido)</td></tr>
     <tr><td>A / D</td><td>Girar sobre sí mismo</td></tr>
     <tr><td>Flechas o I J K L</td><td>Avanzar, retroceder y moverse de lado</td></tr>
     <tr><td>Espacio</td><td>Armar o parar motores</td></tr>
@@ -1853,6 +1901,7 @@ const HELP = {
 };
 /* ---------- Ajustes del mando ---------- */
 const SL=[{k:'thrExpo',id:'sThrExpo',v:'vThrExpo',min:0,max:95,step:5},{k:'rate',id:'sRate',v:'vRate',min:40,max:150,step:5},{k:'dead',id:'sDead',v:'vDead',min:0,max:25,step:1}];
+if(isTouch) SL.push({k:'touchSize',id:'sTouch',v:'vTouch',min:50,max:100,step:5});
 let slFocus=-1;
 const CV={x0:22,x1:144,y0:106,y1:6};
 const cvX=s=>CV.x0+s*(CV.x1-CV.x0), cvY=f=>CV.y0-clamp(f,0,1)*(CV.y0-CV.y1);
@@ -1867,6 +1916,7 @@ function setSetting(i,val){
   const o=SL[i]; val=clamp(Math.round(val/o.step)*o.step,o.min,o.max);
   SET[o.k]=val; store.set(o.k,val); $(o.id).value=String(val); $(o.v).textContent=val+' %';
   if(o.k==='thrExpo') drawCurve();
+  if(o.k==='touchSize') layoutSticks();
 }
 function focusSlider(i){ slFocus=i; document.querySelectorAll('.sl').forEach(el=>el.classList.toggle('focus', +el.dataset.i===i)); }
 SL.forEach((o,i)=>{ $(o.id).addEventListener('input',e=>{ setSetting(i,+e.target.value); focusSlider(i); }); setSetting(i,SET[o.k]); });
@@ -1885,7 +1935,7 @@ function startGame(){
   if(state==='menu') resetFlight();
   if(raceDone && state==='pause'){ resetFlight(); }
   state='play'; hideMenu(); try{ canvas.focus({preventScroll:true}); }catch(e){}
-  cam.init=false; last=performance.now(); acc=0;
+  cam.init=false; last=performance.now(); acc=0; layoutSticks();
   if(isMobile && window.innerHeight>window.innerWidth){ el.rotHint.style.display='block'; rotHintT=4; }
   if(!drone.armed) toast(flightMode==='beginner' ? (lastSrc==='touch' ? 'Sube el stick izquierdo para despegar' : lastSrc==='gp' ? 'Pulsa A o sube el stick izquierdo' : 'Pulsa Espacio o W para despegar') : (lastSrc==='gp' ? 'Stick izquierdo abajo y pulsa A para armar' : lastSrc==='touch' ? 'Pulsa Armar con el gas abajo' : 'Pulsa Espacio para armar'), 2400);
 }
@@ -1908,7 +1958,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(state
 window.addEventListener('gamepadconnected',()=>{ pollPad(); });
 function onResize(){
   const w=window.innerWidth, h=window.innerHeight;
-  renderer.setSize(w,h,false); camera.aspect=w/h; setFov(fovReq,true); measureHud();
+  renderer.setSize(w,h,false); camera.aspect=w/h; setFov(fovReq,true); measureHud(); layoutSticks();
   if(state==='play' && isMobile && h>w){ el.rotHint.style.display='block'; rotHintT=4; }
 }
 window.addEventListener('resize',onResize); window.addEventListener('orientationchange',()=>setTimeout(onResize,250));
@@ -1943,3 +1993,5 @@ requestAnimationFrame(frame);
 </script>
 </body>
 </html>
+
+</body></html>
