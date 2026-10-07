@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -86,6 +87,11 @@ p{margin:0}
 #wCard{display:grid; gap:.45rem}
 #wCard dl{display:grid; grid-template-columns:auto 1fr; gap:.05rem .8rem; margin:0; font-size:.92rem}
 #wCard dt{color:var(--ink-soft)} #wCard dd{margin:0}
+.btnrow{display:flex; flex-wrap:wrap; gap:.6rem; align-items:stretch}
+.second{font-family:var(--f-disp); font-size:1.4rem; font-weight:600; padding:.6rem 1rem; background:transparent; border:1.5px solid var(--ink)}
+#scoreSum{font-family:var(--f-disp); font-size:1.15rem; font-weight:600}
+#scoreBody td,#scoreBody th{padding:.12rem 0 .12rem .5rem} #scoreBody td:first-child,#scoreBody th:first-child{padding-left:0}
+#scoreBody thead th{border-bottom:1px solid var(--rule)}
 .primary{font-family:var(--f-disp); font-size:1.4rem; font-weight:600; padding:.6rem 1rem; background:var(--blue); color:#fff; border:0; justify-self:start}
 :root[data-theme="dark"] .primary{color:#10161c}
 :root[data-theme="dark"] #vehPick button[aria-pressed="true"],:root[data-theme="dark"] #vehPick button[aria-pressed="true"] span{color:#10161c}
@@ -109,11 +115,11 @@ p{margin:0}
 .sens output{font-family:var(--f-disp); font-weight:600; min-width:2ch}
 .chk{display:flex; gap:.55rem; align-items:flex-start; font-size:.95rem}
 .chk input{width:1.15rem; height:1.15rem; margin:.15rem 0 0; accent-color:var(--blue); flex:none}
-#pauseScore{display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-height:16rem; overflow:auto; font-family:var(--f-disp); border-top:1px solid var(--rule); padding-top:.6rem}
-#pauseScore table{border-collapse:collapse; width:100%; font-size:.95rem}
-#pauseScore caption{font-size:1.2rem; font-weight:700; text-align:left}
-#pauseScore th{text-align:right; font-weight:500; color:var(--ink-soft)} #pauseScore th:first-child,#pauseScore td:first-child{text-align:left}
-#pauseScore td{text-align:right} #pauseScore tr.me td{color:var(--red); font-weight:600} #pauseScore tr.dead td{opacity:.55}
+#scoreBody{display:grid; grid-template-columns:1fr 1fr; gap:1.4rem; font-family:var(--f-disp)}
+#scoreBody table{border-collapse:collapse; width:100%; font-size:.95rem}
+#scoreBody caption{font-size:1.2rem; font-weight:700; text-align:left}
+#scoreBody th{text-align:right; font-weight:500; color:var(--ink-soft)} #scoreBody th:first-child,#scoreBody td:first-child{text-align:left}
+#scoreBody td{text-align:right} #scoreBody tr.me td{color:var(--red); font-weight:600} #scoreBody tr.dead td{opacity:.55}
 
 /* hojas: archivo y controles */
 .sheet{position:fixed; z-index:30; inset:0 0 0 auto; width:min(46rem,100%); background:var(--paper); border-left:1.5px solid var(--ink); display:flex; flex-direction:column; padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) 0}
@@ -160,7 +166,7 @@ p{margin:0}
 #feed li{background:var(--plate); padding:.1rem .5rem; opacity:.82; justify-self:start}
 #feed li.me{opacity:1; outline:1px solid rgba(240,237,218,.5)}
 #feed i{font-style:normal; opacity:.75; margin:0 .2rem}
-.ally{color:var(--ally)} .foe{color:var(--foe)}
+.ally{color:var(--ally)} .foe{color:var(--foe)} #feed b.ev{color:#ffe08a}
 #parte{left:calc(env(safe-area-inset-left,0px) + .7rem); top:calc(env(safe-area-inset-top,0px) + 11.5rem); width:min(21rem,44vw); background:#d9d6c2; color:#22251d; padding:.65rem .8rem .75rem; border-left:5px solid #a8362a; display:grid; gap:.3rem}
 #parte h3{font-size:1.2rem}
 #parte p{font-family:var(--f-type); font-size:.84rem; line-height:1.5}
@@ -235,7 +241,7 @@ body.nogl #fatal{max-width:none}
   .screen.scrim{padding:.4rem; place-items:start center}
   #parte{top:calc(env(safe-area-inset-top,0px) + 9rem); width:min(19rem,60vw)}
   #score{grid-template-columns:1fr}
-  #pauseScore{grid-template-columns:1fr}
+  #scoreBody{grid-template-columns:1fr}
   .seg{grid-template-columns:1fr}
   .tl li{grid-template-columns:1fr; gap:0}
 }
@@ -337,7 +343,20 @@ body.nogl #fatal{max-width:none}
 <section id="pause" class="screen scrim" hidden>
   <div class="sheet-in narrow">
     <h2>Juego en pausa</h2>
-    <button type="button" id="btnResume" class="primary">Volver al combate</button>
+    <div class="btnrow">
+      <button type="button" id="btnResume" class="primary">Volver al combate</button>
+      <button type="button" class="second" data-open="scoreSheet">Ver el marcador</button>
+    </div>
+    <div class="links">
+      <button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button>
+      <button type="button" class="link" data-open="controls">Ver los controles</button>
+      <button type="button" class="link" data-open="padcfg">Configurar mando o joystick</button>
+      <button type="button" class="link" id="btnQuit">Abandonar la partida</button>
+    </div>
+    <fieldset class="opts">
+      <legend>Avisos durante el combate</legend>
+      <label class="chk" for="histOn"><input type="checkbox" id="histOn" checked> Mostrar las notas históricas: los partes sobre lugares, armas, vehículos y sucesos de la batalla que aparecen mientras juegas.</label>
+    </fieldset>
     <fieldset class="opts">
       <legend>Cómo apuntar en el móvil</legend>
       <div class="seg" role="group" aria-label="Modo de apuntado">
@@ -349,14 +368,6 @@ body.nogl #fatal{max-width:none}
       <label class="chk" for="invY"><input type="checkbox" id="invY" checked> En el avión, mando de vuelo invertido: ratón o palanca hacia delante baja el morro, y hacia atrás lo sube. Desmárcalo si prefieres que arriba sea subir.</label>
       <p class="quiet" id="padState"></p>
     </fieldset>
-    <div class="links">
-      <button type="button" class="link" id="btnScore">Ver el marcador</button>
-      <button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button>
-      <button type="button" class="link" data-open="controls">Ver los controles</button>
-      <button type="button" class="link" data-open="padcfg">Configurar mando o joystick</button>
-      <button type="button" class="link" id="btnQuit">Abandonar la partida</button>
-    </div>
-    <div id="pauseScore" hidden></div>
   </div>
 </section>
 
@@ -364,8 +375,12 @@ body.nogl #fatal{max-width:none}
   <div class="sheet-in narrow">
     <h2 id="endTitle"></h2>
     <p id="endSub"></p>
+    <div class="btnrow">
+      <button type="button" id="btnAgain" class="primary">Volver al menú</button>
+      <button type="button" class="second" data-open="scoreSheet">Ver el marcador</button>
+    </div>
+    <p id="padEnd" class="quiet" hidden>Con el mando: A vuelve al menú y Select abre el marcador.</p>
     <aside class="typed"><h3>Lo que ocurrió en realidad</h3><p id="endHist"></p></aside>
-    <button type="button" id="btnAgain" class="primary">Volver al menú</button>
     <div class="links"><button type="button" class="link" data-open="archive">Abrir el archivo de la batalla</button></div>
   </div>
 </section>
@@ -373,6 +388,15 @@ body.nogl #fatal{max-width:none}
 <aside id="archive" class="sheet" hidden role="dialog" aria-label="Archivo de la batalla">
   <div class="sheet-head"><h2>Archivo de la batalla</h2><button type="button" class="close">Cerrar</button></div>
   <div id="archBody" class="sheet-body"></div>
+</aside>
+
+<aside id="scoreSheet" class="sheet" hidden role="dialog" aria-label="Marcador">
+  <div class="sheet-head"><h2>Marcador</h2><button type="button" class="close">Cerrar</button></div>
+  <div class="sheet-body">
+    <p id="scoreSum"></p>
+    <div id="scoreBody"></div>
+    <p class="quiet">Bajas: enemigos abatidos. Caídas: veces que ha caído. Tomas: posiciones en cuya conquista participó. Tu fila va resaltada.</p>
+  </div>
 </aside>
 
 <aside id="padcfg" class="sheet small" hidden role="dialog" aria-label="Configurar mando o joystick">
@@ -410,7 +434,7 @@ body.nogl #fatal{max-width:none}
       <dt>Caza</dt><dd>W y S suben y bajan el motor. A y D (o el ratón a los lados) inclinan las alas: el avión vira hacia el lado al que se inclina. Las flechas ↓ y ↑ (o el ratón adelante y atrás) mueven el morro; por defecto, hacia atrás sube. Z y C son el timón y Espacio los frenos. Para despegar, da motor y, a unos 80 o 95 km/h según el avión, tira hacia atrás. Si subes demasiado el morro o te quedas sin velocidad entras en pérdida: el morro cae y el avión se hunde; bájalo y da motor. Para aterrizar, llega despacio, con las alas niveladas y sin caer a plomo. Clic izquierdo dispara y G suelta una bomba.</dd>
       <dt>Caza en el móvil</dt><dd>La palanca de la izquierda da alabeo y cabeceo. A la derecha, «Motor +» y «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba»; abajo, los dos botones de timón. Arrastrar por la derecha gira la cámara alrededor del avión.</dd>
       <dt>Cada caza vuela distinto</dt><dd>Los biplanos (Chato y Fiat CR.32) son lentos, despegan antes y viran muy cerrado. Los monoplanos (Mosca y Bf 109) son más rápidos, necesitan más velocidad para sostenerse y viran más abierto; el Mosca alabea vivísimo y el Bf 109 es el que más corre.</dd>
-      <dt>Tab</dt><dd>Marcador</dd>
+      <dt>Tab</dt><dd>Marcador: mantenlo pulsado en combate. En la pausa y al acabar la ronda lo abre y lo cierra, igual que el botón «Ver el marcador».</dd>
       <dt>Esc o P</dt><dd>Pausa</dd>
       <dt>Flechas</dt><dd>Girar, por si el navegador no captura el ratón</dd>
     </dl>
@@ -424,7 +448,7 @@ body.nogl #fatal{max-width:none}
       <dt>A, B</dt><dd>Saltar y agacharse. Pulsar la palanca derecha (R3) es tumbarse.</dd>
       <dt>X</dt><dd>Recargar; junto a un vehículo, subir o bajar.</dd>
       <dt>Y, RB</dt><dd>Cambiar de arma y lanzar granada.</dd>
-      <dt>Start, Select</dt><dd>Pausa y marcador.</dd>
+      <dt>Start, Select</dt><dd>Pausa y marcador. Select también abre el marcador en la pausa y al acabar la ronda.</dd>
     </dl>
     <p>Junto a una bandera de tu bando repones munición y granadas y recuperas salud poco a poco.</p>
     <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: la rampa desemboca en el piso de campanas por un hueco con barandilla, y arriba hay cuatro vanos con pretil para disparar. Saltar desde allí es casi siempre mortal. De vez en cuando sube también algún soldado del bando que tiene el pueblo, uno o como mucho dos: conviene mirar al campanario antes de cruzar la plaza.</p>
@@ -2127,9 +2151,9 @@ function drawSoldier(s) {
 const input = { keys: {}, fire: false, fireQ: 0, aim: false, lookX: 0, lookY: 0, mvx: 0, mvz: 0, jump: false, locked: false, touch: false, lockFails: 0, everLocked: false, skipUntil: 0, mAvg: 0, mx: -1, my: -1, bomb: false, joy: null, pad: false, padSprint: false, thr: 0, brake: false, rud: 0, thrAbs: -1, flyPad: false };
 let P = null;
 /* opciones que se guardan en el dispositivo */
-const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true };      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
-try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; } catch (e) { }
-function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY })); } catch (e) { } }
+const opts = { gyro: false, sens: 1, gyroSaved: false, invY: true, hist: true };      // hist: mostrar las notas históricas durante el combate      // invY: en el avión, ratón hacia delante baja el morro (por defecto, como en una palanca de vuelo)
+try { const o = JSON.parse(localStorage.getItem('ebro1938') || '{}'); if (typeof o.sens === 'number') opts.sens = clamp(o.sens, 0.5, 2); opts.gyroSaved = !!o.gyro; if (typeof o.invM === 'boolean') opts.invY = o.invM; if (typeof o.hist === 'boolean') opts.hist = o.hist; } catch (e) { }
+function saveOpts() { try { localStorage.setItem('ebro1938', JSON.stringify({ gyro: opts.gyro, sens: opts.sens, invM: opts.invY, hist: opts.hist })); } catch (e) { } }
 
 /* Giroscopio: la orientación real del teléfono marca hacia dónde miras, como en una foto de 360°. Gira el cuerpo o levanta y baja
    el móvil y la vista va a ese sitio; arrastrar con el dedo desplaza la vista respecto al teléfono para los ajustes. */
@@ -2221,6 +2245,7 @@ document.addEventListener('pointerlockchange', () => {
   if (input.locked && !now && game.state === 'play') pauseGame();
   input.locked = now; input.skipUntil = performance.now() + 180; input.mAvg = 0;       // al capturar o soltar llegan saltos falsos del cursor: se ignoran un instante
   if (now) { $('hint').hidden = true; input.lockFails = 0; input.everLocked = true; }
+  if (now && game.state !== 'play') { try { document.exitPointerLock(); } catch (e) { } }       // la captura llegó tarde, ya en un menú: se suelta para que el ratón sirva en él
 });
 document.addEventListener('pointerlockerror', () => lockFailed(input.lockTry));
 
@@ -2244,10 +2269,9 @@ addEventListener('keydown', e => {
       case 'Tab': showScore(true); break;
       case 'Escape': case 'KeyP': pauseGame(); break;
     }
-  } else if (e.code === 'Escape' || (e.code === 'KeyP' && game.state === 'pause')) {
-    if (!$('archive').hidden) $('archive').hidden = true;
-    else if (!$('controls').hidden) $('controls').hidden = true;
-    else if (game.state === 'pause') resumeGame();
+  } else if (e.code === 'Tab' && (game.state === 'pause' || game.state === 'end')) { e.preventDefault(); if (!e.repeat) toggleScoreSheet(); }
+  else if (e.code === 'Escape' || (e.code === 'KeyP' && game.state === 'pause')) {
+    if (!closeSheets() && game.state === 'pause') resumeGame();
   }
 });
 addEventListener('keyup', e => { input.keys[e.code] = false; if (e.code === 'Tab') showScore(false); });
@@ -2445,7 +2469,7 @@ function pollPad(dt) {
   } else {
     if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
     const ok = PH('jump') || PH('fire') || PH('pfire'), back = PH('crouch') || PH('pbomb');
-    if (st === 'pause') { if (PH('pause') || back) { if (!$('archive').hidden) $('archive').hidden = true; else if (!$('controls').hidden) $('controls').hidden = true; else resumeGame(); } }
+    if (st === 'pause') { if (PH('score')) toggleScoreSheet(); else if (PH('pause') || back) { if (!closeSheets()) resumeGame(); } }
     else if (st === 'deploy') {
       if (ok) { audioInit(); deployPlayer(); }
       if (pad.std && (hit(14) || hit(15))) { game.selClass = (game.selClass + (hit(15) ? 1 : 3)) % 4; renderClassCard(); }
@@ -2455,9 +2479,9 @@ function pollPad(dt) {
         drawDeployMap(); uiDeployTick();
       }
     }
-    else if (st === 'end') { if (ok) uiToMenu(); }
+    else if (st === 'end') { if (PH('score')) toggleScoreSheet(); else if (back) closeSheets(); else if (ok) { if (!closeSheets()) uiToMenu(); } }
     else if (st === 'menu') {
-      if (back) { $('archive').hidden = true; $('controls').hidden = true; }
+      if (back) closeSheets();
       else if (pad.std && hit(4)) startMatch(REP); else if (pad.std && hit(5)) startMatch(NAT);
     }
   }
@@ -2833,7 +2857,7 @@ function takeVehicle(p, v) {
   v.driver = p; p.veh = v; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
   if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) { v.thr = 0; v.pitch = 0; v.gp = 0.15; } v.sink = 0; v.graceT = 0; game.pcam = null; game.planeOrb = 0; input.thr = 0; input.brake = false; input.rud = 0; }
   gyroSync();
-  if (!game.vehTold[v.type]) { game.vehTold[v.type] = true; pushCard(v.name, v.def.hist); }
+  if (!game.vehTold[v.type] && pushCard(v.name, v.def.hist)) game.vehTold[v.type] = true;
   if (v.kind === 'tank') showHint('La cruz del centro es el punto al que apuntas. El círculo marca dónde caería el disparo: cuando alcanza la cruz y se pone amarillo, ' + (v.def.cannon ? 'el cañonazo cae justo ahí.' : 'las ametralladoras dan justo ahí.'));
   if (v.kind === 'plane') { const kmh = Math.round((v.def.fl.vs[0] + 0.8 * (v.def.fl.vs[1] - v.def.fl.vs[0])) * 3.6 / 5) * 5, back = opts.invY ? 'hacia atrás' : 'hacia delante';
     showHint(input.touch ? 'Mantén «Motor +». A unos ' + kmh + ' km/h tira de la palanca ' + back + ' para despegar. La palanca inclina las alas para girar y mueve el morro; si lo subes demasiado entrarás en pérdida.'
@@ -3315,7 +3339,7 @@ function nearAA(p) {
 function manAA(p, a) {
   a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
   gyroSync();
-  if (!game.vehTold[a.home.t]) { game.vehTold[a.home.t] = true; pushCard(a.def.name, a.def.hist); }
+  if (!game.vehTold[a.home.t] && pushCard(a.def.name, a.def.hist)) game.vehTold[a.home.t] = true;
   SFX.click();
 }
 function leaveAA(p) {
@@ -3422,9 +3446,9 @@ function pauseGame() {
   if (game.state !== 'play') return;
   game.state = 'pause'; input.fire = false; input.aim = false;
   if (document.pointerLockElement) document.exitPointerLock();
-  $('pause').hidden = false; $('pauseScore').hidden = true; uiOpts();
+  $('pause').hidden = false; uiOpts();
 }
-function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = 'play'; tryLock(); }
+function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; $('scoreSheet').hidden = true; game.state = 'play'; tryLock(); }
 
 function applyDamage(t, dmg, att, head, cause) {
   if (att && att.isCrew && att.veh.driver) att = att.veh.driver;       // las bajas de un vehículo se apuntan a quien lo lleva
@@ -3493,21 +3517,21 @@ function updateProjectiles(dt) {
   }
 }
 function updateEvents(dt) {
-  if (game.floodT > 0) { game.floodT -= dt; if (game.floodT <= 0) { pasarela.on = true; pushCard(EVENTS.floodEnd.title, EVENTS.floodEnd.text); } }
+  if (game.floodT > 0) { game.floodT -= dt; if (game.floodT <= 0) { pasarela.on = true; pushCard(EVENTS.floodEnd.title, EVENTS.floodEnd.text, 'La pasarela del norte vuelve a estar tendida'); } }
   waterY += ((game.floodT > 0 ? 0.62 : 0) - waterY) * Math.min(1, dt * 0.4);
   game.eventT -= dt;
   if (game.eventT > 0) return;
   game.eventT = rnd(58, 78);
   const kind = ['flood', 'air', 'arty'][game.eventI++ % 3];
-  if (kind === 'flood') { pasarela.on = false; game.floodT = 55; pushCard(EVENTS.flood.title, EVENTS.flood.text); }
+  if (kind === 'flood') { pasarela.on = false; game.floodT = 55; pushCard(EVENTS.flood.title, EVENTS.flood.text, 'Crecida del Ebro: la pasarela del norte queda cortada'); }
   else if (kind === 'air') {
     const bx = (pontoon.x0 + pontoon.x1) / 2;
     for (let i = 0; i < 3; i++) planes.push({ x: bx + (i - 1) * 36, y: 120 + (i === 1 ? 0 : 7), z: -820 - (i === 1 ? 0 : 48), dropT: 0, bombs: 5 });
-    pushCard(EVENTS.air.title, EVENTS.air.text);
+    pushCard(EVENTS.air.title, EVENTS.air.text, 'Aviación enemiga sobre el puente de barcas');
   } else {
     const c = FLAGS.filter(f => f.base === undefined && f.owner !== NAT), f = c.find(x => x.contested) || (c.length ? pick(c) : pick(FLAGS.filter(x => x.base === undefined)));
     for (let i = 0; i < 12; i++) { const a = rnd(0, 6.283), r = rnd(4, 30); shells.push({ t: game.time + 3 + i * 1.1 + rnd(0, 0.6), x: f.x + Math.cos(a) * r, z: f.z + Math.sin(a) * r }); }
-    pushCard(EVENTS.arty.title, EVENTS.arty.text + f.name + '.');
+    pushCard(EVENTS.arty.title, EVENTS.arty.text + f.name + '.', 'Fuego de artillería sobre ' + f.name);
   }
 }
 function updateFlags(dt) {
@@ -3531,7 +3555,7 @@ function updateFlags(dt) {
         for (const s of soldiers) if (s.alive && s.team === o && Math.hypot(s.x - f.x, s.z - f.z) < CAP_R) s.caps++;
         feedText(TEAM[o].name + ' toman ' + f.name, o === game.team ? 'ally' : 'foe');
         if (o === game.team) SFX.cap();
-        if (!f.told) { f.told = true; pushCard(f.name, f.hist); }
+        if (!f.told && pushCard(f.name, f.hist)) f.told = true;
       } else feedText(f.name + ' queda en tierra de nadie', '');
     }
   }
@@ -3840,7 +3864,7 @@ function uiShowPlay() {
 }
 function showHint(t) { const h = $('hint'); h.textContent = t; h.hidden = false; clearTimeout(showHint.t); showHint.t = setTimeout(() => { h.hidden = true; }, 6000); }
 function uiResetMatch() {
-  $('feed').innerHTML = ''; $('parte').hidden = true; $('end').hidden = true; $('menu').hidden = true; $('archive').hidden = true; $('controls').hidden = true;
+  $('feed').innerHTML = ''; $('parte').hidden = true; $('end').hidden = true; $('menu').hidden = true; $('archive').hidden = true; $('controls').hidden = true; $('scoreSheet').hidden = true;
   $('flagRow').innerHTML = FLAGS.filter(f => f.base === undefined).map(f => '<li id="fl' + f.id + '">' + f.id + '</li>').join('');
 }
 function uiShowEnd() {
@@ -3864,22 +3888,37 @@ function addFeed(att, t, cause, head) {
   feedLi(a + '<i>' + (cause || 'Fuego') + (head ? ', a la cabeza' : '') + '</i> <b class="' + rel(t) + '">' + t.name + '</b>', me ? 'me' : '');
 }
 function feedText(t, cls) { feedLi('<b class="' + cls + '">' + t + '</b>', 'me'); }
-function pushCard(title, text) { cards.push({ title, text }); if (cards.length > 3) cards.shift(); }
+/* Nota histórica (el parte de la izquierda). Si el jugador las ha desactivado no se muestra; cuando además trae un aviso táctico
+   (short: la pasarela cortada, un bombardeo), ese aviso sale en una línea, sin la historia. Devuelve true si la nota se ha puesto en cola. */
+function pushCard(title, text, short) {
+  if (!opts.hist) { if (short) feedText(short, 'ev'); return false; }
+  cards.push({ title, text }); if (cards.length > 3) cards.shift(); return true;
+}
+function setHist(on) {
+  opts.hist = !!on; saveOpts();
+  if (!opts.hist) { cards.length = 0; cardNow = null; $('parte').hidden = true; }
+}
 
 /* ---- HUD ---- */
 function uiResize() {
   const cs = getComputedStyle($('hud')); safe.t = parseFloat(cs.paddingTop) || 12; safe.r = parseFloat(cs.paddingRight) || 12; safe.b = parseFloat(cs.paddingBottom) || 12; safe.l = parseFloat(cs.paddingLeft) || 12;
   if (game.state === 'menu') drawMenuMap();
 }
+/* cierra el panel lateral que esté abierto (marcador, archivo, controles); devuelve true si había alguno */
+function closeSheets() {
+  let any = false;
+  for (const id of ['scoreSheet', 'archive', 'controls', 'padcfg']) if (!$(id).hidden) { $(id).hidden = true; any = true; }
+  return any;
+}
 function showScore(on) {
   scoreOn = on && game.state === 'play'; $('score').hidden = !scoreOn;
   if (scoreOn) renderScore();
 }
-function uiToMenu() { game.state = 'menu'; for (const id of ['pause', 'end', 'deploy', 'hud', 'ov', 'touch', 'score']) $(id).hidden = true; $('menu').hidden = false; menuProg = 1; drawMenuMap(); }
+function uiToMenu() { game.state = 'menu'; for (const id of ['pause', 'end', 'deploy', 'hud', 'ov', 'touch', 'score', 'scoreSheet']) $(id).hidden = true; $('menu').hidden = false; menuProg = 1; drawMenuMap(); }
 const STD_BTN = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'L2', 'R2', 'Select', 'Start', 'L3', 'R3', 'Cruceta ↑', 'Cruceta ↓', 'Cruceta ←', 'Cruceta →'];
 const STD_AX = ['Palanca izquierda ↔', 'Palanca izquierda ↕', 'Palanca derecha ↔', 'Palanca derecha ↕'];
 function uiPad() {
-  for (const id of ['padMenu', 'padDeploy']) $(id).hidden = !(pad.on && pad.std);
+  for (const id of ['padMenu', 'padDeploy', 'padEnd']) $(id).hidden = !(pad.on && pad.std);
   const name = pad.on ? pad.id.replace(/\s*\(.*$/, '').slice(0, 44) : '';
   $('padState').textContent = pad.on ? (pad.std ? 'Mando detectado: ' : 'Joystick detectado: ') + name + '.' : 'Mando o joystick: no detectado. Conéctalo y pulsa cualquiera de sus botones.';
   if (!$('padcfg').hidden) renderPadCfg();
@@ -3910,8 +3949,16 @@ function uiOpts() {
     : st === 'denied' ? 'El navegador no ha dado permiso para usar los sensores de movimiento. Sigues con el control tradicional.'
     : st === 'none' ? 'A esta página no le llegan datos del giroscopio en este dispositivo o navegador. Sigues con el control tradicional.'
     : 'Apuntas arrastrando el dedo por la mitad derecha de la pantalla.';
-  $('invY').checked = opts.invY; $('sens').value = opts.sens; $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ',');
+  $('invY').checked = opts.invY; $('histOn').checked = opts.hist; $('sens').value = opts.sens; $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ',');
 }
+/* marcador completo en su propio panel: se abre desde la pausa y al acabar la ronda, en cualquier plataforma */
+function renderScoreSheet() {
+  const held = t => FLAGS.filter(f => f.base === undefined && f.owner === t).map(f => f.id).join(' ') || 'ninguna';
+  $('scoreSum').textContent = (game.state === 'end' ? 'Resultado final. ' : '') + 'Refuerzos: ' + TEAM[REP].name + ' ' + Math.max(0, Math.round(game.tickets[REP])) + ' · ' + TEAM[NAT].name + ' ' + Math.max(0, Math.round(game.tickets[NAT])) +
+    '. Posiciones: ' + TEAM[REP].name + ' ' + held(REP) + ' · ' + TEAM[NAT].name + ' ' + held(NAT) + '.';
+  renderScore($('scoreBody'));
+}
+function toggleScoreSheet() { const el = $('scoreSheet'); el.hidden = !el.hidden; if (!el.hidden) { renderScoreSheet(); el.querySelector('.close').focus(); } }
 function renderScore(target) {
   const col = team => {
     const list = soldiers.filter(s => s.team === team).sort((a, b) => (b.kills * 10 + b.caps * 20) - (a.kills * 10 + a.caps * 20));
@@ -4091,7 +4138,7 @@ function buildArchive() {
 (function boot() {
   topo = buildTopo(); buildArchive();
   document.querySelectorAll('.side').forEach(b => b.addEventListener('click', () => startMatch(+b.dataset.team)));
-  const open = id => () => { $(id).hidden = false; if (id === 'padcfg') renderPadCfg(); $(id).querySelector('.close').focus(); };
+  const open = id => () => { $(id).hidden = false; if (id === 'padcfg') renderPadCfg(); if (id === 'scoreSheet') renderScoreSheet(); $(id).querySelector('.close').focus(); };
   $('padcfg').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !pad.map) return;
     if (b.dataset.bind) {
@@ -4128,7 +4175,7 @@ function buildArchive() {
   document.querySelectorAll('[data-gyro]').forEach(b => b.addEventListener('click', () => setGyro(b.dataset.gyro === '1')));
   $('sens').addEventListener('input', e => { opts.sens = clamp(+e.target.value || 1, 0.5, 2); saveOpts(); $('sensOut').textContent = opts.sens.toFixed(1).replace('.', ','); });
   $('invY').addEventListener('change', e => { opts.invY = e.target.checked; saveOpts(); });
-  $('btnScore').addEventListener('click', () => { const el = $('pauseScore'); el.hidden = !el.hidden; if (!el.hidden) renderScore(el); });
+  $('histOn').addEventListener('change', e => setHist(e.target.checked));
   uiPad();
   if (opts.gyroSaved && window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission !== 'function') setGyro(true);
   uiOpts();
@@ -4147,3 +4194,5 @@ function buildArchive() {
 </script>
 </body>
 </html>
+
+</body></html>
