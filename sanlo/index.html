@@ -1275,6 +1275,9 @@ function buildLonja(){
     const nd=Math.max(1,Math.round((x1-x0)/16)),st=(x1-x0)/nd;for(let k=0;k<nd;k++)woodDoor(x0+st*(k+0.5),y+0.06,-147,0,2.4,3.9);};
   casa(-120,-24);casa(-6,58);casa(72,112);
   MONW.box(-15,y+7.5,-157,9,6.5,4,0,WHITE,4.4,5.5,y);ROOF.hip(-15,y+14,-157,9,4,0,2.5,0.3,SLATE);addCollider(-15,-157,9,4,0,y+7.5,y+16,'b');
+  {const yc=y+7.48,U=(a,b)=>[a/2,b/2];STONE.quad([-24,yc,-161],[-6,yc,-161],[-6,yc,-153],[-24,yc,-153],U(-24,-161),U(-6,-161),U(-6,-153),U(-24,-153),[0.86,0.83,0.78]);   // techo del paso
+   for(const z of[-153.15,-160.85])STONE.box(-15,yc-0.3,z,9,0.33,0.18,0,GRAN,2,1,null,true,true);                                  // dinteles
+   for(let k=0;k<5;k++)STONE.box(-15,yc-0.2,-159.7+k*1.35,9,0.21,0.16,0,[0.8,0.77,0.71],2,1,null,false,true);}                     // vigas
   // farolas de la Lonja
   for(let z=-128;z<=90;z+=24)lamp(-114,z);
   for(let x=-60;x<=110;x+=24)lamp(x,-141);
@@ -1692,11 +1695,20 @@ function buildStall(sh){
   p=W(0,0.6);addCollider(p[0],p[1],1.6,1.25,a,y-1,y+2.9,'b');
   p=W(0,-1.7);sh.ix=p[0];sh.iz=p[1];p=W(0,0.75);sh.vx=p[0];sh.vz=p[1];sh.vyaw=Math.PI+a;
 }
+function bunting(poles){   // mástiles con su cuerda combada y banderines triangulares colgando de ella
+  const tops=poles.map(([x,z])=>{const y=groundH(x,z);PROPS.box(x,y-0.3,z,0.06,4.9,0.06,0,[0.32,0.3,0.28]);PROPS.box(x,y+4.55,z,0.09,0.09,0.09,0,[0.75,0.62,0.3]);addCollider(x,z,0.08,0.08,0,y-1,y+4.6,'b');return new THREE.Vector3(x,y+4.42,z);});
+  const COLS=[[0.78,0.2,0.16],[0.91,0.73,0.23],[0.18,0.48,0.3],[0.12,0.31,0.69],[0.95,0.94,0.9]],pos=[],col=[],rope=new THREE.MeshLambertMaterial({color:0x2a2622});let n=0;
+  for(let i=0;i<tops.length-1;i++){const a=tops[i],b=tops[i+1],L=a.distanceTo(b),sag=0.035*L,P=t=>new THREE.Vector3().lerpVectors(a,b,t).add(new THREE.Vector3(0,-sag*4*t*(1-t),0));
+    const pts=[];for(let k=0;k<=16;k++)pts.push(P(k/16));const tb=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,0.012,4,false),rope);scene.add(tb);
+    const nf=Math.max(2,Math.floor(L/1.05));for(let k=0;k<nf;k++){const t0=(k+0.18)/nf,t1=(k+0.82)/nf,p0=P(t0),p1=P(t1),pm=P((t0+t1)/2),c=COLS[n++%COLS.length];
+      const tip=pm.clone().add(new THREE.Vector3(0,-0.46,0));for(const v of[p0,p1,tip])pos.push(v.x,v.y-0.01,v.z);for(let q=0;q<3;q++)col.push(...c);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
+  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}));scene.add(m);
+}
 function buildMarket(){
   pave(722,777,294,309,0,MAT.paving,3);
   for(const sh of SHOPS)buildStall(sh);
-  for(let k=0;k<22;k++){const x=726+k*2.3,y=groundH(x,300);const m=new THREE.Mesh(BOXG,M([0xc8342c,0xe8b93a,0x2f7a4d,0x1f4fb0][k%4]));m.scale.set(0.5,0.4,0.02);m.position.set(x,y+3.9,299.6);scene.add(m);}
-  PROPS.box(751,groundH(751,299.6)+4.1,299.6,26,0.02,0.02,0,IRON);
+  bunting([[722.4,299.2],[736.1,299.2],[756,299.2],[777.6,299.2]]);
 }
 // ---------------------------------------------------------------- Área de servicio de Guadarrama
 const SERVICE={};
@@ -3537,7 +3549,11 @@ function exitPlane(forced){
 function openChute(){
   P.chute=true;if(!CHUTE){CHUTE=new THREE.Group();const can=new THREE.Mesh(new THREE.SphereGeometry(2.6,16,8,0,TAU,0,Math.PI/2.5),new THREE.MeshLambertMaterial({color:0xe8b93a,side:THREE.DoubleSide}));can.position.y=4.2;can.scale.set(1,0.55,0.8);CHUTE.add(can);
     const band=new THREE.Mesh(new THREE.SphereGeometry(2.62,16,3,0,TAU,0.55,0.25),new THREE.MeshLambertMaterial({color:0xc8342c,side:THREE.DoubleSide}));band.position.y=4.2;band.scale.set(1,0.55,0.8);CHUTE.add(band);
-    for(const[a,b]of[[1,1],[-1,1],[1,-1],[-1,-1]]){const l=new THREE.Mesh(BOXG,M(0x2a2a2a));l.scale.set(0.03,2.9,0.03);l.position.set(a*1,2.9,b*0.7);l.rotation.set(-b*0.25,0,a*0.35);CHUTE.add(l);}
+    const cg=new THREE.CylinderGeometry(1,1,1,5),cm=M(0x2a2a2a),wb=M(0x23262b),Y=new THREE.Vector3(0,1,0),A=new THREE.Vector3(),B=new THREE.Vector3();
+    const line=(p,q,r,mat=cm)=>{A.set(...p);B.set(...q);const d=B.clone().sub(A),L=d.length(),m=new THREE.Mesh(cg,mat);m.position.copy(A).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(Y,d.normalize());m.scale.set(r,L,r);CHUTE.add(m);};
+    const pack=new THREE.Mesh(BOXG,wb);pack.scale.set(0.34,0.42,0.13);pack.position.set(0,1.25,-0.22);CHUTE.add(pack);   // mochila del paracaídas a la espalda
+    for(const sx of[-1,1]){const sh=[sx*0.17,1.46,-0.2],top=[sx*0.24,2.3,-0.26];line(sh,top,0.022,wb);line([sx*0.17,1.46,-0.2],[sx*0.13,1.05,-0.21],0.018,wb);   // bandas desde los hombros
+      for(let k=0;k<5;k++){const a=(k/4-0.5)*2.2+(sx<0?Math.PI:0),rx=2.47*Math.cos(a),rz=1.98*Math.sin(a);line(top,[rx,4.62,rz],0.009);}}
     P.h.g.add(CHUTE);}
   CHUTE.visible=true;sfx('swing',1);
 }
