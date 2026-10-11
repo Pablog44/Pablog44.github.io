@@ -333,8 +333,8 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
     <div class="ctrl" style="grid-template-columns:1fr;margin-top:14px"><div><h3>Realidad virtual (Meta Quest y otras gafas WebXR)</h3><table>
         <tr><td>Entrar</td><td>Abre este enlace en el navegador de las gafas y pulsa «Jugar en VR». Las cabinas tienen instrumentos que funcionan; los avisos aparecen flotando delante de ti y el mapa en tu muñeca izquierda.</td></tr>
         <tr><td>A pie</td><td>Stick izq. andar, stick der. girar, gatillo der. disparar (apunta con el mando), X saltar, agarre izq. correr, agarre der. cambiar de arma. Con los puños, la navaja o el bate, golpea de verdad con el mando: rápido hace daño, despacio solo empuja. Con el rifle de caza, acerca la mira al ojo para ver con aumento</td></tr>
-        <tr><td>Vehículos</td><td>A subir/bajar, B cambiar vista, Y recentrar. Coche: gatillo der. acelera, izq. frena, stick izq. dirección, o agarra el volante con las manos y gíralo. Agarre der. dispara la pistola hacia donde apuntes. En cabina, los avisos van en tu regazo: mira hacia abajo</td></tr>
-        <tr><td>Pausa y tiendas</td><td>Mantén Y para abrir la pausa. En los menús, el taller y las tiendas: stick ↕ o señala con el mando, gatillo o A acepta, B vuelve</td></tr>
+        <tr><td>Vehículos</td><td>A subir/bajar, B cambiar vista, Y recentrar. Coche: gatillo der. acelera, izq. frena, stick izq. dirección (clic del stick der. claxon), o agarra el volante con las manos y gíralo. Agarre der. dispara la pistola hacia donde apuntes. En cabina, los avisos van en tu regazo: mira hacia abajo</td></tr>
+        <tr><td>Pausa y tiendas</td><td>Aprieta el stick izquierdo (o mantén Y) para abrir y cerrar la pausa. En los menús, el taller y las tiendas: stick ↕ o señala con el mando, gatillo o A acepta, B vuelve</td></tr>
         <tr><td>Volar</td><td>Stick izq. ↕ motor (o subir/bajar en el helicóptero) y ↔ timón; stick der. palanca de mando. X frenos, gatillo der. humo</td></tr>
       </table></div></div>
     <div class="ctrl" style="grid-template-columns:1fr;margin-top:14px"><div><h3>Móvil (en horizontal) y joystick de vuelo</h3><table>
@@ -3585,7 +3585,7 @@ const VR={on:false,supported:false,session:null,yaw:0,off:new THREE.Matrix4(),re
 const GAMECAM={pos:new THREE.Vector3(),yaw:0};
 const _mA=new THREE.Matrix4(),_mB=new THREE.Matrix4(),_qA=new THREE.Quaternion(),_pA=new THREE.Vector3(),_sOne=new THREE.Vector3(1,1,1);
 const VRKEY={'Y':'A','A':'X','B':'agarre izq.','X':'stick der. (clic)','RT':'gatillo der.','LT':'gatillo izq.','RT / LT':'gatillos','LB / RB':'agarres',
-  'stick izq.':'stick izq.','el stick izquierdo':'el stick izquierdo','stick der.':'la cabeza','el stick derecho':'la cabeza','Back':'tu muñeca izquierda','R3':'B','L3':'clic del stick izq.',
+  'stick izq.':'stick izq.','el stick izquierdo':'el stick izquierdo','stick der.':'la cabeza','el stick derecho':'la cabeza','Back':'tu muñeca izquierda','R3':'B','L3':'clic del stick der.',
   '↑':'agarre izq.','↓':'—','LB / RB / rueda':'agarre der.','LB / RB':'agarre der.','A / B':'A'};
 function vrKey(p,k){return VRKEY[p]||p||k;}
 function camWorldPos(){return VR.on&&VR.ready?VR.head:camera.position;}
@@ -3661,14 +3661,15 @@ function vrPoll(){
   for(const k in B){I[k+'P']=B[k]&&!pv[k];I[k+'H']=B[k];pv[k]=B[k];}
   const now=performance.now();if(I.yP){VR.yDown=now;VR.yFired=false;}
   if(I.yH&&!VR.yFired&&now-VR.yDown>650){VR.yFired=true;vrPauseToggle();}
-  if(!I.yH&&VR.yWas&&!VR.yFired){VR.recenter=true;toast('Vista recentrada · mantén Y para la pausa',1.6);}VR.yWas=I.yH;
+  if(!I.yH&&VR.yWas&&!VR.yFired){VR.recenter=true;toast('Vista recentrada · pulsa el stick izquierdo para la pausa',1.6);}VR.yWas=I.yH;
+  if(I.lsP)vrPauseToggle();   // apretar el stick izquierdo abre (y cierra) el menú de pausa
 }
 function vrInput(I){
   const V=VR.in;I.lookX=I.lookY=0;
   if(P.car){I.thr=clamp(I.thr+V.rt-V.lt,-1,1);if(VW.active){I.steer=VW.steer;P.car.steerV=VW.steer;}else I.steer=clamp(I.steer+V.lx,-1,1);I.hand=I.hand||V.xH;I.carFire=I.carFire||V.rgbH;I.carFireP=I.carFireP||V.rgbP;
-    I.horn=I.horn||V.lsP;I.hornHeld=I.hornHeld||V.lsH;I.radio=I.radio||V.lgbP;}
+    I.horn=I.horn||V.rsP;I.hornHeld=I.hornHeld||V.rsH;I.radio=I.radio||V.lgbP;}
   else if(!P.plane&&!P.train){I.mx=clamp(I.mx+V.lx,-1,1);I.my=clamp(I.my-V.ly,-1,1);I.fire=I.fire||V.rtbH;I.fireP=I.fireP||V.rtbP;I.aim=I.aim||V.ltbH;
-    I.jump=I.jump||V.xP;I.sprint=I.sprint||V.lgbH;I.next=I.next||V.rgbP;I.reload=I.reload||V.rsP;I.throwG=I.throwG||V.lsP;
+    I.jump=I.jump||V.xP;I.sprint=I.sprint||V.lgbH;I.next=I.next||V.rgbP;I.reload=I.reload||V.rsP;
     if(Math.abs(V.rx)>0.7){if(!VR.snapHeld){VR.yaw-=Math.sign(V.rx)*Math.PI/6;VR.snapHeld=true;}}else if(Math.abs(V.rx)<0.3)VR.snapHeld=false;}
   I.enter=I.enter||(V.aP&&!G.cine);I.adv=I.adv||V.aP||V.rtbP;I.skip=I.skip||(G.cine&&V.bP);I.view=I.view||(V.bP&&!G.cine);I.map=false;
 }
@@ -4242,11 +4243,11 @@ const DRIVEBY={g:null,w:null,t:0,by:{},arms:[]};
 function driveByPose(){ // ventanilla del conductor (izquierda) y dirección del arma, sin apuntar hacia dentro del coche
   const c=P.car,T=c.T,s=Math.sin(c.h),co=Math.cos(c.h),fp=VIEW.fp&&!VR.on,f=fp?camDirNow():camFwd();
   const van=T.shape!=='car',lz=van?T.len/2-0.9:(T.cabZ||0)*T.len+T.len*(T.cab||0.5)*0.18,lx=T.wid/2-0.02,y=van?T.hgt*0.7:0.3+T.hgt*0.42+(T.hgt-0.3-T.hgt*0.42)*0.5;
-  let dx=f[0],dy=f[1],dz=f[2];const side=dx*co-dz*s;if(side<0.05){const k=0.05-side;dx+=co*k;dz-=s*k;const l=Math.hypot(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;}
+  const dx=f[0],dy=f[1],dz=f[2],side=dx*co-dz*s;
   if(fp){camera.updateWorldMatrix(true,false);const m=camera.matrixWorld.elements;   // el arma, delante de los ojos y un poco abajo a la izquierda, con el brazo estirado
     DBV.set(m[12],m[13],m[14]).addScaledVector(_v1.set(f[0],f[1],f[2]),0.55).addScaledVector(_v1.set(m[0],m[1],m[2]),-0.1).addScaledVector(_v1.set(m[4],m[5],m[6]),-0.105);
     return{wx:DBV.x-dx*0.5,wy:DBV.y-dy*0.5,wz:DBV.z-dz*0.5,dx,dy,dz,k:0.5};}
-  return{wx:c.x+lx*co+lz*s,wy:c.y+y,wz:c.z-lx*s+lz*co,dx,dy,dz,k:0.25};
+  const sx=side<0.05?-1:1;return{wx:c.x+sx*lx*co+lz*s,wy:c.y+y,wz:c.z-sx*lx*s+lz*co,dx,dy,dz,k:0.25,hide:sx<0};
 }
 function driveByGun(){
   const guns=['assault','smg','shotgun','revolver','pistol','rifle','rocket'];
@@ -4261,7 +4262,7 @@ function driveByGun(){
   return DRIVEBY.g;
 }
 function placeDriveBy(){ // se llama justo antes de dibujar: el brazo va pegado a la ventanilla aunque el coche corra
-  if(!DRIVEBY.g||!DRIVEBY.g.visible||!P.car)return;const p=driveByPose(),g=DRIVEBY.g;
+  if(!DRIVEBY.g||!DRIVEBY.g.visible||!P.car)return;const p=driveByPose(),g=DRIVEBY.g;if(p.hide){g.visible=false;return;}
   g.position.set(p.wx+p.dx*p.k,p.wy+p.dy*p.k,p.wz+p.dz*p.k);g.lookAt(p.wx+p.dx*5,p.wy+p.dy*5,p.wz+p.dz*5);
 }
 function updateDriveBy(dt){if(!DRIVEBY.g)return;DRIVEBY.t-=dt;if(DRIVEBY.t<=0||!P.car)DRIVEBY.g.visible=false;}
@@ -4269,7 +4270,6 @@ function playerFire(I){
   const w=P.cur,W=WEAPONS[w];
   if(W.melee){punch();return;}
   if(W.throw){const a=P.ammo[w];if(a.m<=0){sfx('click');P.fireCool=0.3;return;}a.m--;P.fireCool=1/W.rate;P.punchT=0.3;P.yaw=camYaw;throwPetardo();return;}
-  if(P.car&&!P.plane&&!VR.on){const f=camFwd(),c=P.car;if(f[0]*Math.cos(c.h)-f[2]*Math.sin(c.h)<-0.12){P.fireCool=0.25;if(G.time-(G.rwinT||-9)>4){G.rwinT=G.time;toast('Desde el coche solo se dispara por la ventanilla <b>izquierda</b>: gira la cámara a ese lado',2.5);}return;}}
   if(P.reloadT>0)return;const am=P.ammo[w];
   if(am.m<=0){if(am.r>0)startReload();else{sfx('click');P.fireCool=0.3;}return;}
   am.m--;P.fireCool=1/W.rate;G.shots++;P.fireHold=0.7;VMG.kick=1;if(VR.on&&P.car){VR.carGunT=5;VR.carGunW=w;}
@@ -4294,7 +4294,7 @@ function playerFire(I){
   gunNoise(px,pz);
 }
 function punch(){
-  const W=WEAPONS[P.cur];P.punchT=P.cur==='bat'?0.4:0.3;P.punchN=(P.punchN||0)+1;P.fireCool=1/W.rate;P.yaw=aimYawNow();const f=[Math.sin(P.yaw),Math.cos(P.yaw)];let hit=false;
+  const W=WEAPONS[P.cur];P.punchT=P.cur==='bat'?0.4:0.3;P.punchN=(P.punchN||0)+1;P.punchAt=G.time;P.fireCool=1/W.rate;P.yaw=aimYawNow();const f=[Math.sin(P.yaw),Math.cos(P.yaw)];let hit=false;
   if(P.cur==='bat')sfx('swing',1);
   for(const n of NPCS){if(!n.alive)continue;const dx=n.x-P.x,dz=n.z-P.z,d=Math.hypot(dx,dz);if(d>W.range)continue;if((dx*f[0]+dz*f[1])/(d||1)<(P.cur==='bat'?0.1:0.3))continue;
     hit=true;FX.blood(n.x,n.y+1.5,n.z,P.cur==='fists'?4:9);const was=n.alive;hurtNPC(n,W.dmg,'player','punch',f[0]*1.5,f[1]*1.5);const kb2=P.cur==='bat'?1.4:0.5;n.x+=f[0]*kb2;n.z+=f[1]*kb2;
@@ -4491,8 +4491,8 @@ function iseat(p,m,x,z,ey,fl,w,bench,mine){ // en el asiento propio no se pone r
     for(const sx of[-1,1])ibox(p,IMAT.chrome,x+sx*0.07-0.006,x+sx*0.07+0.006,top+0.58,top+0.63,z-0.09,z-0.08);}
 }
 // volante (gira con la dirección), columna y cuadro de relojes con sus agujas
-function iwheel(ig,e,col,face){
-  const w=new THREE.Group();w.position.set(e[0],e[1]-0.33,e[2]+0.40);w.rotation.x=0.5;ig.add(w);const spin=new THREE.Group();w.add(spin);const k=M(0x151515);
+function iwheel(ig,e,col,face){   // el volante va alto: los relojes se ven por dentro del aro
+  const w=new THREE.Group();w.position.set(e[0],e[1]-0.265,e[2]+0.40);w.rotation.x=0.5;ig.add(w);const spin=new THREE.Group();w.add(spin);const k=M(0x151515);
   spin.add(new THREE.Mesh(new THREE.TorusGeometry(0.18,0.022,8,28),k));bx(spin,k,0.34,0.03,0.025,0,0,0);bx(spin,k,0.03,0.17,0.025,0,-0.085,0);bx(spin,M(0x333333),0.09,0.09,0.045,0,0,0);
   rod(w,M(0x222222),0.03,[0,0,0.02],[0,0,Math.max(0.12,face-(e[2]+0.40))+0.05]);
   return{w,spin};
@@ -4573,7 +4573,7 @@ function ensureCarInterior(c){
 function setCarCab(c,hidden){if(!c||!!c.cabHidden===hidden)return;c.cabHidden=hidden;c.mesh.traverse(o=>{if(o.userData.cab)o.visible=!hidden;if(o.userData.int)o.visible=hidden;});}
 
 // ---------------------------------------------------------------- cristales que se rompen al disparar desde dentro
-// el parabrisas (laminado) se queda en su sitio con una telaraña de grietas; las ventanillas y la luna trasera estallan en pedazos
+// el parabrisas (laminado) se agrieta en telaraña al primer tiro y revienta al segundo; las ventanillas y la luna trasera estallan en pedazos
 const GRC=new THREE.Raycaster();let SHAT={};
 function glassSfx(){if(!AU.ctx)return;nBurst(0.7,0.3,4200,0.9,'highpass');nBurst(0.45,0.12,1800,1.2,'bandpass');for(let k=0;k<6;k++)aTone(rr(2400,5200),rr(0.05,0.14),0.06,'triangle',null,rr(0.02,0.35));}
 function crackTex(src,u,v){
@@ -4600,11 +4600,11 @@ function carGlassShot(ox,oy,oz,dx,dy,dz,maxT){
   c.mesh.updateMatrixWorld(true);GRC.set(_v1.set(ox,oy,oz),_v2.set(dx,dy,dz).normalize());GRC.near=0;GRC.far=Math.min(maxT||8,8);
   const h=GRC.intersectObjects(ps,false)[0];if(h)breakPane(h.object,h.uv||{x:0.5,y:0.5},h.point,_v2);
 }
-function breakPane(m,uv,pt,dir){
-  const p=m.userData.pane;if(p.broken)return;p.broken=true;const src=p.base.userData.cv;
-  if(p.kind==='ws')m.material.map=crackTex(src,uv.x,uv.y);
-  else{m.material.map=shatterTex(src.width,src.height);
-    for(let k=0;k<46;k++)PNORM.emit(pt.x+rr(-0.25,0.25),pt.y+rr(-0.15,0.15),pt.z+rr(-0.25,0.25),dir.x*rr(1,4)+rr(-1.5,1.5),rr(-0.5,2),dir.z*rr(1,4)+rr(-1.5,1.5),rr(0.5,1.1),rr(0.02,0.05),0.78,0.88,0.93,0.95,9.8,0.4);}
+function breakPane(m,uv,pt,dir){   // parabrisas: el primer tiro lo agrieta (telaraña), el segundo lo revienta del todo
+  const p=m.userData.pane;if(p.broken)return;const src=p.base.userData.cv,crack=p.kind==='ws'&&!p.cracked;
+  if(crack){p.cracked=true;m.material.map=crackTex(src,uv.x,uv.y);}
+  else{p.broken=true;m.material.map=shatterTex(src.width,src.height);
+    for(let k=0;k<(p.kind==='ws'?80:46);k++)PNORM.emit(pt.x+rr(-0.25,0.25),pt.y+rr(-0.15,0.15),pt.z+rr(-0.25,0.25),dir.x*rr(1,4)+rr(-1.5,1.5),rr(-0.5,2),dir.z*rr(1,4)+rr(-1.5,1.5),rr(0.5,1.1),rr(0.02,0.05),0.78,0.88,0.93,0.95,9.8,0.4);}
   for(let k=0;k<10;k++)PADD.emit(pt.x,pt.y,pt.z,rr(-2,2),rr(-1,2),rr(-2,2),rr(0.15,0.3),0.04,0.9,0.95,1,1,6,1);
   m.material.needsUpdate=true;glassSfx();
 }
@@ -4632,7 +4632,8 @@ function fpCamera(dt){
 }
 const VMG={g:null,w:null,kick:0,m:{}};
 function updateViewModel(dt){
-  const show=VIEW.fp&&!VR.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85);
+  const fT=G.time-(P.punchAt??-99),fists=P.cur==='fists';   // los puños solo asoman al golpear y se quedan 2 s
+  const show=VIEW.fp&&!VR.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85)&&!(fists&&!(fT>=0&&fT<2));
   if(!VMG.g){if(!show)return;VMG.g=new THREE.Group();camera.add(VMG.g);}
   VMG.g.visible=show;if(!show)return;
   if(VMG.w!==P.cur){for(const k in VMG.m)VMG.m[k].visible=false;
@@ -4647,7 +4648,8 @@ function updateViewModel(dt){
   VMG.kick=Math.max(0,VMG.kick-dt*7);const bob=Math.sin(P.anim*2)*0.012*Math.min(1,P.spd/5),r=P.reloadT>0?0.5:0;
   const two=WEAPONS[P.cur].two,az=two?-0.46:-0.5,ay=-((VMG.m[P.cur].userData.top||0.06)+0.016),bk=bob*(1-aimK*0.8);   // el alza queda justo bajo la mira
   vmMelee();
-  VMG.g.position.set(lerp(0.2,0.0,aimK)+bk,lerp(-0.2,ay,aimK)+Math.abs(bk)*0.6-r*0.12,lerp(-0.42,az,aimK)+VMG.kick*0.05);VMG.g.rotation.set(VMG.kick*0.2+r*0.6,lerp(0,0.04,aimK),0);
+  const dn=fists?smoothstep(1.7,2,fT)*0.3:0;   // al final bajan y desaparecen
+  VMG.g.position.set(lerp(0.2,0.0,aimK)+bk,lerp(-0.2,ay,aimK)+Math.abs(bk)*0.6-r*0.12-dn,lerp(-0.42,az,aimK)+VMG.kick*0.05);VMG.g.rotation.set(VMG.kick*0.2+r*0.6,lerp(0,0.04,aimK),0);
 }
 
 // golpes en primera persona: puñetazos alternando los dos puños, tajos con la navaja (a un lado y al otro) y batazos
@@ -4659,9 +4661,10 @@ function vmMelee(){
     if(on){const f=alt?L:R,sx=alt?1:-1;f.position.x+=sx*0.12*s;f.position.y+=0.06*s;f.position.z-=0.32*s;}
     // cada brazo apunta del puño al hombro, así se ve el antebrazo y no la manga de frente
     const gp=VMG.g.position;for(const[f,sx]of[[R,1],[L,-1]]){_v3.set(sx*0.19-gp.x,-0.34-gp.y,0.16-gp.z).sub(f.position).normalize();f.quaternion.setFromUnitVectors(AX_Z,_v3);}}
-  else if(P.cur==='knife'){const d=alt?-1:1;
-    if(on){g.rotation.set(0.25-0.1*s,d*lerp(0.95,-0.95,e),-d*0.55*s);g.position.set(d*lerp(0.08,-0.2,e),0.03*s,-0.14*s);}
-    else{g.rotation.set(0.28,0.12,0);g.position.set(0,0,0);}}
+  else if(P.cur==='knife'){   // tajo de arriba abajo: levanta la navaja con la punta arriba y la baja de golpe hacia delante
+    const K=[[0.28,0.12,0,0,0],[1.2,0,-0.1,0.22,0.06],[-0.6,0,-0.12,-0.07,-0.2]];let a=K[0],b=K[0],u=0;
+    if(on){if(t<0.35){a=K[0];b=K[1];u=t/0.35;}else if(t<0.65){a=K[1];b=K[2];u=(t-0.35)/0.3;}else{a=K[2];b=K[0];u=(t-0.65)/0.35;}u=u*u*(3-2*u);}
+    g.rotation.set(lerp(a[0],b[0],u),lerp(a[1],b[1],u),0);g.position.set(lerp(a[2],b[2],u),lerp(a[3],b[3],u),lerp(a[4],b[4],u));}
   else if(P.cur==='bat'){
     if(on){g.rotation.set(lerp(1.05,0.05,Math.min(1,e*1.6)),lerp(0.7,-1.5,e),-0.35*(1-e));g.position.set(lerp(0.05,-0.25,e),lerp(0.04,-0.02,e),-0.1*s);}
     else{g.rotation.set(1.05,0.25,-0.35);g.position.set(0.05,0.04,0.08);}}
