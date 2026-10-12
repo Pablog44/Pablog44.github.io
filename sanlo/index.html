@@ -1924,7 +1924,7 @@ function snakeUpdate(dt,I){
   const push=v=>{const last=SNAKE.q.length?SNAKE.q[SNAKE.q.length-1]:SNAKE.dir;if((v[0]===-last[0]&&v[1]===-last[1])||(v[0]===last[0]&&v[1]===last[1]))return;if(SNAKE.q.length<3)SNAKE.q.push(v);};
   if(d.u&&!SNAKE.prev.u)push([0,-1]);if(d.dn&&!SNAKE.prev.dn)push([0,1]);if(d.l&&!SNAKE.prev.l)push([-1,0]);if(d.r&&!SNAKE.prev.r)push([1,0]);SNAKE.prev=d;
   if(SNAKE.over){SNAKE.flash+=dt;if(I.jump||(VR.on&&I.enter)||(SNAKE.flash>0.8&&(d.u||d.dn||d.l||d.r)&&!SNAKE.started)){snakeReset();sfx('click');}snakeDraw();return;}
-  const step=Math.max(0.055,0.13-SNAKE.score*0.0012);SNAKE.t+=dt;
+  const step=0.13;/* velocidad fija: comer no la aumenta */SNAKE.t+=dt;
   while(SNAKE.t>=step&&!SNAKE.over){SNAKE.t-=step;if(SNAKE.q.length)SNAKE.dir=SNAKE.q.shift();
     const h=SNAKE.body[0],nh=[h[0]+SNAKE.dir[0],h[1]+SNAKE.dir[1]];
     const eat=SNAKE.food&&nh[0]===SNAKE.food[0]&&nh[1]===SNAKE.food[1];
