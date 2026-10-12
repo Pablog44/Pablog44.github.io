@@ -1896,18 +1896,18 @@ function snakeEnter(){
 function snakeView(){
   if(VR.on){SNAKE.el.style.display='none';return;}
   SNAKE.el.style.display=SNAKE.tv?'none':'block';
-  SNAKE.cap.innerHTML=`${kb('Flechas o WASD','cruceta o stick','joystick')}: mover · ${kb('Espacio','A','Saltar')}: otra partida · ${kb('V','R3','Vista')}: jugar en la tele del salón · ${kb('F','Y','Salir')}: dejar la consola`;
-  if(SNAKE.tv)hint(`Jugando en la <b>tele del salón</b>. ${kb('V','R3','Vista')} para volver a la pantalla grande · ${kb('F','Y','Salir')} para dejar la consola`,6);
+  SNAKE.cap.innerHTML=`${kb('Flechas o WASD','cruceta o stick izq.','joystick')}: mover · ${kb('Espacio','A','Saltar')}: otra partida · ${kb('V','R3','Vista')}: jugar en primera persona viendo la tele · ${kb('F','Y','Salir')}: dejar la consola`;
+  P.h.g.visible=!SNAKE.tv;
+  if(SNAKE.tv){camYaw=P.yaw;camPitch=-0.1;hint(`<b>Primera persona</b>: juegas mirando la tele del salón. Gira la vista con ${kb('el ratón','el stick derecho','el dedo')} para ver la casa (${kb('clic derecho','LT','Apuntar')}: acercar). ${kb('V','R3','Vista')}: pantalla grande · ${kb('F','Y','Salir')}: dejar la consola`,7);}
   else{camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
 }
-function snakeCamera(){   // sentado en el sofá, la tele llena la pantalla
-  const tx=-495.41,ty=CASA.y+0.95,tz=-1053.5,cx=-492.75,cy=CASA.y+1.22,d=Math.hypot(tx-cx,ty-cy),asp=camera.aspect||1.6;
-  const vf=Math.max(2*Math.atan(Math.tan(Math.atan(1.2/d))/asp),2*Math.atan(0.62/d))*180/Math.PI;
-  camera.position.set(cx,cy,tz);camera.up.set(0,1,0);camera.lookAt(tx,ty,tz);camPos.x=cx;camPos.y=cy;camPos.z=tz;setNear(0.1);
-  if(Math.abs(camera.fov-vf)>0.01){camera.fov=vf;fovNow=vf;camera.updateProjectionMatrix();}
+function snakeCamera(){   // primera persona: los ojos de Nacho sentado en el sofá; se puede mirar alrededor
+  const cx=P.x+Math.sin(P.yaw)*0.12,cz=P.z+Math.cos(P.yaw)*0.12,cy=P.y+1.38;
+  camera.position.set(cx,cy,cz);camera.rotation.set(camPitch,camYaw+Math.PI,0);camPos.x=cx;camPos.y=cy;camPos.z=cz;setNear(0.08);
+  const vf=SNAKE.zoom?24:46;fovNow+=(vf-fovNow)*0.18;if(Math.abs(camera.fov-fovNow)>0.01){camera.fov=fovNow;camera.updateProjectionMatrix();}
 }
 function snakeExit(){
-  if(SNAKE.tv&&!VR.on){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
+  if(SNAKE.tv&&!VR.on){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();P.h.g.visible=true;camPitch=-0.12;}
   SNAKE.on=false;if(SNAKE.el)SNAKE.el.style.display='none';if(CASA.tvMesh&&CASA.tv){CASA.tvMesh.material.map=CASA.tv.tex;CASA.tvMesh.material.needsUpdate=true;}
   P.x=-492.75;P.z=-1053.5;P.y=surfaceH(P.x,P.z);P.h.body.position.y=0;P.h.lLeg.rotation.x=P.h.rLeg.rotation.x=0;save();sfx('click');
 }
@@ -1915,6 +1915,9 @@ function snakeUpdate(dt,I){
   if(P.dead||P.car){snakeExit();return;}
   if(VR.on?I.view:(I.enter||I.skip)){snakeExit();return;}   // en VR se sale con B (A es «otra partida»)
   if(!VR.on&&I.view){SNAKE.tv=!SNAKE.tv;try{localStorage.setItem('gte-snake-tv',SNAKE.tv?'1':'0');}catch(e){}snakeView();sfx('click');}
+  // mirar alrededor en primera persona (las flechas son para la serpiente: solo ratón, stick derecho o dedo)
+  if(SNAKE.tv&&!VR.on){const zs=Math.max(0.35,fovNow/62),lx=(MOUSE.dx*0.0022+TOUCH.ldx*0.0045+PAD.ax[2]*dt*2.7)*sens*zs,ly=(MOUSE.dy*0.0022+TOUCH.ldy*0.0045+PAD.ax[3]*dt*2.0)*sens*zs;
+    camYaw-=lx;camPitch=clamp(camPitch-ly,-1.2,1.0);SNAKE.zoom=!!I.aim;}
   // sentado en el sofá
   P.vx=P.vz=0;P.h.g.position.set(P.x,P.y+0.05,P.z);P.h.g.rotation.y=P.yaw;animHuman(P.h,0,0,'sit');
   const k=c=>!!KEYS[c],d={u:k('ArrowUp')||k('KeyW')||(I.my||0)>0.5||padH(12),dn:k('ArrowDown')||k('KeyS')||(I.my||0)<-0.5||padH(13),l:k('ArrowLeft')||k('KeyA')||(I.mx||0)<-0.5||padH(14),r:k('ArrowRight')||k('KeyD')||(I.mx||0)>0.5||padH(15)};
