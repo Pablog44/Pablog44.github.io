@@ -1682,7 +1682,7 @@ function garageStore(g){
   const c=CARS.find(c=>!c.dead&&c!==P.car&&c.x>g.x0+0.2&&c.x<g.x1-0.2&&c.z>g.z0+0.2&&c.z<g.z1-0.2);
   const prev=g.slot;
   g.car=c||null;
-  if(c){c.temp=false;c.stored=true;c.ai=null;c.parkBrake=true;c.vx=c.vz=0;g.slot={type:c.type,col:c.paint.color.getHex()};if(!prev||prev.type!==g.slot.type||prev.col!==g.slot.col)toast(`<b>${c.T.name}</b> guardado en el garaje de casa`,2.6);}
+  if(c){c.temp=false;c.stored=true;c.ai=null;c.parkBrake=true;c.vx=c.vz=0;g.slot={type:c.type,col:c.paint.color.getHex(),pw:c.pw||0,sp:!!c.spoil,stk:c.stkId||null};if(!prev||prev.type!==g.slot.type||prev.col!==g.slot.col)toast(`<b>${c.T.name}</b> guardado en el garaje de casa`,2.6);}
   else g.slot=null;
   save();
 }
@@ -1716,7 +1716,7 @@ function casaInteract(I){
 // coches guardados al cargar la partida (aparcados dentro, mirando a la puerta)
 function casaLoad(slots){
   for(let i=0;i<GAR.length;i++){const g=GAR[i],s=slots&&slots[i];g.slot=null;if(g.car&&g.car!==P.car&&CARS.includes(g.car)&&g.car.stored)g.car.remove();g.car=null;if(!s||!CAR_TYPES[s.type])continue;
-    const c=new Car(s.type,(g.x0+g.x1)/2,(g.z0+g.z1)/2-0.4,0,s.col);c.parkBrake=true;c.stored=true;g.car=c;g.slot={type:s.type,col:s.col};}
+    const c=new Car(s.type,(g.x0+g.x1)/2,(g.z0+g.z1)/2-0.4,0,s.col);c.parkBrake=true;c.stored=true;if(s.pw)c.tune(s.pw);if(s.sp)c.setSpoiler(true);if(s.stk&&c.sticker)c.sticker(s.stk);g.car=c;g.slot={...s};}
 }
 // guardado: coches de los garajes y ropa comprada (antes de empezar la partida se conserva lo que ya había guardado)
 let WEAR_PROBE=null;
@@ -2403,12 +2403,13 @@ function makeHuman(o){
   if(o.chain)hp_(body,0xd8b13c,0.24,0.04,0.02,0,1.5,0.146);
   if(o.badge){hp_(body,0xc62828,0.03,0.36,0.02,0.09,1.4,0.146);hp_(body,0xc62828,0.03,0.36,0.02,-0.09,1.4,0.146);hp_(body,0xffffff,0.12,0.09,0.02,0,1.2,0.15);}
   if(o.camera)hp_(body,0x151515,0.16,0.11,0.09,0,1.28,0.19);
-  if(o.ruff){const r=new THREE.Mesh(GEO.ruff,M(0xf6f4ee));r.position.set(0,1.6,0);body.add(r);}
+  if(o.ruff){const r=new THREE.Mesh(GEO.ruff,M(0xf6f4ee));r.position.set(0,1.61,0);body.add(r);}
   if(o.neck)addNecklace(body,o.neck);
   const lArm=new THREE.Group(),rArm=new THREE.Group();lArm.position.set(0.34,1.52,0);rArm.position.set(-0.34,1.52,0);body.add(lArm);body.add(rArm);
   for(const A of [lArm,rArm]){hp_(A,o.sleeve||o.shirt,0.15,0.58,0.17,0,-0.29,0,true);hp_(A,o.skin,0.13,0.13,0.14,0,-0.63,0);}
   const mount=new THREE.Group();mount.position.set(0,-0.64,0.03);mount.rotation.x=Math.PI/2;rArm.add(mount);
-  const head=new THREE.Group();head.position.set(0,1.6,0);body.add(head);
+  hp_(body,o.skin,0.15,0.14,0.15,0,1.6,0);   // cuello
+  const head=new THREE.Group();head.position.set(0,1.626,0);body.add(head);
   hp_(head,o.skin,0.3,0.32,0.3,0,0.17,0,true);
   hp_(head,0x1a1a1a,0.2,0.045,0.02,0,0.2,0.151);
   if(o.beard)hp_(head,o.beard,0.26,0.14,0.05,0,0.03,0.14);
@@ -2495,6 +2496,7 @@ Object.assign(WEAPONS,{
 });
 const WORDER=['fists','knife','bat','pistol','revolver','shotgun','smg','assault','rifle','rocket','petardo'];
 const NPCW={pistol:{dmg:6,pellets:1,rate:1.3,acc:0.42,range:70},shotgun:{dmg:3.6,pellets:6,rate:0.75,acc:0.55,range:32},smg:{dmg:3.4,pellets:1,rate:7,acc:0.28,range:80},revolver:{dmg:13,pellets:1,rate:0.7,acc:0.45,range:80},assault:{dmg:4.6,pellets:1,rate:6,acc:0.3,range:100},rifle:{dmg:20,pellets:1,rate:0.45,acc:0.55,range:160}};
+function heldWeaponMesh(w){const m=makeWeaponMesh(w);if(!(WEAPONS[w]&&WEAPONS[w].melee))return m;const o=new THREE.Group();m.rotation.x=-Math.PI/2-(w==='bat'?0.9:0.35);o.add(m);return o;}   // cuerpo a cuerpo: el puño agarra el mango y la hoja sale perpendicular al brazo
 function makeWeaponMesh(w){
   const g=new THREE.Group();const dk=0x2b2c30,dk2=0x3b3d42,wood=0x6b4423;
   if(w==='pistol'){hp_(g,dk,0.05,0.07,0.26,0,0.03,0.08);hp_(g,dk2,0.05,0.15,0.07,0,-0.05,-0.02);}
@@ -2543,6 +2545,8 @@ const CAR_TYPES={
   ambulancia:{name:'Ambulancia del Real Sitio',len:5.2,wid:2.05,hgt:2.5,maxV:36,acc:8,turn:1.5,shape:'van',hp:160,extra:'amb'},
   monster:{name:'Monster truck «El Morlaco»',len:4.8,wid:2.5,hgt:3.15,maxV:34,acc:11,turn:1.45,shape:'monster',hp:340,mass:4,wr:1.0,wx:1.42,wz:1.36},
   todoterreno:{name:'Todoterreno Serrano',len:4.5,wid:1.95,hgt:1.85,maxV:38,acc:9.5,turn:1.6,shape:'car',cab:0.55,cabZ:-0.08,hp:150,extra:'spare'},
+  pickup:{name:'Pickup «El Capataz»',len:5.0,wid:1.95,hgt:1.74,maxV:40,acc:10,turn:1.55,shape:'car',cab:0.36,cabZ:0.15,hp:165,wr:0.41,extra:'pickup'},
+  camper:{name:'Furgoneta Camper «La Sierra»',len:4.6,wid:1.9,hgt:2.15,maxV:33,acc:7.5,turn:1.6,shape:'van',hp:150,extra:'camper'},
 };
 const CAR_COLS=[0xb8322c,0x2d5d9f,0xe8e4d8,0x2f7a4d,0x1d1f24,0xd9a531,0x8e9aa6,0x6b2f63,0xc2672b,0x4b6f8c];
 let CHURRO_TEX=null;
@@ -2572,7 +2576,7 @@ function buildCarMesh(type,color){
     for(const sx of[-1,1])for(const sz of[-1,1]){const m=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.12,1.0,8),yel);m.position.set(sx*(T.wx-0.55),1.25,sz*T.wz);m.rotation.z=sx*0.5;g.add(m);}
   }else if(T.shape==='car'){
     const bh=H*0.42,ch=H-cl-bh-0.06,cL=L*T.cab,cz=T.cabZ*L,zf=cz+cL/2,zr=cz-cL/2,sk=W*0.08+0.01;
-    add(paint,W,bh,L/2-zf,0,cl+bh/2,(L/2+zf)/2,true);add(paint,W,bh,zr+L/2,0,cl+bh/2,(zr-L/2)/2,true);
+    add(paint,W,bh,L/2-zf,0,cl+bh/2,(L/2+zf)/2,true);if(T.extra!=='pickup')add(paint,W,bh,zr+L/2,0,cl+bh/2,(zr-L/2)/2,true);
     for(const sx of[-1,1])add(paint,sk,bh,cL,sx*(W/2-sk/2),cl+bh/2,cz,true);add(paint,W-2*sk,0.12,cL,0,cl+0.06,cz);
     add(paint,W*0.98,0.12,L*0.28,0,cl+bh+0.02,L*0.34);
     add(MAT.glass,W*0.84,ch,cL,0,cl+bh+ch/2,cz,true).userData.cab=1;
@@ -2586,6 +2590,20 @@ function buildCarMesh(type,color){
       const b=new THREE.Mesh(BOXG,new THREE.MeshLambertMaterial({color:0x1030a0,emissive:0x2050ff,emissiveIntensity:0.2}));b.scale.set(W*0.28,0.14,0.26);b.position.set(-W*0.15,cl+bh+ch+0.2,cz);b.userData.cab=1;g.add(b);
       const r=new THREE.Mesh(BOXG,new THREE.MeshLambertMaterial({color:0xa01010,emissive:0xff2020,emissiveIntensity:0.2}));r.scale.set(W*0.28,0.14,0.26);r.position.set(W*0.15,cl+bh+ch+0.2,cz);r.userData.cab=1;g.add(r);siren=[b,r];}
     if(T.extra==='spoiler'){add(dark,W*0.9,0.06,0.35,0,cl+bh+0.35,-L/2+0.25);for(const sx of[-1,1])add(dark,0.06,0.3,0.1,sx*W*0.35,cl+bh+0.18,-L/2+0.25);}
+    if(T.extra==='pickup'){   // caja de carga abierta, barra antivuelco, caja de herramientas, rotativo naranja, defensa delantera y estribos
+      const bl=zr+L/2,bz=(zr-L/2)/2,wt=0.07,bt=cl+bh+0.1,fl0=cl+0.32,al=M(0xb8bcc2),chrome=M(0xc9cdd2);
+      add(paint,W,fl0-cl,bl,0,(cl+fl0)/2,bz,true);add(M(0x2a2b2e),W-2*wt,0.03,bl-0.1,0,fl0+0.015,bz);
+      for(const sx of[-1,1])add(paint,wt,bt-fl0,bl,sx*(W/2-wt/2),(fl0+bt)/2,bz,true);
+      add(paint,W,bt-fl0,wt,0,(fl0+bt)/2,-L/2+wt/2,true);add(dark,W*0.5,0.06,0.03,0,bt-0.12,-L/2-0.015);
+      for(const sx of[-1,1])add(dark,wt+0.02,0.04,bl,sx*(W/2-wt/2),bt+0.02,bz);
+      add(al,W-2*wt-0.02,0.32,0.42,0,fl0+0.16,zr-0.24,true);add(dark,W*0.5,0.04,0.02,0,fl0+0.26,zr-0.46);
+      const beam=(x,ya,za,yb,zb,t)=>{const dy=yb-ya,dz=zb-za,l=Math.hypot(dy,dz),m=add(dark,t,t,l,x,(ya+yb)/2,(za+zb)/2);m.rotation.x=Math.atan2(-dy,dz);return m;};
+      for(const sx of[-1,1]){const x=sx*(W/2-wt/2);add(dark,0.08,0.66,0.08,x,bt+0.31,zr-0.12);beam(x,bt+0.6,zr-0.14,bt+0.03,zr-0.95,0.06);add(dark,0.14,0.03,0.14,x,bt+0.03,zr-0.12);add(dark,0.12,0.03,0.12,x,bt+0.03,zr-0.95);}
+      add(dark,W-wt,0.08,0.08,0,bt+0.62,zr-0.12);
+      add(ME(0xff9a1a,0xff7a00,0.9),0.22,0.13,0.22,0,cl+bh+ch+0.08,cz).userData.cab=1;add(dark,0.28,0.04,0.28,0,cl+bh+ch+0.015,cz).userData.cab=1;
+      {const zb=L/2+0.13;add(chrome,W*0.72,0.07,0.07,0,cl+0.36,zb);add(chrome,W*0.72,0.07,0.07,0,cl+0.68,zb);for(const sx of[-1,1]){add(chrome,0.07,0.5,0.07,sx*W*0.3,cl+0.47,zb);add(dark,0.08,0.08,0.16,sx*W*0.3,cl+0.2,L/2+0.06);add(dark,0.07,0.07,0.1,sx*W*0.3,cl+0.6,L/2+0.06);}}
+      {const wz0=L/2-Math.min(0.85,L*0.2),sl=wz0-0.62;for(const sx of[-1,1]){add(dark,0.22,0.05,2*sl,sx*(W/2+0.1),cl+0.1,0);for(const sz of[-1,1])add(dark,0.1,0.06,0.12,sx*(W/2+0.02),cl+0.1,sz*(sl-0.25));for(const sz of[-1,1])add(dark,0.1,0.28,0.95,sx*(W/2+0.02),cl+0.42,sz*wz0);}}
+      for(let k=0;k<3;k++)add(M([0xd8cdb2,0xcfc3a6,0xe0d6bd][k]),0.45,0.18,0.62,-W*0.24+k*0.24,fl0+0.1+(k===1?0.17:0),zr-0.95-(k%2)*0.2);}
     if(T.extra==='spare'){const s=new THREE.Mesh(GEO.wheel,M(0x151515));s.rotation.y=Math.PI/2;s.position.set(0,cl+bh*0.7,-L/2-0.18);g.add(s);}
   }else if(T.shape==='van'){
     const bh=H-cl;add(paint,W,bh,L,0,cl+bh/2,0,true);
@@ -2598,6 +2616,23 @@ function buildCarMesh(type,color){
       for(const sx of[-1,1]){const s=new THREE.Mesh(new THREE.PlaneGeometry(2.6,0.5),new THREE.MeshLambertMaterial({map:at}));s.position.set(sx*(W/2+0.02),cl+bh*0.72,-0.5);s.rotation.y=sx*Math.PI/2;g.add(s);}
       const b=new THREE.Mesh(BOXG,new THREE.MeshLambertMaterial({color:0x1030a0,emissive:0x2050ff,emissiveIntensity:0.2}));b.scale.set(W*0.3,0.16,0.3);b.position.set(-W*0.16,H+0.08,L/2-0.9);g.add(b);
       const r2=new THREE.Mesh(BOXG,new THREE.MeshLambertMaterial({color:0x1030a0,emissive:0x2050ff,emissiveIntensity:0.2}));r2.scale.set(W*0.3,0.16,0.3);r2.position.set(W*0.16,H+0.08,L/2-0.9);g.add(r2);siren=[b,r2];
+    }
+    if(T.extra==='camper'){   // dos tonos, ventanillas corridas, uve delantera, faros redondos, parachoques cromados y baca con tabla de surf
+      const cream=M(0xf3ecdc),chrome=M(0xc9cdd2),y0=cl+bh*0.5;
+      add(cream,W*1.003,cl+bh-y0,L*1.002,0,(y0+cl+bh)/2,0,true);
+      for(const sx of[-1,1]){add(MAT.glass,0.02,bh*0.26,L-2.1,sx*(W/2+0.008),cl+bh*0.74,-0.35).userData.cab=1;for(const zz of[-L/2+0.55,-0.35,L/2-1.25])add(cream,0.03,bh*0.27,0.08,sx*(W/2+0.012),cl+bh*0.74,zz);}
+      add(MAT.glass,W*0.8,bh*0.22,0.02,0,cl+bh*0.74,-L/2-0.008).userData.cab=1;
+      if(!STK_CACHE.camperV)STK_CACHE.camperV=stkCanvas(g=>{g.clearRect(0,0,256,96);g.fillStyle='#f3ecdc';g.beginPath();g.moveTo(10,0);g.lineTo(128,78);g.lineTo(246,0);g.lineTo(206,0);g.lineTo(128,52);g.lineTo(50,0);g.fill();g.beginPath();g.arc(128,40,17,0,TAU);g.fill();g.strokeStyle='#2c2a28';g.lineWidth=4;g.beginPath();g.arc(128,40,12,0,TAU);g.moveTo(128,28);g.lineTo(128,52);g.moveTo(128,40);g.lineTo(119,49);g.moveTo(128,40);g.lineTo(137,49);g.stroke();});
+      {const v=new THREE.Mesh(new THREE.PlaneGeometry(W*0.96,bh*0.46),new THREE.MeshLambertMaterial({map:STK_CACHE.camperV,transparent:true,alphaTest:0.2}));v.position.set(0,cl+bh*0.26,L/2+0.012);g.add(v);}
+      for(const sx of[-1,1]){const h=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.06,14),head);h.rotation.x=Math.PI/2;h.position.set(sx*(W/2-0.3),cl+bh*0.28,L/2+0.03);g.add(h);
+        const r=new THREE.Mesh(new THREE.TorusGeometry(0.135,0.025,6,16),chrome);r.position.set(sx*(W/2-0.3),cl+bh*0.28,L/2+0.05);g.add(r);}
+      add(chrome,W+0.08,0.1,0.12,0,cl+0.1,L/2+0.06);add(chrome,W+0.08,0.1,0.12,0,cl+0.1,-L/2-0.06);
+      for(const sx of[-1,1])for(const sz of[-1,1])add(dark,0.06,0.12,0.06,sx*(W/2-0.3),H+0.06,sz*(L/2-0.55));
+      for(const sx of[-1,1])add(dark,0.05,0.05,L-0.9,sx*(W/2-0.3),H+0.13,0);for(const sz of[-1,0,1])add(dark,W-0.55,0.04,0.05,0,H+0.13,sz*(L/2-0.6));
+      add(M(0xe8702a),0.55,0.07,2.5,-0.18,H+0.2,0,true);add(M(0xf4f1e6),0.08,0.075,2.3,-0.18,H+0.201,0);add(M(0x2d5d9f),0.5,0.32,0.62,0.42,H+0.31,-0.6,true);add(M(0x6b4a2e),0.42,0.26,0.5,0.42,H+0.28,0.35,true);
+      if(!STK_CACHE.camperF)STK_CACHE.camperF=stkCanvas(g=>{g.clearRect(0,0,256,96);const F=(x,y,r,c)=>{g.fillStyle=c;for(let k=0;k<5;k++){const a=k/5*TAU;g.beginPath();g.arc(x+Math.cos(a)*r*0.6,y+Math.sin(a)*r*0.6,r*0.5,0,TAU);g.fill();}g.fillStyle='#f5d33a';g.beginPath();g.arc(x,y,r*0.38,0,TAU);g.fill();};
+        F(30,40,26,'#e57fa3');F(92,62,20,'#e8702a');F(150,36,24,'#5db86c');F(214,58,22,'#3d7cc9');g.fillStyle='#2c2a28';g.font='bold 15px Georgia,serif';g.textAlign='center';g.fillText('PAZ Y SIERRA',128,92);});
+      for(const sx of[-1,1]){const f=new THREE.Mesh(new THREE.PlaneGeometry(2.0,0.75),new THREE.MeshLambertMaterial({map:STK_CACHE.camperF,transparent:true,alphaTest:0.2}));f.position.set(sx*(W/2+0.012),cl+bh*0.27,-0.25);f.rotation.y=sx*Math.PI/2;g.add(f);}
     }
     if(T.extra==='geo'){
       const gt=signTex(['POLICÍA · G.E.O.'],512,96,'#16181b','#f2f2f2','bold 56px Arial,sans-serif');
@@ -2645,7 +2680,7 @@ class Car{
     this.hp=T.hp;this.dead=false;this.burn=-1;this.driver=null;this.ai=null;this.steerV=0;this.wheelRot=0;this.thr=0;this.sirenOn=false;
     if(color===undefined)color=type==='taxi'||type==='poli'||type==='ambulancia'?0xf2f2ee:(type==='carroza'?0x141418:(type==='toro'?0xc4161c:rpick(CAR_COLS)));
     this.color=color;const m=buildCarMesh(type,color);this.mesh=m.g;this.wheels=m.wheels;this.front=m.front;this.paint=m.paint;this.tail=m.tail;this.siren=m.siren;
-    scene.add(this.mesh);this.id=++CAR_ID;CARS.push(this);this.smokeT=0;this.lastCrash=0;this.vy=0;this.air=false;this.airT=0;this.takeoff=null;this.lastTrain=-9;this.settle();
+    scene.add(this.mesh);this.id=++CAR_ID;CARS.push(this);this.smokeT=0;this.lastCrash=0;this.pw=0;this.am=1;this.vm=1;this.spoil=false;this.vy=0;this.air=false;this.airT=0;this.takeoff=null;this.lastTrain=-9;this.settle();
   }
   groundSample(){const T=this.T,Lh=T.len*0.4,Wh=T.wid*0.45,sf=Math.sin(this.h),cf=Math.cos(this.h);
     const hF=surfaceH(this.x+sf*Lh,this.z+cf*Lh),hB=surfaceH(this.x-sf*Lh,this.z-cf*Lh),hL=surfaceH(this.x+cf*Wh,this.z-sf*Wh),hR=surfaceH(this.x-cf*Wh,this.z+sf*Wh);
@@ -2683,7 +2718,7 @@ class Car{
     sf=Math.sin(this.h);cf=Math.cos(this.h);const rx=-cf,rz=sf;
     vf=this.vx*sf+this.vz*cf;let vl=this.vx*rx+this.vz*rz;
     const thr=inp.thr;
-    if(thr>0){if(vf<-0.5)vf+=20*thr*dt;else vf+=T.acc*thr*dt*Math.max(0,1-Math.max(0,vf)/T.maxV);}
+    if(thr>0){if(vf<-0.5)vf+=20*thr*dt;else vf+=T.acc*this.am*thr*dt*Math.max(0,1-Math.max(0,vf)/(T.maxV*this.vm));}
     else if(thr<0){if(vf>0.5)vf+=20*thr*dt;else vf+=T.acc*0.6*thr*dt*Math.max(0,1-Math.max(0,-vf)/(T.maxV*0.35));}
     vf-=vf*0.06*dt;vf-=Math.sign(vf)*Math.min(Math.abs(vf),(thr===0?2.2:0.3)*dt);
     if(inp.hand)vf-=Math.sign(vf)*Math.min(Math.abs(vf),6.5*dt);
@@ -2724,6 +2759,7 @@ class Car{
       for(let k=0;k<2;k++){const p={x:cs[k][0],z:cs[k][1]};const h=pushOutOBB(o,p,r);if(!h)continue;const dx=p.x-cs[k][0],dz=p.z-cs[k][1];this.x+=dx;this.z+=dz;cs[1-k][0]+=dx;cs[1-k][1]+=dz;
         if(o.v>1.5){this.vx+=h.nx*o.v*0.9;this.vz+=h.nz*o.v*0.9;if(G.time-this.lastTrain>1){this.lastTrain=G.time;this.damage(o.v*7,null);sfxAt('crash',this.x,this.y,this.z,1);if(this.driver==='player')shake(0.9);}}
         else{const vn=this.vx*h.nx+this.vz*h.nz;if(vn<0){this.vx-=h.nx*vn*1.2;this.vz-=h.nz*vn*1.2;impact=Math.max(impact,-vn);}}}}
+    impact=Math.max(impact,carAirHits(this,cs,r));
     if(impact>5&&G.time-this.lastCrash>0.25){this.lastCrash=G.time;this.damage((impact-5)*3.2,null);sfxAt('crash',this.x,this.y,this.z,Math.min(1,impact/18));if(this.driver==='player')shake(Math.min(0.9,impact/22));}
   }
   damage(a,by){
@@ -2745,6 +2781,23 @@ class Car{
     const braking=(this.thr<0&&this.spd>0.5)||(this.thr>0&&this.spd<-0.5);this.tail.emissiveIntensity=this.dead?0:(braking?1.2:0.25);
     if(this.siren){const on=this.sirenOn&&!this.dead;const ph=(G.time*4)%2<1;this.siren[0].material.emissiveIntensity=on&&ph?2.2:0.15;this.siren[1].material.emissiveIntensity=on&&!ph?2.2:0.15;}
   }
+  // potencia del taller (nivel 0, 1 o 2): más aceleración y más punta; con el motor tocado lleva escapes cromados
+  tune(lv){this.pw=lv||0;this.am=[1,1.35,1.75][this.pw];this.vm=[1,1.15,1.32][this.pw];
+    if(this.exMesh){this.mesh.remove(this.exMesh);this.exMesh=null;}if(!this.pw||this.T.shape==='golf')return;
+    const T=this.T,g=new THREE.Group(),ch=new THREE.MeshPhongMaterial({color:0xd8dce0,shininess:110,specular:0xffffff}),y=T.shape==='monster'?1.05:0.36;
+    for(const sx of(this.pw>1?[-1,1]:[1])){const r=this.pw>1?0.065:0.05,p=new THREE.Mesh(new THREE.CylinderGeometry(r,r,0.3,10),ch);p.rotation.x=Math.PI/2;p.position.set(sx*T.wid*0.28,y,-T.len/2-0.06);g.add(p);
+      const k=new THREE.Mesh(new THREE.CircleGeometry(r*0.78,10),M(0x111111));k.position.set(sx*T.wid*0.28,y,-T.len/2-0.211);k.rotation.y=Math.PI;g.add(k);}
+    this.mesh.add(g);this.exMesh=g;}
+  // alerón trasero (para los que no lo traen de fábrica)
+  setSpoiler(on){if(this.spMesh){this.mesh.remove(this.spMesh);this.spMesh=null;}this.spoil=!!on;if(!on)return;
+    const T=this.T,L=T.len,W=T.wid,H=T.hgt,g=new THREE.Group(),dk=M(0x1e1f22);let y,z,legs;
+    if(T.shape==='car'){const bh=H*0.42;legs=T.extra==='pickup'?0.3:0.34;y=0.3+bh+(T.extra==='pickup'?0.1:0)+legs;z=-L/2+0.26;}
+    else if(T.shape==='van'){legs=0.2;y=H+legs;z=-L/2+0.32;}
+    else if(T.shape==='monster'){legs=0.55;y=1.18+0.78+legs;z=-L/2+0.3;}
+    else return;
+    const w=new THREE.Mesh(BOXG,this.paint);w.scale.set(W*0.92,0.05,0.38);w.position.set(0,y,z);w.rotation.x=-0.12;w.castShadow=true;g.add(w);
+    for(const sx of[-1,1]){const e=new THREE.Mesh(BOXG,dk);e.scale.set(0.035,0.17,0.44);e.position.set(sx*W*0.46,y+0.02,z);g.add(e);const l=new THREE.Mesh(BOXG,dk);l.scale.set(0.06,legs,0.1);l.position.set(sx*W*0.3,y-legs/2,z+0.04);g.add(l);}
+    this.mesh.add(g);this.spMesh=g;}
   sticker(id){
     if(this.stk){for(const m of this.stk)this.mesh.remove(m);}this.stk=[];this.stkId=id;if(!id)return;
     const T=this.T,W=T.wid,L=T.len,van=T.shape!=='car',y=van?T.hgt*0.42:0.3+T.hgt*0.21;
@@ -2922,7 +2975,8 @@ let locked=false,lockOK=true,wasLocked=false,lockT=0,rawOK=true,lockPromise=fals
 addEventListener('keydown',e=>{KEYS[e.code]=true;if(!e.repeat)KP.add(e.code);lastDevice='kb';if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab','Backspace'].includes(e.code)&&G.state==='play')e.preventDefault();});
 addEventListener('keyup',e=>{KEYS[e.code]=false;});
 addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;MOUSE.l=MOUSE.r=false;MOUSE.dx=MOUSE.dy=0;});
-CANVAS.addEventListener('mousedown',e=>{lastDevice='kb';if(e.button===0){MOUSE.l=true;MOUSE.lp=true;}if(e.button===2)MOUSE.r=true;tryLock();});
+CANVAS.addEventListener('mousedown',e=>{lastDevice='kb';if(e.button===0&&G.state==='play'&&!locked&&lockOK&&lockFails<3&&!IS_TOUCH&&!VR.on&&CANVAS.requestPointerLock){tryLock();return;}   // el primer clic solo vuelve a capturar el ratón
+  if(e.button===0){MOUSE.l=true;MOUSE.lp=true;}if(e.button===2)MOUSE.r=true;tryLock();});
 addEventListener('mouseup',e=>{if(e.button===0)MOUSE.l=false;if(e.button===2)MOUSE.r=false;});
 addEventListener('mousemove',e=>{
   if(!(locked||MOUSE.r))return;if(performance.now()-lockT<120)return; // justo al capturar el ratón llega un salto acumulado
@@ -2932,7 +2986,17 @@ addEventListener('mousemove',e=>{
   mEma=mEma*0.85+m*0.15;MOUSE.dx+=mx;MOUSE.dy+=my;});
 CANVAS.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('wheel',e=>{if(G.state==='play')MOUSE.wheel+=Math.sign(e.deltaY);},{passive:true});
-function lockFail(){lockOK=false;toast('El navegador no deja capturar el ratón: mantén el clic derecho y arrastra para girar la cámara.',6);}
+let lockFails=0;
+function lockFail(){lockFails++;if(lockFails===3)toast('El navegador no deja capturar el ratón: mantén el clic derecho y arrastra para girar la cámara.',6);}
+// aviso para volver a capturar el ratón (al salir de una tienda con Esc o si el navegador no lo deja a la primera)
+function lockPrompt(show){let el=document.getElementById('lockPrompt');
+  if(show){if(IS_TOUCH||VR.on||locked||G.state!=='play'||!CANVAS.requestPointerLock)return;
+    if(!el){el=document.createElement('div');el.id='lockPrompt';el.style.cssText='position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;background:rgba(10,12,16,0.35);cursor:pointer;font:600 22px Georgia,serif;color:#f3eee3;text-shadow:0 2px 6px #000';
+      el.innerHTML='<div style="padding:14px 26px;border-radius:12px;background:rgba(20,22,28,0.82);border:1px solid #e8b93a">Haz clic para seguir jugando</div>';
+      el.addEventListener('mousedown',e=>{e.preventDefault();e.stopPropagation();lastDevice='kb';lockPrompt(false);tryLock();});document.body.appendChild(el);}
+    el.style.display='flex';}
+  else if(el)el.style.display='none';}
+function lockCheck(){setTimeout(()=>{if(G.state==='play'&&!locked&&lastDevice==='kb')lockPrompt(true);},450);}
 function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH||VR.on)return;if(!CANVAS.requestPointerLock){lockOK=false;return;}
   const plain=gesture=>{try{const p=CANVAS.requestPointerLock();if(p&&p.catch)p.catch(()=>{if(gesture)lockFail();});}catch(e){if(gesture)lockFail();}};
   if(!rawOK){plain(true);return;}
@@ -2941,7 +3005,7 @@ function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH||VR.on)return;
   if(p&&p.catch){lockPromise=true;p.catch(()=>{rawOK=false;plain(false);});}else rawOK=false; // sin promesas, la petición ya fue normal
 }
 
-document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(locked){lockT=performance.now();MOUSE.dx=MOUSE.dy=0;mEma=8;}if(!locked&&wasLocked&&G.state==='play')openPause();wasLocked=locked;});
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(locked){lockT=performance.now();MOUSE.dx=MOUSE.dy=0;mEma=8;lockFails=0;lockPrompt(false);}if(!locked&&wasLocked&&G.state==='play')openPause();wasLocked=locked;});
 document.addEventListener('pointerlockerror',()=>{if(lockPromise)return;lockFail();}); // con promesas, los fallos se gestionan en tryLock
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play')openPause();});
 const PAD={b:[],pb:[],ax:[0,0,0,0],lt:0,rt:0,plt:0,prt:0,on:false};
@@ -3088,7 +3152,7 @@ class NPC{
     const K=KINDS[kind];this.kind=kind;this.team=K.team;this.maxHp=this.hp=opt.hp||K.hp;
     this.weapon=opt.weapon!==undefined?opt.weapon:(kind==='maton'?rpick(['pistol','revolver']):(K.weapon||null));this.mw=opt.mw!==undefined?opt.mw:(K.mw||null);this.extraDrop=opt.extraDrop!==undefined?opt.extraDrop:(K.extra||null);this.neutral=opt.neutral!==undefined?opt.neutral:!!K.neutral;
     this.h=makeHuman(opt.outfit||K.out());scene.add(this.h.g);
-    if(this.weapon||this.mw){this.gun=makeWeaponMesh(this.weapon||this.mw);this.h.mount.add(this.gun);}
+    if(this.weapon||this.mw){this.gun=heldWeaponMesh(this.weapon||this.mw);this.h.mount.add(this.gun);}
     this.x=x;this.z=z;this.y=groundH(x,z);this.yaw=opt.yaw!==undefined?opt.yaw:rr(0,TAU);this.vx=0;this.vz=0;
     this.state=opt.state||'wander';this.alive=true;this.phase=rr(0,10);this.spd=0;this.goal=null;this.wait=0;this.cool=rr(0.7,1.6);
     this.hostile=!!opt.hostile;this.mission=!!opt.mission;this.stage=opt.stage;this.guest=!!opt.guest;this.alertR=opt.alertR||32;
@@ -3158,6 +3222,7 @@ function updateNPC(n,dt){
   for(const c of CARS){if(Math.abs(c.x-n.x)>5.5||Math.abs(c.z-n.z)>5.5)continue;pushOutOBB(c.obb(),n,0.38);}
   if(!P.car&&!P.plane&&!P.dead&&dp<0.8){const px=n.x-P.x,pz=n.z-P.z,pl=Math.hypot(px,pz)||1;n.x=P.x+px/pl*0.8;n.z=P.z+pz/pl*0.8;if(n.team==='civ'&&n.sayT<=0&&Math.hypot(P.vx,P.vz)>4)say(n,rpick(LINES.civHit));}
   for(const o of TRAIN_OBBS){if(Math.abs(o.x-n.x)>7||Math.abs(o.z-n.z)>7||n.y+1.8<o.y0)continue;const h=pushOutOBB(o,n,0.38);if(h&&o.v>1.5&&n.team!=='friend'){killNPC(n,'car',null,h.nx*o.v,h.nz*o.v);FX.blood(n.x,n.y+1,n.z,12);return;}}
+  if(npcAirHit(n))return;   // aviones y helicóptero: no se atraviesan y, si te pillan, te matan
   if(inLake(n.x,n.z)||surfaceH(n.x,n.z)-n.y>0.95){n.x=ox;n.z=oz;n.goal=null;}
   n.x=clamp(n.x,-LIMIT,LIMIT);n.z=clamp(n.z,-LIMIT,LIMIT);n.y=surfaceH(n.x,n.z);
   n.spd=Math.hypot(n.x-ox,n.z-oz)/Math.max(dt,1e-4);
@@ -3278,6 +3343,7 @@ function aheadBlocked(c,ignoreParked=false){
   for(const n of NPCS)if(n.alive&&Math.abs(n.x-c.x)<18&&Math.abs(n.z-c.z)<18)test(n.x,n.z,0.4);
   for(const X of CROSSINGS)if(X.closed&&Math.abs(X.x-c.x)<30&&Math.abs(X.z-c.z)<30)test(X.x,X.z,3);
   for(const o of TRAIN_OBBS)if(Math.abs(o.x-c.x)<22&&Math.abs(o.z-c.z)<22&&o.y0<c.y+c.T.hgt)test(o.x,o.z,1.5);
+  for(const o of AIR_OBBS)if(Math.abs(o.x-c.x)<24&&Math.abs(o.z-c.z)<24&&o.y0<c.y+c.T.hgt&&o.y1>c.y)test(o.x,o.z,Math.min(3,Math.max(o.hx,o.hz)));
   return best;
 }
 function aiDrive(c,dt){
@@ -3756,7 +3822,7 @@ class Aircraft{
   worldHits(dt,r,y0,y1,fast){
     const q={x:this.pos.x,z:this.pos.z},hit=planeHit(q,r,this.pos.y+y0,this.pos.y+y1);
     if(hit){if(fast){this.crash();return true;}this.pos.x=q.x;this.pos.z=q.z;this.vel.x*=0.3;this.vel.z*=0.3;if(this.vf!==undefined)this.vf*=0.3;}
-    for(const c of CARS){if(Math.abs(c.x-this.pos.x)>7||Math.abs(c.z-this.pos.z)>7||this.pos.y>c.y+c.T.hgt+0.5)continue;const t={x:this.pos.x,z:this.pos.z};
+    for(const c of CARS){if(Math.abs(c.x-this.pos.x)>7||Math.abs(c.z-this.pos.z)>7||this.pos.y>c.y+c.T.hgt+0.5)continue;if(this!==P.plane&&this.v<1)continue;const t={x:this.pos.x,z:this.pos.z};   // aparcada no la empuja ningún coche: el coche rebota (carAirHits)
       if(pushOutOBB(c.obb(),t,r*0.8)){if(this.v>12){c.damage(200,this===P.plane?'player':null);this.crash();return true;}this.pos.x=t.x;this.pos.z=t.z;this.vel.multiplyScalar(0.5);if(this.vf!==undefined)this.vf*=0.5;}}
     if(inLake(this.pos.x,this.pos.z)&&this.pos.y<LAKE.wl+0.4){FX.water(this.pos.x,LAKE.wl,this.pos.z);this.crash();return true;}
     if(!this.ground){const L=LIMIT-30;if(Math.abs(this.pos.x)>L||Math.abs(this.pos.z)>L){this.pos.x=clamp(this.pos.x,-L,L);this.pos.z=clamp(this.pos.z,-L,L);
@@ -3784,7 +3850,7 @@ class Plane extends Aircraft{
     this.brk=!!inp.brake;
     if(inp.smokeP&&T.smoke){this.smoke=!this.smoke;if(this===P.plane)toast(this.smoke?'Humo <b>activado</b>':'Humo apagado',1.5);}
     const kc=1-Math.exp(-dt*9);this.ctl.p+=(clamp(inp.pitch+(inp.pm||0)*12,-1,1)-this.ctl.p)*kc;this.ctl.r+=(clamp(inp.roll+(inp.rm||0)*12,-1,1)-this.ctl.r)*kc;this.ctl.y+=(clamp(inp.yaw,-1,1)-this.ctl.y)*kc;
-    const n=Math.max(1,Math.ceil(dt/0.011)),h=dt/n;
+    const n=Math.max(1,Math.ceil(dt/0.011)),h=dt/n;if(this.climbT>0)this.climbT=Math.max(0,this.climbT-dt);
     for(let i=0;i<n;i++){if(this.ground)this.stepGround(h,inp,i===0);else this.stepAir(h,inp,i===0);if(this.dead)return;}
     if(this.worldHits(dt,this.ground?T.hitR*0.85:T.hitR,0.4,2.4,this.v>9||!this.ground))return;
     if(this.smoke&&!this.ground){this.smT-=dt;if(this.smT<=0){this.smT=0.025;const s=this.parts.smoke,p=_v1.set(s[0],s[1],s[2]).applyQuaternion(this.q).add(this.pos);
@@ -3794,20 +3860,25 @@ class Plane extends Aircraft{
   stepGround(h,inp,first){
     const T=this.T,sl=this.groundSlope();this.slope=sl;const V=this.vf,av=Math.abs(V);
     let base=T.gp0;if(T.tailUp)base=T.gp0*(1-smoothstep(T.tailUp[0],T.tailUp[1],av));
-    const pull=clamp(inp.pitch+(first?(inp.pm||0)*10:0),-1,1);let gpT=base;
+    // con ratón: tirar del ratón hacia ti deja la palanca atrás un rato (no solo mientras se mueve) y, con el motor a tope,
+    // al llegar a la velocidad de rotación la avioneta levanta el morro sola; el ratón de lado apenas mueve la rueda
+    const kbm=this===P.plane&&lastDevice==='kb'&&!VR.on;
+    if(kbm){this.mp=clamp((this.mp||0)*Math.exp(-h*0.7)+(first?(inp.pm||0)*6:0),-1,1);}else this.mp=0;
+    const pull=clamp(inp.pitch+(kbm?this.mp:(first?(inp.pm||0)*10:0)),-1,1);let gpT=base;
     if(pull>0.05&&V>T.vRot*0.8)gpT=Math.max(base,pull*0.24);else if(pull<-0.3&&T.tailUp)gpT=Math.min(base,0.02);
+    if(kbm&&this.thr>0.7&&pull>-0.1&&V>T.vRot)gpT=Math.max(gpT,0.18*smoothstep(T.vRot,T.vRot+3,V));
     this.gp+=(gpT-this.gp)*(1-Math.exp(-h*2.6));
     const lift=T.lk*V*V*this.cl(this.gp+T.inc),thrust=this.thr*T.T0*Math.max(0,1-V/T.vProp);
     const drag=T.kd0*V*V+T.kdi*lift*lift/Math.max(V*V,100),load=Math.max(0,1-lift/9.8);
     const fr=(T.rollFr+(this.brk?T.brakeD:0))*load+(this.brk?0.6:0);
     let nv=V+(thrust-Math.sign(V)*drag-9.8*Math.sin(sl))*h;const fd=fr*h;if(nv>0)nv=Math.max(0,nv-fd);else if(nv<0)nv=Math.min(0,nv+fd);
     this.vf=nv;
-    const steer=clamp(inp.yaw+inp.roll*0.7+(first?(inp.rm||0)*6:0),-1,1),an=Math.abs(nv),sr=an<0.3?0:(an<8?T.steerLo:Math.max(0.12,T.steerLo*8/an));
+    const steer=clamp(inp.yaw+inp.roll*0.7+(first?(inp.rm||0)*(kbm?1.4:6):0),-1,1),an=Math.abs(nv),sr=an<0.3?0:(an<8?T.steerLo:Math.max(0.12,T.steerLo*8/an));
     this.hd-=steer*sr*h*(nv<0?-1:1);
     const sf=Math.sin(this.hd),cf=Math.cos(this.hd),cs=Math.cos(sl);
     this.pos.x+=sf*cs*nv*h;this.pos.z+=cf*cs*nv*h;this.pos.y=groundH(this.pos.x,this.pos.z);this.vel.set(sf*cs*nv,Math.sin(sl)*nv,cf*cs*nv);
     this.w.set(0,0,0);this.gload=1;this.stall=false;this.groundAtt();
-    if(lift>9.8*Math.cos(sl)*1.03&&nv>T.vRot*0.8){this.ground=false;this.vel.y+=0.8;this.pos.y+=0.05;this.gmax=this.gmin=1;if(this===P.plane)toast('¡Despegue!',1.6);}
+    if(lift>9.8*Math.cos(sl)*1.03&&nv>T.vRot*0.8){this.ground=false;this.vel.y+=0.8;this.pos.y+=0.05;this.gmax=this.gmin=1;this.climbT=kbm?4.5:0;this.mp=0;if(this===P.plane)toast('¡Despegue!',1.6);}
   }
   stepAir(h,inp,first){
     const T=this.T,q=this.q,F=this.fwd(_v1),U=this.up(_v2),R=this.right(_v3);
@@ -3818,11 +3889,13 @@ class Plane extends Aircraft{
     const ly=Lh.y,bank=Math.atan2(-R.y,U.y),pitch=Math.asin(clamp(F.y,-1,1));
     // autocompensador: ángulo de ataque que mantiene la trayectoria (o el viraje nivelado, si va poco inclinado)
     let need=9.8*ly;if(ly>0.25){const lvl=9.8/Math.max(ly,0.5);need=T.assist?lvl:lerp(need,lvl,0.7*smoothstep(0.25,0.6,ly));}
-    if(T.assist&&ly>0.3&&Math.abs(inp.pitch)<0.05&&Math.abs(inp.pm||0)<1e-4)need+=clamp(-this.vel.y*0.9,-5,5)/Math.max(ly,0.5);   // palanca suelta: vuelve a vuelo nivelado
+    const climb=this.climbT>0&&this===P.plane&&lastDevice==='kb'?4:0;
+    if(T.assist&&ly>0.3&&Math.abs(inp.pitch)<0.05&&Math.abs(inp.pm||0)<1e-4)need+=clamp(climb-this.vel.y*0.9,-5,5)/Math.max(ly,0.5);   // palanca suelta: vuelve a vuelo nivelado (y justo tras despegar con ratón, sube)
     const qa=T.lk*V*V*T.cla,aoaReq=clamp(need/Math.max(qa,1e-3),-T.stallA*0.85,T.stallA*0.85),auth=clamp(V/T.vRef,0.12,1.25);
     let cp=inp.pitch*T.pitchRate*auth,cr=inp.roll*T.rollRate*auth,cy=inp.yaw*T.yawRate*auth;
     const maxTurn=T.lk*V*T.cla*T.stallA*(T.assist?0.85:1.25);   // lo que la sustentación puede girar la trayectoria
     if(cp>0)cp=Math.min(cp,maxTurn+0.05);else cp=Math.max(cp,-(maxTurn*0.75+0.05));
+    if(climb&&!T.assist&&Math.abs(inp.pitch)<0.05&&Math.abs(inp.pm||0)<1e-4)cp+=clamp((0.14-pitch)*2.2,-0.5,0.8);   // acrobática: mantiene unos 8° de subida al despegar
     cp+=clamp((need-9.8*ly)/Math.max(V,6),-1,2.5)-T.stabP*auth*clamp(aoa-aoaReq,-0.9,0.9);cy+=T.stabY*auth*clamp(beta,-0.9,0.9); // anticipación: el morro sigue a la trayectoria que va a curvarse
     if(T.assist){                                             // ayudas de la avioneta de escuela: se nivela sola y no pasa de 60°
       if(Math.abs(inp.roll)<0.08&&Math.abs(inp.rm||0)<1e-4)cr+=-bank*1.3*auth;
@@ -3924,6 +3997,44 @@ class Heli extends Aircraft{
     this.beacon(this.rpm>0.05);
   }
 }
+// ---------------------------------------------------------------- choques sencillos con aviones y helicóptero
+// cada aeronave lleva unas cajas (fuselaje, ala y cola; en el helicóptero, cabina, botalón y estabilizador) que no se
+// pueden atravesar andando ni con el coche. Si la aeronave va a más de 2,5 m/s y te pilla, te mata; el rotor del
+// helicóptero girando también (hay que agacharse... o no acercarse). Por debajo del ala alta de la avioneta sí se pasa.
+let AIR_OBBS=[];
+const AIR_BOX={   // [x, z, medio ancho, medio largo, desde y, hasta y] en el sistema de la aeronave (z hacia el morro)
+  avioneta:[[0,-0.45,0.65,4.05,-0.2,2.3],[0,0.84,5.45,0.82,2.12,2.46],[0,-4.0,1.8,0.48,1.62,1.88]],
+  acro:[[0,-0.4,0.55,3.7,-0.2,1.85],[0,0.35,3.75,0.95,0.88,1.16],[0,-3.45,1.5,0.45,1.32,1.56]],
+  heli:[[0,0.2,1.15,1.95,-0.2,2.75],[0,-4.1,0.3,2.45,1.3,2.45],[0,-5.0,1.1,0.25,1.6,2.1]]};
+function airObbs(){
+  AIR_OBBS=[];
+  for(const a of AIR){const B=AIR_BOX[a.kind];if(!B)continue;const h=a.h,c=Math.cos(h),s=Math.sin(h),v=a.dead?0:Math.hypot(a.vel.x,a.vel.z)+Math.max(0,-a.vel.y)*0.6;
+    for(const[ox,oz,hx,hz,y0,y1]of B)AIR_OBBS.push({x:a.pos.x+ox*c+oz*s,z:a.pos.z-ox*s+oz*c,hx,hz,c,s,y0:a.pos.y+y0,y1:a.pos.y+y1,v,a,tag:'air'});}
+}
+function rotorAt(x,y,z){   // ¿te alcanza el rotor del helicóptero? (el disco se inclina con el helicóptero: la punta de la pala baja)
+  for(const a of AIR){if(!a.isHeli||a.dead||a.rpm<0.55)continue;const U=a.up(_v4),cx=a.pos.x+U.x*3.14,cy=a.pos.y+U.y*3.14,cz=a.pos.z+U.z*3.14;
+    if(Math.hypot(x-cx,z-cz)>=5.0)continue;const ry=cy-(U.x*(x-cx)+U.z*(z-cz))/Math.max(0.3,U.y);if(ry>y+0.15&&ry<y+1.95)return a;}return null;}
+function npcAirHit(n){
+  if(!n.alive)return false;
+  for(const o of AIR_OBBS){if(Math.abs(o.x-n.x)>8||Math.abs(o.z-n.z)>8||n.y+1.8<o.y0||n.y>o.y1)continue;const h=pushOutOBB(o,n,0.38);
+    if(h&&o.v>2.5&&n.team!=='friend'){killNPC(n,'car',o.a===P.plane?'player':null,h.nx*o.v*1.2,h.nz*o.v*1.2);FX.blood(n.x,n.y+1,n.z,14);sfxAt('crash',n.x,n.y,n.z,0.6);return true;}}
+  const r=rotorAt(n.x,n.y,n.z);if(r&&n.team!=='friend'){killNPC(n,'boom',r===P.plane?'player':null,(n.x-r.pos.x)*2,(n.z-r.pos.z)*2);FX.blood(n.x,n.y+1.5,n.z,20);return true;}
+  return false;
+}
+function playerAirHit(){
+  if(P.plane||P.car||P.dead)return;
+  for(const o of AIR_OBBS){if(Math.abs(o.x-P.x)>8||Math.abs(o.z-P.z)>8||P.y+1.8<o.y0||P.y>o.y1)continue;const h=pushOutOBB(o,P,0.4);
+    if(h&&o.v>2.5&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(Math.max(70,o.v*16),null);P.vx=h.nx*o.v;P.vz=h.nz*o.v;P.vy=4.5;P.ground=false;shake(0.8);FX.blood(P.x,P.y+1,P.z,10);}}
+  if(rotorAt(P.x,P.y,P.z)&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(500,null);FX.blood(P.x,P.y+1.5,P.z,20);}
+}
+// coche contra aeronave: rebota como contra una pared; si el golpe es fuerte, la aeronave sufre
+function carAirHits(c,cs,r){
+  let imp=0;
+  for(const o of AIR_OBBS){if(Math.abs(o.x-c.x)>10||Math.abs(o.z-c.z)>10||c.y+c.T.hgt<o.y0||c.y>o.y1||o.a===P.plane&&c===P.car)continue;
+    for(let k=0;k<2;k++){const p={x:cs[k][0],z:cs[k][1]};const h=pushOutOBB(o,p,r);if(!h)continue;const dx=p.x-cs[k][0],dz=p.z-cs[k][1];c.x+=dx;c.z+=dz;cs[1-k][0]+=dx;cs[1-k][1]+=dz;
+      const vn=c.vx*h.nx+c.vz*h.nz;if(vn<0){c.vx-=h.nx*vn*1.3;c.vz-=h.nz*vn*1.3;imp=Math.max(imp,-vn);if(-vn>9&&!o.a.dead)o.a.damage((-vn-9)*5,c.driver==='player'?'player':null);}}}
+  return imp;
+}
 // ---------------------------------------------------------------- flota: dónde vive cada aeronave y cómo reaparece
 const AIR_HOMES={};
 function airHomes(){const a=AIRSTRIP,s=Math.sin(a.rot),c=Math.cos(a.rot);AIR_HOMES.avioneta={x:a.cx+s*72,z:a.cz+c*72,h:Math.atan2(-s,-c)};AIR_HOMES.acro=Object.assign({},ABA.acro);AIR_HOMES.heli=Object.assign({},ABA.heli);}
@@ -3939,6 +4050,7 @@ function updateAircraft(dt){
         a.remove();const n=spawnAircraft(a.kind);if(!P.dead)toast(n.kind==='heli'?'Hay un helicóptero nuevo en la Base Aérea de Abantos':n.kind==='acro'?'Hay una avioneta acrobática nueva en la Base Aérea de Abantos':'Hay una avioneta nueva esperando en la Silla de Felipe II',3.5);}
       else a.respT=1;}}
   }
+  airObbs();
   // choques entre aeronaves
   for(let i=0;i<AIR.length;i++)for(let j=i+1;j<AIR.length;j++){const a=AIR[i],b=AIR[j];if(a.dead||b.dead)continue;const dx=b.pos.x-a.pos.x,dy=b.pos.y-a.pos.y,dz=b.pos.z-a.pos.z,d=Math.hypot(dx,dy,dz),R=(a.isHeli?4.6:a.T.span*0.8)+(b.isHeli?4.6:b.T.span*0.8);
     if(d>=R||d<1e-3)continue;const rv=_v1.copy(b.vel).sub(a.vel).length();if(rv>6){a.crash();b.crash();continue;}
@@ -3968,7 +4080,7 @@ function enterPlane(a){
   const view=`${kb('V','R3','Vista','B')} cambia entre la cabina y la vista exterior`;
   if(a.isHeli)hint(`<b>Helicóptero.</b> ${kb('W / S','RT / LT','Subir / Bajar','stick izq. ↕')} subir y bajar, ${kb('A / D o ratón','LB / RB','joystick ↔','stick izq. ↔')} girar, ${kb('↑ / ↓','stick izq. ↕','joystick ↕','stick der. ↕')} avanzar y retroceder, ${kb('← / →','stick izq. ↔','','stick der. ↔')} de lado. Si lo sueltas todo se queda quieto en el aire. El rotor tarda unos segundos en coger vueltas. ${view}. ${kb('F','Y','Salir','A')} para bajar.`,15);
   else if(a.kind==='acro')hint(`<b>Avioneta acrobática.</b> ${kb('W / S','RT / LT','Motor + / −','stick izq. ↕')} motor, ${kb('A / D','stick izq. ↔','joystick ↔','stick der. ↔')} alabeo (mantenlo para un tonel), ${kb('↓ / ↑ o ratón','stick izq. ↕','joystick ↕','stick der. ↕')} morro: tira a fondo para un looping. ${kb('H','L3','Humo','gatillo der.')} humo. Despega cuesta abajo por el altipuerto. ${view}.`,15);
-  else hint(`<b>Avioneta.</b> ${kb('W / S','RT / LT','Motor + / −','stick izq. ↕')} motor, ${kb('A / D','stick izq.','joystick ↔','stick der. ↔')} alabeo para girar (se nivela sola al soltar), ${kb('↓ / ↑ o ratón','stick izq. ↕','joystick ↕','stick der. ↕')} morro (hacia atrás sube), ${kb('Z / C','LB / RB','','stick izq. ↔')} timón, ${kb('Espacio','A','Frenos','X')} frenos. Despega a unos 80 km/h tirando hacia atrás. ${view}. ${kb('F','Y','Bajar','A')} para bajar o saltar en paracaídas.`,15);
+  else hint(`<b>Avioneta.</b> ${kb('W / S','RT / LT','Motor + / −','stick izq. ↕')} motor, ${kb('A / D','stick izq.','joystick ↔','stick der. ↔')} alabeo para girar (se nivela sola al soltar), ${kb('↓ / ↑ o ratón','stick izq. ↕','joystick ↕','stick der. ↕')} morro (hacia atrás sube), ${kb('Z / C','LB / RB','','stick izq. ↔')} timón, ${kb('Espacio','A','Frenos','X')} frenos. Despega a unos 80 km/h tirando hacia atrás${lastDevice==='kb'&&!VR.on?' (con el ratón basta con el motor a tope: levanta el morro sola)':''}. ${view}. ${kb('F','Y','Bajar','A')} para bajar o saltar en paracaídas.`,15);
 }
 function exitPlane(forced){
   const pl=P.plane;if(!pl)return;const h=pl.h,s=Math.sin(h),c=Math.cos(h),E=pl.T.exit;
@@ -4148,7 +4260,9 @@ function vrRig(dt){
   if(VR.recenter&&VR.ready){_mB.compose(VR.hl,_q1.setFromAxisAngle(AX_Y,yawOfQuat(VR.hq)),_sOne).invert();VR.off.copy(_mB);VR.recenter=false;}
   RIG.matrix.multiplyMatrices(_mA,VR.off);RIG.matrixWorldNeedsUpdate=true;VR.mode=mode;VR.rigOk=true;
 }
-function vrGunMesh(w){const m=makeWeaponMesh(w);m.rotation.y=Math.PI;m.position.set(0,-0.035,0.03);VR.gunG.add(m);VR.guns[w]=m;if(w==='rifle')scopeInit(m);return m;}
+function vrGunMesh(w){const m=makeWeaponMesh(w);m.rotation.y=Math.PI;m.position.set(0,-0.035,0.03);let o=m;
+  if(WEAPONS[w]&&WEAPONS[w].melee){o=new THREE.Group();o.rotation.x=0.95;o.position.set(0,-0.01,0.03);m.position.set(0,0,w==='bat'?0.06:0.02);o.add(m);}   // navaja y bate: salen del puño hacia arriba, no en la línea del brazo
+  VR.gunG.add(o);VR.guns[w]=o;if(w==='rifle')scopeInit(m);return o;}
 function vrProps(dt=0){
   const R=VR.hand.right,L=VR.hand.left,foot=G.state==='play'&&!P.car&&!P.plane&&!P.train&&!P.dead&&!G.cine,W=WEAPONS[P.cur],ranged=foot&&!W.melee&&!W.throw;
   VR.carGunT=Math.max(0,(VR.carGunT||0)-dt);const carGun=G.state==='play'&&!!P.car&&VIEW.fp&&!P.dead&&!G.cine&&VR.carGunT>0,gw=carGun?VR.carGunW:P.cur;
@@ -4582,6 +4696,10 @@ const SHOP_ITEMS={
   taller:{hola:['¿Qué le pasa al buga? A ver, a ver...','Aquí se arregla todo menos el carácter.','¿Pegatinas? Tengo de todo. Hasta de toros.'],carcam:true,items:[
     {cat:'Mecánica',n:'Reparación completa',d:'Chapa, motor y humo fuera',p:()=>{const c=P.car;return c&&c.hp<c.T.hp?Math.round(15+(1-c.hp/c.T.hp)*120):0;},f:()=>{const c=P.car;if(!c)return false;if(c.hp>=c.T.hp){renderShop('Pero si el coche está como nuevo. ¿Qué quieres que te arregle, el alma?');return false;}c.hp=c.T.hp;c.burn=-1;return true;}},
     ...[['Rojo Castilla',0xb8322c],['Azul pizarra',0x2d5d9f],['Blanco granito',0xe8e4d8],['Verde pinar',0x2f7a4d],['Negro Tercio',0x1d1f24],['Amarillo oro',0xd9a531],['Rosa chicle',0xe57fa3],['Naranja butano',0xe8702a]].map(([n,c])=>({cat:'Pintura (la Policía Local ya no reconocerá el coche)',n,d:'Pintura completa',p:60,sw:c,f:()=>{const car=P.car;if(!car)return false;car.paint.color.setHex(c);car.color=c;if(G.wanted>0){G.heat=0;G.wanted=0;clearPolice(false);toast('Coche repintado: la Policía Local ha perdido tu pista.',3);}return true;}})),
+    {cat:'Motor',n:'Potencia nivel 1 «Puesta a punto»',get d(){const c=P.car;return c&&c.pw>=1?'Ya la lleva':'+35 % de aceleración y +15 % de punta, con escape cromado';},p:350,sw:0xe8b93a,f:()=>tallerTune(1)},
+    {cat:'Motor',n:'Potencia nivel 2 «Motor de carreras»',get d(){const c=P.car;return c&&c.pw>=2?'Ya lo lleva':'+75 % de aceleración y +32 % de punta, con doble escape';},p:()=>P.car&&P.car.pw>=1?900:1150,sw:0xc8342c,f:()=>tallerTune(2)},
+    {cat:'Carrocería',n:'Alerón deportivo',get d(){const c=P.car;return c&&(c.spoil||c.T.extra==='spoiler')?'Ya lleva alerón':'Del color del coche, con sus soportes negros';},p:180,sw:0x1e1f22,f:()=>tallerSpoiler(true)},
+    {cat:'Carrocería',n:'Quitar el alerón',d:'Vuelve a como venía de fábrica',p:0,sw:0x9a9ea3,f:()=>tallerSpoiler(false)},
     {cat:'Pegatinas',n:'Llamas de fuego',d:'En los dos costados',p:40,sw:0xe8702a,f:()=>stk('llamas')},
     {cat:'Pegatinas',n:'Número de carreras',d:'El 7, que da suerte',p:25,sw:0xf4f4f4,f:()=>stk('numero')},
     {cat:'Pegatinas',n:'Rayas de carreras',d:'Dos franjas blancas de punta a punta',p:35,sw:0xf4f4f4,f:()=>stk('rayas')},
@@ -4600,13 +4718,19 @@ let SHOP_OPEN=null;
 function wearCrown(){if(G.crown)return toast('Ya llevas la corona puesta, Majestad.',2.5);G.crown=true;applyCrown();toast('Ahora pareces de la realeza. Más o menos.',3);}
 function applyCrown(){if(!G.crown||P.crownMesh)return;const c=new THREE.Mesh(GEO.crown,MAT.gold);c.position.set(0,0.47,0);P.h.head.add(c);P.crownMesh=c;}
 function treasureMap(){const t=rpick(TREASURES);const p=spawnNear(t[0],t[1],8);const pk=spawnPickup('cash',null,p.x,p.z,{amount:400,fixed:false});pk.life=1e9;pk.treasure=true;G.treasure={x:p.x,z:p.z};if(!G.active)setTarget(p.x,p.z);toast('La cruz del mapa está marcada con una estrella amarilla. ¡Suerte!',4);}
+function tallerTune(lv){const c=P.car;if(!c)return false;if(c.T.shape==='golf'){renderShop('¿Un motor de carreras en un carrito de golf? Eso ni en el Gato Mecánico.');return false;}
+  if((c.pw||0)>=lv){renderShop(lv===1?'Este ya va puesto a punto. Si quieres más, el motor de carreras.':'Más potencia no le cabe, que luego te la pegas en la M-600.');return false;}
+  c.tune(lv);toast(lv===1?'<b>Motor puesto a punto</b>: acelera bastante más':'<b>Motor de carreras</b>: agárrate',3);return true;}
+function tallerSpoiler(on){const c=P.car;if(!c)return false;if(on){if(c.T.shape==='golf'){renderShop('Al carrito de golf no le pongo yo un alerón ni loco.');return false;}
+    if(c.spoil||c.T.extra==='spoiler'){renderShop('Ya lleva alerón. Dos serían de hortera.');return false;}c.setSpoiler(true);return true;}
+  if(!c.spoil){renderShop(c.T.extra==='spoiler'?'Ese alerón viene de fábrica, no se lo quito.':'Si no lleva alerón, hijo.');return false;}c.setSpoiler(false);return true;}
 function stk(id){const c=P.car;if(!c)return false;if((c.stkId||null)===id){renderShop(id?'Esa pegatina ya la lleva puesta.':'No tiene pegatinas que quitar.');return false;}c.sticker(id);return true;}
 function garageCam(){const c=P.car;if(!c)return;const s=Math.sin(c.h),co=Math.cos(c.h);const narrow=innerWidth<innerHeight*1.2;
   camera.position.set(c.x+co*6.5+s*1.5,c.y+2.3,c.z-s*6.5+co*1.5);camera.lookAt(c.x+(narrow?0:s*-1.2),c.y+0.9,c.z+(narrow?0:co*-1.2));if(camera.fov!==50){camera.fov=50;fovNow=50;camera.updateProjectionMatrix();}}
 function probadorCam(){P.yaw=Math.PI;P.h.g.rotation.y=P.yaw;P.h.g.position.set(P.x,P.y,P.z);animHuman(P.h,0,0,'walk');
   const narrow=innerWidth<innerHeight*1.2;camera.position.set(P.x+(narrow?0:1.2),P.y+1.45,P.z-3.6);camera.lookAt(P.x+(narrow?0:1.0),P.y+1.05,P.z);if(camera.fov!==50){camera.fov=50;fovNow=50;camera.updateProjectionMatrix();}}
 const priceOf=it=>typeof it.p==='function'?it.p():it.p;
-function openShop(sh){document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);if(t===P.car&&SERVICE.taller){const T=SERVICE.taller,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=3.6,lz=-4.9,px=T.x+lx*c+lz*s,pz=T.z-lx*s+lz*c;GAMECAM.pos.set(px,groundH(px,pz)+1.75,pz);}GAMECAM.yaw=Math.atan2(t.x-GAMECAM.pos.x,t.z-GAMECAM.pos.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
+function openShop(sh){lockPrompt(false);document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);if(t===P.car&&SERVICE.taller){const T=SERVICE.taller,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=3.6,lz=-4.9,px=T.x+lx*c+lz*s,pz=T.z-lx*s+lz*c;GAMECAM.pos.set(px,groundH(px,pz)+1.75,pz);}GAMECAM.yaw=Math.atan2(t.x-GAMECAM.pos.x,t.z-GAMECAM.pos.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function renderShop(msg){
   const sh=SHOP_OPEN,S=SHOP_ITEMS[sh.id];
   let h=`<h2>${sh.name}</h2><div class="shopMsg"><b>${sh.vend}:</b> ${msg}</div><div class="shopMoney">Llevas ${fmtMoney(P.money)}</div><div class="shopList">`;
@@ -4624,7 +4748,7 @@ function buyItem(i){
   const r=it.f();if(r===false)return;P.money-=pr;casaOwn(SHOP_OPEN.id,it);if(pr)sfx('cash');else sfx('pickup');save();
   renderShop(SHOP_ITEMS[SHOP_OPEN.id].carcam?rpick(['Como nuevo, oiga.','Esto ya no lo reconoce ni su madre.','Listo. Y no me lo traiga en otro estado.']):SHOP_ITEMS[SHOP_OPEN.id].probador?rpick(['¡Qué bien te queda!','Estás hecho un galán.','Ni Felipe II iba tan elegante.','Mírate en el espejo, anda.']):rpick(['¡Gracias, guapo!','¡Que aproveche!','Vuelve cuando quieras.','Buen ojo, sí señor.']));
 }
-function closeShop(){if(VR.on&&VR.shopCam)VR.recenter=true;VR.shopCam=false;document.body.classList.remove('inshop');showScreen('shop',false);SHOP_OPEN=null;G.state='play';tryLock();}
+function closeShop(){if(VR.on&&VR.shopCam)VR.recenter=true;VR.shopCam=false;document.body.classList.remove('inshop');showScreen('shop',false);SHOP_OPEN=null;G.state='play';tryLock();lockCheck();}
 // ---------- saltos con premio
 let bestJump=0;
 function onStunt(dist,airT,ramp){
@@ -4644,13 +4768,13 @@ function spawnPickup(kind,sub,x,z,opt={}){
   else if(kind==='armor'){col=0x71a9de;hp_(g,0x2d4a6e,0.55,0.62,0.22,0,0,0);hp_(g,0x71a9de,0.18,0.16,0.23,0,0.1,0);}
   const ring=new THREE.Mesh(GEO.ring,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.65,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=-0.55;g.add(ring);
   const y=groundH(x,z);g.position.set(x,y+0.65,z);scene.add(g);
-  const p={kind,sub,x,z,y,g,amount:opt.amount||0,life:opt.fixed?1e9:60,fixed:!!opt.fixed,respawn:0};PICKS.push(p);return p;
+  const p={kind,sub,x,z,y,g,amount:opt.amount||0,life:opt.fixed?1e9:120,fixed:!!opt.fixed,respawn:0};PICKS.push(p);return p;   // lo que se cae al suelo dura 2 minutos
 }
 function updatePickups(dt){
   for(let i=PICKS.length-1;i>=0;i--){const p=PICKS[i];
     if(p.respawn>0){p.respawn-=dt;if(p.respawn<=0)p.g.visible=true;continue;}
     p.life-=dt;if(p.life<=0){scene.remove(p.g);PICKS.splice(i,1);continue;}
-    p.g.rotation.y+=dt*2;p.g.position.y=p.y+0.65+Math.sin(G.time*3+i)*0.12;
+    p.g.rotation.y+=dt*2;p.g.position.y=p.y+0.65+Math.sin(G.time*3+i)*0.12;if(!p.fixed&&p.life<10)p.g.visible=(G.time*5)%1<0.65;   // parpadea antes de desaparecer
     if(P.dead||P.plane)continue;const d=Math.hypot(P.x-p.x,P.z-p.z);const reach=P.car?2.6:1.5;if(d>reach)continue;
         if(p.kind==='weapon'){const W=WEAPONS[p.sub],am=P.ammo[p.sub];
       if(W.melee){if(P.weapons[p.sub]){scene.remove(p.g);PICKS.splice(i,1);continue;}P.weapons[p.sub]=true;toast(`Has conseguido: <b>${W.name}</b>`,4);if(P.cur==='fists')setWeapon(p.sub);sfx('pickup');wstripT=3;scene.remove(p.g);PICKS.splice(i,1);continue;}
@@ -4669,7 +4793,7 @@ function updatePickups(dt){
 //  JUGADOR
 // =====================================================================
 function camFwd(){const cp=Math.cos(camPitch);return[Math.sin(camYaw)*cp,Math.sin(camPitch),Math.cos(camYaw)*cp];}
-function setWeapon(w){if(!P.weapons[w])return;wstripT=2.6;const old=P.guns[P.cur];if(old)P.h.mount.remove(old);P.cur=w;P.reloadT=0;if(w!=='fists'){if(!P.guns[w])P.guns[w]=makeWeaponMesh(w);P.h.mount.add(P.guns[w]);}}
+function setWeapon(w){if(!P.weapons[w])return;wstripT=2.6;const old=P.guns[P.cur];if(old)P.h.mount.remove(old);P.cur=w;P.reloadT=0;if(w!=='fists'){if(!P.guns[w])P.guns[w]=heldWeaponMesh(w);P.h.mount.add(P.guns[w]);}}
 function cycleWeapon(dir){const own=WORDER.filter(w=>P.weapons[w]);let i=own.indexOf(P.cur);i=(i+dir+own.length)%own.length;setWeapon(own[i]);}
 function startReload(){const W=WEAPONS[P.cur];if(W.melee||W.throw)return;const am=P.ammo[P.cur];if(am.m>=W.mag||am.r<=0||P.reloadT>0)return;P.reloadT=P.cur==='shotgun'?1.8:1.3;sfx('reload');}
 function isAiming(I){return(I.aim&&!WEAPONS[P.cur].melee)||P.fireHold>0;}
@@ -4771,6 +4895,7 @@ function respawn(){
   P.dead=false;P.hp=100;P.armor=0;G.slow=1;const fee=Math.min(P.money,150);P.money-=fee;
   placeAtBase();P.h.g.rotation.x=0;P.h.g.visible=true;
   G.heat=0;G.wanted=0;clearPolice(true);$('wasted').classList.remove('show');
+  for(const c of CARS.slice())if(c!==P.car&&(c.temp&&(c.type==='poli'||c.type==='geo')))c.remove();   // los coches y furgones de la persecución se van al morir
   toast(`El helicóptero sanitario te ha dejado en la Base Aérea de Abantos. Tiritas y gasas: ${fmtMoney(fee)}`,5);
   if(!G.active&&G.mission<3)objective('Vuelve con la Abuela Remedios (<b>R</b>) para intentarlo otra vez');
 }
@@ -4845,6 +4970,7 @@ function updatePlayer(dt,I){
   const ox=P.x,oz=P.z;P.x+=P.vx*dt;P.z+=P.vz*dt;
   collideCircle(P,0.4,P.y+0.15,P.y+1.8);
   for(const o of TRAIN_OBBS){if(Math.abs(o.x-P.x)>7||Math.abs(o.z-P.z)>7||P.y+1.8<o.y0)continue;const h=pushOutOBB(o,P,0.4);if(h&&o.v>1.5&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(o.v*9,null);P.vx=h.nx*o.v;P.vz=h.nz*o.v;P.vy=5;P.ground=false;shake(0.7);}}
+  playerAirHit();
   if(P.ground&&!swim&&surfaceH(P.x,P.z)-P.y>0.95){P.x=ox;P.z=oz;}
   for(const c of CARS){if(Math.abs(c.x-P.x)>5.5||Math.abs(c.z-P.z)>5.5)continue;const o=c.obb();if(P.y>c.y+c.T.hgt-0.2)continue;pushOutOBB(o,P,0.4);}
   P.x=clamp(P.x,-LIMIT,LIMIT);P.z=clamp(P.z,-LIMIT,LIMIT);
@@ -4931,7 +5057,7 @@ function imat(){
     IMAT.meter=new THREE.MeshBasicMaterial({map:texFrom(cv,false)});}
   return IMAT;
 }
-const SEATCOL={pelotilla:0x7a4b2a,berlina:0x4a4f58,taxi:0x2b2b2e,poli:0x262b36,toro:0x8a1c1c,carroza:0x3d1f2c,todoterreno:0x5b5446,furgo:0x3b4048,churros:0x8a5a2a,ambulancia:0x2f4a6a,monster:0x1e1e1e,golf:0x2c2c2c};
+const SEATCOL={pickup:0x3a3c40,camper:0x9a6a3a,pelotilla:0x7a4b2a,berlina:0x4a4f58,taxi:0x2b2b2e,poli:0x262b36,toro:0x8a1c1c,carroza:0x3d1f2c,todoterreno:0x5b5446,furgo:0x3b4048,churros:0x8a5a2a,ambulancia:0x2f4a6a,monster:0x1e1e1e,golf:0x2c2c2c};
 const SEATM={};
 function ibox(p,m,x0,x1,y0,y1,z0,z1){const b=new THREE.Mesh(BOXG,m);b.scale.set(Math.abs(x1-x0),Math.abs(y1-y0),Math.abs(z1-z0));b.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);p.add(b);return b;}
 function ibeam(p,m,a,b,w,d){const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz);const o=new THREE.Mesh(BOXG,m);o.scale.set(w,L,d);o.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);o.quaternion.setFromUnitVectors(AX_Y,_v1.set(dx/L,dy/L,dz/L));p.add(o);return o;}
@@ -5095,7 +5221,8 @@ function updateViewModel(dt){
         const k=new THREE.Mesh(BOXG,M(o.skin));k.scale.set(0.085,0.085,0.1);f.add(k);const t=new THREE.Mesh(BOXG,M(0xd9a27a));t.scale.set(0.02,0.03,0.07);t.position.set(x<0?0.045:-0.045,0.01,-0.005);f.add(t);
         const s=new THREE.Mesh(BOXG,M(o.sleeve||o.shirt));s.scale.set(0.095,0.095,0.62);s.position.set(0,-0.01,0.35);f.add(s);return f;};
       g.userData.R=fist(0);g.userData.L=fist(-0.4);VMG.g.add(g);VMG.m.fists=g;}
-    if(!VMG.m[P.cur]){const g=new THREE.Group(),w=makeWeaponMesh(P.cur);g.userData.top=new THREE.Box3().setFromObject(w).max.y;w.rotation.y=Math.PI;g.add(w);g.userData.w=w;const o=playerOutfit();
+    if(!VMG.m[P.cur]){const g=new THREE.Group(),w=makeWeaponMesh(P.cur);g.userData.top=new THREE.Box3().setFromObject(w).max.y;w.rotation.y=Math.PI;const o=playerOutfit();
+      if(WEAPONS[P.cur].melee){const wr=new THREE.Group();wr.position.set(0,-0.05,0.03);g.add(wr);w.position.z=P.cur==='bat'?0.06:0.02;wr.add(w);g.userData.wr=wr;}else g.add(w);g.userData.w=w;   // cuerpo a cuerpo: el arma sale del puño, perpendicular al antebrazo
       const arm=new THREE.Mesh(BOXG,M(o.sleeve||o.shirt));arm.scale.set(0.09,0.09,0.36);arm.position.set(0.03,-0.08,0.2);g.add(arm);
       const hand=new THREE.Mesh(BOXG,M(o.skin));hand.scale.set(0.075,0.08,0.09);hand.position.set(0,-0.05,0.03);g.add(hand);VMG.g.add(g);VMG.m[P.cur]=g;}
     VMG.m[P.cur].visible=true;VMG.w=P.cur;}
@@ -5115,13 +5242,14 @@ function vmMelee(){
     if(on){const f=alt?L:R,sx=alt?1:-1;f.position.x+=sx*0.12*s;f.position.y+=0.06*s;f.position.z-=0.32*s;}
     // cada brazo apunta del puño al hombro, así se ve el antebrazo y no la manga de frente
     const gp=VMG.g.position;for(const[f,sx]of[[R,1],[L,-1]]){_v3.set(sx*0.19-gp.x,-0.34-gp.y,0.16-gp.z).sub(f.position).normalize();f.quaternion.setFromUnitVectors(AX_Z,_v3);}}
-  else if(P.cur==='knife'){   // tajo de arriba abajo: levanta la navaja con la punta arriba y la baja de golpe hacia delante
-    const K=[[0.28,0.12,0,0,0],[1.2,0,-0.1,0.22,0.06],[-0.6,0,-0.12,-0.07,-0.2]];let a=K[0],b=K[0],u=0;
+  else if(P.cur==='knife'){   // tajo de arriba abajo: la hoja sale del puño hacia arriba; se echa atrás y baja de golpe hacia delante
+    const wr=g.userData.wr,K=[[1.35,0.06,0.12,0,0,0],[2.1,0.1,-0.05,-0.08,0.17,0.06],[0.12,-0.14,-0.1,-0.1,-0.08,-0.22]];let a=K[0],b=K[0],u=0;   // [muñeca, giro x, giro y, x, y, z]
     if(on){if(t<0.35){a=K[0];b=K[1];u=t/0.35;}else if(t<0.65){a=K[1];b=K[2];u=(t-0.35)/0.3;}else{a=K[2];b=K[0];u=(t-0.65)/0.35;}u=u*u*(3-2*u);}
-    g.rotation.set(lerp(a[0],b[0],u),lerp(a[1],b[1],u),0);g.position.set(lerp(a[2],b[2],u),lerp(a[3],b[3],u),lerp(a[4],b[4],u));}
-  else if(P.cur==='bat'){
-    if(on){g.rotation.set(lerp(1.05,0.05,Math.min(1,e*1.6)),lerp(0.7,-1.5,e),-0.35*(1-e));g.position.set(lerp(0.05,-0.25,e),lerp(0.04,-0.02,e),-0.1*s);}
-    else{g.rotation.set(1.05,0.25,-0.35);g.position.set(0.05,0.04,0.08);}}
+    if(wr)wr.rotation.x=lerp(a[0],b[0],u);g.rotation.set(lerp(a[1],b[1],u),lerp(a[2],b[2],u),0);g.position.set(lerp(a[3],b[3],u),lerp(a[4],b[4],u),lerp(a[5],b[5],u));}
+  else if(P.cur==='bat'){   // el bate, levantado sobre el hombro, perpendicular al brazo; el batazo lo baja de lado
+    const wr=g.userData.wr;
+    if(on){if(wr)wr.rotation.x=lerp(1.72,0.12,Math.min(1,e*1.6));g.rotation.set(lerp(0.05,0,e),lerp(0.6,-1.5,e),-0.3*(1-e));g.position.set(lerp(0.0,-0.25,e),lerp(0.1,-0.02,e),-0.1*s);}
+    else{if(wr)wr.rotation.x=1.72;g.rotation.set(0.05,0.25,-0.3);g.position.set(0.0,0.1,0.02);}}
 }
 
 // ---------------------------------------------------------------- fogonazo en la punta del arma (primera persona: ordenador, móvil y VR)
@@ -5488,12 +5616,12 @@ function menuNav(){
   bs.forEach((b,i)=>b.classList.toggle('pad-focus',i===menuIdx&&lastDevice==='pad'));
   if(padP(0))bs[menuIdx].click();else if(G.state==='paused'&&(padP(1)||padP(9)))resume();
 }
-function openPause(){if(G.state!=='play')return;G.state='paused';showScreen('pause',true);menuIdx=0;
+function openPause(){if(G.state!=='play')return;lockPrompt(false);G.state='paused';showScreen('pause',true);menuIdx=0;
   $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped.`;
   if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
-function resume(){cheatBoxToggle(false);VRCHEAT.on=false;showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();}
+function resume(){cheatBoxToggle(false);VRCHEAT.on=false;showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();lockCheck();}
 function openMap(){if(G.state!=='play'&&G.state!=='paused')return;G.prevState=G.state;G.state='map';showScreen('pause',false);drawBigMap();showScreen('bigmap',true);if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
-function closeMap(){showScreen('bigmap',false);G.state='play';tryLock();}
+function closeMap(){showScreen('bigmap',false);G.state='play';tryLock();lockCheck();}
 $('btnResume').onclick=resume;$('btnMapP').onclick=openMap;
 $('btnRestart').onclick=()=>{try{localStorage.removeItem('gte-save-v1');}catch(e){}location.reload();};
 $('btnGrass').onclick=()=>setGrassLevel((GRASS.level+3)%4);
@@ -5542,12 +5670,13 @@ function spawnWorld(){
   {const[ax,az]=SW(16,14);new Car('ambulancia',ax,az,SERV.rot);}
   new Car('golf',222,244,Math.PI);
   new Car('todoterreno',-625,684,0.9);
+  {const p=spawnNear(SPOTS.presa.x,SPOTS.presa.z,14);new Car('camper',p.x,p.z,rr(0,TAU),0x5f9ea0);}{const s=SERVICE.taller;if(s){const c=Math.cos(s.rot),sn=Math.sin(s.rot),lx=-6,lz=12,x=s.x+lx*c+lz*sn,z=s.z-lx*sn+lz*c;const p=spawnNear(x,z,6);new Car('pickup',p.x,p.z,s.rot,0xe8e4d8);}}
   airHomes();spawnAircraft('avioneta');spawnAircraft('heli');spawnAircraft('acro');
   new Car('taxi',790,298,-Math.PI/2);
   // aparcados en las calles del casco
   const streets=ROADS.filter(r=>r.b===1);let placed=0;
   for(let k=0;k<200&&placed<11;k++){const r=pick(streets);const i=randi(3,r.pts.length-4);const a=r.pts[i],b=r.pts[i+1];let dx=b[0]-a[0],dz=b[1]-a[1];const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
-    const ty=pick(['pelotilla','berlina','furgo','todoterreno','pelotilla']),off=r.w+0.35+Math.max(0,CAR_TYPES[ty].wid/2-0.85);const x=a[0]-dz*off,z=a[1]+dx*off;if(otherRoadNear(x,z,r,6)||CARS.some(c=>Math.hypot(c.x-x,c.z-z)<10)||blockedAt(x,z,1.2))continue;new Car(ty,x,z,Math.atan2(dx,dz));placed++;}
+    const ty=pick(['pelotilla','berlina','furgo','todoterreno','pelotilla','pickup','camper']),off=r.w+0.35+Math.max(0,CAR_TYPES[ty].wid/2-0.85);const x=a[0]-dz*off,z=a[1]+dx*off;if(otherRoadNear(x,z,r,6)||CARS.some(c=>Math.hypot(c.x-x,c.z-z)<10)||blockedAt(x,z,1.2))continue;new Car(ty,x,z,Math.atan2(dx,dz));placed++;}
   // tráfico
   const FL='Calle Floridablanca',ES='Carretera de la Estación',BO='Paseo de Carlos III',AL='Paseo de los Alamillos',RE='Calle del Rey',PA='Calle del Patriarca',JL='Calle Juan de Leyva',RV='Calle Reina Victoria',M6='Carretera de Guadarrama (M-600)',HE='Carretera de la Herrería (M-505)',AB='Carretera de Abantos',PO='Calle Pozas',AV='Carretera de Ávila',DM='Calle Duque de Medinaceli';
   const loops=[
@@ -5561,13 +5690,14 @@ function spawnWorld(){
   for(const[R,count] of loops){
     const sp=R.map(p=>{const r=nearestRoad(p[0],p[1]);return r&&r.road.t==='c'?15:10;});
     for(let c=0;c<count;c++){for(let t=0;t<30;t++){const i=randi(0,R.length-1);const[x,z]=laneTarget(R,i);if(Math.hypot(x-P.x,z-P.z)<40||CARS.some(o=>Math.hypot(o.x-x,o.z-z)<14))continue;
-      const nx=R[(i+1)%R.length];const car=new Car(pick(['pelotilla','berlina','taxi','furgo','todoterreno','berlina']),x,z,Math.atan2(nx[0]-R[i][0],nx[1]-R[i][1]));car.ai={mode:'route',route:R,i:(i+1)%R.length,sp,stuck:0,rev:0};car.driver={};break;}}
+      const nx=R[(i+1)%R.length];const car=new Car(pick(['pelotilla','berlina','taxi','furgo','todoterreno','berlina','pickup','camper']),x,z,Math.atan2(nx[0]-R[i][0],nx[1]-R[i][1]));car.ai={mode:'route',route:R,i:(i+1)%R.length,sp,stuck:0,rev:0};car.driver={};break;}}
   }
   // botiquines y chalecos
   for(const[x,z] of[[-150,-60],CW(532,206),[-600,694],[790,300],[62,-205],[-40,-305]])spawnPickup('health',null,x,z,{fixed:true});
   for(const[x,z] of[[-122,-198],[-466,-1034],[228,238]])spawnPickup('armor',null,x,z,{fixed:true});
 }
-function cleanupCars(){for(const c of CARS.slice()){if(c===P.car)continue;const d=Math.hypot(c.x-P.x,c.z-P.z);if((c.temp&&!c.ai&&d>260)||(c.dead&&d>300&&c.temp))c.remove();}}
+function cleanupCars(){for(const c of CARS.slice()){if(c===P.car)continue;const d=Math.hypot(c.x-P.x,c.z-P.z);if((c.temp&&!c.ai&&d>260)||(c.dead&&d>300&&c.temp)){c.remove();continue;}
+  if(c.dead){if(c.diedAt===undefined)c.diedAt=G.time;const age=G.time-c.diedAt;if(age>120&&(d>30||age>150)){FX.smoke(c.x,c.y+1,c.z,0.4);c.remove();}}}}   // coches calcinados: a los 2 minutos se los lleva la grúa
 function updateAudio(dt){
   if(!AU.ctx)return;const t=AU.ctx.currentTime;const e=AU.eng,c=P.car;
   if(P.plane&&!P.plane.dead&&G.state==='play'){const pl=P.plane;
@@ -5628,7 +5758,7 @@ function frameBody(now,xrf){
     }
     updateBubbles(rdt);updateHUD(rdt);drawMinimap();
   }
-  else if(G.state==='shop'){menuNav();if(KP.has('Escape')||padP(1)||tP('pause'))closeShop();}
+  else if(G.state==='shop'){menuNav();if(KP.has('KeyP')){closeShop();openPause();}else if(KP.has('Escape')||padP(1)||tP('pause'))closeShop();}
   else if(G.state==='paused'||G.state==='credits'){menuNav();if(G.state==='paused'&&KP.has('KeyM')&&!cheatTyping())openMap();}
   else if(G.state==='map'){if(I.map||I.pause||padP(1))closeMap();}
   if(IS_TOUCH&&!VR.on&&G.state==='play'&&innerHeight>innerWidth*1.05)openPause();
