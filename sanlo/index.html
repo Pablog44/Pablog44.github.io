@@ -157,6 +157,9 @@ button.b:focus-visible,button.b.pad-focus{ outline:3px solid #fff; outline-offse
 #pauseInner{ width:min(560px,92vw); margin:auto 0; padding:16px 0; }
 #pause h2{ font-family:var(--display); font-size:64px; font-weight:400; margin:0 0 16px; }
 button.b.dim{ opacity:0.45; }
+#cheatBox{ margin:-12px 0 22px; } .cheatRow{ display:flex; gap:10px; }
+#cheatIn{ flex:1; min-width:0; font-family:var(--ui); font-size:21px; font-weight:700; padding:9px 14px; background:rgba(10,12,16,.55); color:#F3EEE3; border:2px solid var(--oro); outline:none; letter-spacing:1px; }
+#cheatIn:focus{ border-color:#fff; } #cheatMsg{ min-height:22px; margin-top:8px; font-size:17px; font-weight:600; } #cheatMsg.ok{ color:#9fe870; } #cheatMsg.bad{ color:#ff8a6c; }
 #pause .btns{ flex-direction:column; align-items:flex-start; }
 .sliders{ display:grid; grid-template-columns:auto 1fr; gap:10px 16px; align-items:center; font-size:18px; font-weight:600; margin-bottom:18px; }
 .sliders input{ accent-color:var(--oro); width:100%; }
@@ -362,8 +365,10 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
       <button class="b alt" id="btnGrass">Césped: Alto</button>
       <button class="b alt" id="btnGrassD">Alcance del césped: 170 m</button>
       <button class="b alt" id="btnFps">Mostrar FPS: no</button>
+      <button class="b alt" id="btnCheats">Trucos</button>
       <button class="b alt" id="btnRestart">Empezar de cero</button>
     </div>
+    <div id="cheatBox" class="hidden"><div class="cheatRow"><input id="cheatIn" type="text" maxlength="20" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Escribe un truco y pulsa Intro"><button class="b" id="btnCheatOk">Aplicar</button></div><div id="cheatMsg"></div></div>
   </div>
 </div>
 
@@ -665,7 +670,7 @@ const ROADS=[
  {n:'Calle Grimaldi',w:3.4,t:'s',b:0,p:[[-15,-178],[-15,-140]]},
  {n:'Calle Pozas',w:4,t:'s',b:1,p:[[-30,-300],[-95,-300],[-165,-292]]},
  {n:'Calle de Santiago',w:4,t:'s',b:1,p:[[-95,-300],[-100,-238]]},
- {n:'Carretera de Abantos',w:5,t:'c',b:0,p:[[-165,-292],[-225,-330],[-258,-398],[-222,-458],[-280,-520],[-360,-540],[-335,-615],[-268,-680],[-320,-760],[-418,-800],[-468,-890],[-430,-975],[-472,-1040]]},
+ {n:'Carretera de Abantos',w:5,t:'c',b:0,p:[[-165,-292],[-225,-330],[-258,-398],[-222,-458],[-280,-520],[-360,-540],[-335,-615],[-268,-680],[-320,-760],[-418,-800],[-468,-890],[-430,-975],[-452,-1004],[-461,-1024]]},
  {n:'Paseo de los Alamillos',w:4.4,t:'s',b:0,p:[[-143,140],[-160,166],[-180,188],[-195,205]]},
  {n:'Carretera de la Herrería (M-505)',w:5.5,t:'c',b:0,p:[[-195,205],[-240,262],[-298,332],[-356,420],[-418,515],[-478,590],[-532,640],[-590,680],[-612,700]]},
  {n:'Carretera de Ávila',w:5,t:'c',b:2,p:[[-141,-30],[-200,-15],[-298,25],[-398,95],[-470,160]]},
@@ -739,6 +744,8 @@ const STAIR=(()=>{const r=nearestRoad(-138,0),htop=(r?r.h:H0+3)+0.12,N=Math.max(
 HLOCK.push({x0:-120.5,x1:116,z0:-147.5,z1:96,f:()=>H0});               // la Lonja, llana de verdad hasta el muro
 HLOCK.push({x0:-121.9,x1:93.9,z0:96.1,z1:152.4,f:()=>H0-0.4});         // Jardín de los Frailes: el Paseo de Carlos III corre junto a su muro
 HLOCK.push({x0:-129,x1:-127,z0:-9,z1:9,f:()=>STAIR.htop-0.15});           // bajo la escalinata, por debajo de los peldaños
+HLOCK.push({x0:-497,x1:-466,z0:-1065,z1:-1049,f:(x,z,h)=>{const F=FLAT.find(f=>f.x0===-500&&f.z0===-1068);return F?F.h:h;}});   // casa de Nacho: el talud de la vía no se mete dentro
+HLOCK.push({x0:-489,x1:-466,z0:-1009,z1:-1007,f:(x,z,h)=>{const F=FLAT.find(f=>f.x0===-500&&f.z0===-1068);return F?Math.min(h,F.h-3.5):h;}});   // mirador: el terreno cae delante del balcón y se ve el valle
 function buildHeights(){
   for(let j=0;j<=GN;j++)for(let i=0;i<=GN;i++){
     const x=-HALF+i*CELL,z=-HALF+j*CELL;
@@ -1457,6 +1464,410 @@ function lonjaBorde(y,gap){
     STONE.box(x,top-0.4,z,0.55,1.1,0.55,0,GRAN,1,1,null,true,true);const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(0.85);b.position.set(x,top+0.7+0.5,z);b.castShadow=true;scene.add(b);}
 }
 
+// =====================================================================
+//  CASA DE NACHO junto al Mirador de Abantos
+//  casa de piedra con interior (cocina, salón, cama y armario con la ropa comprada) y dos garajes con puerta
+//  basculante: al acercarte se levanta; al cerrarse con un coche dentro, el coche queda guardado en la partida
+// =====================================================================
+const CASA={built:false,y:0,shop:{id:'armario',name:'Armario de Nacho',vend:'Nacho'},wardrobe:{x:-494.25,z:-1058.5},mirror:{x:-489,z:-1055},bed:{x:-493.4,z:-1061.6},door:null,doorColl:null,doorOpen:0};
+const GAR=[];
+function casaBox(B,x0,x1,y0,y1,z0,z1,col,coll,tag='b',tw=2,th=2){if(x1-x0<0.005||y1-y0<0.005||z1-z0<0.005)return;B.box((x0+x1)/2,y0,(z0+z1)/2,(x1-x0)/2,y1-y0,(z1-z0)/2,0,col,tw,th);if(coll)addCollider((x0+x1)/2,(z0+z1)/2,(x1-x0)/2,(z1-z0)/2,0,y0-1,y1+0.3,tag);}
+// muro con huecos. ax='x': corre a lo largo de x (de c0 a c1) con grosor t0..t1 en z; ax='z': a lo largo de z con grosor en x
+// huecos: [a,b,ya,yb,puerta] — las ventanas llevan colisión (cristal), las puertas no
+function casaMuro(B,col,ax,c0,c1,t0,t1,yb,yt,holes,coll){
+  const put=(a,b,ya,y2)=>{if(ax==='x')casaBox(B,a,b,ya,y2,t0,t1,col,false);else casaBox(B,t0,t1,ya,y2,a,b,col,false);};
+  const cl=(a,b)=>{if(!coll||b-a<0.01)return;if(ax==='x')addCollider((a+b)/2,(t0+t1)/2,(b-a)/2,(t1-t0)/2,0,yb-1,yt+0.3,'b');else addCollider((t0+t1)/2,(a+b)/2,(t1-t0)/2,(b-a)/2,0,yb-1,yt+0.3,'b');};
+  const hs=(holes||[]).slice().sort((p,q)=>p[0]-q[0]);let c=c0,run=c0;
+  for(const[a,b,ya,y2,door]of hs){put(c,a,yb,yt);put(a,b,yb,ya);put(a,b,y2,yt);if(door){cl(run,a);run=b;}c=b;}
+  put(c,c1,yb,yt);cl(run,c1);
+}
+function casaTex(w,h,draw){const c=mkCanvas(w,h),g=c.getContext('2d');draw(g,w,h);return texFrom(c,false);}
+function buildCasaNacho(){
+  const y=groundH(-485,-1040);CASA.y=y;
+  const INT=new GB(new THREE.MeshLambertMaterial({vertexColors:true,emissive:new THREE.Color(0x3b342b)}),false),CEIL=new GB(new THREE.MeshBasicMaterial({vertexColors:true}),false),GLS=new GB(new THREE.MeshLambertMaterial({vertexColors:true,transparent:true,opacity:0.32,depthWrite:false,side:THREE.DoubleSide}),false);
+  const WOOD=[0.45,0.3,0.18],DKW=[0.3,0.2,0.12],PLAST=[0.93,0.89,0.8],WHITE2=[0.95,0.95,0.93],CREAM=[0.86,0.8,0.68],GLASS=[0.16,0.24,0.32],SHUT=[0.22,0.42,0.27];
+  // ---------------- plaza del mirador: empedrado, balcón de grava al sur y zona de merendero al este
+  if(!MAT.plaza)MAT.plaza=new THREE.MeshLambertMaterial({map:TEX.street,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
+  pave(-496,-447,-1050,-1025,0,MAT.plaza,3);pave(-466,-447,-1025,-1020.5,0,MAT.plaza,3);
+  // aparcamiento pintado junto al merendero y dos jardineras con árbol delante de la casa
+  for(let z=-1048;z<=-1032.9;z+=3)PROPS.box(-452.5,y+0.01,z,3,0.02,0.06,0,[0.93,0.93,0.9]);PROPS.box(-455.5,y+0.01,-1040.5,0.06,0.02,7.5,0,[0.93,0.93,0.9]);
+  for(const[x,z]of[[-493,-1036],[-484.5,-1036]]){const pl=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.1,0.55,16),new THREE.MeshLambertMaterial({map:TEX.granite}));pl.position.set(x,y+0.27,z);pl.castShadow=true;scene.add(pl);
+    const so=new THREE.Mesh(new THREE.CircleGeometry(0.92,16),M(0x4a3524));so.rotation.x=-Math.PI/2;so.position.set(x,y+0.5,z);scene.add(so);addCollider(x,z,1.05,1.05,0,y-1,y+0.6,'wall');addTree('oak',x,z,0.75);}
+  pave(-486,-466,-1025,-1016.6,0,MAT.gravel,6);pave(-466,-447,-1064.3,-1050,0,MAT.gravel,6);
+  for(let x=-495.5;x<=-466.5;x+=1.0)STONE.box(x,y-0.1,-1025.15,0.5,0.25,0.15,0,GRAN,1,1);                 // bordillo entre el empedrado y el balcón
+  // ---------------- casa (planta baja de piedra, tejado de pizarra). Fachada al sur (z=-1050)
+  const LX0=-496,LX1=-480,LZ0=-1064,LZ1=-1050,WT=0.4,HT=3.5,yb=y-0.6,yt=y+HT;
+  const doorX0=-488.6,doorX1=-487.4,DH=2.3,win=(c)=>[c-0.7,c+0.7,y+1.0,y+2.2,false];
+  casaMuro(STONE,GRAN,'x',LX0,LX1,LZ1-WT,LZ1,yb,yt,[win(-493),[doorX0,doorX1,y-0.6,y+DH,true],win(-483.5)],true);   // fachada
+  casaMuro(STONE,GRAN,'x',LX0,LX1,LZ0,LZ0+WT,yb,yt,[win(-485.6)],true);                                             // trasera
+  casaMuro(STONE,GRAN,'z',LZ0,LZ1,LX0,LX0+WT,yb,yt,[],true);                                                      // poniente (contra el monte)
+  casaMuro(STONE,GRAN,'z',LZ0,LZ1,LX1-WT,LX1,yb,yt,[],true);                                                      // pared con el garaje
+  STONE.box((LX0+LX1)/2,yt-0.05,(LZ0+LZ1)/2,(LX1-LX0)/2+0.25,0.35,(LZ1-LZ0)/2+0.25,0,GRAN,2,1,null,true,true);    // cornisa
+  ROOF.hip((LX0+LX1)/2,yt+0.3,(LZ0+LZ1)/2,(LX1-LX0)/2,(LZ1-LZ0)/2,0,2.9,0.55,SLATE);
+  STONE.box(-484.5,yt+0.8,-1060,0.55,3.3,0.55,0,GRAN,1,1);STONE.box(-484.5,yt+4.1,-1060,0.7,0.2,0.7,0,GRAN,1,1);     // chimenea
+  addCollider((LX0+LX1)/2,(LZ0+LZ1)/2,(LX1-LX0)/2,(LZ1-LZ0)/2,0,y+3.3,y+7,'b');                                  // techo (para la cámara)
+  {const ZC=[0.78,0.74,0.68],zt=y+0.9;   // zócalo: tres lados, con el hueco de la puerta libre (no entra en el garaje)
+   casaBox(STONE,LX0-0.12,doorX0-0.12,yb,zt,LZ1-0.05,LZ1+0.12,ZC,false);casaBox(STONE,doorX1+0.12,LX1,yb,zt,LZ1-0.05,LZ1+0.12,ZC,false);
+   casaBox(STONE,LX0-0.12,LX1,yb,zt,LZ0-0.12,LZ0+0.05,ZC,false);casaBox(STONE,LX0-0.12,LX0+0.05,yb,zt,LZ0-0.12,LZ1+0.12,ZC,false);
+   // marco de la puerta: jambas y dintel de granito por fuera, de madera por dentro
+   const FC=[0.84,0.8,0.72];casaBox(STONE,doorX0-0.14,doorX0,y-0.02,y+DH+0.08,LZ1-0.02,LZ1+0.13,FC,false);casaBox(STONE,doorX1,doorX1+0.14,y-0.02,y+DH+0.08,LZ1-0.02,LZ1+0.13,FC,false);
+   casaBox(STONE,doorX0-0.2,doorX1+0.2,y+DH,y+DH+0.2,LZ1-0.02,LZ1+0.15,FC,false);}
+  // ventanas: cristal, marco, alféizar y contraventanas verdes
+  const ventana=(ax,c,pos,out)=>{const w=1.4,h=1.2,y0=y+1.0;
+    if(ax==='x'){GLS.box(c,y0,pos,w/2,h,0.03,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(c+s*(w/2+0.05),y0-0.05,pos+out*0.21,0.06,h+0.1,0.04,0,WOOD);PROPS.box(c+s*(w/2+0.42),y0,pos+out*0.25,0.36,h,0.03,0,SHUT);}
+      PROPS.box(c,y0+h/2-0.03,pos,w/2,0.06,0.05,0,WOOD);PROPS.box(c,y0-0.1,pos+out*0.25,w/2+0.12,0.1,0.18,0,GRAN);PROPS.box(c,y0+h,pos+out*0.21,w/2+0.1,0.08,0.04,0,WOOD);}
+    else{GLS.box(pos,y0,c,0.03,h,w/2,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(pos+out*0.21,y0-0.05,c+s*(w/2+0.05),0.04,h+0.1,0.06,0,WOOD);PROPS.box(pos+out*0.25,y0,c+s*(w/2+0.42),0.03,h,0.36,0,SHUT);}
+      PROPS.box(pos,y0+h/2-0.03,c,0.05,0.06,w/2,0,WOOD);PROPS.box(pos+out*0.25,y0-0.1,c,0.18,0.1,w/2+0.12,0,GRAN);}};
+  ventana('x',-493,LZ1-0.2,1);ventana('x',-483.5,LZ1-0.2,1);ventana('x',-485.6,LZ0+0.2,-1);
+  // porche: dos postes, tejadillo, escalón, farol, felpudo, macetas y el letrero
+  for(const x of[-489.4,-486.6]){PROPS.box(x,y,-1048.4,0.09,2.75,0.09,0,DKW);}PROPS.box(-488,y+2.7,-1049.2,1.75,0.12,0.95,0,DKW);ROOF.hip(-488,y+2.82,-1049.2,1.8,1.0,0,0.45,0.15,SLATE);
+  STONE.box(-488,y-0.2,-1049.3,1.0,0.32,0.75,0,GRAN,1,1);PROPS.box(-488,y+0.13,-1049.2,0.5,0.02,0.32,0,[0.5,0.36,0.22]);
+  {const m=new THREE.Mesh(BOXG,ME(0xfff1c4,0xffd890,0.9));m.scale.set(0.16,0.24,0.16);m.position.set(-489.1,y+2.2,-1049.93);scene.add(m);PROPS.box(-489.1,y+2.04,-1049.98,0.03,0.06,0.04,0,IRON);}
+  for(const x of[-490.2,-485.8]){STONE.box(x,y,-1049.3,0.32,0.45,0.32,0,[0.62,0.36,0.26],1,1);HEDGE.box(x,y+0.45,-1049.3,0.34,0.4,0.34,0,[0.3,0.55,0.25],1,1);
+    for(let k=0;k<4;k++)PROPS.box(x+(k%2?0.12:-0.12),y+0.82,-1049.3+(k<2?0.12:-0.12),0.06,0.06,0.06,0,[[0.9,0.2,0.25],[0.95,0.8,0.2],[0.75,0.3,0.7],[1,1,1]][k]);}
+  signMesh(signTex(['CASA DE NACHO'],512,96,'#3a2a1c','#f0e3c0','bold 52px Georgia,serif'),1.1,0.2,-488,y+2.6,-1049.82,0);
+  // puerta de entrada: se abre sola hacia dentro al acercarte
+  {const piv=new THREE.Group();piv.position.set(doorX0,y,-1050.2);scene.add(piv);const dm=new THREE.Mesh(new THREE.BoxGeometry(1.2,DH,0.06),new THREE.MeshLambertMaterial({map:MAT.door.map}));dm.position.set(0.6,DH/2,0);dm.castShadow=true;piv.add(dm);
+   const kn=new THREE.Mesh(BOXG,M(0xc9a13b));kn.scale.set(0.06,0.06,0.1);kn.position.set(1.05,1.05,0);piv.add(kn);CASA.door=piv;CASA.doorColl=addCollider(-488,-1050.2,0.6,0.08,0,y-1,y+DH,'b');}
+  // ---------------- interior de la casa
+  const IX0=LX0+WT,IX1=LX1-WT,IZ0=LZ0+WT,IZ1=LZ1-WT,yc=y+3.25,e=0.012;
+  {const fl=casaTex(256,256,(g,w,h)=>{g.fillStyle='#8a5f3a';g.fillRect(0,0,w,h);for(let r=0;r<8;r++){const o=(r%2)*64;for(let x=-64+o;x<w;x+=128){g.fillStyle=`rgba(${60+Math.random()*40|0},${35+Math.random()*25|0},15,0.35)`;g.fillRect(x,r*32,128,32);}g.fillStyle='rgba(30,18,8,0.6)';g.fillRect(0,r*32,w,2);}});
+   fl.wrapS=fl.wrapT=THREE.RepeatWrapping;fl.repeat.set((IX1-IX0)/3,(IZ1-IZ0)/3);
+   const fm=new THREE.Mesh(new THREE.PlaneGeometry(IX1-IX0,IZ1-IZ0),new THREE.MeshLambertMaterial({map:fl,emissive:new THREE.Color(0x2a1e14),polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));fm.rotation.x=-Math.PI/2;fm.position.set((IX0+IX1)/2,y+0.03,(IZ0+IZ1)/2);fm.receiveShadow=true;scene.add(fm);PAVED.push([LX0,LX1,LZ0,LZ1]);}
+  CEIL.quad([IX0,yc,IZ0],[IX1,yc,IZ0],[IX1,yc,IZ1],[IX0,yc,IZ1],[0,0],[1,0],[1,1],[0,1],[0.8,0.77,0.71]);            // techo (sin sombra, siempre claro)
+  for(let x=IX0+1.5;x<IX1;x+=3){casaBox(CEIL,x-0.09,x+0.09,yc-0.22,yc,IZ0,IZ1,[0.36,0.25,0.16],false);CEIL.quad([x-0.09,yc-0.22,IZ0],[x+0.09,yc-0.22,IZ0],[x+0.09,yc-0.22,IZ1],[x-0.09,yc-0.22,IZ1],[0,0],[1,0],[1,1],[0,1],[0.3,0.2,0.12]);}   // vigas de madera
+  // revoco interior de las paredes (con sus huecos)
+  casaMuro(INT,PLAST,'x',IX0,IX1,IZ1-e-0.01,IZ1-e,y,yc,[win(-493),[doorX0,doorX1,y-0.6,y+DH,true],win(-483.5)],false);
+  casaMuro(INT,PLAST,'x',IX0,IX1,IZ0+e,IZ0+e+0.01,y,yc,[win(-485.6)],false);
+  casaMuro(INT,PLAST,'z',IZ0,IZ1,IX0+e,IX0+e+0.01,y,yc,[],false);
+  casaMuro(INT,PLAST,'z',IZ0,IZ1,IX1-e-0.01,IX1-e,y,yc,[],false);
+  for(const[a,b,c,d]of[[IX0,IX1,IZ1-0.12,IZ1-0.02],[IX0,IX1,IZ0+0.02,IZ0+0.12]])casaBox(INT,a,b,y,y+0.12,c,d,DKW,false);   // rodapiés
+  // cocina (rincón nordeste): encimera, fogones, fregadero, armarios altos y nevera
+  casaBox(INT,-486.4,-481.3,y,y+0.88,IZ0,IZ0+0.62,WHITE2,true);casaBox(INT,-486.45,-481.25,y+0.88,y+0.93,IZ0,IZ0+0.66,[0.35,0.33,0.31],false);
+  casaBox(INT,-483.9,-483.1,y+0.93,y+0.95,IZ0+0.1,IZ0+0.55,[0.08,0.08,0.09],false);casaBox(INT,-486.0,-485.2,y+0.9,y+0.94,IZ0+0.12,IZ0+0.5,[0.7,0.72,0.75],false);   // fogones y fregadero (bajo la ventana)
+  casaBox(INT,-485.63,-485.57,y+0.93,y+1.22,IZ0+0.04,IZ0+0.1,[0.75,0.76,0.8],false);casaBox(INT,-485.63,-485.57,y+1.16,y+1.22,IZ0+0.04,IZ0+0.3,[0.75,0.76,0.8],false);casaBox(INT,-486.3,-484.9,y+0.98,y+1.0,IZ0,IZ0+0.08,[0.85,0.82,0.75],false);
+  casaBox(INT,-484.65,-481.3,y+1.55,y+2.25,IZ0,IZ0+0.36,[0.9,0.88,0.82],false);for(let x=-484.25;x<-481.3;x+=0.82)casaBox(INT,x,x+0.04,y+1.6,y+2.2,IZ0+0.36,IZ0+0.38,[0.6,0.55,0.45],false);
+  casaBox(INT,-481.2,IX1-0.05,y,y+1.9,IZ0,IZ0+0.7,[0.92,0.93,0.94],true);casaBox(INT,-481.0,-480.97,y+0.9,y+1.5,IZ0+0.7,IZ0+0.72,[0.6,0.6,0.62],false);
+  // mesa de comedor con cuatro sillas
+  casaBox(INT,-485.3,-483.7,y+0.72,y+0.78,-1059.5,-1058.5,WOOD,false);for(const[a,b]of[[-485.2,-1059.4],[-483.8,-1059.4],[-485.2,-1058.6],[-483.8,-1058.6]])casaBox(INT,a-0.04,a+0.04,y,y+0.72,b-0.04,b+0.04,DKW,false);
+  addCollider(-484.5,-1059,0.8,0.5,0,y-1,y+0.78,'b');
+  for(const[cx,cz,dz]of[[-484.9,-1060.1,-1],[-484.1,-1060.1,-1],[-484.9,-1057.9,1],[-484.1,-1057.9,1]]){casaBox(INT,cx-0.22,cx+0.22,y+0.42,y+0.47,cz-0.22,cz+0.22,WOOD,false);casaBox(INT,cx-0.22,cx+0.22,y+0.47,y+0.95,cz+dz*0.2-0.03,cz+dz*0.2+0.03,WOOD,false);for(const sx of[-0.18,0.18])for(const sz of[-0.18,0.18])casaBox(INT,cx+sx-0.02,cx+sx+0.02,y,y+0.42,cz+sz-0.02,cz+sz+0.02,DKW,false);}
+  // cama (rincón noroeste) con mesilla y lámpara
+  casaBox(INT,IX0,-493.9,y,y+0.42,IZ0,IZ0+2.05,DKW,true);casaBox(INT,IX0+0.03,-493.95,y+0.42,y+0.6,IZ0+0.05,IZ0+2.0,[0.95,0.94,0.9],false);
+  casaBox(INT,IX0+0.05,-493.95,y+0.58,y+0.66,IZ0+0.75,IZ0+2.02,[0.72,0.18,0.18],false);casaBox(INT,IX0+0.25,-494.15,y+0.6,y+0.75,IZ0+0.12,IZ0+0.55,WHITE2,false);
+  casaBox(INT,IX0,-493.9,y+0.42,y+1.25,IZ0,IZ0+0.08,WOOD,false);
+  casaBox(INT,-493.7,-493.2,y,y+0.55,IZ0+0.05,IZ0+0.5,WOOD,true);{const l=new THREE.Mesh(BOXG,ME(0xfff3d0,0xffe2a0,0.8));l.scale.set(0.22,0.25,0.22);l.position.set(-493.45,y+0.85,IZ0+0.28);scene.add(l);casaBox(INT,-493.47,-493.43,y+0.55,y+0.72,IZ0+0.26,IZ0+0.3,[0.2,0.2,0.2],false);}
+  // armario (pared de poniente)
+  casaBox(INT,IX0,IX0+0.62,y,y+2.25,-1059.5,-1057.5,WOOD,true);casaBox(INT,IX0+0.62,IX0+0.64,y+0.05,y+2.2,-1058.52,-1058.48,DKW,false);
+  for(const z of[-1058.75,-1058.25])casaBox(INT,IX0+0.64,IX0+0.68,y+1.0,y+1.3,z-0.02,z+0.02,[0.8,0.65,0.3],false);
+  // salón: tele en la pared de poniente, sofá, butaca, mesa baja, alfombra, estantería, lámpara de pie y plantas
+  casaBox(INT,IX0,IX0+0.45,y,y+0.5,-1054.6,-1052.4,DKW,true);casaBox(INT,IX0+0.12,IX0+0.18,y+0.55,y+1.35,-1054.3,-1052.7,[0.06,0.06,0.07],false);
+  {const cv=mkCanvas(384,192),tv=texFrom(cv,false);CASA.tv={cv,g:cv.getContext('2d'),tex:tv,t:9};tvDraw(0.3);
+   const s=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.74),new THREE.MeshBasicMaterial({map:tv}));s.position.set(IX0+0.19,y+0.95,-1053.5);s.rotation.y=Math.PI/2;scene.add(s);}
+  casaBox(INT,-492.3,-491.4,y,y+0.45,-1054.9,-1052.1,[0.32,0.38,0.5],true);casaBox(INT,-491.7,-491.4,y+0.45,y+0.95,-1054.9,-1052.1,[0.3,0.36,0.48],false);
+  for(const z of[-1054.9,-1052.35])casaBox(INT,-492.3,-491.4,y+0.45,y+0.7,z,z+0.25,[0.3,0.36,0.48],false);
+  for(const z of[-1054.1,-1053.1])casaBox(INT,-492.25,-491.75,y+0.45,y+0.62,z-0.42,z+0.42,[0.4,0.46,0.6],false);
+  casaBox(INT,-494.2,-493.2,y+0.38,y+0.44,-1054.0,-1053.0,WOOD,true);for(const[a,b]of[[-494.1,-1053.9],[-493.3,-1053.9],[-494.1,-1053.1],[-493.3,-1053.1]])casaBox(INT,a-0.03,a+0.03,y,y+0.38,b-0.03,b+0.03,DKW,false);
+  casaBox(INT,-494.9,-491.6,y+0.005,y+0.02,-1055.1,-1051.9,[0.62,0.2,0.18],false);casaBox(INT,-494.6,-491.9,y+0.01,y+0.025,-1054.8,-1052.2,[0.86,0.72,0.42],false);
+  casaBox(INT,-490.6,-489.8,y,y+0.42,-1051.6,-1050.8,[0.55,0.3,0.2],true);casaBox(INT,-490.6,-489.8,y+0.42,y+0.9,-1050.8,-1050.6,[0.55,0.3,0.2],false);
+  casaBox(INT,-491.2,-489.0,y,y+2.0,IZ0,IZ0+0.38,WOOD,true);for(let k=1;k<5;k++)casaBox(INT,-491.15,-489.05,y+k*0.4,y+k*0.4+0.03,IZ0+0.02,IZ0+0.37,DKW,false);
+  for(let k=0;k<22;k++){const sh=k%4,x=-491.1+((k*0.37)%2.0),h=0.22+((k*7)%5)*0.03;casaBox(INT,x,x+0.07,y+sh*0.4+0.03,y+sh*0.4+0.03+h,IZ0+0.06,IZ0+0.3,[[0.62,0.15,0.15],[0.15,0.32,0.55],[0.2,0.45,0.25],[0.8,0.65,0.25],[0.4,0.25,0.5]][k%5],false);}
+  casaBox(INT,-480.9,-480.75,y,y+1.55,-1051.2,-1051.05,[0.2,0.2,0.2],false);{const l=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,0.3,10),ME(0xfff1cc,0xffe0a0,0.7));l.position.set(-480.83,y+1.7,-1051.12);scene.add(l);}
+  for(const[px,pz]of[[IX0+0.35,IZ1-0.35],[IX1-0.35,-1055.6]]){casaBox(INT,px-0.2,px+0.2,y,y+0.4,pz-0.2,pz+0.2,[0.65,0.38,0.25],false);casaBox(INT,px-0.28,px+0.28,y+0.4,y+1.1,pz-0.28,pz+0.28,[0.25,0.5,0.24],false);}
+  {const pic=casaTex(256,160,(g,w,h)=>{g.fillStyle='#6b4a2a';g.fillRect(0,0,w,h);g.fillStyle='#a9c7e3';g.fillRect(10,10,w-20,h-20);g.fillStyle='#5f7d4d';g.beginPath();g.moveTo(10,110);g.lineTo(90,60);g.lineTo(170,95);g.lineTo(246,70);g.lineTo(246,150);g.lineTo(10,150);g.fill();
+     g.fillStyle='#d8cdb5';g.fillRect(70,96,120,34);g.fillStyle='#55606b';g.fillRect(64,90,132,8);g.beginPath();g.arc(130,92,14,Math.PI,0);g.fill();g.fillRect(74,80,8,12);g.fillRect(178,80,8,12);});
+   const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.82),new THREE.MeshLambertMaterial({map:pic,emissive:new THREE.Color(0x222222)}));p.position.set(-490.45,y+1.75,IZ1-0.03);p.rotation.y=Math.PI;scene.add(p);}
+  {const l=new THREE.Mesh(new THREE.SphereGeometry(0.28,12,8),ME(0xfff6dd,0xffe6b0,0.9));l.position.set(-486.6,yc-0.5,-1056.5);scene.add(l);casaBox(INT,-486.62,-486.58,yc-0.24,yc,-1056.52,-1056.48,[0.2,0.2,0.2],false);}
+  // ---------------- garajes: dos plazas con puerta basculante
+  const GX0=-480,GX1=-468.4,GZ0=-1060,GZ1=-1050,GH=3.2,gyt=y+GH,dH=2.8;
+  const bays=[{x0:-480,x1:-474.5,dc:-477.25,dw:4.4},{x0:-473.9,x1:-468.8,dc:-471.35,dw:4.3}];
+  PAVED.push([GX0,GX1,GZ0,GZ1]);
+  casaMuro(STONE,GRAN,'x',GX0,GX1,GZ1-WT,GZ1,yb,gyt,bays.map(b=>[b.dc-b.dw/2,b.dc+b.dw/2,y-0.6,y+dH,true]),true);
+  casaMuro(STONE,GRAN,'x',GX0,GX1,GZ0,GZ0+WT,yb,gyt,[],true);casaMuro(STONE,GRAN,'z',GZ0,GZ1,GX1-WT,GX1,yb,gyt,[],true);casaMuro(STONE,GRAN,'z',GZ0,GZ1,-474.5,-473.9,yb,gyt,[],true);
+  STONE.box((GX0+GX1)/2,gyt-0.05,(GZ0+GZ1)/2,(GX1-GX0)/2+0.22,0.3,(GZ1-GZ0)/2+0.22,0,GRAN,2,1,null,true,true);
+  ROOF.hip((GX0+GX1)/2,gyt+0.25,(GZ0+GZ1)/2,(GX1-GX0)/2,(GZ1-GZ0)/2,0,1.6,0.45,SLATE);
+  addCollider((GX0+GX1)/2,(GZ0+GZ1)/2,(GX1-GX0)/2,(GZ1-GZ0)/2,0,y+3.0,y+6,'b');
+  const doorTexG=casaTex(256,256,(g,w,h)=>{g.fillStyle='#e9e5da';g.fillRect(0,0,w,h);for(let k=0;k<8;k++){const yy=k*32;const gr=g.createLinearGradient(0,yy,0,yy+32);gr.addColorStop(0,'#f5f2ea');gr.addColorStop(0.85,'#d9d4c7');gr.addColorStop(1,'#a9a397');g.fillStyle=gr;g.fillRect(0,yy,w,32);}
+     g.fillStyle='rgba(0,0,0,0.25)';for(let x=8;x<w;x+=24)for(let k=0;k<8;k++)g.fillRect(x,k*32+12,10,2);g.fillStyle='#8b8577';g.fillRect(118,226,20,6);});
+  const dmat=new THREE.MeshLambertMaterial({map:doorTexG});
+  for(const b of bays){
+    const cz=(GZ0+GZ1)/2,inner=[b.x0+(b.x0===-480?0:0),b.x1];
+    // dentro: suelo de hormigón, techo, tubo fluorescente, estanterías y bidones
+    const fl=new THREE.Mesh(new THREE.PlaneGeometry(b.x1-b.x0,GZ1-WT-(GZ0+WT)),new THREE.MeshLambertMaterial({color:0x8d8b86,emissive:new THREE.Color(0x26251f),polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));fl.rotation.x=-Math.PI/2;fl.position.set((b.x0+b.x1)/2,y+0.03,(GZ0+WT+GZ1-WT)/2);scene.add(fl);
+    CEIL.quad([b.x0,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ1-WT],[b.x0,y+GH-0.14,GZ1-WT],[0,0],[1,0],[1,1],[0,1],[0.66,0.66,0.63]);
+    for(const[a,c]of[[b.x0+0.005,b.x0+0.015],[b.x1-0.015,b.x1-0.005]]){casaBox(INT,a,c,y,y+GH-0.14,GZ0+WT,GZ1-WT,[0.8,0.79,0.75],false);casaBox(INT,a-0.004,c+0.004,y,y+0.45,GZ0+WT,GZ1-WT,[0.42,0.4,0.37],false);}
+    casaBox(INT,b.x0+0.01,b.x1-0.01,y,y+GH-0.14,GZ0+WT+0.005,GZ0+WT+0.015,[0.8,0.79,0.75],false);casaBox(INT,b.x0+0.01,b.x1-0.01,y,y+0.45,GZ0+WT+0.002,GZ0+WT+0.019,[0.42,0.4,0.37],false);
+    {const t=new THREE.Mesh(BOXG,ME(0xffffff,0xf2f7ff,1.1));t.scale.set(0.12,0.06,2.4);t.position.set((b.x0+b.x1)/2,y+GH-0.2,cz);scene.add(t);}
+    casaBox(INT,b.x0+0.05,b.x0+0.5,y,y+1.9,GZ0+WT+0.3,GZ0+WT+2.2,[0.35,0.36,0.4],true);for(let k=1;k<4;k++)casaBox(INT,b.x0+0.05,b.x0+0.5,y+k*0.55,y+k*0.55+0.04,GZ0+WT+0.3,GZ0+WT+2.2,[0.55,0.56,0.6],false);
+    for(let k=0;k<5;k++)casaBox(INT,b.x0+0.1,b.x0+0.45,y+0.04+(k%3)*0.55,y+0.3+(k%3)*0.55,GZ0+WT+0.4+k*0.35,GZ0+WT+0.65+k*0.35,[[0.75,0.2,0.15],[0.85,0.68,0.2],[0.2,0.4,0.7]][k%3],false);
+    // puerta basculante (gira sobre su borde de arriba hacia dentro)
+    const piv=new THREE.Group();piv.position.set(b.dc,y+dH,GZ1-WT/2);scene.add(piv);const dm=new THREE.Mesh(new THREE.BoxGeometry(b.dw,dH,0.07),dmat);dm.position.set(0,-dH/2,0);dm.castShadow=true;piv.add(dm);
+    PROPS.box(b.dc,y+dH,GZ1+0.03,b.dw/2+0.12,0.16,0.06,0,[0.3,0.3,0.32]);for(const s of[-1,1])PROPS.box(b.dc+s*(b.dw/2+0.06),y,GZ1+0.03,0.06,dH,0.06,0,[0.3,0.3,0.32]);
+    {const m=new THREE.Mesh(BOXG,ME(0xfff1c4,0xffd890,0.9));m.scale.set(0.3,0.12,0.14);m.position.set(b.dc,y+dH+0.35,GZ1+0.08);scene.add(m);}
+    const coll=addCollider(b.dc,GZ1-WT/2,b.dw/2,0.12,0,y-1,y+dH+0.1,'b');
+    GAR.push({x0:b.x0,x1:b.x1,z0:GZ0+WT,z1:GZ1-WT/2,xc:b.dc,zd:GZ1,y,dH,piv,coll,open:0,slot:null,moving:false});
+  }
+  signMesh(signTex(['GARAJE'],256,64,'#2c2a28','#e9d9a8','bold 40px Georgia,serif'),1.2,0.3,-474.2,y+3.0,GZ1+0.05,0);
+  // ---------------- el mirador: balcón al sur con barandilla de piedra, prismáticos, bancos y panel; a poniente, un jardín con fuente
+  const BZ=-1016.3,BX0=-486,BX1=-466;
+  for(let x=BX0;x<=BX1+0.01;x+=2.5){const g=Math.min(y,groundH(x,BZ)-0.4);STONE.box(x,g,BZ,0.22,y+0.95-g,0.22,0,GRAN,1,1);
+    if(x<BX1-0.1){const g2=Math.min(y,groundH(x+1.25,BZ)-0.4,groundH(x+2.5,BZ)-0.4,g);STONE.box(x+1.25,g2,BZ,1.25,y+0.22-g2,0.18,0,GRAN,2,1);}}
+  STONE.box((BX0+BX1)/2,y+0.9,BZ,(BX1-BX0)/2+0.1,0.14,0.26,0,GRAN,2,1,null,true,true);
+  for(let x=BX0+0.5;x<BX1;x+=1.0)if(Math.abs(((x-BX0)%2.5))>0.4)STONE.box(x,y+0.22,BZ,0.06,0.68,0.06,0,GRAN,1,1);
+  addCollider((BX0+BX1)/2,BZ,(BX1-BX0)/2,0.25,0,y-3,y+1.1,'wall');
+  for(const x of[BX0,BX1]){const g=Math.min(y,groundH(x,BZ)-0.4);STONE.box(x,g,BZ,0.45,y+1.35-g,0.45,0,GRAN,1,1);const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(0.62);b.position.set(x,y+1.72,BZ);b.castShadow=true;scene.add(b);}
+  const scope=(x,z,yaw)=>{PROPS.box(x,groundH(x,z),z,0.06,y+1.05-groundH(x,z),0.06,0,[0.25,0.3,0.28]);const g=new THREE.Group();g.position.set(x,y+1.18,z);g.rotation.y=yaw;scene.add(g);
+    const tb=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,0.42,10),M(0x2f5e3b));tb.rotation.x=Math.PI/2;g.add(tb);const ey=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.12,8),M(0x1b1b1b));ey.rotation.x=Math.PI/2;ey.position.z=-0.26;g.add(ey);
+    const bx=new THREE.Mesh(BOXG,M(0x2f5e3b));bx.scale.set(0.16,0.12,0.16);bx.position.y=-0.1;g.add(bx);addCollider(x,z,0.15,0.15,0,y-2,y+1.3,'b');
+    {const ob=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.06,12),M(0x1b1b1b));ob.rotation.x=Math.PI/2;ob.position.set(0,0,0.22);g.add(ob);}
+    g.rotation.order='YXZ';TELE.list.push({x,z,y:y+1.18,yaw0:yaw,g});};
+  scope(-480,-1017.3,0.44);scope(-470,-1017.3,0.43);   // apuntan al Monasterio
+  for(const x of[-484,-475])graniteBench(x,-1019.6,0);
+  {const pan=casaTex(512,320,(g,w,h)=>{g.fillStyle='#3a3024';g.fillRect(0,0,w,h);g.fillStyle='#efe3c4';g.fillRect(12,12,w-24,h-24);g.fillStyle='#3a3024';g.font='bold 34px Georgia,serif';g.textAlign='center';g.fillText('MIRADOR DE ABANTOS',w/2,52);
+     g.font='20px Georgia,serif';g.fillText('Sierra de Guadarrama · Real Sitio de San Lorenzo',w/2,82);
+     const gr=g.createLinearGradient(0,96,0,250);gr.addColorStop(0,'#bcd6ea');gr.addColorStop(1,'#e8eef2');g.fillStyle=gr;g.fillRect(30,96,w-60,160);g.fillStyle='#7c8f62';g.beginPath();g.moveTo(30,220);g.lineTo(130,170);g.lineTo(240,205);g.lineTo(360,160);g.lineTo(482,210);g.lineTo(482,256);g.lineTo(30,256);g.fill();
+     g.fillStyle='#d7cbb2';g.fillRect(200,196,110,34);g.fillStyle='#5b636c';g.fillRect(194,190,122,8);g.beginPath();g.arc(255,192,13,Math.PI,0);g.fill();g.fillStyle='#3a3024';g.font='16px Georgia,serif';g.fillText('Real Monasterio  ·  Madrid  ·  Presa del Romeral',w/2,290);});
+   for(const x of[-480.3,-477.7])PROPS.box(x,y,-1023.2,0.07,1.1,0.07,0,DKW);const m=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.5,0.06),[M(0x3a3024),M(0x3a3024),M(0x3a3024),M(0x3a3024),new THREE.MeshLambertMaterial({map:pan}),M(0x3a3024)]);
+   m.position.set(-479,y+1.75,-1023.2);m.rotation.x=-0.25;scene.add(m);addCollider(-479,-1023.2,1.25,0.15,0,y-1,y+2.6,'b');}
+  // jardín con fuente (al pie del monte, a poniente del balcón)
+  {const fx=-491,fz=-1020.6;HEDGE.box(-491,y,-1016.9,5,0.55,0.35,0,[0.27,0.5,0.23],2,1);HEDGE.box(-495.7,y,-1020.8,0.35,0.55,4.2,0,[0.27,0.5,0.23],2,1);
+   addCollider(-491,-1016.9,5,0.35,0,y-1,y+0.6,'b');addCollider(-495.7,-1020.8,0.35,4.2,0,y-1,y+0.6,'b');
+   const bas=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.6,0.6,20),new THREE.MeshLambertMaterial({map:TEX.granite}));bas.position.set(fx,y+0.25,fz);bas.castShadow=true;scene.add(bas);
+   const wat=new THREE.Mesh(new THREE.CircleGeometry(1.32,20),MAT.water);wat.rotation.x=-Math.PI/2;wat.position.set(fx,y+0.5,fz);scene.add(wat);
+   const col=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,1.1,10),new THREE.MeshLambertMaterial({map:TEX.granite}));col.position.set(fx,y+1.0,fz);scene.add(col);
+   const cup=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.25,0.22,14),new THREE.MeshLambertMaterial({map:TEX.granite}));cup.position.set(fx,y+1.6,fz);scene.add(cup);
+   const bl=new THREE.Mesh(ballG2(),MAT.granBall);bl.scale.setScalar(0.3);bl.position.set(fx,y+1.95,fz);scene.add(bl);addCollider(fx,fz,1.55,1.55,0,y-1,y+0.7,'wall');
+   for(const[a,b,w,d]of[[-493.8,-1018.3,1.2,0.5],[-488.2,-1018.3,1.2,0.5],[-494.3,-1023.4,0.5,1.2]]){STONE.box(a,y,b,w,0.3,d,0,GRAN,1,1);HEDGE.box(a,y+0.3,b,w-0.05,0.18,d-0.05,0,[0.3,0.48,0.22],1,1);
+     for(let k=0;k<12;k++)PROPS.box(a+(((k*37)%10)/10-0.5)*(w*1.7),y+0.5,b+(((k*53)%10)/10-0.5)*(d*1.7),0.06,0.06,0.06,0,[[0.92,0.2,0.25],[0.97,0.82,0.2],[0.75,0.3,0.75],[1,0.55,0.15],[1,1,1],[0.35,0.45,0.95]][k%6]);addCollider(a,b,w,d,0,y-1,y+0.5,'b');}
+   graniteBench(-491,-1023.6,0);}
+  // arco de entrada sobre la carretera: dos pilares de granito con bolas, viga de madera y letreros por los dos lados
+  {const AZ=-1021,AX=-459.4,top=y+5.2;
+   for(const x of[AX-6.9,AX+6.9]){const g=Math.min(groundH(x-0.6,AZ),groundH(x+0.6,AZ))-0.4;STONE.box(x,g,AZ,0.55,top-g,0.55,0,GRAN,1,2);STONE.box(x,top,AZ,0.7,0.22,0.7,0,GRAN,1,1);
+     const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(0.6);b.position.set(x,top+0.75,AZ);b.castShadow=true;scene.add(b);addCollider(x,AZ,0.6,0.6,0,g-1,top+1.4,'wall');
+     for(const sx of[-1,1]){const px=x+sx*1.25,pg=groundH(px,AZ+0.2);STONE.box(px,pg-0.3,AZ+0.2,0.55,0.75,0.45,0,GRAN,1,1);HEDGE.box(px,pg+0.45,AZ+0.2,0.5,0.28,0.4,0,[0.28,0.52,0.24],1,1);
+       for(let k=0;k<6;k++)PROPS.box(px-0.38+k*0.15,pg+0.76,AZ+0.2+((k%2)?0.12:-0.12),0.05,0.05,0.05,0,[[0.92,0.2,0.25],[0.97,0.82,0.2],[0.75,0.3,0.75],[1,0.55,0.15],[1,1,1],[0.35,0.45,0.95]][k]);addCollider(px,AZ+0.2,0.55,0.45,0,pg-1,pg+0.8,'b');}}
+   PROPS.box(AX,y+4.85,AZ,7.4,0.38,0.24,0,DKW);PROPS.box(AX,y+5.23,AZ,7.6,0.08,0.3,0,[0.24,0.16,0.1]);
+   for(const x of[AX-2.6,AX+2.6])PROPS.box(x,y+4.3,AZ,0.03,0.55,0.03,0,IRON);
+   signMesh(signTex(['MIRADOR DE ABANTOS'],768,112,'#3a2a1c','#f3e6c4','bold 66px Georgia,serif','#b4955a'),5.8,0.85,AX,y+3.95,AZ+0.06,0);
+   signMesh(signTex(['CASA DE NACHO · BUEN VIAJE'],768,112,'#3a2a1c','#f3e6c4','bold 54px Georgia,serif','#b4955a'),5.8,0.85,AX,y+3.95,AZ-0.06,Math.PI);
+   for(const x of[AX-6.9,AX+6.9]){const m=new THREE.Mesh(BOXG,ME(0xfff1c4,0xffd890,0.9));m.scale.set(0.2,0.3,0.2);m.position.set(x,y+3.2,AZ+0.68);scene.add(m);PROPS.box(x,y+3.0,AZ+0.6,0.04,0.06,0.1,0,IRON);}}
+  // muro de mampostería al pie del monte, detrás de los garajes y el merendero
+  for(let x=-480;x<-445;x+=2.5){STONE.box(x+1.25,y-0.5,-1064.75,1.27,2.1,0.35,0,GRAN,2,2);STONE.box(x+1.25,y+1.6,-1064.7,1.3,0.16,0.45,0,[0.78,0.74,0.68],2,1,null,true,true);}
+  addCollider(-462.5,-1064.75,17.5,0.35,0,y-1,y+1.8,'wall');
+  buildTorreVigia(-455,-1061.4,GLS);
+  // merendero: mesas de madera
+  const picnic=(x,z)=>{PROPS.box(x,y+0.72,z,0.95,0.06,0.42,0,WOOD);for(const s of[-1,1]){PROPS.box(x,y+0.42,z+s*0.75,0.95,0.05,0.18,0,WOOD);PROPS.box(x+s*0.75,y,z,0.06,0.72,0.06,0,DKW);PROPS.box(x+s*0.75,y,z+s*0.75,0.05,0.42,0.05,0,DKW);PROPS.box(x-s*0.75,y,z+s*0.75,0.05,0.42,0.05,0,DKW);}addCollider(x,z,1,1,0,y-1,y+0.8,'b');};
+  picnic(-462,-1058);picnic(-451,-1056);
+  // farolas, rocas, flores y árboles alrededor
+  for(const[x,z]of[[-495.2,-1027],[-495.2,-1046],[-466,-1027],[-449,-1028],[-449,-1048],[-466,-1050.6],[-479.5,-1025.8]])lamp(x,z);
+  const rock=(x,z,s)=>{const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),M(0x8e8a82));const g=groundH(x,z);r.position.set(x,g+s*0.35,z);r.rotation.set(s*1.3,s*2.1,s*0.7);r.scale.set(1,0.7,1.1);r.castShadow=true;scene.add(r);addCollider(x,z,s*0.85,s*0.85,0,g-1,g+s,'b');};
+  for(const[x,z,s]of[[-499.5,-1036,1.1],[-500.5,-1028,0.8],[-446,-1034,0.9],[-446.5,-1060,1.2],[-469,-1068,1.0],[-499,-1066,1.3],[-497.5,-1015,0.7]])if(roadClear(x,z,1.5))rock(x,z,s);
+  for(const[x,z]of[[-494.5,-1047.6],[-482,-1047.6]]){STONE.box(x,y,z,1.2,0.35,0.5,0,GRAN,1,1);HEDGE.box(x,y+0.35,z,1.15,0.3,0.45,0,[0.28,0.5,0.24],1,1);
+    for(let k=0;k<10;k++)PROPS.box(x-1.0+k*0.22,y+0.68,z+((k%2)?0.15:-0.15),0.05,0.05,0.05,0,[[0.9,0.2,0.25],[0.95,0.8,0.2],[0.75,0.3,0.7],[1,0.55,0.15],[1,1,1]][k%5]);addCollider(x,z,1.2,0.5,0,y-1,y+0.7,'b');}
+  const tr=(k,x,z,s)=>{if(!roadClear(x,z,2))return;for(const o of queryStatic(x,z,4,[]))if(insideOBB(o,x,z,1.2))return;addTree(k,x,z,s);};
+  for(let z=-1066;z<=-1020;z+=7)tr('pine',-501+((z*13)%3),z,0.9+((z*7)%3)*0.1);
+  for(let x=-498;x<=-446;x+=7)tr('pine',x,-1069.5-((x*11)%3),0.95+((x*3)%3)*0.08);
+  for(const[x,z]of[[-447.5,-1052],[-445.5,-1042],[-498,-1012],[-493,-1011]])tr(z>-1015?'oak':'pine',x,z,1);
+  // el monte de detrás, más poblado: dos filas más de pinos, otra a poniente y unos cuantos peñascos
+  for(const zr of[-1076,-1082])for(let x=-503;x<=-442;x+=5.5){const j=Math.sin(x*12.9+zr)*1.6;tr('pine',x+j,zr+Math.cos(x*7.3)*1.4,0.85+((x*zr)%4+4)%4*0.06);}
+  for(const xr of[-507,-513])for(let z=-1070;z<=-1008;z+=6){const j=Math.sin(z*3.7+xr)*1.5;tr('pine',xr+j,z+Math.cos(z*5.1)*1.2,0.9+((z*7)%3+3)%3*0.07);}
+  for(const[x,z,s]of[[-489,-1071,1.0],[-471,-1072.5,0.8],[-458,-1070,1.1],[-505,-1043,1.2],[-510,-1024,0.9],[-449,-1072,0.7]])if(roadClear(x,z,1.5))rock(x,z,s);
+  for(const B of[INT,CEIL,GLS]){const im=B.build();if(im){im.receiveShadow=B===INT;im.castShadow=false;}}
+  // pasillo de vista desde los prismáticos hasta el Monasterio: ahí no se plantan pinos (colisiones fantasma, que no chocan con nada)
+  {const ox=-475,oz=-1017,yaw=Math.atan2(-ox,-oz);for(let d=8;d<460;d+=16){const w=3+d*0.03;addCollider(ox+Math.sin(yaw)*(d+8),oz+Math.cos(yaw)*(d+8),w,8.5,yaw,1e9,1e9+1,'b');}}
+  SPOTS.mirador={x:-476,z:-1021,y};CASA.built=true;
+}
+// ---------------- cada fotograma: puertas de los garajes y de la casa
+function garageStore(g){
+  const c=CARS.find(c=>!c.dead&&c!==P.car&&c.x>g.x0+0.2&&c.x<g.x1-0.2&&c.z>g.z0+0.2&&c.z<g.z1-0.2);
+  const prev=g.slot;
+  g.car=c||null;
+  if(c){c.temp=false;c.stored=true;c.ai=null;c.parkBrake=true;c.vx=c.vz=0;g.slot={type:c.type,col:c.paint.color.getHex()};if(!prev||prev.type!==g.slot.type||prev.col!==g.slot.col)toast(`<b>${c.T.name}</b> guardado en el garaje de casa`,2.6);}
+  else g.slot=null;
+  save();
+}
+function garageSound(open){if(!AU.ctx)return;nBurst(0.18,1.25,240,0.7,'lowpass');aTone(open?70:62,1.2,0.05,'sawtooth');aTone(open?140:120,1.2,0.025,'triangle');}
+function casaUpdate(dt){
+  if(!CASA.built||G.state!=='play')return;
+  const px=P.car?P.car.x:P.x,pz=P.car?P.car.z:P.z,act=!P.dead&&!P.plane&&!P.train;
+  for(const g of GAR){
+    const inBay=(x,z)=>x>g.x0&&x<g.x1&&z>g.z0-0.2&&z<g.z1+0.6;
+    const d=Math.hypot(px-g.xc,pz-(g.zd+3.5));const want=act&&(inBay(px,pz)||d<(P.car?9.5:4.2));
+    const prev=g.open;g.open=clamp(g.open+(want?dt:-dt)/1.35,0,1);
+    if(g.open!==prev){if(!g.moving){g.moving=true;garageSound(want);}const e=g.open*g.open*(3-2*g.open);g.piv.rotation.x=e*Math.PI/2*0.97;g.piv.position.y=g.y+g.dH+e*0.18;g.coll.y0=e>0.8?g.y+2.62:g.y-1;}
+    else g.moving=false;
+    if(prev>0&&g.open===0)garageStore(g);
+  }
+  // puerta de la casa
+  {const d=P.car?99:Math.hypot(P.x+488,P.z+1050.2);const prev=CASA.doorOpen;CASA.doorOpen=clamp(CASA.doorOpen+(d<2.7?dt:-dt)*2.2,0,1);
+   if(prev!==CASA.doorOpen){const e=CASA.doorOpen*CASA.doorOpen*(3-2*CASA.doorOpen);CASA.door.rotation.y=e*1.55;CASA.doorColl.y0=e>0.6?CASA.y+2.5:CASA.y-1;if(prev===0)sfx('swing',0.4);}}
+  if(CASA.tv&&Math.hypot(px+493.8,pz+1053.5)<22){CASA.tv.t-=dt;if(CASA.tv.t<=0){CASA.tv.t=0.12;tvDraw(G.time);}}
+  if(Math.hypot(px+478,pz+1045)<28)hintOnce('casa','Esta es la <b>casa de Nacho</b>. Entra con un coche en uno de los <b>garajes</b> y bájate: al cerrarse la puerta, el coche queda guardado. Dentro tienes la cama (guarda la partida) y el armario con tu ropa.',9);
+}
+function casaSleep(){heal(100);save();sfx('pickup');banner('Buenos días, Nacho','Has dormido como un tronco · Partida guardada',2.8);}
+function casaInteract(I){
+  if(P.car||!CASA.built)return false;
+  for(const t of TELE.list)if(Math.hypot(P.x-t.x,P.z-t.z)<1.5){hint(`Pulsa ${kb('F','Y','Mirar')} para mirar por los <b>prismáticos</b> del mirador`,0.3);if(I.enter){teleEnter(t);return true;}return false;}
+  const dW=Math.hypot(P.x-CASA.wardrobe.x,P.z-CASA.wardrobe.z),dB=Math.hypot(P.x-CASA.bed.x,P.z-CASA.bed.z);
+  if(dW<1.3){hint(`Pulsa ${kb('F','Y','Abrir')} para abrir el <b>armario</b> y ponerte la ropa que has comprado`,0.3);if(I.enter){P.x=CASA.mirror.x;P.z=CASA.mirror.z;P.y=surfaceH(P.x,P.z);P.vx=P.vz=0;openShop(CASA.shop);return true;}}
+  else if(dB<1.5){hint(`Pulsa ${kb('F','Y','Dormir')} para <b>dormir</b>: recuperas la salud y se guarda la partida`,0.3);if(I.enter){casaSleep();return true;}}
+  return false;
+}
+// coches guardados al cargar la partida (aparcados dentro, mirando a la puerta)
+function casaLoad(slots){
+  for(let i=0;i<GAR.length;i++){const g=GAR[i],s=slots&&slots[i];g.slot=null;if(g.car&&g.car!==P.car&&CARS.includes(g.car)&&g.car.stored)g.car.remove();g.car=null;if(!s||!CAR_TYPES[s.type])continue;
+    const c=new Car(s.type,(g.x0+g.x1)/2,(g.z0+g.z1)/2-0.4,0,s.col);c.parkBrake=true;c.stored=true;g.car=c;g.slot={type:s.type,col:s.col};}
+}
+// guardado: coches de los garajes y ropa comprada (antes de empezar la partida se conserva lo que ya había guardado)
+let WEAR_PROBE=null;
+function casaSaveData(){if(CASA.loaded)return{garage:GAR.map(g=>g.slot||null),owned:G.owned||{}};const p=loadSave()||{};return{garage:p.garage||[],owned:p.owned};}
+function casaOwn(id,it){if((id==='ropa'||id==='collares')&&priceOf(it)>0)(G.owned||(G.owned={}))[it.n]=1;}
+function casaStart(s){
+  G.owned=s&&s.owned?Object.assign({},s.owned):{};
+  if(s&&!s.owned&&G.outfit)for(const id of['ropa','collares'])for(const it of SHOP_ITEMS[id].items){if(priceOf(it)===0)continue;   // partidas antiguas: lo que llevas puesto ya es tuyo
+    WEAR_PROBE={};try{it.f();}catch(e){}const pt=WEAR_PROBE.p;WEAR_PROBE=null;if(pt&&Object.keys(pt).every(k=>k in G.outfit&&G.outfit[k]===pt[k]))G.owned[it.n]=1;}
+  casaLoad(s?s.garage||[]:[]);CASA.loaded=true;
+}
+// el armario: la ropa y los collares que tienes (lo gratis, más lo que has comprado)
+function armarioSetup(){
+  SHOP_ITEMS.armario={hola:['A ver qué me pongo hoy…','Esto me lo compré en el mercadillo. Y esto también.','Con este modelito no me reconoce ni la Abuela Remedios.'],probador:true,
+    get items(){const out=[],own=G.owned||{};for(const id of['ropa','collares'])for(const it of SHOP_ITEMS[id].items){if(!(priceOf(it)===0||own[it.n]))continue;out.push({cat:it.cat||'Collares',n:it.n,d:'De tu armario',p:0,sw:it.sw,f:it.f});}return out;}};
+}
+
+// ---------------- la tele del salón: el «Canal Real Sitio» enseña el Monasterio pasando del día a la noche (un día cada 48 s)
+const TV_STARS=Array.from({length:46},(_,i)=>{const r=k=>{const v=Math.sin(i*12.9898+k*78.233)*43758.5453;return v-Math.floor(v);};return[r(1)*384,r(2)*112,0.5+r(3)*0.5];});
+function tvDraw(t){
+  const T=CASA.tv;if(!T)return;const g=T.g,W=384,H=192,hz=150;
+  const hr=(t/48*24+7)%24,sun=Math.sin((hr-6)/12*Math.PI);   // >0 de día
+  const mix=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k)),css=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
+  const DAY=[[61,124,201],[185,212,236]],DUSK=[[58,58,120],[240,140,70]],NIGHT=[[6,10,30],[22,30,64]];
+  let top,bot;if(sun>0.25){top=DAY[0];bot=DAY[1];}else if(sun>-0.05){const k=(sun+0.05)/0.3;top=mix(DUSK[0],DAY[0],k);bot=mix(DUSK[1],DAY[1],k);}else{const k=clamp((sun+0.3)/0.25,0,1);top=mix(NIGHT[0],DUSK[0],k);bot=mix(NIGHT[1],DUSK[1],k);}
+  const gr=g.createLinearGradient(0,0,0,hz);gr.addColorStop(0,css(top));gr.addColorStop(1,css(bot));g.fillStyle=gr;g.fillRect(0,0,W,H);
+  const night=clamp(-sun*4,0,1);
+  if(night>0){for(const[x,y,a]of TV_STARS){g.fillStyle=`rgba(255,255,240,${(a*night*(0.75+0.25*Math.sin(t*3+x))).toFixed(2)})`;g.fillRect(x,y,1.6,1.6);}}
+  // sol y luna recorren el cielo
+  const arc=(k)=>[20+k*344,hz-Math.sin(k*Math.PI)*120];
+  if(hr>5.5&&hr<18.5){const[x,y]=arc((hr-6)/12);const c=sun>0.25?'#fff6c8':'#ffb15a';g.fillStyle=c;g.beginPath();g.arc(x,y,11,0,TAU);g.fill();g.fillStyle='rgba(255,230,160,0.25)';g.beginPath();g.arc(x,y,19,0,TAU);g.fill();}
+  else{const k=((hr+6)%24)/12;const[x,y]=arc(k);g.fillStyle='#eef0f6';g.beginPath();g.arc(x,y,9,0,TAU);g.fill();g.fillStyle=css(top);g.beginPath();g.arc(x+4,y-3,8,0,TAU);g.fill();}
+  // monte Abantos y el Monasterio
+  const lit=1-night*0.75;g.fillStyle=css(mix([92,120,80],[20,28,30],night));g.beginPath();g.moveTo(0,118);g.lineTo(70,92);g.lineTo(150,112);g.lineTo(250,84);g.lineTo(384,110);g.lineTo(384,hz);g.lineTo(0,hz);g.fill();
+  g.fillStyle=css(mix([120,150,90],[24,36,32],night));g.fillRect(0,hz-8,W,H-hz+8);
+  const st=css(mix([214,204,182],[58,58,66],night)),sl=css(mix([82,92,104],[24,26,34],night));
+  g.fillStyle=st;g.fillRect(70,108,244,40);g.fillRect(84,86,20,62);g.fillRect(280,86,20,62);g.fillRect(170,92,44,56);
+  g.fillStyle=sl;g.beginPath();g.moveTo(62,110);g.lineTo(192,96);g.lineTo(322,110);g.fill();for(const x of[84,280]){g.beginPath();g.moveTo(x-3,88);g.lineTo(x+10,70);g.lineTo(x+23,88);g.fill();}
+  g.beginPath();g.arc(192,92,20,Math.PI,0);g.fill();g.fillRect(189,60,6,14);g.fillStyle=st;g.beginPath();g.arc(192,58,4,0,TAU);g.fill();
+  for(let r=0;r<2;r++)for(let x=78;x<310;x+=11){if((x>100&&x<108)||(x>276&&x<284))continue;const on=night>0.3&&((x*7+r*13)%5)<3;g.fillStyle=on?'#ffd772':css(mix([110,104,96],[30,30,40],night));g.fillRect(x,116+r*14,4,7);}
+  if(night>0.3){g.fillStyle=`rgba(255,215,120,${(0.18*night).toFixed(2)})`;g.fillRect(64,104,256,46);}
+  // rótulo con la hora y el teletipo
+  g.fillStyle='rgba(10,10,22,0.82)';g.fillRect(0,H-36,W,36);g.fillStyle='#c8342c';g.fillRect(0,H-36,92,36);
+  g.fillStyle='#fff';g.font='bold 15px Arial';g.fillText('REAL SITIO',8,H-21);g.font='bold 13px Arial';const hh=Math.floor(hr),mm=Math.floor((hr-hh)*60);g.fillText(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`,8,H-6);
+  const msg='EN DIRECTO desde la Lonja · '+(sun>0.25?'Día despejado en San Lorenzo de El Escorial':(sun>-0.05?(hr<12?'Amanece sobre el Monasterio':'Atardece sobre el Real Sitio'):'Noche estrellada en la Sierra de Guadarrama'))+' · Mínima de 9 °C en Abantos · ';
+  g.save();g.beginPath();g.rect(96,H-36,W-96,36);g.clip();g.font='14px Arial';const mw=g.measureText(msg).width;const off=(t*42)%mw;g.fillText(msg+msg,100-off,H-13);g.restore();
+  g.fillStyle='rgba(255,255,255,0.85)';g.font='bold 11px Arial';g.fillText('● EN DIRECTO',W-88,16);
+  T.tex.needsUpdate=true;
+}
+// ---------------- torre de vigilancia forestal: patas de madera inclinadas con tornapuntas, plataforma con suelo, balcón, escalera y caseta acristalada
+function gbBeam(B,a,b,r,col){
+  const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz)||1,u=[dx/L,dy/L,dz/L],h=Math.abs(u[1])<0.9?[0,1,0]:[1,0,0];
+  let s=[u[1]*h[2]-u[2]*h[1],u[2]*h[0]-u[0]*h[2],u[0]*h[1]-u[1]*h[0]];const sl=Math.hypot(...s);s=s.map(v=>v/sl);const t=[s[1]*u[2]-s[2]*u[1],s[2]*u[0]-s[0]*u[2],s[0]*u[1]-s[1]*u[0]];
+  const C=[[1,1],[-1,1],[-1,-1],[1,-1]].map(([p,q])=>[(s[0]*p+t[0]*q)*r,(s[1]*p+t[1]*q)*r,(s[2]*p+t[2]*q)*r]);
+  for(let k=0;k<4;k++){const c0=C[k],c1=C[(k+1)%4],P0=[a[0]+c0[0],a[1]+c0[1],a[2]+c0[2]],P1=[a[0]+c1[0],a[1]+c1[1],a[2]+c1[2]],P2=[b[0]+c1[0],b[1]+c1[1],b[2]+c1[2]],P3=[b[0]+c0[0],b[1]+c0[1],b[2]+c0[2]];
+    const e1=[P1[0]-P0[0],P1[1]-P0[1],P1[2]-P0[2]],e2=[P2[0]-P0[0],P2[1]-P0[1],P2[2]-P0[2]],n=[e1[1]*e2[2]-e1[2]*e2[1],e1[2]*e2[0]-e1[0]*e2[2],e1[0]*e2[1]-e1[1]*e2[0]],m=[c0[0]+c1[0],c0[1]+c1[1],c0[2]+c1[2]];
+    if(n[0]*m[0]+n[1]*m[1]+n[2]*m[2]>=0)B.quad(P0,P1,P2,P3,[0,0],[1,0],[1,L],[0,L],col);else B.quad(P0,P3,P2,P1,[0,0],[0,L],[1,L],[1,0],col);}
+}
+function buildTorreVigia(tx,tz,GLS){
+  const ty=groundH(tx,tz),Hd=10.5,B0=2.3,B1=1.45,WD=[0.42,0.3,0.2],DK=[0.3,0.21,0.13],PL=[0.62,0.47,0.32],GN=[0.24,0.42,0.28];
+  const corner=(sx,sz,hh)=>{const k=hh/Hd,b=B0+(B1-B0)*k;return[tx+sx*b,ty+hh,tz+sz*b];};
+  const CS=[[-1,-1],[1,-1],[1,1],[-1,1]];
+  for(const[sx,sz]of CS){const g=groundH(tx+sx*B0,tz+sz*B0);STONE.box(tx+sx*B0,g-0.3,tz+sz*B0,0.32,0.62,0.32,0,[0.7,0.68,0.64],1,1);gbBeam(PROPS,[tx+sx*B0,g+0.3,tz+sz*B0],corner(sx,sz,Hd),0.13,WD);
+    addCollider(tx+sx*B0,tz+sz*B0,0.32,0.32,0,g-1,g+Hd,'b');}
+  // anillos y cruces de San Andrés en las cuatro caras
+  const lv=[0.3,3.6,7.0,Hd-0.15];
+  for(let f=0;f<4;f++){const[a,b]=[CS[f],CS[(f+1)%4]];
+    for(let i=1;i<lv.length;i++){gbBeam(PROPS,corner(a[0],a[1],lv[i]),corner(b[0],b[1],lv[i]),0.07,DK);
+      gbBeam(PROPS,corner(a[0],a[1],lv[i-1]+0.1),corner(b[0],b[1],lv[i]-0.1),0.045,DK);gbBeam(PROPS,corner(b[0],b[1],lv[i-1]+0.1),corner(a[0],a[1],lv[i]-0.1),0.045,DK);}}
+  // plataforma con suelo por debajo y vigas a la vista
+  const D=2.25,y0=ty+Hd;PROPS.box(tx,y0-0.05,tz,D,0.22,D,0,PL,4,3.2,null,true,true);
+  for(const o of[-1.4,0,1.4]){PROPS.box(tx+o,y0-0.25,tz,0.08,0.2,D-0.05,0,DK,4,3.2,null,true,true);PROPS.box(tx,y0-0.25,tz+o,D-0.05,0.2,0.08,0,DK,4,3.2,null,true,true);}
+  // balcón con barandilla alrededor (hueco de la escalera al sur)
+  const ry=y0+0.17;for(const[sx,sz]of CS)gbBeam(PROPS,[tx+sx*D,ry,tz+sz*D],[tx+sx*D,ry+1.0,tz+sz*D],0.05,DK);
+  for(let f=0;f<4;f++){const[a,b]=[CS[f],CS[(f+1)%4]],A=[tx+a[0]*D,0,tz+a[1]*D],Bp=[tx+b[0]*D,0,tz+b[1]*D];
+    const south=a[1]===1&&b[1]===1;const segs=south?[[0,0.38],[0.62,1]]:[[0,1]];
+    for(const[u0,u1]of segs)for(const hh of[0.5,1.0]){const P0=[A[0]+(Bp[0]-A[0])*u0,ry+hh,A[2]+(Bp[2]-A[2])*u0],P1=[A[0]+(Bp[0]-A[0])*u1,ry+hh,A[2]+(Bp[2]-A[2])*u1];gbBeam(PROPS,P0,P1,hh>0.9?0.045:0.03,hh>0.9?DK:WD);}
+    for(let k=1;k<6;k++){const u=k/6;if(south&&u>0.36&&u<0.64)continue;gbBeam(PROPS,[A[0]+(Bp[0]-A[0])*u,ry,A[2]+(Bp[2]-A[2])*u],[A[0]+(Bp[0]-A[0])*u,ry+0.5,A[2]+(Bp[2]-A[2])*u],0.025,WD);}}
+  // caseta: zócalo de tablas, ventanales corridos con su cristal, tejado de pizarra con alero, veleta
+  const C=1.5,cy=ry,wh=2.35;
+  for(const[sx,sz]of CS)PROPS.box(tx+sx*(C-0.06),cy,tz+sz*(C-0.06),0.07,wh,0.07,0,DK);
+  for(const s of[-1,1]){PROPS.box(tx,cy,tz+s*C,C,0.95,0.05,0,PL,2,1);PROPS.box(tx+s*C,cy,tz,0.05,0.95,C,0,PL,2,1);
+    PROPS.box(tx,cy+0.95,tz+s*(C+0.06),C+0.05,0.06,0.12,0,DK);PROPS.box(tx+s*(C+0.06),cy+0.95,tz,0.12,0.06,C+0.05,0,DK);
+    PROPS.box(tx,cy+2.0,tz+s*C,C,0.35,0.05,0,PL,2,1);PROPS.box(tx+s*C,cy+2.0,tz,0.05,0.35,C,0,PL,2,1);
+    GLS.box(tx,cy+1.0,tz+s*C,C-0.05,1.0,0.02,0,[0.6,0.76,0.86]);GLS.box(tx+s*C,cy+1.0,tz,0.02,1.0,C-0.05,0,[0.6,0.76,0.86]);
+    for(const o of[-0.5,0.5]){PROPS.box(tx+o,cy+1.0,tz+s*(C+0.02),0.035,1.0,0.035,0,DK);PROPS.box(tx+s*(C+0.02),cy+1.0,tz+o,0.035,1.0,0.035,0,DK);}
+    for(const o of[-0.98,0.98]){PROPS.box(tx+o,cy+1.0,tz+s*(C+0.13),0.3,1.0,0.03,0,GN);PROPS.box(tx+s*(C+0.13),cy+1.0,tz+o,0.03,1.0,0.3,0,GN);}}
+  PROPS.box(tx,cy+wh-0.05,tz,C+0.02,0.08,C+0.02,0,DK,4,3.2,null,true,true);
+  ROOF.pyramid(tx,cy+wh+0.03,tz,C+0.65,1.25,SLATE);
+  PROPS.box(tx,cy+wh+1.2,tz,0.03,0.9,0.03,0,IRON);PROPS.box(tx+0.18,cy+wh+1.85,tz,0.2,0.12,0.01,0,[0.75,0.2,0.18]);
+  {const m=new THREE.Mesh(BOXG,ME(0xfff1c4,0xffd890,0.6));m.scale.set(0.14,0.2,0.14);m.position.set(tx,cy+2.1,tz+C+0.25);scene.add(m);}
+  // escalera de mano por la cara sur, hasta el hueco de la barandilla
+  const lz=tz+D+0.32,lg=groundH(tx,lz);for(const s of[-0.28,0.28])gbBeam(PROPS,[tx+s,lg,lz],[tx+s,ry+1.05,lz],0.04,DK);
+  for(let hh=lg+0.3;hh<ry+0.9;hh+=0.32)gbBeam(PROPS,[tx-0.28,hh,lz],[tx+0.28,hh,lz],0.022,WD);
+  addCollider(tx,tz,D,D,0,y0-0.4,cy+wh+1.4,'b');
+  signMesh(signTex(['TORRE DE VIGILANCIA'],512,80,'#2f4a32','#f0e8cf','bold 40px Georgia,serif'),1.5,0.24,tx,cy+0.55,tz+C+0.07,0);
+}
+// ---------------- prismáticos del mirador: se mira con el ratón / stick / dedo, zoom con la rueda o adelante-atrás; en VR, siguiendo la cabeza
+const TELE={on:false,t:null,yaw:0,pitch:0,fov:14,list:[],mask:null,txt:null,vr:null,rt:null,cam:null,css:false};
+function teleMaskDraw(){
+  const c=TELE.mask,W=innerWidth,H=innerHeight;c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,W,H);
+  const r=Math.min(H*0.46,W*0.27),dx=r*0.66;g.globalCompositeOperation='destination-out';for(const s of[-1,1]){const gr=g.createRadialGradient(W/2+s*dx,H/2,r*0.8,W/2+s*dx,H/2,r);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(W/2+s*dx,H/2,r,0,TAU);g.fill();}
+  g.globalCompositeOperation='source-over';
+}
+function teleEnter(t){
+  TELE.on=true;TELE.t=t;teleFog(true);TELE.yaw=t.g.rotation.y||t.yaw0;TELE.pitch=t.g.rotation.x?-t.g.rotation.x:-0.14;TELE.fov=14;P.vx=P.vz=0;sfx('click');
+  if(!TELE.css){TELE.css=true;const st=document.createElement('style');st.textContent='#teleMask{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}#teleTxt{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:7;pointer-events:none;color:#efe3c4;font:600 14px Georgia,serif;text-shadow:0 1px 3px #000;white-space:nowrap}body.tele #crosshair,body.tele #minimapWrap{visibility:hidden}';document.head.appendChild(st);}
+  if(!VR.on){if(!TELE.mask){TELE.mask=document.createElement('canvas');TELE.mask.id='teleMask';document.body.appendChild(TELE.mask);TELE.txt=document.createElement('div');TELE.txt.id='teleTxt';document.body.appendChild(TELE.txt);addEventListener('resize',()=>{if(TELE.on&&TELE.mask)teleMaskDraw();});}
+    teleMaskDraw();TELE.mask.style.display='block';TELE.txt.style.display='block';document.body.classList.add('tele');}
+  hint(`Mira alrededor con ${kb('el ratón','el stick derecho','el dedo')}. Zoom: ${kb('rueda o W / S','stick izquierdo ↕','joystick ↕')}. Para salir, ${kb('F','Y','Salir')}.`,5);
+}
+function teleExit(){
+  if(!TELE.on)return;TELE.on=false;teleFog(false);if(TELE.mask){TELE.mask.style.display='none';TELE.txt.style.display='none';}document.body.classList.remove('tele');if(TELE.vr)TELE.vr.visible=false;
+  camYaw=TELE.yaw;camPitch=-0.12;if(!VR.on){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}sfx('click');
+}
+function teleUpdate(dt,I){
+  const t=TELE.t;if(!t||I.enter||I.skip||I.jump||P.dead||P.car){teleExit();return;}
+  if(VR.on&&VR.ready){TELE.yaw=VR.headYaw;TELE.pitch=VR.headPitch;}
+  else{const k=TELE.fov/62;TELE.yaw-=I.lookX*k;TELE.pitch=clamp(TELE.pitch-I.lookY*k,-0.6,0.42);let d=TELE.yaw-t.yaw0;d=Math.atan2(Math.sin(d),Math.cos(d));TELE.yaw=t.yaw0+clamp(d,-1.5,1.5);}
+  TELE.fov=clamp(TELE.fov*Math.exp(-(I.my||0)*dt*1.1),2.2,34);if(I.prev)TELE.fov=Math.max(2.2,TELE.fov*0.8);if(I.next)TELE.fov=Math.min(34,TELE.fov*1.25);
+  t.g.rotation.y=TELE.yaw;t.g.rotation.x=-TELE.pitch;
+  if(!VR.on){P.x=t.x-Math.sin(TELE.yaw)*0.72;P.z=t.z-Math.cos(TELE.yaw)*0.72;P.y=surfaceH(P.x,P.z);P.yaw=TELE.yaw;P.h.g.position.set(P.x,P.y,P.z);P.h.g.rotation.y=P.yaw;animHuman(P.h,0,0,'walk');
+    if(TELE.txt)TELE.txt.textContent=`Prismáticos del Mirador de Abantos  ·  ×${(14/TELE.fov*3).toFixed(1)}`;}
+  P.vx=P.vz=0;
+}
+function teleCamera(){
+  const t=TELE.t,cp=Math.cos(TELE.pitch),f=[Math.sin(TELE.yaw)*cp,Math.sin(TELE.pitch),Math.cos(TELE.yaw)*cp];
+  const hf=Math.hypot(f[0],f[2])||1;camera.position.set(t.x+f[0]/hf*1.45,t.y+0.12,t.z+f[2]/hf*1.45);camera.rotation.set(TELE.pitch,TELE.yaw+Math.PI,0);
+  camPos.x=camera.position.x;camPos.y=camera.position.y;camPos.z=camera.position.z;setNear(0.3);
+  if(Math.abs(camera.fov-TELE.fov)>0.01){camera.fov=TELE.fov;fovNow=TELE.fov;camera.updateProjectionMatrix();}
+}
+function teleFog(on){if(!scene.fog)return;if(on){TELE.fog=[scene.fog.near,scene.fog.far];scene.fog.near=1100;scene.fog.far=3400;}else if(TELE.fog){scene.fog.near=TELE.fog[0];scene.fog.far=TELE.fog[1];}}
+// en VR: lo que ves por los prismáticos se pinta en dos círculos delante de los ojos
+function teleVR(){
+  if(!TELE.on||!VR.on||!VR.ready||G.state!=='play'){if(TELE.vr)TELE.vr.visible=false;return;}
+  if(!TELE.vr){TELE.rt=new THREE.WebGLRenderTarget(768,448);TELE.cam=new THREE.PerspectiveCamera(14,768/448,0.3,4000);
+    const grp=new THREE.Group();grp.position.set(0,0,-0.7);camera.add(grp);
+    const mk=(geo,mat,r)=>{mat.transparent=true;mat.depthTest=false;mat.depthWrite=false;mat.fog=false;const o=new THREE.Mesh(geo,mat);o.renderOrder=r;o.frustumCulled=false;grp.add(o);return o;};
+    mk(new THREE.PlaneGeometry(0.86,0.5),new THREE.MeshBasicMaterial({map:TELE.rt.texture,toneMapped:false}),1007);
+    const cv=mkCanvas(1024,768),g=cv.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,1024,768);const sc=1024/3.2,cx=512,cy=384,r=0.235*sc,dx=0.165*sc;g.globalCompositeOperation='destination-out';
+    for(const s of[-1,1]){const gr=g.createRadialGradient(cx+s*dx,cy,r*0.82,cx+s*dx,cy,r);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(cx+s*dx,cy,r,0,TAU);g.fill();}
+    g.globalCompositeOperation='source-over';g.fillStyle='#efe3c4';g.font='bold 20px Georgia,serif';g.textAlign='center';g.fillText('Stick izquierdo ↕: zoom   ·   A: salir',cx,cy+r+34);
+    mk(new THREE.PlaneGeometry(3.2,2.4),new THREE.MeshBasicMaterial({map:texFrom(cv,false)}),1008);TELE.vr=grp;}
+  if(TELE.fog&&scene.fog&&scene.fog.near>1000){scene.fog.near=TELE.fog[0];scene.fog.far=TELE.fog[1];}
+  TELE.vr.visible=true;TELE.cam.fov=TELE.fov;TELE.cam.updateProjectionMatrix();{const F=VR.headF,hf=Math.hypot(F.x,F.z)||1,c=TELE.cam;c.position.set(VR.head.x+F.x/hf*1.3,Math.max(VR.head.y,TELE.t.y+0.12),VR.head.z+F.z/hf*1.3);c.up.set(0,1,0);c.lookAt(c.position.x+F.x*100,c.position.y+F.y*100,c.position.z+F.z*100);}TELE.cam.updateMatrixWorld();
+  const hide=[TELE.vr,VR.hud&&VR.hud.mesh,VR.menu&&VR.menu.mesh,VR.map,VR.laser,VR.ret,VR.laser3,VR.gunG].filter(Boolean),was=hide.map(o=>o.visible);hide.forEach(o=>o.visible=false);
+  const fn=scene.fog?[scene.fog.near,scene.fog.far]:null;if(fn){scene.fog.near=1100;scene.fog.far=3400;}
+  const xe=renderer.xr.enabled,prev=renderer.getRenderTarget();renderer.xr.enabled=false;renderer.setRenderTarget(TELE.rt);renderer.render(scene,TELE.cam);renderer.setRenderTarget(prev);renderer.xr.enabled=xe;
+  if(fn){scene.fog.near=fn[0];scene.fog.far=fn[1];}hide.forEach((o,i)=>o.visible=was[i]);
+}
+
 // ---------------------------------------------------------------- monumentos y edificios singulares
 const SPOTS={};
 function buildLandmarks(){
@@ -1559,11 +1970,8 @@ function buildLandmarks(){
    STONE.box(cx,y,cz-2,2.6,1.4,1.6,0,GRAN,1,1);STONE.box(cx,y+1.4,cz-3.2,2.6,1.6,0.5,0,GRAN,1,1);for(let k=0;k<3;k++)STONE.box(cx,y,cz+0.2+k*0.6,1.6,0.45*(3-k),0.3,0,GRAN,1,1);
    {const sx=cx+12,sz=cz-16,sy=groundH(sx,sz);signMesh(signTex(['SILLA DE FELIPE II'],512,96,'#3a3024','#f0e3c0','bold 50px Georgia,serif'),3.4,0.65,sx,sy+1.2,sz,2.54);PROPS.box(sx,sy,sz,0.06,0.9,0.06,0,[0.3,0.22,0.14]);}
    const ey=groundH(-548,680);WALLS.box(-548,ey-1,680,5,7,8,0.6,[0.97,0.96,0.93],4,3.2,ey);ROOF.hip(-548,ey+6,680,5,8,0.6,2.6,0.4,TILE);STONE.box(-548+Math.sin(0.6)*7.5,ey+6,680+Math.cos(0.6)*7.5,1.4,3.2,0.5,0.6,GRAN,1,1);addCollider(-548,680,5,8,0.6,ey-2,ey+9);}
-  // Mirador de Abantos y torre de vigilancia forestal
-  {const y=groundH(-472,-1043);STONE.box(-472,y-0.5,-1046,8,1.1,6,0,GRAN,2,2);STONE.box(-472,y+0.6,-1052,8,1,0.4,0,GRAN,1,1);SPOTS.mirador={x:-470,z:-1036,y};
-   const ty=groundH(-490,-1060);for(const[a,b]of[[-1.6,-1.6],[1.6,-1.6],[-1.6,1.6],[1.6,1.6]])PROPS.box(-490+a,ty,-1060+b,0.12,12,0.12,0,[0.35,0.3,0.26]);
-   WALLS.box(-490,ty+12,-1060,2.2,2.4,2.2,0,[0.6,0.5,0.4],4,3.2,ty+12);ROOF.pyramid(-490,ty+14.4,-1060,2.6,1.4,SLATE);addCollider(-490,-1060,1.8,1.8,0,ty-1,ty+15,'b');
-   signMesh(signTex(['MIRADOR DE ABANTOS'],512,96,'#3a3024','#f0e3c0','bold 50px Georgia,serif'),3.6,0.7,-466,y+1.6,-1039.5,0);}
+  // Mirador de Abantos y casa de Nacho (con sus dos garajes)
+  buildCasaNacho();armarioSetup();
   // Presa del Romeral
   {const wl=LAKE.wl;buildLakeWater();
    let da=1e9,db=-1e9;for(let x=LAKE.x0;x<LAKE.x1;x+=1)if(groundH(x,LAKE.z1-3)<wl){da=Math.min(da,x);db=Math.max(db,x);} // la presa cierra el agua de orilla a orilla
@@ -2319,7 +2727,7 @@ class Car{
     if(impact>5&&G.time-this.lastCrash>0.25){this.lastCrash=G.time;this.damage((impact-5)*3.2,null);sfxAt('crash',this.x,this.y,this.z,Math.min(1,impact/18));if(this.driver==='player')shake(Math.min(0.9,impact/22));}
   }
   damage(a,by){
-    if(this.dead)return;if(by)this.lastBy=by;this.hp-=a;
+    if(this.dead)return;if(by)this.lastBy=by;if(this.type==='geo')a*=0.2;this.hp-=a;
     if(by==='player'&&(this.type==='poli'||this.type==='geo'))addHeat(0.5,'poli');
     if(this.hp<=0&&this.burn<0){this.hp=0;this.burn=2.2;}
   }
@@ -2499,7 +2907,7 @@ const P={x:ABA.spawn.x,z:ABA.spawn.z,y:H0,vx:0,vz:0,vy:0,yaw:Math.PI/2,hp:100,ar
 for(const w in WEAPONS)if(!WEAPONS[w].melee)P.ammo[w]={m:0,r:0};
 let wstripT=0;
 let camYaw=Math.PI/2,camPitch=-0.12,carYawOff=0,carPitch=-0.16,carLookT=0,aimK=0,shakeAmt=0,hurtFlash=0,bloom=0,hitT=0,fovNow=62;
-const TORO_SPAWN={x:-489,z:-1026,h:1.9};let TORO=null;let MONSTER=null;
+const TORO_SPAWN={x:-452.6,z:-1040.5,h:Math.PI/2};let TORO=null;let MONSTER=null;
 let REMEDIOS=null,sens=1,lastDevice='kb';
 const lerpAng=(a,b,t)=>a+angNorm(b-a)*t;
 function shake(v){shakeAmt=Math.min(1.2,shakeAmt+v);}
@@ -3746,11 +4154,11 @@ function vrProps(dt=0){
   VR.carGunT=Math.max(0,(VR.carGunT||0)-dt);const carGun=G.state==='play'&&!!P.car&&VIEW.fp&&!P.dead&&!G.cine&&VR.carGunT>0,gw=carGun?VR.carGunW:P.cur;
   if(R){if(VR.gunG.parent!==R.g)R.g.add(VR.gunG);if(VR.laser.parent!==R.g)R.g.add(VR.laser);
     if(VR.gunW!==gw){for(const k in VR.guns)VR.guns[k].visible=false;if(gw!=='fists'){(VR.guns[gw]||vrGunMesh(gw)).visible=true;}VR.gunW=gw;}
-    VR.gunG.visible=(foot&&VIEW.fp&&P.cur!=='fists')||carGun;VR.laser.visible=(ranged&&VIEW.fp)||VR.menu.open||carGun;VR.laser.scale.z=VR.menu.open&&VR.menu.hitD>0?clamp(VR.menu.hitD/7,0.02,1):1;R.body.visible=!VR.gunG.visible;for(const m of R.pad)m.visible=!(foot&&!VIEW.fp);}
+    VR.gunG.visible=(foot&&VIEW.fp&&P.cur!=='fists')||carGun;VR.laser.visible=(VR.laserOn!==false&&((ranged&&VIEW.fp)||carGun))||VR.menu.open;VR.laser.scale.z=VR.menu.open&&VR.menu.hitD>0?clamp(VR.menu.hitD/7,0.02,1):1;R.body.visible=!VR.gunG.visible;for(const m of R.pad)m.visible=!(foot&&!VIEW.fp);}
   // tercera persona: el arma la lleva el personaje; el mando solo marca la mira
   const show3=ranged&&!VIEW.fp&&VR.tgtOk;VR.ret.visible=show3;
   if(show3){VR.ret.position.set(VR.tgt[0],VR.tgt[1],VR.tgt[2]);VR.ret.scale.setScalar(clamp(VR.ret.position.distanceTo(VR.head)*0.016,0.06,4));VR.ret.lookAt(VR.head);}
-  const l3=show3&&isAiming(LASTI);VR.laser3.visible=l3;
+  const l3=show3&&isAiming(LASTI)&&VR.laserOn!==false;VR.laser3.visible=l3;
   if(l3){const mz=muzzlePos(),a=VR.laser3.geometry.attributes.position;a.setXYZ(0,mz.x,mz.y,mz.z);a.setXYZ(1,VR.tgt[0],VR.tgt[1],VR.tgt[2]);a.needsUpdate=true;}
   for(const o of VR.ctl)if(o!==R&&o.body)o.body.visible=true;
   if(L){if(VR.map.parent!==L.g)L.g.add(VR.map);VR.map.visible=G.state==='play';VR.mapTex.needsUpdate=true;}
@@ -3805,9 +4213,11 @@ function vrMenuKind(){return G.state==='paused'?'pause':G.state==='shop'?'shop':
 const txtOf=(el,sel)=>{const e=sel?el.querySelector(sel):el;return e?e.textContent.replace(/\s+/g,' ').trim():'';};
 function vrMenuData(kind){
   const D={title:'',lines:[],items:[]};
+  if(kind==='pause'&&VRCHEAT.on){vrCheatItems(D);return D;}
   if(kind==='pause'){D.title='Pausa';D.lines=[txtOf($('stats'))];
     const bs=[...$('pause').querySelectorAll('.btns button.b')].filter(b=>!b.classList.contains('hidden'));
     for(const b of bs){D.items.push({label:b.id==='btnRestart'&&VR.menu.confirm>performance.now()?'¿Seguro? Pulsa otra vez para borrar la partida':txtOf(b),el:b,dim:b.classList.contains('dim')});
+      if(b.id==='btnResume')D.items.push({label:`Línea roja de apuntado: ${VR.laserOn===false?'no':'sí'}`,sub:'En los menús, las tiendas y el taller se ve siempre',act:()=>{VR.laserOn=VR.laserOn===false;saveOpts();}});
       if(b.id==='btnResume')D.items.push({label:`Volumen: ${Math.round(AU.vol*100)} %`,sub:'Stick ↔ para subir o bajar',adj:d=>{AU.vol=clamp(Math.round(AU.vol*20+d)/20,0,1);$('volR').value=AU.vol;if(AU.master)AU.master.gain.value=AU.muted?0:AU.vol;},act:()=>{AU.vol=AU.vol>=0.99?0:Math.min(1,Math.round(AU.vol*10+1)/10);$('volR').value=AU.vol;if(AU.master)AU.master.gain.value=AU.muted?0:AU.vol;}});}
     D.lines.push('Para salir de la realidad virtual también puedes usar el botón del sistema de las gafas.');}
   else if(kind==='shop'){const si=$('shopInner');D.title=txtOf(si,'h2');D.lines=[txtOf(si,'.shopMsg'),txtOf(si,'.shopMoney')];
@@ -3862,7 +4272,7 @@ function vrMenuActivate(it){
   if(it.el&&it.el.id==='btnRestart'){if(!(VR.menu.confirm>performance.now())){VR.menu.confirm=performance.now()+3000;return;}}
   if(it.act)it.act();else if(it.el)it.el.click();
 }
-function vrMenuBack(){const k=VR.menu.kind;if(k==='pause')resume();else if(k==='shop')closeShop();else if(k==='map')closeMap();}
+function vrMenuBack(){const k=VR.menu.kind;if(k==='pause'&&VRCHEAT.on){VRCHEAT.on=false;VRCHEAT.msg='';VR.menu.sel=0;}else if(k==='pause')resume();else if(k==='shop')closeShop();else if(k==='map')closeMap();}
 function vrMenu(dt){
   const M=VR.menu;if(!M)return;const kind=vrMenuKind();
   if(!kind){if(M.open)vrMenuClose();return;}
@@ -4110,6 +4520,7 @@ function rebuildPlayer(){
   animHuman(P.h,0,0,'walk');
 }
 function wear(patch,label){
+  if(WEAR_PROBE){WEAR_PROBE.p=patch;return true;}
   const cur=playerOutfit();if(Object.keys(patch).every(k=>cur[k]===patch[k])){renderShop('¡Pero si eso ya lo llevas puesto!');return false;}
   Object.assign(G.outfit,patch);rebuildPlayer();save();return true;
 }
@@ -4195,13 +4606,13 @@ function garageCam(){const c=P.car;if(!c)return;const s=Math.sin(c.h),co=Math.co
 function probadorCam(){P.yaw=Math.PI;P.h.g.rotation.y=P.yaw;P.h.g.position.set(P.x,P.y,P.z);animHuman(P.h,0,0,'walk');
   const narrow=innerWidth<innerHeight*1.2;camera.position.set(P.x+(narrow?0:1.2),P.y+1.45,P.z-3.6);camera.lookAt(P.x+(narrow?0:1.0),P.y+1.05,P.z);if(camera.fov!==50){camera.fov=50;fovNow=50;camera.updateProjectionMatrix();}}
 const priceOf=it=>typeof it.p==='function'?it.p():it.p;
-function openShop(sh){document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);GAMECAM.yaw=Math.atan2(t.x-camera.position.x,t.z-camera.position.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
+function openShop(sh){document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);if(t===P.car&&SERVICE.taller){const T=SERVICE.taller,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=3.6,lz=-4.9,px=T.x+lx*c+lz*s,pz=T.z-lx*s+lz*c;GAMECAM.pos.set(px,groundH(px,pz)+1.75,pz);}GAMECAM.yaw=Math.atan2(t.x-GAMECAM.pos.x,t.z-GAMECAM.pos.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function renderShop(msg){
   const sh=SHOP_OPEN,S=SHOP_ITEMS[sh.id];
   let h=`<h2>${sh.name}</h2><div class="shopMsg"><b>${sh.vend}:</b> ${msg}</div><div class="shopMoney">Llevas ${fmtMoney(P.money)}</div><div class="shopList">`;
   let cat='';
   S.items.forEach((it,i)=>{const pr=priceOf(it);const can=P.money>=pr;if(it.cat&&it.cat!==cat){cat=it.cat;h+=`<div class="shopCat">${cat}</div>`;}
-    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${pr?fmtMoney(pr):'Gratis'}</div><button class="b${can?'':' alt'}" data-i="${i}">${can?'Comprar':'No llega'}</button></div>`;});
+    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${sh.id==='armario'?'Tuyo':(pr?fmtMoney(pr):'Gratis')}</div><button class="b${can?'':' alt'}" data-i="${i}">${sh.id==='armario'?'Ponérmelo':(can?'Comprar':'No llega')}</button></div>`;});
   h+=`</div><div class="btns"><button class="b alt" id="shopClose">Cerrar</button></div>`;
   $('shopInner').innerHTML=h;
   for(const b of $('shopInner').querySelectorAll('button[data-i]'))b.onclick=()=>buyItem(+b.dataset.i);
@@ -4210,7 +4621,7 @@ function renderShop(msg){
 function buyItem(i){
   const it=SHOP_ITEMS[SHOP_OPEN.id].items[i];
   const pr=priceOf(it);if(P.money<pr){sfx('click');renderShop('Eso vale '+fmtMoney(pr)+' y tú llevas '+fmtMoney(P.money)+'. Aquí no se fía.');return;}
-  const r=it.f();if(r===false)return;P.money-=pr;if(pr)sfx('cash');else sfx('pickup');save();
+  const r=it.f();if(r===false)return;P.money-=pr;casaOwn(SHOP_OPEN.id,it);if(pr)sfx('cash');else sfx('pickup');save();
   renderShop(SHOP_ITEMS[SHOP_OPEN.id].carcam?rpick(['Como nuevo, oiga.','Esto ya no lo reconoce ni su madre.','Listo. Y no me lo traiga en otro estado.']):SHOP_ITEMS[SHOP_OPEN.id].probador?rpick(['¡Qué bien te queda!','Estás hecho un galán.','Ni Felipe II iba tan elegante.','Mírate en el espejo, anda.']):rpick(['¡Gracias, guapo!','¡Que aproveche!','Vuelve cuando quieras.','Buen ojo, sí señor.']));
 }
 function closeShop(){if(VR.on&&VR.shopCam)VR.recenter=true;VR.shopCam=false;document.body.classList.remove('inshop');showScreen('shop',false);SHOP_OPEN=null;G.state='play';tryLock();}
@@ -4344,7 +4755,7 @@ function punch(){
   if(hit)for(const n of NPCS)if(n.alive&&n.team==='police'&&Math.hypot(n.x-P.x,n.z-P.z)<25){addHeat(0.5);break;}
 }
 function damagePlayer(d,src){
-  if(P.dead||G.cine)return;const a=Math.min(P.armor,d*0.75);P.armor-=a;P.hp-=d-a;P.lastHurt=G.time;hurtFlash=Math.min(1,hurtFlash+0.3+d/40);
+  if(P.dead||G.cine||(P.car&&P.car.type==='geo'))return;const a=Math.min(P.armor,d*0.75);P.armor-=a;P.hp-=d-a;P.lastHurt=G.time;hurtFlash=Math.min(1,hurtFlash+0.3+d/40);
   if(Math.random()<0.45)sfx('hurt',0.7);if(P.hp<=0){P.hp=0;playerDie();}
 }
 function playerDie(){
@@ -4389,12 +4800,14 @@ function findLockTarget(){
 }
 function updatePlayer(dt,I){
   if(P.plane){if(I.enter)exitPlane(false);if(P.plane){P.x=P.plane.x;P.z=P.plane.z;P.y=P.plane.y;P.vx=P.vz=0;P.h.g.visible=false;}return;}
+  if(TELE.on){teleUpdate(dt,I);return;}
   if(P.train){updateOnTrain(I);return;}
   if(!P.car&&sideTalk(I))return;
   P.nearShop=null;P.nearTrain=false;
   if(!P.car){
     P.nearShop=SHOPS.find(sh=>Math.hypot(P.x-sh.ix,P.z-sh.iz)<2.6)||null;
     P.nearTrain=TRAIN.state==='stop'&&TRAIN.cars.some(c=>Math.hypot(c.x-P.x,c.z-P.z)<6.5);
+    if(!P.nearShop&&!P.nearTrain&&casaInteract(I))return;
     if(P.nearShop){hint(`Pulsa ${kb('F','Y','Comprar')} para comprar en <b>${P.nearShop.name}</b>`,0.3);if(I.enter){openShop(P.nearShop);return;}}
     else if(P.nearTrain){hint(`Pulsa ${kb('F','Y','Tren')} para subir al tren. Sale en <b>${Math.ceil(TRAIN.t)} s</b>`,0.3);if(I.enter){boardTrain();return;}}
   }
@@ -4674,7 +5087,7 @@ function fpCamera(dt){
 const VMG={g:null,w:null,kick:0,m:{}};
 function updateViewModel(dt){
   const fT=G.time-(P.punchAt??-99),fists=P.cur==='fists';   // los puños solo asoman al golpear y se quedan 2 s
-  const show=VIEW.fp&&!VR.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85)&&!(fists&&!(fT>=0&&fT<2));
+  const show=VIEW.fp&&!VR.on&&!TELE.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85)&&!(fists&&!(fT>=0&&fT<2));
   if(!VMG.g){if(!show)return;VMG.g=new THREE.Group();camera.add(VMG.g);}
   VMG.g.visible=show;if(!show)return;
   if(VMG.w!==P.cur){for(const k in VMG.m)VMG.m[k].visible=false;
@@ -4755,7 +5168,51 @@ function fpsTick(dt){
       g.font='700 34px ui-monospace,Menlo,Consolas,monospace';g.textAlign='center';g.textBaseline='middle';g.fillText(txt,80,30);V.tex.needsUpdate=true;}}
   else if(FPSV.vr)FPSV.vr.mesh.visible=false;
   FPSV.txt=txt;}
+
+// ---------------------------------------------------------------- trucos (menú de pausa): plane, acrobat, weapon, money, monster
+// en el ordenador y el móvil se escriben en un cuadro de texto; en VR se escriben letra a letra con el stick
+const CHEATS={
+  plane:{desc:'Te lleva a la avioneta de la Silla de Felipe II',f:()=>cheatToPlane(PLANE,'la avioneta de la Silla')},
+  acrobat:{desc:'Te lleva a la avioneta acrobática de la Base Aérea de Abantos',f:()=>cheatToPlane(ACRO,'la avioneta acrobática')},
+  weapon:{desc:'Todas las armas con munición',f:()=>{for(const k in WEAPONS){if(k==='fists')continue;const W=WEAPONS[k];giveW(k,W.melee?0:(W.throw?6:W.mag*4));}save();return 'Tienes todas las armas';}},
+  money:{desc:'10.000 € al bolsillo',f:()=>{P.money+=10000;save();return '+10.000 €';}},
+  monster:{desc:'Te lleva al taller «El Gato Mecánico»',f:()=>{const T=SERVICE.taller;if(!T)return null;const c=Math.cos(T.rot),s=Math.sin(T.rot),lx=9,lz=0;
+    cheatTeleport(T.x+lx*c+lz*s,T.z-lx*s+lz*c,Math.atan2(-c,s));return 'Estás en el taller';}},
+};
+function cheatTeleport(x,z,yaw){
+  if(P.dead)return;if(TELE.on)teleExit();if(P.plane)exitPlane(true);if(P.car)exitCar();if(P.train&&typeof exitTrain==='function')exitTrain();
+  P.chute=false;if(CHUTE)CHUTE.visible=false;P.bail=false;
+  P.x=x;P.z=z;P.y=surfaceH(x,z);P.vx=P.vz=P.vy=0;P.ground=true;P.yaw=yaw;camYaw=yaw;camPitch=-0.12;P.h.g.visible=true;P.h.g.position.set(P.x,P.y,P.z);P.h.g.rotation.y=yaw;
+  if(VR.on){VR.yaw=yaw+Math.PI;VR.recenter=true;VR.camFootOk=false;}
+}
+function cheatToPlane(a,name){
+  if(!a||a.dead)return `Ahora mismo no hay ${name}: espera a que la repongan`;
+  const E=a.T.exit,[ex,ez]=a.local2w(E[0]*1.6,E[1]),yaw=Math.atan2(a.pos.x-ex,a.pos.z-ez);cheatTeleport(ex,ez,yaw);return `Estás junto a ${name}`;
+}
+function runCheat(txt){
+  const k=String(txt||'').trim().toLowerCase();const C=CHEATS[k];
+  if(!C){sfx('fail');return{ok:false,msg:k?`«${k}» no es ningún truco`:'Escribe un truco'};}
+  const r=C.f();if(r===null){sfx('fail');return{ok:false,msg:'Ahora no se puede'};}
+  sfx('passed');toast('<b>Truco:</b> '+r,3);return{ok:true,msg:r};
+}
+// cuadro de texto del menú de pausa (ordenador y móvil)
+function cheatBoxToggle(show){
+  const b=$('cheatBox');if(!b)return;const on=show===undefined?b.classList.contains('hidden'):show;b.classList.toggle('hidden',!on);$('cheatMsg').textContent='';
+  if(on){$('cheatIn').value='';if(!VR.on)setTimeout(()=>{try{$('cheatIn').focus();}catch(e){}},30);}else $('cheatIn').blur();
+}
+function cheatApply(){const r=runCheat($('cheatIn').value);$('cheatMsg').textContent=r.msg;$('cheatMsg').className=r.ok?'ok':'bad';if(r.ok){$('cheatIn').value='';cheatBoxToggle(false);resume();}}
+function cheatTyping(){const a=document.activeElement;return !!a&&a.id==='cheatIn';}
+// VR: escribir con el stick (↔ elige la letra, A la añade)
+const VRCHEAT={on:false,txt:'',li:0,msg:''},CHEAT_ABC='abcdefghijklmnopqrstuvwxyz';
+function vrCheatItems(D){
+  const C=VRCHEAT,L=CHEAT_ABC[C.li];D.title='Trucos';D.lines=['Escribe el truco: elige la letra con el stick ↔ y añádela con A o el gatillo.','Texto: '+(C.txt||'·')+'_'+(C.msg?'   —   '+C.msg:'')];
+  D.items=[{label:`Letra:  ‹ ${L.toUpperCase()} ›`,sub:'Stick ↔ para cambiar de letra · A para añadirla',adj:d=>{C.li=(C.li+d+26)%26;},act:()=>{if(C.txt.length<16)C.txt+=CHEAT_ABC[C.li];C.msg='';}},
+    {label:'Borrar la última letra',act:()=>{C.txt=C.txt.slice(0,-1);C.msg='';}},
+    {label:'Aplicar el truco',act:()=>{const r=runCheat(C.txt);C.msg=r.msg;if(r.ok){C.txt='';C.on=false;resume();}}},
+    {label:'Volver a la pausa',act:()=>{C.on=false;C.msg='';}}];
+}
 function updateCamera(dt){
+  if(TELE.on&&!VR.on){teleCamera();return;}
   if(P.plane){updatePlaneCamera(dt);return;}
   if(VIEW.fp&&!P.dead&&fpCamera(dt))return;
   setNear(0.25);if(P.car)setCarCab(P.car,false);
@@ -4901,7 +5358,7 @@ const ZONES=[
   ['Estación del Hospital',(x,z)=>Math.hypot(x-STATIONS[3].x,z-STATIONS[3].z)<32],
   ['Mercadillo de la Estación',(x,z)=>x>719&&x<784&&z>286&&z<318],['Apeadero de la Silla',(x,z)=>Math.hypot(x+600,z-779)<38],['Estación de Abantos',(x,z)=>Math.hypot(x+540,z+992)<45],
   ['Silla de Felipe II',(x,z)=>Math.hypot(x+642,z-735)<45],['Aeródromo de la Silla',(x,z)=>{const a=AIRSTRIP,dx=x-a.cx,dz=z-a.cz,c=Math.cos(a.rot),s=Math.sin(a.rot);return Math.abs(dx*c-dz*s)<40&&Math.abs(dx*s+dz*c)<110;}],['Ermita de la Virgen de Gracia',(x,z)=>Math.hypot(x+548,z-680)<35],
-  ['Base Aérea de Abantos',(x,z)=>x>ABA.cx-ABA.hx-6&&x<RWY.x1+6&&z>ABA.cz-ABA.hz-6&&z<ABA.cz+ABA.hz+6],['Mirador de Abantos',(x,z)=>Math.hypot(x+472,z+1043)<60],['Presa del Romeral',(x,z)=>x>LAKE.x0-30&&x<LAKE.x1+30&&z>LAKE.z0-30&&z<LAKE.z1+30],
+  ['Base Aérea de Abantos',(x,z)=>x>ABA.cx-ABA.hx-6&&x<RWY.x1+6&&z>ABA.cz-ABA.hz-6&&z<ABA.cz+ABA.hz+6],['Casa de Nacho',(x,z)=>x>-497&&x<-467&&z>-1065&&z<-1049],['Mirador de Abantos',(x,z)=>Math.hypot(x+472,z+1043)<60],['Presa del Romeral',(x,z)=>x>LAKE.x0-30&&x<LAKE.x1+30&&z>LAKE.z0-30&&z<LAKE.z1+30],
   ['Casita del Príncipe',(x,z)=>{const[cx,cz]=CW(540,240);return Math.hypot(x-cx,z-cz)<95;}],
   ['Hospital del Real Sitio',(x,z)=>SERVICE.hospital&&Math.hypot(x-SW(33,6)[0],z-SW(33,6)[1])<26],['Taller «El Gato Mecánico»',(x,z)=>SERVICE.taller&&Math.hypot(x-SERVICE.taller.x,z-SERVICE.taller.z)<14],
   ['Área de servicio de Guadarrama',(x,z)=>{const dx=x-SERV.x,dz=z-SERV.z,c=Math.cos(SERV.rot),s=Math.sin(SERV.rot);const lx=dx*c-dz*s,lz=dx*s+dz*c;return Math.abs(lx)<55&&lz>-20&&lz<40;}],['Casita del Infante',(x,z)=>Math.hypot(x+505,z-195)<70],['Estación de El Escorial',(x,z)=>Math.hypot(x-805,z-320)<90],
@@ -4956,7 +5413,7 @@ function blips(){
   for(const n of NPCS){if(!n.alive)continue;if(n.mission)out.push({x:n.x,z:n.z,t:'dot',c:'#E4572E',edge:true,r:n.boss?7:5});else if(n.team==='police'&&n.hostile)out.push({x:n.x,z:n.z,t:'dot',c:(G.time*4)%2<1?'#3D7BD9':'#E4572E',r:4});}
   sideBlips(out);
   for(const st of STATIONS)out.push({x:st.x,z:st.z,t:'T',c:'#3D7BD9'});
-  out.push({x:752,z:299,t:'shop',c:'#5DB86C'});
+  out.push({x:752,z:299,t:'shop',c:'#5DB86C'});out.push({x:-482,z:-1055,t:'house',c:'#3d9a4a'});
   if(SERVICE.hospital){const h=SW(33,6);out.push({x:h[0],z:h[1],t:'hosp',c:'#d62828'});out.push({x:SERVICE.taller.x,z:SERVICE.taller.z,t:'wrench',c:'#E8702A'});const q=SW(0,26);out.push({x:q[0],z:q[1],t:'shop',c:'#b3202a'});}
   if(TRAIN.cars.length&&!P.train){const m=TRAIN.cars[1];out.push({x:m.x,z:m.z,t:'train',c:'#E8702A',edge:false});}
   for(const a of AIR)if(!a.dead&&P.plane!==a)out.push({x:a.pos.x,z:a.pos.z,t:a.isHeli?'heli':'plane',c:a.kind==='acro'?'#E8B93A':'#F3EEE3',edge:false});
@@ -4976,6 +5433,7 @@ function drawBlip(g,x,y,b,s=1){
   else if(b.t==='ring'){g.lineWidth=5;g.strokeStyle='#111';g.beginPath();g.arc(0,0,8,0,TAU);g.stroke();g.lineWidth=3;g.strokeStyle=b.c;g.stroke();}
   else if(b.t==='A'){g.beginPath();g.arc(0,0,10,0,TAU);g.fill();g.stroke();g.fillStyle='#111';g.font='bold 14px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('A',0,1);}
   else if(b.t==='T'||b.t==='shop'){g.beginPath();g.arc(0,0,9,0,TAU);g.fill();g.stroke();g.fillStyle='#fff';g.font='bold 12px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(b.t==='T'?'T':'€',0,1);}
+  else if(b.t==='house'){g.beginPath();g.moveTo(-10,-1);g.lineTo(0,-10);g.lineTo(10,-1);g.lineTo(7,-1);g.lineTo(7,9);g.lineTo(-7,9);g.lineTo(-7,-1);g.closePath();g.fill();g.stroke();g.fillStyle='#fff';g.fillRect(-2.5,2,5,7);}
   else if(b.t==='train'){g.fillRect(-9,-5,18,10);g.strokeRect(-9,-5,18,10);}
   else if(b.t==='plane'){g.fillRect(-2,-9,4,17);g.fillRect(-9,-3,18,4);g.fillRect(-5,6,10,3);g.strokeRect(-2,-9,4,17);g.strokeRect(-9,-3,18,4);}
   else if(b.t==='heli'){g.beginPath();g.arc(0,0,10,0,TAU);g.fill();g.stroke();g.fillStyle='#111';g.font='bold 14px Arial,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('H',0,1);}
@@ -5006,7 +5464,7 @@ function drawMinimap(){
   const fy=P.plane?P.plane.h:P.car?P.car.h:P.yaw;const ang=Math.atan2(Math.cos(fy),Math.sin(fy))+rot;
   g.save();g.translate(R,R);g.rotate(ang);g.beginPath();const k=S/420*1.6;g.moveTo(12*k,0);g.lineTo(-8*k,8*k);g.lineTo(-4*k,0);g.lineTo(-8*k,-8*k);g.closePath();g.fillStyle='#fff';g.fill();g.lineWidth=2.5;g.strokeStyle='#111';g.stroke();g.restore();
 }
-const LABELS=[['Real Monasterio',0,0],['Lonja',-100,-125],['Pza. de la Constitución',-120,-250],['Real Coliseo',10,-218],['Casita del Príncipe',CW(540,275)[0],CW(540,275)[1]],['Hospital',SW(33,-24)[0],SW(33,-24)[1]],['Taller',SW(-27,-18)[0],SW(-27,-18)[1]],['Casita del Infante',-505,225],['Silla de Felipe II',-642,770],['Estación de El Escorial',805,290],['Golf La Herrería',110,360],['Bosque de La Herrería',-380,520],['Monte Abantos',-560,-1170],['Presa del Romeral',-160,-730],['Mirador de Abantos',-472,-1010],['Casa de la Compaña',-182,97],['El Plantel',-230,70],['Jardín de los Frailes',-14,125],['Cocheras del Rey',238,-300],['Plaza de San Lorenzo',-28,-330],['Aeródromo de la Silla',-790,650],['Apeadero de la Silla',-600,810],['Estación de Abantos',-600,-1000],['Estación del Hospital',540,-1135],['Base Aérea de Abantos',-372,-1078],['Mercadillo',756,284],['Salida del Gran Premio',-175,10]];
+const LABELS=[['Real Monasterio',0,0],['Lonja',-100,-125],['Pza. de la Constitución',-120,-250],['Real Coliseo',10,-218],['Casita del Príncipe',CW(540,275)[0],CW(540,275)[1]],['Hospital',SW(33,-24)[0],SW(33,-24)[1]],['Taller',SW(-27,-18)[0],SW(-27,-18)[1]],['Casita del Infante',-505,225],['Silla de Felipe II',-642,770],['Estación de El Escorial',805,290],['Golf La Herrería',110,360],['Bosque de La Herrería',-380,520],['Monte Abantos',-560,-1170],['Presa del Romeral',-160,-730],['Mirador de Abantos',-472,-1010],['Casa de Nacho',-482,-1057],['Casa de la Compaña',-182,97],['El Plantel',-230,70],['Jardín de los Frailes',-14,125],['Cocheras del Rey',238,-300],['Plaza de San Lorenzo',-28,-330],['Aeródromo de la Silla',-790,650],['Apeadero de la Silla',-600,810],['Estación de Abantos',-600,-1000],['Estación del Hospital',540,-1135],['Base Aérea de Abantos',-372,-1078],['Mercadillo',756,284],['Salida del Gran Premio',-175,10]];
 function drawBigMap(){
   const c=$('bigmapCanvas'),g=c.getContext('2d'),S=c.width,k=S/WS;g.drawImage(MAPC,0,0,S,S);
   const to=(x,z)=>[(x+HALF)*k,(z+HALF)*k];
@@ -5019,7 +5477,7 @@ function drawBigMap(){
 // =====================================================================
 //  MENÚS, GUARDADO Y ARRANQUE
 // =====================================================================
-function save(){try{localStorage.setItem('gte-save-v1',JSON.stringify({mission:G.mission,money:P.money,weapons:P.weapons,ammo:P.ammo,kills:G.kills,stolen:G.stolen,deaths:G.deaths,hints:G.hintsDone,crown:!!G.crown,outfit:G.outfit,rec:REC,jump:bestJump}));}catch(e){}}
+function save(){try{localStorage.setItem('gte-save-v1',JSON.stringify({mission:G.mission,money:P.money,weapons:P.weapons,ammo:P.ammo,kills:G.kills,stolen:G.stolen,deaths:G.deaths,hints:G.hintsDone,crown:!!G.crown,outfit:G.outfit,rec:REC,jump:bestJump,...casaSaveData()}));}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('gte-save-v1')||'null');return s;}catch(e){return null;}}
 function showScreen(id,on){$(id).classList.toggle('hidden',!on);}
 let menuIdx=0;
@@ -5033,7 +5491,7 @@ function menuNav(){
 function openPause(){if(G.state!=='play')return;G.state='paused';showScreen('pause',true);menuIdx=0;
   $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped.`;
   if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
-function resume(){showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();}
+function resume(){cheatBoxToggle(false);VRCHEAT.on=false;showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();}
 function openMap(){if(G.state!=='play'&&G.state!=='paused')return;G.prevState=G.state;G.state='map';showScreen('pause',false);drawBigMap();showScreen('bigmap',true);if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function closeMap(){showScreen('bigmap',false);G.state='play';tryLock();}
 $('btnResume').onclick=resume;$('btnMapP').onclick=openMap;
@@ -5041,6 +5499,9 @@ $('btnRestart').onclick=()=>{try{localStorage.removeItem('gte-save-v1');}catch(e
 $('btnGrass').onclick=()=>setGrassLevel((GRASS.level+3)%4);
 $('btnGrassD').onclick=()=>setGrassDist((GRASS.dist+1)%GRASS_DIST.length);
 $('btnFps').onclick=()=>setShowFps(!SHOWFPS);
+$('btnCheats').onclick=()=>{if(VR.on){VRCHEAT.on=true;VRCHEAT.txt='';VRCHEAT.msg='';VR.menu.sel=0;}else cheatBoxToggle();};
+$('btnCheatOk').onclick=cheatApply;
+$('cheatIn').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();cheatApply();}else if(e.key==='Escape'){e.preventDefault();cheatBoxToggle(false);}});
 $('volR').oninput=e=>{AU.vol=+e.target.value;if(AU.master)AU.master.gain.value=AU.muted?0:AU.vol;};
 $('btnMute').onclick=()=>setMute(!AU.muted);
 $('sensR').oninput=e=>{sens=+e.target.value;};
@@ -5052,10 +5513,10 @@ function startGame(cont){
   if(IS_TOUCH){try{const el=document.documentElement;const pr=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):(el.webkitRequestFullscreen?el.webkitRequestFullscreen():null);
     if(pr&&pr.then)pr.then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
   auInit();showScreen('title',false);$('hud').classList.remove('hidden');G.state='play';
-  if(cont){const s=loadSave();if(s){G.mission=s.mission||0;P.money=s.money||0;Object.assign(P.weapons,s.weapons||{});for(const w in P.ammo)if(s.ammo&&s.ammo[w])P.ammo[w]=s.ammo[w];G.kills=s.kills||0;G.stolen=s.stolen||0;G.deaths=s.deaths||0;G.hintsDone=s.hints||{};G.crown=!!s.crown;applyCrown();G.outfit=s.outfit||{};rebuildPlayer();Object.assign(REC,s.rec||{});bestJump=s.jump||0;}
+  if(cont){const s=loadSave();if(s){G.mission=s.mission||0;P.money=s.money||0;Object.assign(P.weapons,s.weapons||{});for(const w in P.ammo)if(s.ammo&&s.ammo[w])P.ammo[w]=s.ammo[w];G.kills=s.kills||0;G.stolen=s.stolen||0;G.deaths=s.deaths||0;G.hintsDone=s.hints||{};G.crown=!!s.crown;applyCrown();G.outfit=s.outfit||{};rebuildPlayer();Object.assign(REC,s.rec||{});bestJump=s.jump||0;}casaStart(s);
     placeAtBase();const best=['assault','smg','shotgun','revolver','pistol'].find(w=>P.weapons[w]);if(best)setWeapon(best);
     objective(G.mission<3?'Ve a ver a la Abuela Remedios (<b>R</b>) a la Plaza de la Constitución':'Modo libre: El Escorial es tuyo.');toast('Partida cargada: estás en la Base Aérea de Abantos, junto al helicóptero',3.5);tryLock();return;}
-  tryLock();
+  casaStart(null);tryLock();
   playDialog(INTRO,orbitShot(0,0,270,H0+95,H0+22,0.06,2.3),()=>{
     placeAtBase();
     objective('Ve a ver a la <b>Abuela Remedios</b> a la Plaza de la Constitución (<b>R</b> en el mapa)');
@@ -5152,7 +5613,7 @@ function frameBody(now,xrf){
         carHits(c);
         c.mesh.visible=c===P.car||Math.hypot(c.x-camPos.x,c.z-camPos.z)<420;
       }
-      updateTrain(dt);updateCrossings(dt);updateDriveBy(dt);updateDetails(dt);
+      updateTrain(dt);updateCrossings(dt);updateDriveBy(dt);updateDetails(dt);casaUpdate(dt);
       if(MONSTER&&MONSTER.dead&&SERVICE.monster){if(MONSTER.respT===undefined)MONSTER.respT=25;MONSTER.respT-=dt;const q=SERVICE.monster; // el monster truck vuelve a aparecer detrás del taller
         if(MONSTER.respT<=0&&Math.hypot(P.x-q.x,P.z-q.z)>40&&!CARS.some(c=>!c.dead&&Math.hypot(c.x-q.x,c.z-q.z)<6)){if(Math.hypot(MONSTER.x-P.x,MONSTER.z-P.z)>60)MONSTER.remove();MONSTER=new Car('monster',q.x,q.z,q.h,0xc8342c);}}
       if(TORO&&TORO.dead){if(TORO.respT===undefined)TORO.respT=20;TORO.respT-=dt;const q=TORO_SPAWN;
@@ -5168,12 +5629,13 @@ function frameBody(now,xrf){
     updateBubbles(rdt);updateHUD(rdt);drawMinimap();
   }
   else if(G.state==='shop'){menuNav();if(KP.has('Escape')||padP(1)||tP('pause'))closeShop();}
-  else if(G.state==='paused'||G.state==='credits'){menuNav();if(G.state==='paused'&&(KP.has('KeyM')))openMap();}
+  else if(G.state==='paused'||G.state==='credits'){menuNav();if(G.state==='paused'&&KP.has('KeyM')&&!cheatTyping())openMap();}
   else if(G.state==='map'){if(I.map||I.pause||padP(1))closeMap();}
   if(IS_TOUCH&&!VR.on&&G.state==='play'&&innerHeight>innerWidth*1.05)openPause();
   {const tv=IS_TOUCH&&!VR.on&&G.state==='play';if(tv!==TOUCH.vis){TOUCH.vis=tv;$('touch').classList.toggle('hidden',!tv);TOUCH.mode='';}}
   updateAudio(rdt);if(G.state==='play')updateBells(rdt);syncWorldToCamera();
-  if(VR.on){vrRig(rdt);vrMenu(rdt);vrProps(rdt);vrHud(rdt);vrScope();}
+  if(VR.on){vrRig(rdt);vrMenu(rdt);vrProps(rdt);vrHud(rdt);vrScope();teleVR();}
+  if(P.car&&P.car.type==='geo'&&G.geoIn!==P.car){G.geoIn=P.car;toast('<b>Furgón blindado del GEO</b>: aguanta muchos tiros y aquí dentro no te hacen daño',4);}else if(!P.car)G.geoIn=null;
   updateViewModel(rdt);fpFlashTick(rdt);fpsTick(rawDt);placeDriveBy();updateGrass(rdt);updateLakeWater(rdt);renderer.render(scene,camera);if(VR.on)vrAfterRender(xrf);endInputFrame();
 }
 function civSpawner(dt){
@@ -5638,8 +6100,8 @@ function setMute(m){AU.muted=m;if(AU.master)AU.master.gain.setTargetAtTime(m?0:A
 function muteLabel(){const b=$('btnMute');if(b)b.textContent=AU.muted?'Sonido: silenciado':'Sonido: activado';}
 let SHOWFPS=false;
 function setShowFps(v){SHOWFPS=!!v;const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);saveOpts();}
-function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level,dist:GRASS.dist,mute:!!AU.muted,fps:SHOWFPS}));}catch(e){}}
-function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;if(o&&o.dist>=0&&o.dist<GRASS_DIST.length)GRASS.dist=o.dist;if(o&&o.mute)AU.muted=true;if(o&&o.fps)SHOWFPS=true;}catch(e){}grassLabels();muteLabel();{const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);}}
+function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level,dist:GRASS.dist,mute:!!AU.muted,fps:SHOWFPS,vrl:VR.laserOn===false?0:1}));}catch(e){}}
+function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;if(o&&o.dist>=0&&o.dist<GRASS_DIST.length)GRASS.dist=o.dist;if(o&&o.mute)AU.muted=true;if(o&&o.fps)SHOWFPS=true;if(o&&o.vrl===0)VR.laserOn=false;}catch(e){}grassLabels();muteLabel();{const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);}}
 function updateGrass(dt){
   if(!GRASS.geo){GRASS.geo=grassGeo();GRASS.mat=grassMat();}
   const U=GRASS.uni;U.uTime.value+=dt;GRASS.wa+=dt*0.03;const gust=0.38+0.3*Math.max(0,Math.sin(U.uTime.value*0.21))+0.12*Math.sin(U.uTime.value*0.77);
