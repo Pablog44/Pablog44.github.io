@@ -361,6 +361,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
       <button class="b alt" id="btnMapP">Ver mapa</button>
       <button class="b alt" id="btnView">Vista: tercera persona</button>
       <button class="b alt hidden" id="btnVRP">Entrar en VR</button>
+      <button class="b alt hidden" id="btnFull">Pantalla completa</button>
       <button class="b alt" id="btnMute">Sonido: activado</button>
       <button class="b alt" id="btnGrass">Césped: Alto</button>
       <button class="b alt" id="btnGrassD">Alcance del césped: 170 m</button>
@@ -1563,10 +1564,16 @@ function buildCasaNacho(){
   // salón: tele en la pared de poniente, sofá, butaca, mesa baja, alfombra, estantería, lámpara de pie y plantas
   casaBox(INT,IX0,IX0+0.45,y,y+0.5,-1054.6,-1052.4,DKW,true);casaBox(INT,IX0+0.12,IX0+0.18,y+0.55,y+1.35,-1054.3,-1052.7,[0.06,0.06,0.07],false);
   {const cv=mkCanvas(384,192),tv=texFrom(cv,false);CASA.tv={cv,g:cv.getContext('2d'),tex:tv,t:9};tvDraw(0.3);
-   const s=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.74),new THREE.MeshBasicMaterial({map:tv}));s.position.set(IX0+0.19,y+0.95,-1053.5);s.rotation.y=Math.PI/2;scene.add(s);}
+   const s=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.74),new THREE.MeshBasicMaterial({map:tv}));CASA.tvMesh=s;s.position.set(IX0+0.19,y+0.95,-1053.5);s.rotation.y=Math.PI/2;scene.add(s);}
   casaBox(INT,-492.3,-491.4,y,y+0.45,-1054.9,-1052.1,[0.32,0.38,0.5],true);casaBox(INT,-491.7,-491.4,y+0.45,y+0.95,-1054.9,-1052.1,[0.3,0.36,0.48],false);
   for(const z of[-1054.9,-1052.35])casaBox(INT,-492.3,-491.4,y+0.45,y+0.7,z,z+0.25,[0.3,0.36,0.48],false);
   for(const z of[-1054.1,-1053.1])casaBox(INT,-492.25,-491.75,y+0.45,y+0.62,z-0.42,z+0.42,[0.4,0.46,0.6],false);
+  // consola de videojuegos junto a la tele (con su luz verde) y el mando encima de la mesa baja
+  casaBox(INT,IX0+0.06,IX0+0.36,y+0.5,y+0.585,-1052.69,-1052.43,[0.11,0.11,0.13],false);casaBox(INT,IX0+0.355,IX0+0.365,y+0.53,y+0.545,-1052.66,-1052.46,[0.05,0.05,0.05],false);
+  {const led=new THREE.Mesh(BOXG,ME(0x30ff70,0x30ff70,1.2));led.scale.set(0.012,0.012,0.012);led.position.set(IX0+0.367,y+0.565,-1052.47);scene.add(led);}
+  casaBox(INT,-493.82,-493.58,y+0.44,y+0.475,-1053.62,-1053.38,[0.2,0.2,0.22],false);for(const dz of[-0.11,0.11])casaBox(INT,-493.86,-493.66,y+0.44,y+0.47,-1053.5+dz-0.05,-1053.5+dz+0.05,[0.2,0.2,0.22],false);
+  for(const[dx,dz,c]of[[0.04,0.07,[0.85,0.2,0.2]],[0.0,0.1,[0.2,0.6,0.25]],[0.08,0.1,[0.2,0.35,0.85]]])casaBox(INT,-493.7+dx-0.01,-493.7+dx+0.01,y+0.475,y+0.485,-1053.5+dz-0.01,-1053.5+dz+0.01,c,false);
+  CASA.console={x:-492.9,z:-1053.5};
   casaBox(INT,-494.2,-493.2,y+0.38,y+0.44,-1054.0,-1053.0,WOOD,true);for(const[a,b]of[[-494.1,-1053.9],[-493.3,-1053.9],[-494.1,-1053.1],[-493.3,-1053.1]])casaBox(INT,a-0.03,a+0.03,y,y+0.38,b-0.03,b+0.03,DKW,false);
   casaBox(INT,-494.9,-491.6,y+0.005,y+0.02,-1055.1,-1051.9,[0.62,0.2,0.18],false);casaBox(INT,-494.6,-491.9,y+0.01,y+0.025,-1054.8,-1052.2,[0.86,0.72,0.42],false);
   casaBox(INT,-490.6,-489.8,y,y+0.42,-1051.6,-1050.8,[0.55,0.3,0.2],true);casaBox(INT,-490.6,-489.8,y+0.42,y+0.9,-1050.8,-1050.6,[0.55,0.3,0.2],false);
@@ -1701,7 +1708,7 @@ function casaUpdate(dt){
   // puerta de la casa
   {const d=P.car?99:Math.hypot(P.x+488,P.z+1050.2);const prev=CASA.doorOpen;CASA.doorOpen=clamp(CASA.doorOpen+(d<2.7?dt:-dt)*2.2,0,1);
    if(prev!==CASA.doorOpen){const e=CASA.doorOpen*CASA.doorOpen*(3-2*CASA.doorOpen);CASA.door.rotation.y=e*1.55;CASA.doorColl.y0=e>0.6?CASA.y+2.5:CASA.y-1;if(prev===0)sfx('swing',0.4);}}
-  if(CASA.tv&&Math.hypot(px+493.8,pz+1053.5)<22){CASA.tv.t-=dt;if(CASA.tv.t<=0){CASA.tv.t=0.12;tvDraw(G.time);}}
+  if(CASA.tv&&!SNAKE.on&&Math.hypot(px+493.8,pz+1053.5)<22){CASA.tv.t-=dt;if(CASA.tv.t<=0){CASA.tv.t=0.12;tvDraw(G.time);}}
   if(Math.hypot(px+478,pz+1045)<28)hintOnce('casa','Esta es la <b>casa de Nacho</b>. Entra con un coche en uno de los <b>garajes</b> y bájate: al cerrarse la puerta, el coche queda guardado. Dentro tienes la cama (guarda la partida) y el armario con tu ropa.',9);
 }
 function casaSleep(){heal(100);save();sfx('pickup');banner('Buenos días, Nacho','Has dormido como un tronco · Partida guardada',2.8);}
@@ -1711,6 +1718,7 @@ function casaInteract(I){
   const dW=Math.hypot(P.x-CASA.wardrobe.x,P.z-CASA.wardrobe.z),dB=Math.hypot(P.x-CASA.bed.x,P.z-CASA.bed.z);
   if(dW<1.3){hint(`Pulsa ${kb('F','Y','Abrir')} para abrir el <b>armario</b> y ponerte la ropa que has comprado`,0.3);if(I.enter){P.x=CASA.mirror.x;P.z=CASA.mirror.z;P.y=surfaceH(P.x,P.z);P.vx=P.vz=0;openShop(CASA.shop);return true;}}
   else if(dB<1.5){hint(`Pulsa ${kb('F','Y','Dormir')} para <b>dormir</b>: recuperas la salud y se guarda la partida`,0.3);if(I.enter){casaSleep();return true;}}
+  else if(CASA.console&&Math.hypot(P.x-CASA.console.x,P.z-CASA.console.z)<1.4){hint(`Pulsa ${kb('F','Y','Jugar','A')} para jugar a la <b>consola</b>: el Snake de toda la vida`,0.3);if(I.enter){snakeEnter();return true;}}
   return false;
 }
 // coches guardados al cargar la partida (aparcados dentro, mirando a la puerta)
@@ -1866,6 +1874,72 @@ function teleVR(){
   const fn=scene.fog?[scene.fog.near,scene.fog.far]:null;if(fn){scene.fog.near=1100;scene.fog.far=3400;}
   const xe=renderer.xr.enabled,prev=renderer.getRenderTarget();renderer.xr.enabled=false;renderer.setRenderTarget(TELE.rt);renderer.render(scene,TELE.cam);renderer.setRenderTarget(prev);renderer.xr.enabled=xe;
   if(fn){scene.fog.near=fn[0];scene.fog.far=fn[1];}hide.forEach((o,i)=>o.visible=was[i]);
+}
+
+// ---------------- consola de la casa: el Snake de toda la vida, en la tele del salón (y en grande en la pantalla, menos en VR)
+const SNAKE={tv:(()=>{try{return localStorage.getItem('gte-snake-tv')==='1';}catch(e){return false;}})(),on:false,cv:null,g:null,tex:null,el:null,cap:null,dir:[1,0],q:[],body:[],food:null,t:0,score:0,over:false,prev:{},flash:0};
+const SN_C=32,SN_R=15,SN_S=12;
+function snakeReset(){SNAKE.body=[[10,7],[9,7],[8,7],[7,7]];SNAKE.dir=[1,0];SNAKE.q=[];SNAKE.score=0;SNAKE.over=false;SNAKE.t=0;snakeFood();}
+function snakeFood(){for(let k=0;k<500;k++){const f=[Math.floor(Math.random()*SN_C),Math.floor(Math.random()*SN_R)];if(!SNAKE.body.some(b=>b[0]===f[0]&&b[1]===f[1])){SNAKE.food=f;return;}}}
+function snakeEnter(){
+  if(!SNAKE.cv){SNAKE.cv=mkCanvas(SN_C*SN_S,SN_R*SN_S+12);SNAKE.g=SNAKE.cv.getContext('2d');SNAKE.tex=texFrom(SNAKE.cv,false);SNAKE.tex.magFilter=THREE.NearestFilter;
+    const el=document.createElement('div');el.id='snakeBox';el.style.cssText='position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);width:min(88vw,760px);z-index:5;pointer-events:none;padding:14px 14px 10px;border-radius:18px;background:#1b1c20;box-shadow:0 10px 40px rgba(0,0,0,0.6),inset 0 0 0 3px #2c2e34;display:none';
+    SNAKE.cv.style.cssText='width:100%;display:block;border-radius:6px;image-rendering:pixelated;image-rendering:crisp-edges';el.appendChild(SNAKE.cv);
+    const cap=document.createElement('div');cap.style.cssText='margin-top:8px;text-align:center;color:#cfd3c8;font:600 14px Georgia,serif';el.appendChild(cap);SNAKE.cap=cap;document.body.appendChild(el);SNAKE.el=el;}
+  SNAKE.on=true;snakeReset();SNAKE.prev={};SNAKE.flash=0;P.vx=P.vz=0;
+  P.x=-491.85;P.z=-1053.5;P.y=surfaceH(P.x,P.z);P.yaw=camYaw=-Math.PI/2;camPitch=-0.12;   // sentado en el sofá, mirando a la tele
+  if(CASA.tvMesh){CASA.tvMesh.material.map=SNAKE.tex;CASA.tvMesh.material.needsUpdate=true;}
+  snakeView();
+  hint(`<b>Snake.</b> Come la comida sin chocarte con las paredes ni contigo mismo. ${kb('F','Y','Salir','B')} para dejarlo${VR.on?' (stick izquierdo para mover, A para otra partida)':''}.`,5);sfx('pickup');snakeDraw();
+}
+// dos formas de jugar: con la pantalla grande delante o mirando la tele de verdad del salón (en VR, siempre la tele)
+function snakeView(){
+  if(VR.on){SNAKE.el.style.display='none';return;}
+  SNAKE.el.style.display=SNAKE.tv?'none':'block';
+  SNAKE.cap.innerHTML=`${kb('Flechas o WASD','cruceta o stick','joystick')}: mover · ${kb('Espacio','A','Saltar')}: otra partida · ${kb('V','R3','Vista')}: jugar en la tele del salón · ${kb('F','Y','Salir')}: dejar la consola`;
+  if(SNAKE.tv)hint(`Jugando en la <b>tele del salón</b>. ${kb('V','R3','Vista')} para volver a la pantalla grande · ${kb('F','Y','Salir')} para dejar la consola`,6);
+  else{camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
+}
+function snakeCamera(){   // sentado en el sofá, la tele llena la pantalla
+  const tx=-495.41,ty=CASA.y+0.95,tz=-1053.5,cx=-492.75,cy=CASA.y+1.22,d=Math.hypot(tx-cx,ty-cy),asp=camera.aspect||1.6;
+  const vf=Math.max(2*Math.atan(Math.tan(Math.atan(1.2/d))/asp),2*Math.atan(0.62/d))*180/Math.PI;
+  camera.position.set(cx,cy,tz);camera.up.set(0,1,0);camera.lookAt(tx,ty,tz);camPos.x=cx;camPos.y=cy;camPos.z=tz;setNear(0.1);
+  if(Math.abs(camera.fov-vf)>0.01){camera.fov=vf;fovNow=vf;camera.updateProjectionMatrix();}
+}
+function snakeExit(){
+  if(SNAKE.tv&&!VR.on){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
+  SNAKE.on=false;if(SNAKE.el)SNAKE.el.style.display='none';if(CASA.tvMesh&&CASA.tv){CASA.tvMesh.material.map=CASA.tv.tex;CASA.tvMesh.material.needsUpdate=true;}
+  P.x=-492.75;P.z=-1053.5;P.y=surfaceH(P.x,P.z);P.h.body.position.y=0;P.h.lLeg.rotation.x=P.h.rLeg.rotation.x=0;save();sfx('click');
+}
+function snakeUpdate(dt,I){
+  if(P.dead||P.car){snakeExit();return;}
+  if(VR.on?I.view:(I.enter||I.skip)){snakeExit();return;}   // en VR se sale con B (A es «otra partida»)
+  if(!VR.on&&I.view){SNAKE.tv=!SNAKE.tv;try{localStorage.setItem('gte-snake-tv',SNAKE.tv?'1':'0');}catch(e){}snakeView();sfx('click');}
+  // sentado en el sofá
+  P.vx=P.vz=0;P.h.g.position.set(P.x,P.y+0.05,P.z);P.h.g.rotation.y=P.yaw;animHuman(P.h,0,0,'sit');
+  const k=c=>!!KEYS[c],d={u:k('ArrowUp')||k('KeyW')||(I.my||0)>0.5||padH(12),dn:k('ArrowDown')||k('KeyS')||(I.my||0)<-0.5||padH(13),l:k('ArrowLeft')||k('KeyA')||(I.mx||0)<-0.5||padH(14),r:k('ArrowRight')||k('KeyD')||(I.mx||0)>0.5||padH(15)};
+  const push=v=>{const last=SNAKE.q.length?SNAKE.q[SNAKE.q.length-1]:SNAKE.dir;if((v[0]===-last[0]&&v[1]===-last[1])||(v[0]===last[0]&&v[1]===last[1]))return;if(SNAKE.q.length<3)SNAKE.q.push(v);};
+  if(d.u&&!SNAKE.prev.u)push([0,-1]);if(d.dn&&!SNAKE.prev.dn)push([0,1]);if(d.l&&!SNAKE.prev.l)push([-1,0]);if(d.r&&!SNAKE.prev.r)push([1,0]);SNAKE.prev=d;
+  if(SNAKE.over){SNAKE.flash+=dt;if(I.jump||(VR.on&&I.enter)||(SNAKE.flash>0.8&&(d.u||d.dn||d.l||d.r)&&!SNAKE.started)){snakeReset();sfx('click');}snakeDraw();return;}
+  const step=Math.max(0.055,0.13-SNAKE.score*0.0012);SNAKE.t+=dt;
+  while(SNAKE.t>=step&&!SNAKE.over){SNAKE.t-=step;if(SNAKE.q.length)SNAKE.dir=SNAKE.q.shift();
+    const h=SNAKE.body[0],nh=[h[0]+SNAKE.dir[0],h[1]+SNAKE.dir[1]];
+    const eat=SNAKE.food&&nh[0]===SNAKE.food[0]&&nh[1]===SNAKE.food[1];
+    if(nh[0]<0||nh[1]<0||nh[0]>=SN_C||nh[1]>=SN_R||SNAKE.body.slice(0,eat?SNAKE.body.length:SNAKE.body.length-1).some(b=>b[0]===nh[0]&&b[1]===nh[1])){
+      SNAKE.over=true;SNAKE.flash=0;const best=REC.snake||0;if(SNAKE.score>best){REC.snake=SNAKE.score;save();toast(`¡Récord en el Snake! <b>${SNAKE.score}</b> puntos`,3);}sfx('fail');break;}
+    SNAKE.body.unshift(nh);if(eat){SNAKE.score+=10;sfx('cash');snakeFood();}else SNAKE.body.pop();}
+  snakeDraw();
+}
+function snakeDraw(){
+  const g=SNAKE.g,W=SN_C*SN_S,H=SN_R*SN_S+12;if(!g)return;
+  g.fillStyle='#9bbc0f';g.fillRect(0,0,W,H);g.fillStyle='#8bac0f';for(let x=0;x<SN_C;x++)for(let y=0;y<SN_R;y++)if((x+y)%2)g.fillRect(x*SN_S,12+y*SN_S,SN_S,SN_S);
+  g.fillStyle='#0f380f';g.fillRect(0,0,W,12);g.fillStyle='#9bbc0f';g.font='bold 10px monospace';g.textBaseline='middle';g.fillText(`SNAKE   PUNTOS ${SNAKE.score}`,6,6.5);const rec=`RÉCORD ${REC.snake||0}`;g.fillText(rec,W-6-g.measureText(rec).width,6.5);
+  if(SNAKE.food){const[fx,fy]=SNAKE.food;g.fillStyle='#0f380f';g.fillRect(fx*SN_S+3,12+fy*SN_S+3,SN_S-6,SN_S-6);g.fillRect(fx*SN_S+5,12+fy*SN_S+1,2,3);}
+  SNAKE.body.forEach((b,i)=>{g.fillStyle=i?'#306230':'#0f380f';g.fillRect(b[0]*SN_S+1,12+b[1]*SN_S+1,SN_S-2,SN_S-2);});
+  if(SNAKE.body.length){const h=SNAKE.body[0];g.fillStyle='#9bbc0f';g.fillRect(h[0]*SN_S+4+SNAKE.dir[0]*2,12+h[1]*SN_S+4+SNAKE.dir[1]*2,3,3);}
+  if(SNAKE.over&&(SNAKE.flash*2.5)%1<0.75){g.fillStyle='rgba(15,56,15,0.85)';g.fillRect(W/2-120,H/2-28,240,58);g.fillStyle='#9bbc0f';g.textAlign='center';g.font='bold 18px monospace';g.fillText('FIN DE LA PARTIDA',W/2,H/2-10);
+    g.font='11px monospace';g.fillText(VR.on?'A: otra partida · B: salir':(lastDevice==='pad'?'A: otra partida · Y: salir':(lastDevice==='touch'?'Saltar: otra · Salir: dejarlo':'ESPACIO: otra partida · F: salir')),W/2,H/2+14);g.textAlign='left';}
+  SNAKE.tex.needsUpdate=true;
 }
 
 // ---------------------------------------------------------------- monumentos y edificios singulares
@@ -2578,7 +2652,7 @@ function buildCarMesh(type,color){
     const bh=H*0.42,ch=H-cl-bh-0.06,cL=L*T.cab,cz=T.cabZ*L,zf=cz+cL/2,zr=cz-cL/2,sk=W*0.08+0.01;
     add(paint,W,bh,L/2-zf,0,cl+bh/2,(L/2+zf)/2,true);if(T.extra!=='pickup')add(paint,W,bh,zr+L/2,0,cl+bh/2,(zr-L/2)/2,true);
     for(const sx of[-1,1])add(paint,sk,bh,cL,sx*(W/2-sk/2),cl+bh/2,cz,true);add(paint,W-2*sk,0.12,cL,0,cl+0.06,cz);
-    add(paint,W*0.98,0.12,L*0.28,0,cl+bh+0.02,L*0.34);
+    {const h0=Math.max(L*0.2,zf+0.02);add(paint,W*0.98,0.12,L/2-h0,0,cl+bh+0.02,(h0+L/2)/2);}   // capó (empieza en el parabrisas, no dentro de la cabina)
     add(MAT.glass,W*0.84,ch,cL,0,cl+bh+ch/2,cz,true).userData.cab=1;
     add(paint,W*0.87,0.07,cL*0.88,0,cl+bh+ch,cz).userData.cab=1;
     for(const sx of[-1,1])for(const sz of[-1,1])add(paint,0.07,ch,0.12,sx*W*0.42,cl+bh+ch/2,cz+sz*cL*0.46).userData.cab=1;
@@ -4152,6 +4226,7 @@ function vrKey(p,k){return VRKEY[p]||p||k;}
 function camWorldPos(){return VR.on&&VR.ready?VR.head:camera.position;}
 function vrCheck(){
   if(!navigator.xr||!navigator.xr.isSessionSupported)return;
+  if(IS_TOUCH&&!/OculusBrowser|Quest|Pico|Wolvic|VR/i.test(navigator.userAgent))return;   // en el móvil no se ofrece la VR
   navigator.xr.isSessionSupported('immersive-vr').then(ok=>{VR.supported=!!ok;if(ok){$('btnVR').classList.remove('hidden');$('btnVRP').classList.remove('hidden');
     $('vrNote').innerHTML+=' Tus gafas de VR están listas: pulsa <b>Jugar en VR</b>.';}}).catch(()=>{});
 }
@@ -4264,7 +4339,7 @@ function vrGunMesh(w){const m=makeWeaponMesh(w);m.rotation.y=Math.PI;m.position.
   if(WEAPONS[w]&&WEAPONS[w].melee){o=new THREE.Group();o.rotation.x=0.95;o.position.set(0,-0.01,0.03);m.position.set(0,0,w==='bat'?0.06:0.02);o.add(m);}   // navaja y bate: salen del puño hacia arriba, no en la línea del brazo
   VR.gunG.add(o);VR.guns[w]=o;if(w==='rifle')scopeInit(m);return o;}
 function vrProps(dt=0){
-  const R=VR.hand.right,L=VR.hand.left,foot=G.state==='play'&&!P.car&&!P.plane&&!P.train&&!P.dead&&!G.cine,W=WEAPONS[P.cur],ranged=foot&&!W.melee&&!W.throw;
+  const R=VR.hand.right,L=VR.hand.left,foot=G.state==='play'&&!P.car&&!P.plane&&!P.train&&!P.dead&&!G.cine&&!SNAKE.on&&!TELE.on,W=WEAPONS[P.cur],ranged=foot&&!W.melee&&!W.throw;
   VR.carGunT=Math.max(0,(VR.carGunT||0)-dt);const carGun=G.state==='play'&&!!P.car&&VIEW.fp&&!P.dead&&!G.cine&&VR.carGunT>0,gw=carGun?VR.carGunW:P.cur;
   if(R){if(VR.gunG.parent!==R.g)R.g.add(VR.gunG);if(VR.laser.parent!==R.g)R.g.add(VR.laser);
     if(VR.gunW!==gw){for(const k in VR.guns)VR.guns[k].visible=false;if(gw!=='fists'){(VR.guns[gw]||vrGunMesh(gw)).visible=true;}VR.gunW=gw;}
@@ -4926,6 +5001,7 @@ function findLockTarget(){
 function updatePlayer(dt,I){
   if(P.plane){if(I.enter)exitPlane(false);if(P.plane){P.x=P.plane.x;P.z=P.plane.z;P.y=P.plane.y;P.vx=P.vz=0;P.h.g.visible=false;}return;}
   if(TELE.on){teleUpdate(dt,I);return;}
+  if(SNAKE.on){snakeUpdate(dt,I);return;}
   if(P.train){updateOnTrain(I);return;}
   if(!P.car&&sideTalk(I))return;
   P.nearShop=null;P.nearTrain=false;
@@ -5213,7 +5289,7 @@ function fpCamera(dt){
 const VMG={g:null,w:null,kick:0,m:{}};
 function updateViewModel(dt){
   const fT=G.time-(P.punchAt??-99),fists=P.cur==='fists';   // los puños solo asoman al golpear y se quedan 2 s
-  const show=VIEW.fp&&!VR.on&&!TELE.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85)&&!(fists&&!(fT>=0&&fT<2));
+  const show=VIEW.fp&&!VR.on&&!TELE.on&&!SNAKE.on&&G.state==='play'&&!G.cine&&!P.dead&&!P.car&&!P.plane&&!P.train&&!(P.cur==='rifle'&&aimK>0.85)&&!(fists&&!(fT>=0&&fT<2));
   if(!VMG.g){if(!show)return;VMG.g=new THREE.Group();camera.add(VMG.g);}
   VMG.g.visible=show;if(!show)return;
   if(VMG.w!==P.cur){for(const k in VMG.m)VMG.m[k].visible=false;
@@ -5304,6 +5380,8 @@ const CHEATS={
   acrobat:{desc:'Te lleva a la avioneta acrobática de la Base Aérea de Abantos',f:()=>cheatToPlane(ACRO,'la avioneta acrobática')},
   weapon:{desc:'Todas las armas con munición',f:()=>{for(const k in WEAPONS){if(k==='fists')continue;const W=WEAPONS[k];giveW(k,W.melee?0:(W.throw?6:W.mag*4));}save();return 'Tienes todas las armas';}},
   money:{desc:'10.000 € al bolsillo',f:()=>{P.money+=10000;save();return '+10.000 €';}},
+  shop:{desc:'Te lleva a las tiendas (cada vez a una distinta)',f:()=>{const L=SHOPS;if(!L.length)return null;CHEATS.shop.i=((CHEATS.shop.i??-1)+1)%L.length;const sh=L[CHEATS.shop.i],ix=sh.ix??sh.x,iz=sh.iz??sh.z,dx=ix-sh.x,dz=iz-sh.z,l=Math.hypot(dx,dz)||1;
+    const x=ix+dx/l*1.2,z=iz+dz/l*1.2;cheatTeleport(x,z,Math.atan2(sh.x-x,sh.z-z));return 'Estás en '+sh.name;}},
   monster:{desc:'Te lleva al taller «El Gato Mecánico»',f:()=>{const T=SERVICE.taller;if(!T)return null;const c=Math.cos(T.rot),s=Math.sin(T.rot),lx=9,lz=0;
     cheatTeleport(T.x+lx*c+lz*s,T.z-lx*s+lz*c,Math.atan2(-c,s));return 'Estás en el taller';}},
 };
@@ -5341,6 +5419,7 @@ function vrCheatItems(D){
 }
 function updateCamera(dt){
   if(TELE.on&&!VR.on){teleCamera();return;}
+  if(SNAKE.on&&SNAKE.tv&&!VR.on){snakeCamera();return;}
   if(P.plane){updatePlaneCamera(dt);return;}
   if(VIEW.fp&&!P.dead&&fpCamera(dt))return;
   setNear(0.25);if(P.car)setCarCab(P.car,false);
@@ -5616,7 +5695,13 @@ function menuNav(){
   bs.forEach((b,i)=>b.classList.toggle('pad-focus',i===menuIdx&&lastDevice==='pad'));
   if(padP(0))bs[menuIdx].click();else if(G.state==='paused'&&(padP(1)||padP(9)))resume();
 }
-function openPause(){if(G.state!=='play')return;lockPrompt(false);G.state='paused';showScreen('pause',true);menuIdx=0;
+function fsEl(){return document.fullscreenElement||document.webkitFullscreenElement||null;}
+function fullLabel(){const b=$('btnFull');if(!b)return;const can=!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);b.classList.toggle('hidden',!(IS_TOUCH&&can&&!VR.on));b.textContent=fsEl()?'Salir de pantalla completa':'Pantalla completa';}
+function toggleFull(){try{if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return;}const el=document.documentElement;const pr=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):(el.webkitRequestFullscreen?el.webkitRequestFullscreen():null);
+  if(pr&&pr.then)pr.then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}fullLabel();}).catch(()=>{toast('El navegador no deja poner pantalla completa aquí',3);});}catch(e){toast('El navegador no deja poner pantalla completa aquí',3);}}
+document.addEventListener('fullscreenchange',fullLabel);document.addEventListener('webkitfullscreenchange',fullLabel);
+$('btnFull').onclick=()=>{toggleFull();setTimeout(fullLabel,300);};
+function openPause(){if(G.state!=='play')return;lockPrompt(false);fullLabel();G.state='paused';showScreen('pause',true);menuIdx=0;
   $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped.`;
   if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function resume(){cheatBoxToggle(false);VRCHEAT.on=false;showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();lockCheck();}
@@ -5734,7 +5819,7 @@ function frameBody(now,xrf){
     if(I.pause&&!P.dead){openPause();}
     else if(I.map&&!G.cine&&!P.dead&&!VR.on){openMap();}
     else{
-      if(I.view&&!G.cine&&!P.dead)toggleView();
+      if(I.view&&!G.cine&&!P.dead&&!SNAKE.on)toggleView();
       if(G.cine)updateDialog(rdt,I);else if(P.dead)updateDeadPlayer(rdt);else updatePlayer(dt,I);
       for(const c of CARS.slice()){
         if(c===P.car){c.update(dt,P.dead||G.cine||(G.side&&G.side.type==='race'&&G.side.state==='count')?{thr:0,steer:0,hand:1}:{thr:I.thr,steer:I.steer,hand:I.hand});}
