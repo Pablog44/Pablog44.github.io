@@ -142,6 +142,7 @@ body.touch .kbpad{ display:none; }
 button.b{ font-family:var(--ui); font-size:22px; font-weight:800; padding:10px 28px; border:2px solid var(--oro); background:var(--oro); color:#1d1a12; cursor:pointer; clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
 button.b.alt{ background:transparent; color:var(--oro); }
 button.b.vr{ background:#71A9DE; border-color:#71A9DE; color:#10161d; }
+button.b.red{ background:#C8402F; border-color:#C8402F; color:#fff; }
 .vrnote{ margin:-12px 0 20px; }
 .vrnote b{ color:var(--oro); }
 button.b:hover{ filter:brightness(1.1); }
@@ -164,6 +165,7 @@ button.b.dim{ opacity:0.45; }
 .sliders{ display:grid; grid-template-columns:auto 1fr; gap:10px 16px; align-items:center; font-size:18px; font-weight:600; margin-bottom:18px; }
 .sliders input{ accent-color:var(--oro); width:100%; }
 #stats{ font-size:17px; color:var(--granito); margin-bottom:14px; }
+#stats .kstats b{ color:var(--oro); }
 
 #shop{ background:rgba(16,19,24,.82); align-items:flex-start; justify-content:center; overflow-y:auto; z-index:21; }
 #shopInner{ width:min(620px,94vw); margin:auto 0; padding:14px 0; }
@@ -291,7 +293,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
   <div id="titleInner">
     <h1>Gran Timo Escurialense</h1>
     <div class="sub">Crimen, churros y granito en San Lorenzo de El Escorial</div>
-    <div class="btns"><button class="b" id="btnPlay">Jugar</button><button class="b alt hidden" id="btnContinue">Continuar partida</button><button class="b vr hidden" id="btnVR">Jugar en VR</button></div>
+    <div class="btns"><button class="b hidden" id="btnContinue">Continuar partida</button><button class="b" id="btnPlay">Jugar</button><button class="b vr hidden" id="btnVR">Jugar en VR</button></div>
     <div class="note vrnote" id="vrNote">Nuevo: helicóptero y avioneta acrobática en la <b>Base Aérea de Abantos</b>, junto al Mirador. Empiezas a su lado. Pulsa <b>V</b> para cambiar entre primera persona (cabina) y tercera persona.</div>
     <p>A Nacho Mendrugo le acaban de echar de guía turístico por jurar a unos jubilados de Albacete que el Monasterio es una parrilla gigante para barbacoas reales. Sin trabajo y con 3,50 € en el bolsillo, recibe un mensaje de la Abuela Remedios, la churrera más peligrosa de la Sierra: Don Felipe «El Prudente» Carrasco, un mafioso que se cree la reencarnación de Felipe II, quiere convertir El Escorial en un parque temático con tobogán acuático.</p>
 
@@ -308,7 +310,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
         <tr><td>1-0, rueda</td><td>Cambiar de arma</td></tr>
         <tr><td>G</td><td>Lanzar petardo</td></tr>
         <tr><td>H · T</td><td>Claxon · Radio</td></tr>
-        <tr><td>J</td><td>Trabajar de taxista o repartidor</td></tr>
+        <tr><td>J</td><td>Trabajar de taxista, repartidor o paramédico (6 zonas por ronda)</td></tr>
         <tr><td>M · Esc</td><td>Mapa · Pausa</td></tr>
         <tr><td>V</td><td>Vista en primera persona (cabina) / tercera persona</td></tr>
         <tr><td>Aviones</td><td>W/S motor, A/D alabeo, ↓↑ o ratón morro (↓ sube), Z/C o ←→ timón, Espacio frenos, H humo (acrobática), F bajar</td></tr>
@@ -326,7 +328,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
         <tr><td>X</td><td>Recargar · Disparar desde el coche</td></tr>
         <tr><td>LB · RB</td><td>Cambiar de arma</td></tr>
         <tr><td>Cruceta ↑ · L3</td><td>Radio · Claxon</td></tr>
-        <tr><td>Cruceta ↓</td><td>Trabajar de taxista o repartidor</td></tr>
+        <tr><td>Cruceta ↓</td><td>Trabajar de taxista, repartidor o paramédico (6 zonas por ronda)</td></tr>
         <tr><td>Back · Start</td><td>Mapa · Pausa</td></tr>
         <tr><td>R3</td><td>Cambiar vista primera / tercera persona</td></tr>
         <tr><td>Aviones</td><td>RT/LT motor, stick izq. alabeo y morro, LB/RB timón, stick der. mirar</td></tr>
@@ -365,6 +367,7 @@ body.touch .tbtn.small{ width:auto; height:30px; border-radius:15px; padding:0 1
       <button class="b alt" id="btnMute">Sonido: activado</button>
       <button class="b alt" id="btnGrass">Césped: Alto</button>
       <button class="b alt" id="btnGrassD">Alcance del césped: 170 m</button>
+      <button class="b alt" id="btnDens">Gente y tráfico: normal</button>
       <button class="b alt" id="btnFps">Mostrar FPS: no</button>
       <button class="b alt" id="btnCheats">Trucos</button>
       <button class="b alt" id="btnRestart">Empezar de cero</button>
@@ -1277,7 +1280,7 @@ function buildLonja(){
   // Casas de Oficios (Herrera, 1587) y arco de la calle Grimaldi
   const casa=(x0,x1)=>{const cx=(x0+x1)/2,hx=(x1-x0)/2;MONW.box(cx,y-2,-156,hx,16,9,0,WHITE,4.4,5.5,y);STONE.box(cx,y+13.4,-156,hx+0.3,0.6,9.3,0,GRAN,2,2);ROOF.hip(cx,y+14,-156,hx,9,0,5.5,0.5,SLATE);addCollider(cx,-156,hx,9,0,y-3,y+20,'b');
     const nd=Math.max(1,Math.round((x1-x0)/16)),st=(x1-x0)/nd;for(let k=0;k<nd;k++)woodDoor(x0+st*(k+0.5),y+0.06,-147,0,2.4,3.9);};
-  casa(-120,-24);casa(-6,58);casa(72,112);
+  casa(-111,-24);casa(-6,58);casa(72,112);   // la primera empieza 9 m más atrás: la curva de Floridablanca ya no se mete por la esquina
   MONW.box(-15,y+7.5,-157,9,6.5,4,0,WHITE,4.4,5.5,y);ROOF.hip(-15,y+14,-157,9,4,0,2.5,0.3,SLATE);addCollider(-15,-157,9,4,0,y+7.5,y+16,'b');
   {const yc=y+7.48,U=(a,b)=>[a/2,b/2];STONE.quad([-24,yc,-161],[-6,yc,-161],[-6,yc,-153],[-24,yc,-153],U(-24,-161),U(-6,-161),U(-6,-153),U(-24,-153),[0.86,0.83,0.78]);   // techo del paso
    for(const z of[-153.15,-160.85])STONE.box(-15,yc-0.3,z,9,0.33,0.18,0,GRAN,2,1,null,true,true);                                  // dinteles
@@ -2478,6 +2481,7 @@ function makeHuman(o){
   if(o.apron)hp_(body,0xf5f2ea,0.44,0.72,0.02,0,1.05,0.15);
   if(o.tie){hp_(body,0xf4f4f4,0.14,0.44,0.02,0,1.33,0.142);hp_(body,0x7a1420,0.05,0.4,0.025,0,1.31,0.15);}
   if(o.chain)hp_(body,0xd8b13c,0.24,0.04,0.02,0,1.5,0.146);
+  if(o.hood){hp_(body,o.hood,0.4,0.26,0.12,0,1.55,-0.17);hp_(body,0xe8e4d8,0.02,0.2,0.02,0.06,1.38,0.146);hp_(body,0xe8e4d8,0.02,0.2,0.02,-0.06,1.38,0.146);}   // capucha caída y cordones de la sudadera
   if(o.badge){hp_(body,0xc62828,0.03,0.36,0.02,0.09,1.4,0.146);hp_(body,0xc62828,0.03,0.36,0.02,-0.09,1.4,0.146);hp_(body,0xffffff,0.12,0.09,0.02,0,1.2,0.15);}
   if(o.camera)hp_(body,0x151515,0.16,0.11,0.09,0,1.28,0.19);
   if(o.ruff){const r=new THREE.Mesh(GEO.ruff,M(0xf6f4ee));r.position.set(0,1.61,0);body.add(r);}
@@ -2502,6 +2506,7 @@ function makeHuman(o){
     case 'helmet':hp_(head,0x15171a,0.36,0.17,0.37,0,0.38,-0.01);hp_(head,0x15171a,0.37,0.08,0.33,0,0.3,-0.02);hp_(head,0x223040,0.29,0.07,0.04,0,0.21,0.16);hp_(head,0x0d0d0e,0.07,0.07,0.07,0.19,0.17,0);break;
     case 'poli':hp_(head,0x1c2a4a,0.34,0.13,0.34,0,0.37,0);hp_(head,0xd8e23a,0.345,0.04,0.345,0,0.33,0);hp_(head,0x111111,0.3,0.03,0.16,0,0.32,0.22);break;
     case 'bun':hp_(head,o.hair,0.15,0.15,0.15,0,0.38,-0.12);break;
+    case 'balaclava':hp_(head,hc,0.315,0.335,0.315,0,0.17,0);hp_(head,o.skin,0.23,0.075,0.01,0,0.2,0.159);hp_(head,0x1a1a1a,0.2,0.045,0.01,0,0.2,0.165);break;   // pasamontañas: solo se le ven los ojos
     case 'crown':{const c=new THREE.Mesh(GEO.crown,MAT.gold);c.position.set(0,0.4,0);head.add(c);break;}
   }
   return{g,body,lLeg,rLeg,lArm,rArm,head,mount,S};
@@ -2550,6 +2555,7 @@ const OUTFITS={
   boss:()=>({skin:0xe6c09c,hair:0x6d5f52,shirt:0x121214,pants:0x121214,shoes:0x0e0e0e,hat:'crown',ruff:true,chain:true,beard:0x9b8b7a,scale:1.12}),
   geo:()=>({skin:0x1c1d20,hair:0x111111,shirt:0x141518,sleeve:0x141518,pants:0x141518,shoes:0x0b0b0c,hat:'helmet',vest:0x24272c,geo:true}),
   poli:()=>({skin:rpick(SKINS),hair:0x2b1d14,shirt:0x1f2d52,pants:0x1f2d52,shoes:0x111111,hat:'poli',vest:0xd8e23a}),
+  malhechor:()=>{const c=rpick([0x1b1c20,0x2a2d33,0x3a2f2a,0x23301f]);return{skin:rpick(SKINS),shirt:c,sleeve:c,pants:rpick([0x23262c,0x2f3a4a,0x1a1a1a]),shoes:0x111111,hat:'balaclava',hatCol:rpick([0x111113,0x1c1c1f,0x3b1f1f]),hood:c};},
   cazador:()=>({skin:rpick(SKINS),hair:0x4a3222,shirt:0x4b5b3a,pants:0x3f5a36,shoes:0x3a2a1a,hat:'cap',hatCol:0xe86a1c,vest:0xe86a1c,beard:Math.random()<0.6?0x4a3222:undefined}),
 };
 
@@ -3032,7 +3038,7 @@ function radioTick(){
 // =====================================================================
 //  ESTADO DE JUEGO
 // =====================================================================
-const G={state:'loading',time:0,slow:1,mission:0,active:null,cine:false,kills:0,stolen:0,heat:0,wanted:0,lastCrime:-99,searching:false,deaths:0,shots:0,polT:0,civT:0,lastShotHeat:-99,hintsDone:{},zone:'',street:''};
+const G={state:'loading',time:0,slow:1,mission:0,active:null,cine:false,kills:0,kc:{poli:0,geo:0,civ:0,mal:0},stolen:0,heat:0,wanted:0,lastCrime:-99,searching:false,deaths:0,shots:0,polT:0,civT:0,lastShotHeat:-99,hintsDone:{},zone:'',street:''};
 const P={x:ABA.spawn.x,z:ABA.spawn.z,y:H0,vx:0,vz:0,vy:0,yaw:Math.PI/2,hp:100,armor:0,money:3.5,weapons:{fists:true},ammo:{},cur:'fists',car:null,dead:false,deadT:0,anim:0,fireCool:0,reloadT:0,punchT:0,fireHold:0,lastHurt:-99,lastRun:-99,ground:true,h:null,guns:{},lock:null,spd:0};
 for(const w in WEAPONS)if(!WEAPONS[w].melee)P.ammo[w]={m:0,r:0};
 let wstripT=0;
@@ -3204,6 +3210,7 @@ const KINDS={
   chandal:{hp:65,team:'gang',out:OUTFITS.chandal},tercio:{hp:85,team:'gang',out:OUTFITS.tercio,weapon:'shotgun'},
   escolta:{hp:105,team:'gang',out:OUTFITS.escolta,weapon:'smg'},boss:{hp:1100,team:'gang',out:OUTFITS.boss,weapon:'smg',extra:'rocket'},
   poli:{hp:90,team:'police',out:OUTFITS.poli,weapon:'pistol'},geo:{hp:150,team:'police',out:OUTFITS.geo,weapon:'assault'},cazador:{hp:70,team:'hunter',out:OUTFITS.cazador,weapon:'rifle',neutral:true},carterista:{hp:45,team:'gang',out:civOutfit,mw:'knife',neutral:true},
+  malhechor:{hp:60,team:'gang',out:OUTFITS.malhechor,neutral:true},
   remedios:{hp:1e9,team:'friend',out:OUTFITS.remedios},
   vendedor:{hp:1e9,team:'friend',out:civOutfit},
 };
@@ -3219,6 +3226,8 @@ const LINES={
   cazador:['¡Esto es un coto!','¡Que me espantas los ciervos!'],
   carterista:['¿Y tú qué miras?','¡Esta cartera era mía!','¡Te pincho, guía!'],
   maton:['¿Qué miras?','Aquí no se te ha perdido nada.'],
+  malhechor:['¡La cartera o la vida!','¡Quieto todo el mundo!','¡Suelta el móvil, abuelo!','¡Esto es un atraco!','¡Ni un paso, guía!','¡Para el tobogán de Don Felipe!'],
+  victima:['¡Socorro! ¡Al ladrón!','¡Que alguien me ayude!','¡Mi cartera no, que tengo la foto de mi nieto!','¡Ay, que me atracan!'],
   boss:['¡En mis dominios no se pone el sol!','¡Tengo más de dos mil ventanas y en ninguna te quiero ver!','¡Tardé 21 años en construirlo, tú no duras ni 21 segundos!','¡Este tobogán será la octava maravilla!','¡Plebeyo con polo!'],
   vendedor:['¡Eh, que esto no es la tómbola!','¡Sin tocar el género!','¡Aquí se paga, no se dispara!'],
   remedios:['¡Niño, que te doy con la zapatilla!','¡A la abuela no se le apunta!','¡Ese es mi Churromóvil, sinvergüenza!'],
@@ -3227,7 +3236,7 @@ const NPCS=[];const PREF={shotgun:8,smg:14,pistol:11,revolver:12,assault:17,rifl
 class NPC{
   constructor(kind,x,z,opt={}){
     const K=KINDS[kind];this.kind=kind;this.team=K.team;this.maxHp=this.hp=opt.hp||K.hp;
-    this.weapon=opt.weapon!==undefined?opt.weapon:(kind==='maton'?rpick(['pistol','revolver']):(K.weapon||null));this.mw=opt.mw!==undefined?opt.mw:(K.mw||null);this.extraDrop=opt.extraDrop!==undefined?opt.extraDrop:(K.extra||null);this.neutral=opt.neutral!==undefined?opt.neutral:!!K.neutral;
+    const mal=kind==='malhechor'?rpick(['knife','knife','bat','pistol','pistol','revolver']):null;this.weapon=opt.weapon!==undefined?opt.weapon:(kind==='maton'?rpick(['pistol','revolver']):(mal&&!WEAPONS[mal].melee?mal:(K.weapon||null)));this.mw=opt.mw!==undefined?opt.mw:(mal&&WEAPONS[mal].melee?mal:(K.mw||null));this.extraDrop=opt.extraDrop!==undefined?opt.extraDrop:(K.extra||null);this.neutral=opt.neutral!==undefined?opt.neutral:!!K.neutral;
     this.h=makeHuman(opt.outfit||K.out());scene.add(this.h.g);
     if(this.weapon||this.mw){this.gun=heldWeaponMesh(this.weapon||this.mw);this.h.mount.add(this.gun);}
     this.x=x;this.z=z;this.y=groundH(x,z);this.yaw=opt.yaw!==undefined?opt.yaw:rr(0,TAU);this.vx=0;this.vz=0;
@@ -3266,6 +3275,7 @@ function updateNPC(n,dt){
       if(n.wait>0){n.wait-=dt;}else{const gx=n.goal.x-n.x,gz=n.goal.z-n.z,gl=Math.hypot(gx,gz)||1;dvx=gx/gl*1.35;dvz=gz/gl*1.35;}
       if(n.team==='civ'&&dp<9&&n.sayT<=0&&Math.random()<dt*0.25&&!P.car)say(n,rpick(LINES.tourist));
       if(n.neutral&&n.hostile)n.state='attack';
+      if(n.kind==='malhechor')malWander(n,dt,dp);
       break;
     case 'flee':{
       const fx=n.x-n.fleeX,fz=n.z-n.fleeZ,fl=Math.hypot(fx,fz)||1;dvx=fx/fl*5.3;dvz=fz/fl*5.3;pose=n.fleeT>5?'up':'walk';
@@ -3292,6 +3302,7 @@ function updateNPC(n,dt){
       if(n.sayT<=0&&Math.random()<dt*(n.boss?0.35:0.1)){const L=LINES[n.kind];if(L)say(n,rpick(L),n.boss?3.4:2.4);}
       break;}
     case 'leave':{dvx=-dxp/dp*1.5;dvz=-dzp/dp*1.5;if(dp>150){n.remove();return;}break;}
+    case 'rob':case 'escape':case 'held':{const r=malState(n,dt,dxp,dzp,dp);if(r===null)return;dvx=r.vx;dvz=r.vz;pose=r.pose;if(r.face!==undefined)face=r.face;break;}
   }
   const k=Math.min(1,dt*8);n.vx=lerp(n.vx,dvx,k);n.vz=lerp(n.vz,dvz,k);
   const ox=n.x,oz=n.z;n.x+=n.vx*dt;n.z+=n.vz*dt;
@@ -3336,7 +3347,7 @@ function killNPC(n,cause,by,dx=0,dz=0){
   if(n.extraDrop)spawnPickup('weapon',n.extraDrop,n.x+rr(-1,1),n.z+rr(-1,1));
   if(Math.random()<(n.team==='civ'?0.45:0.85))spawnPickup('cash',null,n.x+rr(-1.2,1.2),n.z+rr(-1.2,1.2),{amount:n.boss?2500:Math.round(rr(5,n.team==='civ'?35:90))});
   if(Math.random()<0.6)sfxAt('scream',n.x,n.y,n.z);
-  if(by==='player'){G.kills++;if(n.team==='civ')addHeat(0.45);if(n.team==='police')addHeat(1);}
+  if(by==='player'){G.kills++;const kc=G.kc;if(n.kind==='geo')kc.geo++;else if(n.team==='police')kc.poli++;else if(n.team==='gang')kc.mal++;else kc.civ++;if(n.team==='civ')addHeat(0.45);if(n.team==='police')addHeat(1);if(n.kind==='malhechor'&&!n.mission)malReward(n);}
   if(P.lock===n)P.lock=null;
   if(n.mission)updateObjective();
   if(n.boss)say(n,'¡Mi... tobogán... acuático...!',4);
@@ -3424,7 +3435,7 @@ function aheadBlocked(c,ignoreParked=false){
   return best;
 }
 function aiDrive(c,dt){
-  const ai=c.ai;if(ai.mode==='race'){aiRace(c,dt);return;}if(ai.mode==='chase'){aiChase(c,dt);return;}
+  const ai=c.ai;if(ai.mode==='race'){aiRace(c,dt);return;}if(ai.mode==='chase'){aiChase(c,dt);return;}if(ai.mode==='flee'){aiFlee(c,dt);return;}
   const R=ai.route,n=R.length;ai.passT=(ai.passT||0)-dt;const lane=ai.passT>0?0.7:2.4;let[tx,tz]=laneTarget(R,ai.i,lane);let d=Math.hypot(tx-c.x,tz-c.z),guard=0;
   while(d<7&&guard++<6){ai.i=(ai.i+1)%n;[tx,tz]=laneTarget(R,ai.i,lane);d=Math.hypot(tx-c.x,tz-c.z);}
   const[t2x,t2z]=laneTarget(R,(ai.i+1)%n,lane);const ax=(tx*2+t2x)/3,az=(tz*2+t2z)/3;
@@ -3466,7 +3477,7 @@ function explosion(x,y,z,src,R=9,power=1,fw=false){
   for(const n of NPCS){if(!n.alive||n.team==='friend')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<R){const k=1-d/R,ux=(n.x-x)/(d||1),uz=(n.z-z)/(d||1);if(k>0.3/power)killNPC(n,'boom',by,ux*12*k,uz*12*k);else hurtNPC(n,80*k*power,by,'boom',ux,uz);}}
   for(const c of CARS){if(c===src||c.dead)continue;const d=Math.hypot(c.x-x,c.z-z);if(d<R){if(by)c.lastBy=by;c.damage(120*power*(1-d/R),null);const ux=(c.x-x)/(d||1),uz=(c.z-z)/(d||1);c.vx+=ux*8*(1-d/R);c.vz+=uz*8*(1-d/R);}}
   for(const a of AIR){if(a.dead||a===src)continue;const d=Math.hypot(a.pos.x-x,a.pos.z-z,a.pos.y-y);if(d<R)a.damage(160*power*(1-d/R));}
-  if(!P.dead){if(P.car&&P.car===src){damagePlayer(40,null);if(!P.dead){exitCar();P.vy=6;P.ground=false;}}else{const d=P.car?Math.hypot(P.car.x-x,P.car.z-z):dP;if(d<R)damagePlayer(95*power*(1-d/R),null);}}
+  if(!P.dead){if(P.car&&P.car===src){damagePlayer(40,null);if(!P.dead){exitCar();P.vy=6;P.ground=false;}}else{const d=P.car?Math.hypot(P.car.x-x,P.car.z-z):dP;if(d<R&&!(P.airImm&&src===P.airImm.a&&G.time<P.airImm.until+6))damagePlayer(95*power*(1-d/R),null);}}
 }
 
 const PROJ=[];let ROCKET_G=null,PET_G=null;
@@ -4100,9 +4111,10 @@ function npcAirHit(n){
 }
 function playerAirHit(){
   if(P.plane||P.car||P.dead)return;
-  for(const o of AIR_OBBS){if(Math.abs(o.x-P.x)>8||Math.abs(o.z-P.z)>8||P.y+1.8<o.y0||P.y>o.y1)continue;const h=pushOutOBB(o,P,0.4);
+  const imm=P.airImm&&(G.time<P.airImm.until||!P.ground||P.bail)?P.airImm.a:null;if(!imm)P.airImm=null;
+  for(const o of AIR_OBBS){if(o.a===imm||Math.abs(o.x-P.x)>8||Math.abs(o.z-P.z)>8||P.y+1.8<o.y0||P.y>o.y1)continue;const h=pushOutOBB(o,P,0.4);
     if(h&&o.v>2.5&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(Math.max(70,o.v*16),null);P.vx=h.nx*o.v;P.vz=h.nz*o.v;P.vy=4.5;P.ground=false;shake(0.8);FX.blood(P.x,P.y+1,P.z,10);}}
-  if(rotorAt(P.x,P.y,P.z)&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(500,null);FX.blood(P.x,P.y+1.5,P.z,20);}
+  const ro=rotorAt(P.x,P.y,P.z);if(ro&&ro!==imm&&G.time-P.lastRun>1){P.lastRun=G.time;damagePlayer(500,null);FX.blood(P.x,P.y+1.5,P.z,20);}
 }
 // coche contra aeronave: rebota como contra una pared; si el golpe es fuerte, la aeronave sufre
 function carAirHits(c,cs,r){
@@ -4164,6 +4176,7 @@ function exitPlane(forced){
   if(pl.ground&&!forced){const[ex,ez]=pl.local2w(E[0],E[1]);P.x=ex;P.z=ez;P.y=groundH(P.x,P.z);P.vx=P.vz=P.vy=0;P.ground=true;if(!pl.isHeli)pl.thr=0;
     if(pl.v>8){P.vx=pl.vel.x*0.3;P.vz=pl.vel.z*0.3;toast('¡Salto en marcha!',2);damagePlayer(Math.min(25,pl.v*0.6),null);}}
   else{const[ex,ez]=pl.local2w(pl.isHeli?E[0]*0.6:0,pl.isHeli?0:-1.5);P.x=ex;P.z=ez;P.y=pl.pos.y+(pl.isHeli?0.3:-0.4);P.vx=pl.vel.x*0.3;P.vz=pl.vel.z*0.3;P.vy=Math.min(0,pl.vel.y*0.3);P.ground=false;P.bail=true;
+    P.airImm={a:pl,until:G.time+8};   // al saltar en el aire, la aeronave que dejas (fuselaje y rotor) no te puede matar
     if(!forced)toast(pl.agl>7?'¡Al vacío! El paracaídas se abre solo.':'¡Salto!',3);}
   P.plane=null;P.h.g.visible=true;P.h.g.position.set(P.x,P.y,P.z);P.yaw=h;camYaw=h;camPitch=-0.25;
   if(VR.on){VR.yaw=h+Math.PI;VR.recenter=true;}
@@ -4407,7 +4420,7 @@ const txtOf=(el,sel)=>{const e=sel?el.querySelector(sel):el;return e?e.textConte
 function vrMenuData(kind){
   const D={title:'',lines:[],items:[]};
   if(kind==='pause'&&VRCHEAT.on){vrCheatItems(D);return D;}
-  if(kind==='pause'){D.title='Pausa';D.lines=[txtOf($('stats'))];
+  if(kind==='pause'){D.title='Pausa';D.lines=$('stats').innerHTML.split('<br>').map(h=>h.replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim()).filter(Boolean).slice(0,3);
     const bs=[...$('pause').querySelectorAll('.btns button.b')].filter(b=>!b.classList.contains('hidden'));
     for(const b of bs){D.items.push({label:b.id==='btnRestart'&&VR.menu.confirm>performance.now()?'¿Seguro? Pulsa otra vez para borrar la partida':txtOf(b),el:b,dim:b.classList.contains('dim')});
       if(b.id==='btnResume')D.items.push({label:`Línea roja de apuntado: ${VR.laserOn===false?'no':'sí'}`,sub:'En los menús, las tiendas y el taller se ve siempre',act:()=>{VR.laserOn=VR.laserOn===false;saveOpts();}});
@@ -4977,7 +4990,7 @@ function respawn(){
   G.heat=0;G.wanted=0;clearPolice(true);$('wasted').classList.remove('show');
   for(const c of CARS.slice())if(c!==P.car&&(c.temp&&(c.type==='poli'||c.type==='geo')))c.remove();   // los coches y furgones de la persecución se van al morir
   toast(`El helicóptero sanitario te ha dejado en la Base Aérea de Abantos. Tiritas y gasas: ${fmtMoney(fee)}`,5);
-  if(!G.active&&G.mission<3)objective('Vuelve con la Abuela Remedios (<b>R</b>) para intentarlo otra vez');
+  if(!G.active&&G.mission<MISSIONS.length)objective('Vuelve con la Abuela Remedios (<b>R</b>) para intentarlo otra vez');
 }
 function tryEnterCar(){
   for(const a of AIR){if(a.dead)continue;if(Math.hypot(a.pos.x-P.x,a.pos.z-P.z)<(a.isHeli?5.8:6.5)&&(a.ground||(a.isHeli&&a.agl<1.2))){enterPlane(a);return;}}
@@ -5500,6 +5513,42 @@ const MISSIONS=[
      for(let k=0;k<7;k++){const p=spawnNear(c.x+rr(-14,14),c.z+rr(-4,12),2);new NPC('civil',p.x,p.z,{state:'idle',pose:'dance',guest:true});}},
    stages:[{obj:'Baja por la Carretera de la Estación hasta la <b>Casita del Príncipe</b>',goto:{x:CW(540,212)[0],z:CW(540,212)[1],r:80}},{obj:'Revienta la fiesta de los <b>Tercios de Carrasco</b>',kill:true}],
    outro:[['Felipe','¡Mequetrefe! ¡Plebeyo! Has arruinado mi fiesta y mi DJ ha dimitido.'],['Felipe','Al amanecer me sentaré en MI silla a contemplar MI obra. Y después... ¡tobogán acuático desde la cúpula hasta la Lonja!'],['Remedios','Nacho, ven a la plaza. Esto se ha puesto serio. Trae hambre.']]},
+  {title:'La receta de la abuela',reward:2000,
+   intro:[['Remedios','¡Nacho! ¡Me han robado el recetario de las rosquillas! Cuatro generaciones de masa, hijo. CUATRO.'],['Nacho','¿Quién roba un recetario de rosquillas?'],['Remedios','Los Tercios de Carrasco. Quiere servir MIS rosquillas en su parque temático, con mi cara en el envoltorio. Van en una furgoneta negra dando vueltas al Monasterio.'],['Nacho','¿Y qué hago, les pido que me lo devuelvan?'],['Remedios','Coge un coche, alcánzalos y revienta esa furgoneta. El recetario es de hojalata, aguanta lo que le eches. Luego me lo traes.']],
+   start(){const A=G.active,R=routeInfo(RACEPATH),n=R.length;let bi=0,bd=1e9;for(let i=0;i<n;i++){const d=Math.abs(Math.hypot(R[i][0]-P.x,R[i][1]-P.z)-110);if(d<bd){bd=d;bi=i;}}
+     const[x,z]=laneTarget(R,bi,1.2),q=R[(bi+1)%n],c=missionCar('furgo',x,z,Math.atan2(q[0]-R[bi][0],q[1]-R[bi][1]),0x141418,{hp:320});c.stage=0;c.driver={};c.ai={mode:'flee',route:R,i:bi,stuck:0,rev:0,lane:1.2,base:0,skill:0.92,grip:0.78,mult:0.8};A.chase=c;
+     hint(`Necesitas un coche: el <b>Churromóvil</b> de Remedios está aparcado en la plaza. ${kb('F','Y','Subir','A')} para subir.`,6);},
+   stages:[{obj:'Alcanza la <b>furgoneta negra</b> de los Tercios y revientala',chase:true},
+     {obj:'Recoge el <b>recetario</b> de Remedios',item:true,got:'¡El recetario! Huele a pólvora, pero se lee.',begin(){const c=G.active.chase;const s=Math.sin(c.h),co=Math.cos(c.h);const p=spawnNear(c.x+co*4,c.z-s*4,2);missionItem(p.x,p.z,0xc8872c);setTarget(p.x,p.z);}},
+     {obj:'Devuélvele el recetario a la <b>Abuela Remedios</b>',goto:{x:0,z:0,r:4},begin(){const st=this;st.goto.x=REMEDIOS.x+2.5;st.goto.z=REMEDIOS.z;}}],
+   outro:[['Remedios','¡Mi recetario! Ni una mancha... bueno, una de aceite, pero esa ya estaba.'],['Remedios','Carrasco está desesperado, Nacho. Dicen que ahora paga a unos malhechores con pasamontañas para que atraquen a los turistas. Ven a la plaza cuando puedas.']]},
+  {title:'Pasamontañas en el Coliseo',reward:2500,
+   intro:[['Remedios','Una banda de malhechores con pasamontañas está atracando la taquilla del Real Coliseo. Trabajan para Carrasco: con lo que roban se paga el tobogán.'],['Nacho','¿Y la Policía Local?'],['Remedios','Dentro del Coliseo, viendo la zarzuela. Tienen abono.'],['Nacho','Pues nada, voy yo. Como siempre.'],['Remedios','Y ojo: cuando oigan los tiros, los municipales van a pensar que el atracador eres tú. Despístalos y vuelve.']],
+   start(){const c={x:10,z:-179};const W=[['pistol',null],[null,'knife'],['smg',null],['pistol',null],[null,'bat'],['revolver',null]];
+     W.forEach(([w,m],i)=>{const p=spawnNear(c.x+rr(-12,12),c.z+rr(-9,9),3);mEnemy('malhechor',p.x,p.z,{weapon:w,mw:m,stage:1,state:'idle',pose:i%2?'aim1':'talk',alertR:22});});
+     for(let k=0;k<3;k++){const p=spawnNear(c.x+rr(-6,6),c.z+rr(-5,5),2);new NPC('civil',p.x,p.z,{state:'idle',pose:'up',guest:true});}},
+   stages:[{obj:'Ve al <b>Real Coliseo</b> a parar el atraco',goto:{x:10,z:-179,r:45}},{obj:'Acaba con los <b>malhechores</b> del pasamontañas',kill:true},
+     {obj:'La Policía Local cree que el atracador eres tú: <b>despístala</b>',lose:true,begin(){addHeat(1.6);banner('¡Que viene la Policía Local!','Creen que el atracador eres tú',2.6);}}],
+   outro:[['Felipe','¡Guía de pacotilla! ¡Esos señores del pasamontañas eran mi departamento de financiación!'],['Remedios','Ya lo has oído, Nacho. Se ha quedado sin dinero... pero no sin camiones. Pásate por la plaza, que tengo petardos.']]},
+  {title:'Sabotaje en La Herrería',reward:3000,
+   intro:[['Remedios','Carrasco ha traído las piezas del tobogán acuático en tres furgones. Están aparcados en el Bosque de La Herrería, en la carretera.'],['Nacho','¿Y quiere que los robe?'],['Remedios','Quiero que los revientes. Te he metido una docena de petardos de San Lorenzo en el bolsillo. Lánzalos debajo y aléjate.'],['Nacho','Abuela, ¿de dónde saca usted tantos petardos?'],['Remedios','De la Legión. Y los vigilan sus Tercios, así que ve con cuidado.']],
+   start(){giveW('petardo',12);const A=G.active,r=ROADS.find(q=>q.n.includes('M-505')),N=r.pts.length;A.vans=[];
+     [0.32,0.52,0.72].forEach((f,k)=>{const i=Math.floor(N*f),a=r.pts[i],b=r.pts[i+1];let dx=b[0]-a[0],dz=b[1]-a[1];const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;const sd=k%2?1:-1,o=r.w+3.6,x=a[0]-dz*o*sd,z=a[1]+dx*o*sd;
+       const c=missionCar('furgo',x,z,Math.atan2(dx,dz),0x2c4a7a);c.stage=1;c.parkBrake=true;A.vans.push(c);
+       {const t=signTex(['TOBOGANES','CARRASCO'],512,160,'#2c4a7a','#f3eee3','bold 54px Arial,sans-serif');for(const q of[-1,1]){const m=new THREE.Mesh(new THREE.PlaneGeometry(3,0.95),new THREE.MeshLambertMaterial({map:t}));m.position.set(q*(c.T.wid/2+0.02),1.45,-0.5);m.rotation.y=q*Math.PI/2;c.mesh.add(m);}}
+       for(let q=0;q<2;q++){const p=spawnNear(x+dx*rr(5,8)*(q?1:-1),z+dz*rr(5,8)*(q?1:-1),2);mEnemy('tercio',p.x,p.z,{stage:9,state:'idle',pose:'talk',alertR:32,marker:false,weapon:q?'shotgun':'pistol'});}});
+     const v=A.vans[0];A.def.stages[0].goto={x:v.x,z:v.z,r:110};toast(`Tienes <b>12 petardos</b>: ${lastDevice==='kb'?'se lanzan con la <kbd>G</kbd>':'elígelos en el selector de armas y dispara para lanzarlos'}. También puedes disparar a los furgones hasta que ardan.`,5);},
+   stages:[{obj:'Ve al <b>Bosque de La Herrería</b>, junto a la carretera',goto:{x:-400,z:450,r:110}},{obj:'Revienta los <b>furgones del tobogán</b>',destroy:3}],
+   outro:[['Felipe','¡MIS TOBOGANES! ¡Tres furgones de fibra de vidrio importada de Benidorm!'],['Remedios','Ahora se ha encerrado con sus escoltas en la Silla de Felipe II. Antes de ir hay que saber cuántos son. Ven a la plaza.']]},
+  {title:'Ojos en el cielo',reward:3500,
+   intro:[['Remedios','Carrasco se ha atrincherado en la Silla de Felipe II. Antes de entrar necesitamos saber cuántos escoltas tiene.'],['Nacho','¿Y cómo lo sabemos? ¿Le pregunto?'],['Remedios','Mi sobrino, el del butano, te ha dejado el helicóptero listo en la Base Aérea de Abantos. Sobrevuela sus tres puestos de guardia y vuelve a aterrizar en la base.'],['Nacho','¿Y si me disparan?'],['Remedios','Pues vuela alto y rápido. Y no me rompas el helicóptero, que es prestado.']],
+   start(){},
+   stages:[{obj:'Ve a la <b>Base Aérea de Abantos</b> y súbete al <b>helicóptero</b>',board:'heli'},
+     {obj:'Sobrevuela el primer puesto de guardia, junto a la <b>Silla de Felipe II</b>',fly:{x:-662,z:745,r:38},got:'Primer puesto: cuatro escoltas y una nevera portátil',begin(){heliPost(-662,745);setTarget(-662,745);}},
+     {obj:'Sobrevuela el segundo puesto de guardia',fly:{x:-585,z:768,r:38},got:'Segundo puesto: dos escoltas jugando al mus',begin(){heliPost(-585,768);setTarget(-585,768);}},
+     {obj:'Sobrevuela el tercer puesto de guardia',fly:{x:-640,z:655,r:38},got:'Tercer puesto: un trono de plástico. Ya está todo visto',begin(){heliPost(-640,655);setTarget(-640,655);}},
+     {obj:'Vuelve y aterriza en la <b>Base Aérea de Abantos</b>',land:{x:0,z:0,r:45},begin(){this.land.x=ABA.heli.x;this.land.z=ABA.heli.z;setTarget(ABA.heli.x,ABA.heli.z);}}],
+   outro:[['Remedios','¡Lo has visto todo! Doce escoltas, subfusiles y un trono de plástico.'],['Remedios','Ya sabemos a qué nos enfrentamos. Ven a la plaza cuando estés listo para acabar con esto.']]},
   {title:'La Silla del Rey',reward:5000,finale:true,
    intro:[['Remedios','Se ha subido a la Silla de Felipe II con sus escoltas. Llevan subfusiles, gafas de sol y un ego del tamaño de la cúpula.'],['Nacho','¿Y si lo convenzo hablando? Fui guía turístico, puedo hablar tres horas seguidas.'],['Remedios','Por eso te despidieron, hijo. Ve por el Bosque de La Herrería. Y no me atropelles ningún ciervo, que en septiembre están en berrea y son muy rencorosos.']],
    start(){},
@@ -5513,6 +5562,7 @@ const MISSIONS=[
   },
 ];
 let BOSS=null,PARTY_BUILT=false;
+function heliPost(x,z){for(let k=0;k<2;k++){const p=spawnNear(x+rr(-6,6),z+rr(-6,6),3);new NPC('escolta',p.x,p.z,{mission:true,stage:9,state:'idle',pose:'walk',alertR:70,weapon:k?'smg':'pistol'});}}
 function buildPartyProps(){
   if(PARTY_BUILT)return;PARTY_BUILT=true;const y=SPOTS.casita.y;
   const g=new THREE.Group();hp_(g,0x1c1c1c,2.4,1,0.9,0,0.5,0,true);hp_(g,0xc9c9c9,0.5,0.05,0.4,-0.6,1.03,0);hp_(g,0xc9c9c9,0.5,0.05,0.4,0.6,1.03,0);
@@ -5528,7 +5578,7 @@ function setTarget(x,z){const y=groundH(x,z);targetBeam.position.set(x,y+35,z);t
 function clearTarget(){targetBeam.visible=targetRing.visible=false;G.target=null;}
 function startMission(i){
   const def=MISSIONS[i];G.active={i,def,stage:-1,tot:{},party:false};G.heat=0;G.wanted=0;clearPolice(true);
-  playDialog(def.intro,remediosShot(),()=>{def.start();banner(def.title,'Misión '+(i+1)+' de 3',3);beginStage(0);});
+  playDialog(def.intro,remediosShot(),()=>{def.start();banner(def.title,'Misión '+(i+1)+' de '+MISSIONS.length,3);beginStage(0);});
 }
 function beginStage(k){const A=G.active;A.stage=k;const st=A.def.stages[k];if(st.begin)st.begin();if(st.goto)setTarget(st.goto.x,st.goto.z);else clearTarget();updateObjective();}
 function updateObjective(){
@@ -5537,27 +5587,29 @@ function updateObjective(){
   objective(t);
 }
 function updateMission(dt){
-  if(!G.active&&!G.side&&!G.job&&G.mission<3&&!P.dead&&!G.cine&&REMEDIOS){
+  if(!G.active&&!G.side&&!G.job&&G.mission<MISSIONS.length&&!P.dead&&!G.cine&&REMEDIOS){
     const mx=REMEDIOS.x+2.5,mz=REMEDIOS.z+0.3;remBeam.visible=remRing.visible=true;remBeam.position.set(mx,groundH(mx,mz)+35,mz);remRing.position.set(mx,groundH(mx,mz)+0.15,mz);
-    const d=Math.hypot(P.x-mx,P.z-mz);if(d<2.6){if(P.car||P.plane)hint(`Bájate del vehículo (${kb('F','Y','Bajar')}) para hablar con Remedios`,2);else startMission(G.mission);}
+    const d=Math.hypot(P.x-mx,P.z-mz);if(d>5)G.remAway=true;if(d<2.6&&G.remAway!==false){if(P.car||P.plane)hint(`Bájate del vehículo (${kb('F','Y','Bajar')}) para hablar con Remedios`,2);else startMission(G.mission);}
   }else if(remBeam){remBeam.visible=remRing.visible=false;}
   const A=G.active;if(!A||A.stage<0||G.cine)return;const st=A.def.stages[A.stage];
-  if(st.goto){if(Math.hypot(P.x-st.goto.x,P.z-st.goto.z)<st.goto.r){if(st.onDone)st.onDone();nextStage();}}
+  if(st.tick&&st.tick(A,dt))return;
+  if(missionStageTick(A,st,dt)){}
+  else if(st.goto){if(Math.hypot(P.x-st.goto.x,P.z-st.goto.z)<st.goto.r){if(st.onDone)st.onDone();nextStage();}}
   else if(st.kill){const left=NPCS.some(n=>n.mission&&n.stage===A.stage&&n.alive);if(!left&&(A.tot[A.stage]||0)>0)nextStage();}
   if(BOSS&&BOSS.alive){$('bossHp').style.width=(100*BOSS.hp/BOSS.maxHp)+'%';}
 }
 function nextStage(){const A=G.active;if(A.stage+1>=A.def.stages.length)completeMission();else beginStage(A.stage+1);}
 function completeMission(){
-  const A=G.active,def=A.def;G.active=null;clearTarget();$('bossBar').classList.add('hidden');BOSS=null;
+  const A=G.active,def=A.def;missionCleanup(false);G.active=null;G.remAway=false;   // la siguiente empieza cuando te alejes y vuelvasclearTarget();$('bossBar').classList.add('hidden');BOSS=null;
   for(const n of NPCS){n.guest=false;if(n.mission){n.mission=false;if(n.marker){n.h.g.remove(n.marker);n.marker=null;}}}P.money+=def.reward;G.mission=Math.max(G.mission,A.i+1);G.heat=0;G.wanted=0;clearPolice(false);
   banner('¡Misión superada!',`${def.title}   +${fmtMoney(def.reward)}`,3.6);sfx('passed');FX.confetti(P.x,P.y+2,P.z);objective('');save();
   setTimeout(()=>{
     if(def.finale){finale();return;}
-    phone(def.outro,()=>{if(!G.active&&G.mission<3)objective('Vuelve a la Plaza de la Constitución con la Abuela Remedios (<b>R</b>)');});
+    phone(def.outro,()=>{if(!G.active&&G.mission<MISSIONS.length)objective('Vuelve a la Plaza de la Constitución con la Abuela Remedios (<b>R</b>)');});
   },3600);
 }
 function failMission(reason,silent){
-  const A=G.active;if(!A)return;G.active=null;clearTarget();$('bossBar').classList.add('hidden');BOSS=null;
+  const A=G.active;if(!A)return;missionCleanup(true);G.active=null;clearTarget();$('bossBar').classList.add('hidden');BOSS=null;
   for(const n of NPCS.slice())if(n.mission||n.guest)n.remove();
   if(!silent)banner('Misión fallida',reason);sfx('fail');
 }
@@ -5627,10 +5679,10 @@ function updateHUD(dt){
 const MM=$('minimap'),MMC=MM.getContext('2d');
 function blips(){
   const out=[];
-  if(!G.active&&!G.job&&!G.side&&G.mission<3&&REMEDIOS)out.push({x:REMEDIOS.x+2.5,z:REMEDIOS.z,t:'R',c:'#E8B93A',edge:true});
+  if(!G.active&&!G.job&&!G.side&&G.mission<MISSIONS.length&&REMEDIOS)out.push({x:REMEDIOS.x+2.5,z:REMEDIOS.z,t:'R',c:'#E8B93A',edge:true});
   if(G.target&&!G.job)out.push({x:G.target.x,z:G.target.z,t:'star',c:'#E8B93A',edge:true,dist:true});
   for(const n of NPCS){if(!n.alive)continue;if(n.mission)out.push({x:n.x,z:n.z,t:'dot',c:'#E4572E',edge:true,r:n.boss?7:5});else if(n.team==='police'&&n.hostile)out.push({x:n.x,z:n.z,t:'dot',c:(G.time*4)%2<1?'#3D7BD9':'#E4572E',r:4});}
-  sideBlips(out);
+  sideBlips(out);malBlips(out);missionBlips(out);
   for(const st of STATIONS)out.push({x:st.x,z:st.z,t:'T',c:'#3D7BD9'});
   out.push({x:752,z:299,t:'shop',c:'#5DB86C'});out.push({x:-482,z:-1055,t:'house',c:'#3d9a4a'});
   if(SERVICE.hospital){const h=SW(33,6);out.push({x:h[0],z:h[1],t:'hosp',c:'#d62828'});out.push({x:SERVICE.taller.x,z:SERVICE.taller.z,t:'wrench',c:'#E8702A'});const q=SW(0,26);out.push({x:q[0],z:q[1],t:'shop',c:'#b3202a'});}
@@ -5696,7 +5748,7 @@ function drawBigMap(){
 // =====================================================================
 //  MENÚS, GUARDADO Y ARRANQUE
 // =====================================================================
-function save(){try{localStorage.setItem('gte-save-v1',JSON.stringify({mission:G.mission,money:P.money,weapons:P.weapons,ammo:P.ammo,kills:G.kills,stolen:G.stolen,deaths:G.deaths,hints:G.hintsDone,crown:!!G.crown,outfit:G.outfit,rec:REC,jump:bestJump,...casaSaveData()}));}catch(e){}}
+function save(){try{localStorage.setItem('gte-save-v1',JSON.stringify({mission:G.mission,money:P.money,weapons:P.weapons,ammo:P.ammo,kills:G.kills,kc:G.kc,mv:2,stolen:G.stolen,deaths:G.deaths,hints:G.hintsDone,crown:!!G.crown,outfit:G.outfit,rec:REC,jump:bestJump,...casaSaveData()}));}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('gte-save-v1')||'null');return s;}catch(e){return null;}}
 function showScreen(id,on){$(id).classList.toggle('hidden',!on);}
 let menuIdx=0;
@@ -5714,7 +5766,7 @@ function toggleFull(){try{if(fsEl()){(document.exitFullscreen||document.webkitEx
 document.addEventListener('fullscreenchange',fullLabel);document.addEventListener('webkitfullscreenchange',fullLabel);
 $('btnFull').onclick=()=>{toggleFull();setTimeout(fullLabel,300);};
 function openPause(){if(G.state!=='play')return;lockPrompt(false);fullLabel();G.state='paused';showScreen('pause',true);menuIdx=0;
-  $('stats').innerHTML=`Misiones completadas: ${G.mission} de 3. Bajas: ${G.kills}. Coches robados: ${G.stolen}.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped.`;
+  const kc=G.kc;$('stats').innerHTML=`Misiones completadas: ${G.mission} de ${MISSIONS.length}. Coches robados: ${G.stolen}.<br><span class="kstats">Bajas: <b>${G.kills}</b> · Policías <b>${kc.poli}</b> · GEO <b>${kc.geo}</b> · Civiles <b>${kc.civ}</b> · Malhechores <b>${kc.mal}</b></span>.<br>Récords: Gran Premio ${REC.race?fmtTime(REC.race):'sin ganar'}. Circuito de Aros ${REC.rings?fmtTime(REC.rings):'sin completar'}. Mejor salto ${bestJump?bestJump.toFixed(1)+' m':'ninguno'}.<br>Rendimiento: ${Math.round(G.fps||0)} FPS. Si va a tirones, baja el césped o la gente y el tráfico.`;
   if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function resume(){cheatBoxToggle(false);VRCHEAT.on=false;showScreen('pause',false);showScreen('bigmap',false);G.state='play';tryLock();lockCheck();}
 function openMap(){if(G.state!=='play'&&G.state!=='paused')return;G.prevState=G.state;G.state='map';showScreen('pause',false);drawBigMap();showScreen('bigmap',true);if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
@@ -5724,6 +5776,7 @@ $('btnRestart').onclick=()=>{try{localStorage.removeItem('gte-save-v1');}catch(e
 $('btnGrass').onclick=()=>setGrassLevel((GRASS.level+3)%4);
 $('btnGrassD').onclick=()=>setGrassDist((GRASS.dist+1)%GRASS_DIST.length);
 $('btnFps').onclick=()=>setShowFps(!SHOWFPS);
+$('btnDens').onclick=()=>setDensity((DENS.i+1)%DENS.lv.length);
 $('btnCheats').onclick=()=>{if(VR.on){VRCHEAT.on=true;VRCHEAT.txt='';VRCHEAT.msg='';VR.menu.sel=0;}else cheatBoxToggle();};
 $('btnCheatOk').onclick=cheatApply;
 $('cheatIn').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();cheatApply();}else if(e.key==='Escape'){e.preventDefault();cheatBoxToggle(false);}});
@@ -5732,15 +5785,18 @@ $('btnMute').onclick=()=>setMute(!AU.muted);
 $('sensR').oninput=e=>{sens=+e.target.value;};
 $('bigmap').onclick=()=>{if(G.state==='map')closeMap();};
 $('btnFree').onclick=()=>{showScreen('credits',false);$('hud').classList.remove('hidden');G.state='play';objective('Modo libre: El Escorial es tuyo. Busca el <b>Toro GT</b> en el Mirador de Abantos.');tryLock();};
-$('btnPlay').onclick=()=>startGame(false);$('btnContinue').onclick=()=>startGame(true);
+$('btnPlay').onclick=newGameClick;$('btnContinue').onclick=()=>startGame(true);
 $('btnVR').onclick=()=>{auInit();enterVR();};$('btnVRP').onclick=()=>{if(VR.on)exitVR();else{auInit();enterVR();}};$('btnView').onclick=()=>{VIEW.fp=!VIEW.fp;viewLabel();};
+// con partida guardada: «Continuar partida» (amarillo, a la izquierda) y «Empezar partida» (rojo), que pide confirmación porque borra la anterior
+function titleButtons(){const has=!!loadSave(),b=$('btnPlay');$('btnContinue').classList.toggle('hidden',!has);b.classList.toggle('red',has);b.textContent=has?'Empezar partida':'Jugar';delete b.dataset.sure;}
+function newGameClick(){const b=$('btnPlay');if(loadSave()){if(!b.dataset.sure){b.dataset.sure='1';b.textContent='¿Seguro? Se borra la partida guardada';clearTimeout(b.__t);b.__t=setTimeout(titleButtons,3500);return;}try{localStorage.removeItem('gte-save-v1');}catch(e){}}startGame(false);}
 function startGame(cont){
   if(IS_TOUCH){try{const el=document.documentElement;const pr=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):(el.webkitRequestFullscreen?el.webkitRequestFullscreen():null);
     if(pr&&pr.then)pr.then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
   auInit();showScreen('title',false);$('hud').classList.remove('hidden');G.state='play';
-  if(cont){const s=loadSave();if(s){G.mission=s.mission||0;P.money=s.money||0;Object.assign(P.weapons,s.weapons||{});for(const w in P.ammo)if(s.ammo&&s.ammo[w])P.ammo[w]=s.ammo[w];G.kills=s.kills||0;G.stolen=s.stolen||0;G.deaths=s.deaths||0;G.hintsDone=s.hints||{};G.crown=!!s.crown;applyCrown();G.outfit=s.outfit||{};rebuildPlayer();Object.assign(REC,s.rec||{});bestJump=s.jump||0;}casaStart(s);
+  if(cont){const s=loadSave();if(s){G.mission=s.mission||0;P.money=s.money||0;Object.assign(P.weapons,s.weapons||{});for(const w in P.ammo)if(s.ammo&&s.ammo[w])P.ammo[w]=s.ammo[w];G.kills=s.kills||0;G.kc=Object.assign({poli:0,geo:0,civ:0,mal:0},s.kc||{});G.stolen=s.stolen||0;if(!s.mv&&G.mission>=3)G.mission=2;   /* partidas antiguas acabadas: les quedan las 4 misiones nuevas */G.deaths=s.deaths||0;G.hintsDone=s.hints||{};G.crown=!!s.crown;applyCrown();G.outfit=s.outfit||{};rebuildPlayer();Object.assign(REC,s.rec||{});bestJump=s.jump||0;}casaStart(s);
     placeAtBase();const best=['assault','smg','shotgun','revolver','pistol'].find(w=>P.weapons[w]);if(best)setWeapon(best);
-    objective(G.mission<3?'Ve a ver a la Abuela Remedios (<b>R</b>) a la Plaza de la Constitución':'Modo libre: El Escorial es tuyo.');toast('Partida cargada: estás en la Base Aérea de Abantos, junto al helicóptero',3.5);tryLock();return;}
+    objective(G.mission<MISSIONS.length?'Ve a ver a la Abuela Remedios (<b>R</b>) a la Plaza de la Constitución':'Modo libre: El Escorial es tuyo.');toast('Partida cargada: estás en la Base Aérea de Abantos, junto al helicóptero',3.5);tryLock();return;}
   casaStart(null);tryLock();
   playDialog(INTRO,orbitShot(0,0,270,H0+95,H0+22,0.06,2.3),()=>{
     placeAtBase();
@@ -5784,8 +5840,9 @@ function spawnWorld(){
     [route(roadPts(PO),roadPts(AB),roadPts(AB,true),roadPts(PO,true),roadPts(JL),roadPts(JL,true)),1],
     [route(roadPts(AV),roadPts(AV,true),roadPts(FL,false,[-141,-30],[-128,-166]),roadPts(RV),roadPts(DM),roadPts(DM,true),roadPts(RV,true),roadPts(FL,false,[-128,-166],[-141,-30])),1],
   ];
+  TRAFFIC.loops=[];
   for(const[R,count] of loops){
-    const sp=R.map(p=>{const r=nearestRoad(p[0],p[1]);return r&&r.road.t==='c'?15:10;});
+    const sp=R.map(p=>{const r=nearestRoad(p[0],p[1]);return r&&r.road.t==='c'?15:10;});TRAFFIC.loops.push({R,sp,count});
     for(let c=0;c<count;c++){for(let t=0;t<30;t++){const i=randi(0,R.length-1);const[x,z]=laneTarget(R,i);if(Math.hypot(x-P.x,z-P.z)<40||CARS.some(o=>Math.hypot(o.x-x,o.z-z)<14))continue;
       const nx=R[(i+1)%R.length];const car=new Car(pick(['pelotilla','berlina','taxi','furgo','todoterreno','berlina','pickup','camper']),x,z,Math.atan2(nx[0]-R[i][0],nx[1]-R[i][1]));car.ai={mode:'route',route:R,i:(i+1)%R.length,sp,stuck:0,rev:0};car.driver={};break;}}
   }
@@ -5793,7 +5850,7 @@ function spawnWorld(){
   for(const[x,z] of[[-150,-60],CW(532,206),[-600,694],[790,300],[62,-205],[-40,-305]])spawnPickup('health',null,x,z,{fixed:true});
   for(const[x,z] of[[-122,-198],[-466,-1034],[228,238]])spawnPickup('armor',null,x,z,{fixed:true});
 }
-function cleanupCars(){for(const c of CARS.slice()){if(c===P.car)continue;const d=Math.hypot(c.x-P.x,c.z-P.z);if((c.temp&&!c.ai&&d>260)||(c.dead&&d>300&&c.temp)){c.remove();continue;}
+function cleanupCars(){for(const c of CARS.slice()){if(c===P.car||c.mission)continue;const d=Math.hypot(c.x-P.x,c.z-P.z);if((c.temp&&!c.ai&&d>260)||(c.dead&&d>300&&c.temp)){c.remove();continue;}
   if(c.dead){if(c.diedAt===undefined)c.diedAt=G.time;const age=G.time-c.diedAt;if(age>120&&(d>30||age>150)){FX.smoke(c.x,c.y+1,c.z,0.4);c.remove();}}}}   // coches calcinados: a los 2 minutos se los lleva la grúa
 function updateAudio(dt){
   if(!AU.ctx)return;const t=AU.ctx.currentTime;const e=AU.eng,c=P.car;
@@ -5825,7 +5882,7 @@ function frameBody(now,xrf){
   const rawDt=Math.max(0,(now-lastT)/1000),rdt=Math.min(0.05,rawDt);lastT=now;if(rawDt>0&&rawDt<1)G.fps=G.fps?lerp(G.fps,1/rawDt,0.05):60;
   pollPad();if(VR.on){vrPoll();vrWheel();}const I=readInput(rdt);LASTI=I;
   if(VR.on){vrAim();vrMelee(rdt);if(VR.ready&&G.state==='play'&&!P.car&&!P.plane&&!P.train&&!G.cine&&!P.dead){camYaw=VR.headYaw;camPitch=VR.headPitch;}}
-  if(G.state==='title'){titleCam(now/1000);captureGameCam();menuNav();if(KP.has('Enter')&&document.activeElement===document.body)startGame(false);}
+  if(G.state==='title'){titleCam(now/1000);captureGameCam();menuNav();if(KP.has('Enter')&&document.activeElement===document.body)startGame(!!loadSave());}
   else if(G.state==='play'){
     const dt=rdt*G.slow;G.time+=dt;
     if(I.pause&&!P.dead){openPause();}
@@ -5848,7 +5905,7 @@ function frameBody(now,xrf){
       updateAircraft(dt);
       for(const n of NPCS.slice())updateNPC(n,dt);
       updateProj(dt);
-      if(!G.cine){updatePickups(dt);updateMission(dt);updateSide(dt,I);updateJob(dt,I);updateGarage();civSpawner(dt);policeSpawner(dt);cleanupCars();}
+      if(!G.cine){updatePickups(dt);updateMission(dt);updateSide(dt,I);updateJob(dt,I);updateGarage();civSpawner(dt);malSpawner(dt);trafficSpawner(dt);policeSpawner(dt);cleanupCars();}
       // si se acaba de abrir una tienda (taller, probador), su cámara manda: no se pisa con la del juego
       updateWanted(dt);updateFX(dt);if(G.state==='play'&&(!G.cine||P.dead))updateCamera(rdt);
       if(!(VR.on&&P.dead)&&G.state==='play')captureGameCam();
@@ -5865,14 +5922,156 @@ function frameBody(now,xrf){
   if(P.car&&P.car.type==='geo'&&G.geoIn!==P.car){G.geoIn=P.car;toast('<b>Furgón blindado del GEO</b>: aguanta muchos tiros y aquí dentro no te hacen daño',4);}else if(!P.car)G.geoIn=null;
   updateViewModel(rdt);fpFlashTick(rdt);fpsTick(rawDt);placeDriveBy();updateGrass(rdt);updateLakeWater(rdt);renderer.render(scene,camera);if(VR.on)vrAfterRender(xrf);endInputFrame();
 }
+// ================================================================ extra: densidad, malhechores, IA de conducción y misiones nuevas
+// ---------------------------------------------------------------- densidad de gente y tráfico (menú de pausa)
+const DENS={i:1,lv:[{n:'baja',p:0.6,c:0.6},{n:'normal',p:1,c:1},{n:'alta',p:1.5,c:1.7},{n:'muy alta',p:2,c:2.5}]};
+const TRAFFIC={loops:[],t:0};
+function densLabel(){const b=$('btnDens');if(b)b.textContent='Gente y tráfico: '+DENS.lv[DENS.i].n+(DENS.i>=2?' (si el juego va fluido)':'');}
+function setDensity(i){DENS.i=i;densLabel();saveOpts();TRAFFIC.t=0;}
+function trafficWanted(){return Math.round(11*DENS.lv[DENS.i].c*(IS_TOUCH?0.75:1));}
+// mantiene el número de coches circulando: repone los robados o destruidos y quita los que sobran, siempre lejos de tu vista
+function trafficSpawner(dt){
+  TRAFFIC.t-=dt;if(TRAFFIC.t>0||!TRAFFIC.loops.length)return;TRAFFIC.t=0.6;
+  const live=CARS.filter(c=>c.ai&&c.ai.mode==='route'&&!c.dead),want=trafficWanted(),cf=camFwd();
+  const seen=(x,z)=>{const dx=x-camPos.x,dz=z-camPos.z,d=Math.hypot(dx,dz)||1;return d<240&&(dx*cf[0]+dz*cf[2])/d>0.35;};
+  if(live.length<want){
+    const tot=TRAFFIC.loops.reduce((a,l)=>a+l.count,0);let r=Math.random()*tot,L=TRAFFIC.loops[0];for(const l of TRAFFIC.loops){r-=l.count;if(r<=0){L=l;break;}}
+    const R=L.R;for(let t=0;t<24;t++){const i=randi(0,R.length-1),[x,z]=laneTarget(R,i),d=Math.hypot(x-P.x,z-P.z);if(d<90||d>650||seen(x,z)||CARS.some(o=>Math.hypot(o.x-x,o.z-z)<14))continue;
+      const nx=R[(i+1)%R.length],car=new Car(pick(['pelotilla','berlina','taxi','furgo','todoterreno','berlina','pickup','camper']),x,z,Math.atan2(nx[0]-R[i][0],nx[1]-R[i][1]));
+      car.ai={mode:'route',route:R,i:(i+1)%R.length,sp:L.sp,stuck:0,rev:0};car.driver={};car.traffic=true;break;}
+  }else if(live.length>want+1){
+    for(const c of live){if(c.mission)continue;const d=Math.hypot(c.x-P.x,c.z-P.z);if(d>160&&!seen(c.x,c.z)){c.remove();break;}}
+  }
+}
+// ---------------------------------------------------------------- malhechores: atracan a los turistas y se escapan con el botín
+// pasamontañas y sudadera; si te acercas o les disparas, se defienden. Abatirlos no da estrellas y el Ayuntamiento paga recompensa.
+const MAL={t:25};
+function malRob(n,v){n.state='rob';n.victim=v;n.robT=undefined;n.goal=null;}
+function malWander(n,dt,dp){
+  if(Math.random()<dt*0.04){let best=null,bd=22;for(const v of NPCS){if(!v.alive||v.team!=='civ'||v.job||v.guest||v.state==='held'||v.state==='flee')continue;const d=Math.hypot(v.x-n.x,v.z-n.z);if(d<bd){bd=d;best=v;}}if(best)malRob(n,best);}
+  if(!n.provoked&&dp<3.2&&!P.car&&!P.plane&&!P.dead&&Math.random()<dt*0.6){n.provoked=true;if(Math.random()<0.45){n.hostile=true;n.state='attack';say(n,rpick(['¡La cartera, guía!','¿Qué miras, pringao?','¡Suelta la pasta!']),2.4);}}
+}
+function malSack(n){if(n.sack)return;const s=hp_(n.h.body,0x8a6a3a,0.3,0.36,0.22,0,1.18,-0.27);n.sack=s;const t=hp_(n.h.body,0x6d5230,0.12,0.06,0.12,0,1.4,-0.27);}
+function malState(n,dt,dxp,dzp,dp){
+  if(n.state==='held'){   // víctima con las manos arriba
+    const r=n.holdBy;if(!r||!r.alive||r.state!=='rob'||!NPCS.includes(r)){n.holdBy=null;n.state='wander';makeFlee(n,r?r.x:n.x+1,r?r.z:n.z,9);return{vx:0,vz:0,pose:'up'};}
+    return{vx:0,vz:0,pose:'up',face:Math.atan2(r.x-n.x,r.z-n.z)};}
+  if(n.state==='rob'){
+    const v=n.victim;if(!v||!v.alive||!NPCS.includes(v)||(v.state!=='held'&&n.robT!==undefined)){n.state='escape';n.escT=0;return{vx:0,vz:0,pose:'walk'};}
+    const dx=v.x-n.x,dz=v.z-n.z,d=Math.hypot(dx,dz)||1,face=Math.atan2(dx,dz),pose=n.weapon?(WEAPONS[n.weapon].two?'aim2':'aim1'):'punch';
+    if(n.robT===undefined){if(d>1.5)return{vx:dx/d*3.4,vz:dz/d*3.4,pose:'walk',face};
+      n.robT=3.4;v.state='held';v.holdBy=n;v.vx=v.vz=0;say(n,rpick(LINES.malhechor),2.6);setTimeout(()=>{if(v.alive&&v.state==='held')say(v,rpick(LINES.victima),2.6);},700);
+      if(Math.hypot(n.x-P.x,n.z-P.z)<160&&G.time-(MAL.msgT||-99)>20){MAL.msgT=G.time;toast(`<b>¡Atraco!</b> Un malhechor está robando a un turista cerca de ti. Si lo detienes, el Ayuntamiento paga recompensa.`,4);}
+      return{vx:0,vz:0,pose,face};}
+    n.robT-=dt;if(n.robT<=0){n.loot=true;malSack(n);n.state='escape';n.escT=0;v.state='wander';v.holdBy=null;makeFlee(v,n.x,n.z,10);say(v,'¡Al ladrón! ¡Que se lleva mi cartera!',2.6);}
+    return{vx:0,vz:0,pose:n.robT>0?pose:'walk',face};}
+  // escape: corre alejándose de ti; si lo alcanzas y va armado, se da la vuelta y pelea
+  n.escT=(n.escT||0)+dt;
+  if(dp<(n.weapon?14:4)&&!P.dead&&!G.cine&&Math.random()<dt*1.5){n.hostile=true;n.state='attack';say(n,rpick(['¡No me vas a pillar!','¡Esto es mío!','¡Atrás, guía!']),2.2);return{vx:0,vz:0,pose:'walk'};}
+  if(n.escT>45&&dp>90){n.remove();return null;}
+  if(!n.goal||Math.hypot(n.goal.x-n.x,n.goal.z-n.z)<2){const a=Math.atan2(n.x-P.x,n.z-P.z)+rr(-0.7,0.7),x=n.x+Math.sin(a)*30,z=n.z+Math.cos(a)*30;n.goal=blockedAt(x,z,0.6)||inLake(x,z)?npcGoal(n):{x,z};}
+  const gx=n.goal.x-n.x,gz=n.goal.z-n.z,gl=Math.hypot(gx,gz)||1;return{vx:gx/gl*5.4,vz:gz/gl*5.4,pose:'walk'};
+}
+// cada medio minuto, más o menos, un atraco cerca de ti (en el casco y alrededor del Monasterio)
+function malSpawner(dt){
+  if(G.active||G.cine||P.dead||P.plane)return;MAL.t-=dt*DENS.lv[DENS.i].p;if(MAL.t>0)return;MAL.t=rr(30,55);
+  if(townF(P.x,P.z)<0.3&&Math.hypot(P.x,P.z+60)>280)return;
+  if(NPCS.filter(n=>n.kind==='malhechor'&&n.alive).length>=3)return;
+  const vs=NPCS.filter(v=>v.alive&&v.team==='civ'&&!v.job&&!v.guest&&v.state==='wander'&&Math.hypot(v.x-P.x,v.z-P.z)>25&&Math.hypot(v.x-P.x,v.z-P.z)<85);if(!vs.length)return;
+  const v=rpick(vs),p=spawnNear(v.x,v.z,9);const n=new NPC('malhechor',p.x,p.z,{});malRob(n,v);
+}
+function malReward(n){const v=Math.round(n.loot?rr(90,160):rr(30,70));P.money+=v;sfx('cash');toast(`${n.loot?'Atraco frustrado':'Malhechor abatido'}: recompensa del Ayuntamiento <b>+${fmtMoney(v)}</b>`,3);
+  if(n.loot)spawnPickup('cash',null,n.x+rr(-0.8,0.8),n.z+rr(-0.8,0.8),{amount:Math.round(rr(40,120))});}
+function malBlips(out){for(const n of NPCS)if(n.alive&&n.kind==='malhechor'&&!n.mission&&(n.state==='rob'||n.state==='escape'||n.hostile))out.push({x:n.x,z:n.z,t:'dot',c:'#B05AD8',r:4.5,edge:Math.hypot(n.x-P.x,n.z-P.z)<160});}
+// ---------------------------------------------------------------- IA de conducción rápida (carrera y huidas): curvas con física, frenada anticipada y adelantamientos
+function routeInfo(R){
+  if(R._s)return R;const n=R.length,s=new Float32Array(n+1),k=new Float32Array(n);let acc=0;
+  for(let i=0;i<n;i++){s[i]=acc;const a=R[i],b=R[(i+1)%n];acc+=Math.hypot(b[0]-a[0],b[1]-a[1]);}s[n]=acc;R._L=acc;R._s=s;
+  const step=(j,dir)=>(j+dir+n)%n,seg=(a,b)=>Math.hypot(R[b][0]-R[a][0],R[b][1]-R[a][1]);
+  for(let i=0;i<n;i++){let j0=i,j1=i,d=0;for(let g=0;g<40&&d<7;g++){const p=step(j0,-1);d+=seg(p,j0);j0=p;}d=0;for(let g=0;g<40&&d<7;g++){const q=step(j1,1);d+=seg(j1,q);j1=q;}
+    const A=R[j0],B=R[i],C=R[j1],ab=Math.hypot(B[0]-A[0],B[1]-A[1]),bc=Math.hypot(C[0]-B[0],C[1]-B[1]),ac=Math.hypot(C[0]-A[0],C[1]-A[1]);
+    const cr=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);k[i]=ab*bc*ac>1e-6?2*cr/(ab*bc*ac):0;}   // >0: curva a la derecha
+  // suaviza la curvatura para que no frene por cada vértice de la polilínea
+  const k2=new Float32Array(n);for(let i=0;i<n;i++){let a=0;for(let d=-2;d<=2;d++)a+=k[(i+d+n)%n];k2[i]=a/5;}R._k=k2;return R;
+}
+function cornerV(c,kap,f){const T=c.T,R=1/Math.max(1e-4,Math.abs(kap)),tr=T.turn*f;return Math.min(T.maxV*(c.vm||1),tr*R/(1+tr*R/95));}
+function routeDist(R,i,j){const n=R.length;return j>=i?R._s[j]-R._s[i]:R._L-R._s[i]+R._s[j];}
+function aiFollow(c,dt){
+  const ai=c.ai,R=routeInfo(ai.route),n=R.length,T=c.T,v=c.spd,sk=ai.skill||1,mult=ai.mult||1;
+  // punto de la ruta en el que estamos (avanza mientras la proyección pasa el final del tramo)
+  for(let g=0;g<12;g++){const a=R[ai.i],b=R[(ai.i+1)%n],sx=b[0]-a[0],sz=b[1]-a[1],L2=sx*sx+sz*sz||1;if(((c.x-a[0])*sx+(c.z-a[1])*sz)/L2<1)break;ai.i=(ai.i+1)%n;}
+  if(Math.hypot(R[ai.i][0]-c.x,R[ai.i][1]-c.z)>40){let bi=ai.i,bd=1e9;for(let d=-30;d<=60;d++){const j=(ai.i+d+n)%n,e=Math.hypot(R[j][0]-c.x,R[j][1]-c.z);if(e<bd){bd=e;bi=j;}}ai.i=bi;}
+  const rn=nearestRoad(c.x,c.z),hw=rn?rn.seg.hw:4.6,lim=Math.max(0.6,hw-T.wid/2-0.5);
+  // trazada: se abre hacia el interior de la próxima curva; para adelantar, al lado libre
+  let kmax=0;for(let j=1,d=0;d<40&&j<60;j++){const q=(ai.i+j)%n;d=routeDist(R,ai.i,q);if(Math.abs(R._k[q])>Math.abs(kmax))kmax=R._k[q];}
+  let laneT=(ai.base||0)+Math.sign(kmax)*Math.min(lim,1.8)*clamp(Math.abs(kmax)*28,0,1);
+  const s=Math.sin(c.h),co=Math.cos(c.h);let obs=null;
+  const test=(x,z,w,vf)=>{const dx=x-c.x,dz=z-c.z,fd=dx*s+dz*co;if(fd<1||fd>Math.max(14,v*0.9))return;const ld=dx*(-co)+dz*s;if(Math.abs(ld)<w+T.wid/2+0.35&&(!obs||fd<obs.fd))obs={fd,ld,vf,w};};
+  if(P.car&&P.car!==c)test(P.car.x,P.car.z,P.car.T.wid/2,P.car.spd);
+  for(const o of CARS)if(o!==c&&!o.dead&&o!==P.car&&Math.abs(o.x-c.x)<30&&Math.abs(o.z-c.z)<30)test(o.x,o.z,o.T.wid/2,o.spd);
+  for(const q of NPCS)if(q.alive&&Math.abs(q.x-c.x)<20&&Math.abs(q.z-c.z)<20)test(q.x,q.z,0.35,0);
+  let capV=1e9;
+  if(obs&&obs.vf<v-0.5){const ol=ai.lane+obs.ld,gap=obs.w+T.wid/2+0.7,side=obs.ld>=0?-1:1;let want=ol+side*gap;if(Math.abs(want)>lim)want=ol-side*gap;
+    if(Math.abs(want)<=lim+0.3){ai.passT=1.2;ai.passLane=clamp(want,-lim,lim);}else capV=Math.max(obs.vf,obs.fd<6?0:obs.vf+(obs.fd-6)*0.8);
+    if(obs.fd<9)capV=Math.min(capV,Math.max(0,obs.vf)+Math.max(0,obs.fd-3)*1.5);}   // mientras se aparta, no se le echa encima
+  ai.passT=(ai.passT||0)-dt;if(ai.passT>0)laneT=ai.passLane;
+  laneT=clamp(laneT,-lim,lim);ai.lane=ai.lane===undefined?0:ai.lane+clamp(laneT-ai.lane,-2.4*dt,2.4*dt);
+  // punto de mira a una distancia proporcional a la velocidad (persecución pura)
+  const Ld=clamp(4.5+Math.abs(v)*0.4,7,20);let j=ai.i,acc=0,tx=R[j][0],tz=R[j][1];
+  for(let g=0;g<60;g++){const q=(j+1)%n,l=Math.hypot(R[q][0]-R[j][0],R[q][1]-R[j][1]);if(acc+l>=Ld){const t=(Ld-acc)/(l||1);tx=lerp(R[j][0],R[q][0],t);tz=lerp(R[j][1],R[q][1],t);break;}acc+=l;j=q;tx=R[j][0];tz=R[j][1];}
+  {const q=(j+1)%n;let dx=R[q][0]-R[j][0],dz=R[q][1]-R[j][1];const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;tx+=-dz*ai.lane;tz+=dx*ai.lane;}
+  const alpha=angNorm(Math.atan2(tx-c.x,tz-c.z)-c.h),La=Math.max(3,Math.hypot(tx-c.x,tz-c.z)),om=Math.abs(v)*2*Math.sin(alpha)/La;
+  const kk=Math.min(1,Math.abs(v)/6)*(1-Math.min(Math.abs(v)/95,0.5));let steer=clamp(-om/(T.turn*Math.max(kk,0.25))*1.1,-1,1);
+  if(Math.abs(v)<4)steer=clamp(-alpha*2.5,-1,1);
+  // velocidad objetivo: la menor de las curvas que vienen, contando con lo que da tiempo a frenar
+  const f=(ai.grip||0.8)*sk*Math.min(mult,1.04),aB=13;let vt=T.maxV*(c.vm||1)*(ai.top||1)*Math.min(1,0.9+0.1*sk)*mult;
+  const D=v*v/(2*aB)+25;for(let g=0,q=ai.i;g<200;g++){const d=routeDist(R,ai.i,q);if(d>D)break;const vc=cornerV(c,R._k[q],f);vt=Math.min(vt,Math.sqrt(vc*vc+2*aB*Math.max(0,d-4)));q=(q+1)%n;}
+  vt=Math.min(vt,capV);if(Math.abs(alpha)>0.6)vt=Math.min(vt,Math.max(6,vt*(1.3-Math.abs(alpha))));
+  let thr=v<vt-0.3?1:(v>vt+0.8?-clamp((v-vt)/5,0.35,1):0.12);
+  // atascado: marcha atrás girando al revés; si no sale, se recoloca algo más adelante
+  if(Math.abs(v)<0.8&&vt>3){ai.stuck+=dt;if(ai.stuck>1.6){ai.rev=1.1;ai.stuck=0;ai.stuckAll=(ai.stuckAll||0)+1;}}else{ai.stuck=0;if(Math.abs(v)>8)ai.stuckAll=0;}
+  if(ai.rev>0){ai.rev-=dt;c.update(dt,{thr:-0.9,steer:-steer,hand:0});return;}
+  if((ai.stuckAll||0)>=3&&Math.hypot(c.x-P.x,c.z-P.z)>25){const q=(ai.i+5)%n,[lx,lz]=laneTarget(R,q,ai.lane),w=R[(q+1)%n];c.x=lx;c.z=lz;c.h=Math.atan2(w[0]-R[q][0],w[1]-R[q][1]);c.vx=c.vz=0;c.settle();ai.i=q;ai.stuckAll=0;}
+  c.update(dt,{thr,steer,hand:0});
+}
+// huida (misiones): el coche corre por su ruta; si te quedas lejos afloja un poco para que no sea imposible alcanzarlo
+function aiFlee(c,dt){const ai=c.ai,d=P.car?Math.hypot(P.car.x-c.x,P.car.z-c.z):Math.hypot(P.x-c.x,P.z-c.z);ai.mult=!P.car?0.5:(d>220?0.66:(d>120?0.8:0.93));aiFollow(c,dt);}
+// ---------------------------------------------------------------- misiones: coches de misión, objetos y etapas nuevas
+function missionCar(type,x,z,h,col,opt={}){const c=new Car(type,x,z,h,col);c.mission=true;c.temp=true;if(opt.hp){c.hp=opt.hp;c.maxHp=opt.hp;}
+  const m=new THREE.Mesh(GEO.cone,ME(0xe4572e,0xff3010,0.7));m.scale.setScalar(1.6);m.position.y=c.T.hgt+1.6;c.mesh.add(m);c.mk=m;const A=G.active;if(A)(A.cars||(A.cars=[])).push(c);return c;}
+function missionCarsDone(stage){const A=G.active;return!(A&&A.cars&&A.cars.some(c=>c.stage===stage&&!c.dead));}
+function missionItem(x,z,col=0xe8b93a){const y=groundH(x,z),g=new THREE.Group();const b=new THREE.Mesh(BOXG,ME(col,col,0.5));b.scale.set(0.5,0.12,0.38);g.add(b);
+  const p=new THREE.Mesh(BOXG,M(0xf3eee3));p.scale.set(0.46,0.1,0.34);p.position.y=0.02;g.add(p);g.position.set(x,y+0.6,z);scene.add(g);const A=G.active;if(A)A.item=g;return g;}
+function missionCleanup(fail){const A=G.active;if(!A)return;if(A.item){scene.remove(A.item);A.item=null;}
+  for(const c of A.cars||[]){if(c.mk){c.mesh.remove(c.mk);c.mk=null;}c.mission=false;if(fail&&!c.dead&&c!==P.car)c.remove();else if(c.ai&&c.ai.mode==='flee'){c.ai=null;c.driver=null;}}}
+function missionBlips(out){const A=G.active;if(!A)return;for(const c of A.cars||[])if(!c.dead&&c.mk)out.push({x:c.x,z:c.z,t:'dot',c:'#E4572E',edge:true,r:7});}
+// etapas nuevas: chase (alcanzar y destruir un coche), destroy (varios coches), item (recoger un objeto), lose (despistar a la policía),
+// board (subirse a un vehículo), fly (pasar por encima de un punto en helicóptero) y land (aterrizar en un sitio)
+function missionStageTick(A,st,dt){
+  if(st.chase){const c=A.chase;if(!c||c.dead){nextStage();return true;}const d=Math.hypot(c.x-P.x,c.z-P.z);A.far=d>420?(A.far||0)+dt:0;
+    if(A.far>6){failMission('Se te ha escapado la furgoneta');return true;}if(d<60&&!A.warned){A.warned=true;toast('¡Dale caña! Embístela o dispárale hasta que arda.',3);}return true;}
+  if(st.destroy){if(missionCarsDone(A.stage)){nextStage();}else{const left=(A.cars||[]).filter(c=>c.stage===A.stage&&!c.dead).length;objective(`${st.obj} <span style="color:#E8B93A">(${st.destroy-left}/${st.destroy})</span>`);}return true;}
+  if(st.item){const it=A.item;if(it){it.rotation.y+=dt*2;it.position.y=groundH(it.position.x,it.position.z)+0.6+Math.sin(G.time*3)*0.12;}
+    if(it&&!P.car&&Math.hypot(P.x-it.position.x,P.z-it.position.z)<1.8){scene.remove(it);A.item=null;sfx('pickup');toast(st.got||'¡Recogido!',3);nextStage();}
+    else if(it&&P.car&&Math.hypot(P.x-it.position.x,P.z-it.position.z)<8)hint(`Bájate del vehículo (${kb('F','Y','Bajar','A')}) para recogerlo`,0.3);return true;}
+  if(st.lose){if(G.wanted===0&&A.loseArmed){nextStage();}else{if(G.wanted>0)A.loseArmed=true;objective(`${st.obj} ${G.wanted>0?'<span style="color:#E8B93A">('+G.wanted+' ★)</span>':''}`);}return true;}
+  if(st.board){const a=AIR.find(q=>q.kind===st.board&&!q.dead);if(a)setTarget(a.pos.x,a.pos.z);if(P.plane&&P.plane.kind===st.board){A.ride=P.plane;clearTarget();nextStage();}return true;}
+  if(st.fly||st.land){const pl=P.plane;if(A.ride&&(A.ride.dead||(!pl&&!st.land)||(pl&&pl!==A.ride))){failMission(A.ride.dead?'Has estrellado el helicóptero':'Te has bajado del helicóptero');return true;}
+    const g=st.fly||st.land,d=Math.hypot(P.x-g.x,P.z-g.z);
+    if(st.fly&&pl&&d<g.r){sfx('pickup');toast(st.got||'¡Hecho!',2.5);nextStage();return true;}
+    if(st.land&&d<g.r&&(!pl||pl.ground)){nextStage();return true;}
+    if(st.land&&d<g.r&&pl&&!pl.ground)hint('Baja despacio con el helicóptero hasta posarlo en el suelo',0.3);return true;}
+  return false;
+}
+
 function civSpawner(dt){
   G.civT-=dt;if(G.civT>0)return;G.civT=0.35;
   const town=townF(P.x,P.z),nearMon=Math.hypot(P.x,P.z+60)<280,forest=Math.max(herreriaF(P.x,P.z),pinarF(P.x,P.z));
-  const target=Math.round((town>0.3||nearMon?24:(forest>0.4?7:8))*(IS_TOUCH?0.6:1));let cnt=0;const rm=[];
+  const target=Math.round((town>0.3||nearMon?24:(forest>0.4?7:8))*(IS_TOUCH?0.6:1)*DENS.lv[DENS.i].p);let cnt=0;const rm=[];
   for(const n of NPCS){if(n.mission||n.team==='friend'||n.guest||n.job)continue;const d=Math.hypot(n.x-P.x,n.z-P.z);
-    if(!n.alive){if(d>120||n.deadT>31)rm.push(n);continue;}if(n.team==='police'){if(G.wanted===0&&d>160)rm.push(n);continue;}if(d>200){rm.push(n);continue;}cnt++;}
+    if(!n.alive){if(d>120||n.deadT>31)rm.push(n);continue;}if(n.team==='police'){if(G.wanted===0&&d>160)rm.push(n);continue;}if(d>200){rm.push(n);continue;}if(n.state==='rob'||n.state==='escape'||n.state==='held')continue;cnt++;}
   for(const n of rm)n.remove();
-  if(cnt<target){const p=spawnPoint(50,115,true);if(p){let kind='civil';if(forest>0.4&&Math.random()<0.4)kind='cazador';else if(town>0.3&&Math.random()<0.1)kind='maton';else if((town>0.3||nearMon)&&Math.random()<0.08)kind='carterista';new NPC(kind,p.x,p.z,{});}}
+  if(cnt<target){const p=spawnPoint(50,115,true);if(p){let kind='civil';if(forest>0.4&&Math.random()<0.4)kind='cazador';else if(town>0.3&&Math.random()<0.1)kind='maton';else if((town>0.3||nearMon)&&Math.random()<0.08)kind='carterista';else if(town>0.3&&Math.random()<0.05)kind='malhechor';new NPC(kind,p.x,p.z,{});}}
 }
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
 async function boot(){
@@ -5884,7 +6083,7 @@ async function boot(){
   for(let i=0;i<steps.length;i++){$('loadText').textContent=steps[i][0];$('loadBar').firstElementChild.style.width=(i/steps.length*100)+'%';await new Promise(r=>setTimeout(r,40));steps[i][1]();}
   $('loadBar').firstElementChild.style.width='100%';
   showScreen('loading',false);showScreen('title',true);G.state='title';
-  loadOpts();if(loadSave())$('btnContinue').classList.remove('hidden');
+  loadOpts();titleButtons();
   renderer.setAnimationLoop(frame);vrCheck();
 }
 boot().catch(e=>{console.error(e);$('loadText').textContent='Error al generar el mundo: '+e.message;});
@@ -6079,8 +6278,8 @@ function startRace(){
   const c=P.car;if(!c||c.dead)return;
   for(const o of CARS){if(o.ai&&o.ai.mode==='route'&&Math.hypot(o.x-RACE_START.x,o.z-RACE_START.z)<80){const R=o.ai.route,j=(o.ai.i+70)%R.length,[lx,lz]=laneTarget(R,j);o.x=lx;o.z=lz;o.vx=o.vz=0;o.ai.i=(j+1)%R.length;o.settle();}}
   const S={type:'race',state:'count',t:3.6,time:0,laps:2,racers:[],beep:4,me:{cp:0,lap:0,done:false}};
-  const rv=[['berlina',0x2f7a4d,'El Niño de la Herrería',1.0],['toro',0xe8b93a,'La Marquesa de Abantos',0.97],['taxi',undefined,'Paco el del Taxi',0.94]];
-  rv.forEach(([type,col,name,skill],k)=>{const g=gridSlot(k);const car=new Car(type,g.x,g.z,g.h,col);car.temp=true;car.driver={};car.ai={mode:'race',route:RACEPATH,i:(g.i+1)%RACEPATH.length,stuck:0,rev:0,lane:g.lat*0.6,skill,mult:1};S.racers.push({car,name,cp:0,lap:0,done:false});});
+  const rv=[['berlina',0x2f7a4d,'El Niño de la Herrería',1.0,0.79,0.97],['toro',0xe8b93a,'La Marquesa de Abantos',0.92,0.64,0.66],['taxi',undefined,'Paco el del Taxi',0.95,0.76,0.92]];
+  rv.forEach(([type,col,name,skill,grip,top],k)=>{const g=gridSlot(k);const car=new Car(type,g.x,g.z,g.h,col);car.temp=true;car.driver={};car.ai={mode:'race',route:RACEPATH,i:g.i,stuck:0,rev:0,lane:g.lat,base:g.lat*0.35,skill,grip,top,mult:1};S.racers.push({car,name,cp:0,lap:0,done:false});});
   const g=gridSlot(3);c.x=g.x;c.z=g.z;c.h=g.h;c.vx=c.vz=0;c.settle();P.x=c.x;P.z=c.z;
   G.side=S;G.heat=0;G.wanted=0;clearPolice(true);objective('');banner('Gran Premio del Real Sitio','Dos vueltas al Monasterio',2.6);
 }
@@ -6095,7 +6294,7 @@ function updateRace(dt){
   if(!P.car||P.car.dead||P.dead){endRace(null);return;}
   if(raceStep(S.me,P.car.x,P.car.z,15)){sfx('pickup');if(S.me.done){endRace(1+S.racers.filter(r=>r.done).length);return;}if(S.me.cp===0)toast(`Vuelta ${S.me.lap+1} de ${S.laps}`,2);}
   const my=raceProg(S.me,P.car.x,P.car.z);
-  for(const r of S.racers){if(r.car.dead||!r.car.ai)continue;raceStep(r,r.car.x,r.car.z,11);r.prog=r.done?1e9-r.fin:raceProg(r,r.car.x,r.car.z);r.car.ai.mult=clamp(1+(my-r.prog)*0.035,0.82,1.22);}
+  for(const r of S.racers){if(r.car.dead||!r.car.ai)continue;raceStep(r,r.car.x,r.car.z,13);r.prog=r.done?1e9-r.fin:raceProg(r,r.car.x,r.car.z);r.car.ai.mult=clamp(1+(my-r.prog)*0.035,0.84,1.08);}
   const next=RACEPATH[RACE_CP[S.me.cp]],nn=RACEPATH[RACE_CP[(S.me.cp+1)%RACE_CP.length]];
   cpBeam.visible=true;cpBeam.position.set(next[0],groundH(next[0],next[1])+14,next[1]);cpBeam2.visible=true;cpBeam2.position.set(nn[0],groundH(nn[0],nn[1])+10,nn[1]);G.target={x:next[0],z:next[1]};
   if(Math.hypot(P.car.x-next[0],P.car.z-next[1])>450){endRace(null,'Te has salido del circuito');}
@@ -6111,18 +6310,8 @@ function endRace(pos,why){
 }
 function cleanRace(){const S=G.side;if(S)for(const r of S.racers)r.car.remove();cpBeam.visible=cpBeam2.visible=false;G.side=null;G.target=null;}
 function aiRace(c,dt){
-  const ai=c.ai,R=ai.route,n=R.length;const S=G.side;
-  if(!S||S.type!=='race'||S.state==='count'){c.update(dt,{thr:0,steer:0,hand:1});return;}
-  let[tx,tz]=laneTarget(R,ai.i,ai.lane);let d=Math.hypot(tx-c.x,tz-c.z),guard=0;
-  while(d<8&&guard++<6){ai.i=(ai.i+1)%n;[tx,tz]=laneTarget(R,ai.i,ai.lane);d=Math.hypot(tx-c.x,tz-c.z);}
-  const[t2x,t2z]=laneTarget(R,(ai.i+2)%n,ai.lane);const ax=(tx+t2x)/2,az=(tz+t2z)/2;
-  const diff=angNorm(Math.atan2(ax-c.x,az-c.z)-c.h);const steer=clamp(-diff*2.6,-1,1);
-  let vt=RACE_SP[ai.i]*ai.skill*ai.mult*(1-Math.min(0.5,Math.abs(diff)*0.8));const blk=aheadBlocked(c);if(blk!==null&&blk<5)vt=Math.min(vt,Math.max(3,blk*1.4));
-  const vf=c.spd;let thr=vf<vt-0.4?1:(vf>vt+1.5?-0.9:0.1);
-  if(Math.abs(vf)<0.8&&vt>3){ai.stuck+=dt;if(ai.stuck>2){ai.rev=1.1;ai.stuck=0;ai.stuckAll=(ai.stuckAll||0)+1;}}else ai.stuck=0;
-  if(ai.rev>0){ai.rev-=dt;thr=-0.9;c.update(dt,{thr,steer:-steer,hand:0});return;}
-  if((ai.stuckAll||0)>=3){const j=(ai.i+4)%n,[lx,lz]=laneTarget(R,j,ai.lane),q=R[(j+1)%n];c.x=lx;c.z=lz;c.h=Math.atan2(q[0]-R[j][0],q[1]-R[j][1]);c.vx=c.vz=0;c.settle();ai.i=(j+1)%n;ai.stuckAll=0;}
-  c.update(dt,{thr,steer,hand:0});
+  const S=G.side;if(!S||S.type!=='race'||S.state==='count'){c.update(dt,{thr:0,steer:0,hand:1});return;}
+  aiFollow(c,dt);
 }
 // ---------------------------------------------------------------- bucle, marcadores y HUD
 function updateSide(dt,I){
@@ -6170,9 +6359,33 @@ function randomAddress(minD,maxD,fx,fz){
     return{x:p[0],z:p[1],sx,sz,name:`${street}, ${Math.floor(rr(1,49))}`};}
   return null;
 }
+// cada trabajo tiene 6 zonas; se recorren en orden aleatorio (una ronda) y luego vuelven a salir con menos tiempo.
+// Cada viaje completado aprieta un poco el cronómetro, pero nunca por debajo de lo que un buen conductor puede hacer con ese vehículo.
+const JOB_ZONES={
+  amb:[['la Lonja del Monasterio',-141,-60],['la Plaza de la Constitución',-118,-200],['la Estación de El Escorial',780,290],['la Casita del Príncipe',CASITA.rx,CASITA.rz],['el Golf La Herrería',200,184],['la calle Juan de Leyva',62,-368]],
+  taxi:[['la Plaza de San Lorenzo',-30,-300],['la Estación de El Escorial',780,290],['las Cocheras del Rey',190,-262],['la Casa de la Compaña',-148,96],['la Casita del Infante',-465,158],['el Real Coliseo',10,-179]],
+  reparto:[['la calle Duque de Medinaceli',-80,-400],['la calle Pozas',-110,-296],['la calle del Patriarca',125,-310],['el Paseo de Carlos III',120,100],['la Carretera de Ávila',-300,60],['la calle Juan de Leyva',62,-368]]};
+const JOB_NAME={taxi:'Taxi',amb:'Ambulancia',reparto:'Reparto'};
+function shuffled(n){const a=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function addrNear(z,R=95){
+  const C=[];for(const r of ROADS){if(r.t==='t')continue;for(let i=2;i<r.pts.length-3;i++){const p=r.pts[i];if(Math.hypot(p[0]-z[1],p[1]-z[2])<R)C.push([r,i]);}}
+  for(let k=0;k<40&&C.length;k++){const[r,i]=rpick(C),p=r.pts[i],q=r.pts[i+1];let dx=q[0]-p[0],dz=q[1]-p[1];const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;const sd=Math.random()<0.5?1:-1;
+    const sx=p[0]-dz*sd*(r.w+1.3),sz=p[1]+dx*sd*(r.w+1.3);if(blockedAt(sx,sz,0.5)||inLake(sx,sz))continue;return{x:p[0],z:p[1],sx,sz,name:z[0]};}
+  const s=snapRoad(z[1],z[2]);return{x:s.x,z:s.z,sx:s.x+2,sz:s.z,name:z[0]};
+}
+function jobLimit(J,d){const V=J.car.T.maxV*(J.car.vm||1),k=J.lvl;let L=d/Math.min(V*0.36,V*0.27*(1+0.07*k))+Math.max(10,25-1.6*k);
+  if(J.round>1)L*=Math.max(0.86,1-0.05*(J.round-1));   // zona repetida: menos tiempo
+  return Math.round(Math.max(L,d/(V*0.38)+10));}
+function jobZone(J){if(!J.queue.length)J.queue=shuffled(6).filter(i=>!J.doneZ.has(i));J.zi=J.queue.shift();const z=JOB_ZONES[J.type][J.zi];J.rep=J.round>1;return z;}
+function jobTimer(J,lim){J.t0=J.t;J.limit=lim;if(J.rep)toast(`<b>${JOB_ZONES[J.type][J.zi][0]}</b> otra vez (ronda ${J.round}): tienes menos tiempo`,3);}
+const jobLeft=J=>J.limit-(J.t-J.t0);
+function jobOk(J){J.doneZ.add(J.zi);J.lvl++;const k='job_'+J.type;REC[k]=Math.max(REC[k]||0,J.lvl);
+  if(J.doneZ.size>=6){const b=150*J.round;P.money+=b;J.earned+=b;setTimeout(()=>banner(`¡Ronda ${J.round} completada!`,`Las 6 zonas · +${fmtMoney(b)}${J.type==='amb'?' · vida y chaleco a tope':''}`,3.2),2300);
+    if(J.type==='amb'){P.hp=100;P.armor=Math.max(P.armor,100);}J.round++;J.doneZ.clear();J.queue=[];}}
+function jobFail(J,msg){J.queue.push(J.zi);sfx('fail');banner('Viaje fallido',msg,2.6);J.fails++;}
 function startJob(c){
-  const taxi=c.type==='taxi',amb=c.type==='ambulancia';G.job={type:taxi?'taxi':(amb?'amb':'reparto'),car:c,stage:'',trips:0,earned:0,t:0,pax:null};
-  banner(taxi?'Taxista del Real Sitio':(amb?'Paramédico del Real Sitio':'Repartidor de Paquetería Real'),`Pulsa ${lastDevice==='pad'?'↓':lastDevice==='touch'?'Trabajo':lastDevice==='vr'?'el stick derecho hacia arriba':'J'} otra vez para terminar la jornada`,2.8);
+  const taxi=c.type==='taxi',amb=c.type==='ambulancia';G.job={type:taxi?'taxi':(amb?'amb':'reparto'),car:c,stage:'',trips:0,earned:0,t:0,pax:null,lvl:0,round:1,queue:[],doneZ:new Set(),zi:0,fails:0,t0:0,limit:0};
+  banner(taxi?'Taxista del Real Sitio':(amb?'Paramédico del Real Sitio':'Repartidor de Paquetería Real'),`6 zonas por ronda, cada viaje con menos tiempo. Pulsa ${lastDevice==='pad'?'↓':lastDevice==='touch'?'Trabajo':lastDevice==='vr'?'el stick derecho hacia arriba':'J'} otra vez para terminar la jornada`,3.4);
   if(taxi)nextFare();else if(amb)nextPatient();else goDepot();
 }
 function endJob(why){
@@ -6180,57 +6393,68 @@ function endJob(why){
   banner('Fin de la jornada',`${why}. ${J.trips} ${J.type==='taxi'?'carreras':(J.type==='amb'?'traslados al hospital':'repartos')}, ${fmtMoney(J.earned)} ganados`,3.4);save();
 }
 function nextFare(){
-  const J=G.job,c=J.car;const a=randomAddress(150,650,c.x,c.z)||randomAddress(150,1300,c.x,c.z)||randomAddress(100,2600,c.x,c.z);if(!a){endJob('No hay clientes');return;}
-  J.stage='pickup';J.pick=a;J.pax=new NPC('civil',a.sx,a.sz,{state:'idle',pose:'up'});J.pax.job=true;J.pax.yaw=Math.atan2(a.x-a.sx,a.z-a.sz);
-  setTarget(a.x,a.z);objective(`Recoge al cliente en <b>${a.name}</b>`);
+  const J=G.job,z=jobZone(J),a=addrNear(z);
+  J.stage='pickup';J.pick=a;J.pax=new NPC('civil',a.sx,a.sz,{state:'idle',pose:'up'});J.pax.job=true;J.pax.yaw=Math.atan2(a.x-a.sx,a.z-a.sz);J.limit=0;
+  setTarget(a.x,a.z);objective(`Cliente ${J.doneZ.size+1}/6 (ronda ${J.round}): recógelo en <b>${a.name}</b>`);
 }
-// ambulancia: un herido sentado en el suelo esperando; hay que llevarlo al hospital cuanto antes
+// ambulancia: un herido sentado en el suelo esperando; hay tiempo para llegar hasta él y luego para llevarlo al hospital
 function nextPatient(){
-  const J=G.job,c=J.car;const a=randomAddress(150,700,c.x,c.z)||randomAddress(100,1400,c.x,c.z);if(!a){endJob('No hay avisos');return;}
+  const J=G.job,c=J.car,z=jobZone(J),a=addrNear(z);
   J.stage='pickup';J.pick=a;J.pax=new NPC('civil',a.sx,a.sz,{state:'idle',pose:'sit'});J.pax.job=true;J.pax.yaw=Math.atan2(a.x-a.sx,a.z-a.sz);
-  setTarget(a.x,a.z);objective(`Aviso de emergencia: recoge al herido en <b>${a.name}</b>`);
+  jobTimer(J,jobLimit(J,Math.hypot(a.x-c.x,a.z-c.z)));setTarget(a.x,a.z);
 }
-function goDepot(){const J=G.job;const d=snapRoad(190,-262);J.stage='load';J.depot=d;setTarget(d.x,d.z);objective('Ve al <b>almacén de Paquetería Real</b> (Cocheras del Rey) a cargar la furgoneta');}
-function nextDrop(){const J=G.job,c=J.car;const a=randomAddress(150,700,c.x,c.z);if(!a){goDepot();return;}J.stage='deliver';J.addr=a;J.hpPrev=c.hp;setTarget(a.x,a.z);objective(`Entrega el paquete en <b>${a.name}</b> (quedan ${J.pk})`);}
-function jobPay(v,msg){const J=G.job;v=Math.round(v);P.money+=v;J.earned+=v;J.trips++;sfx('cash');banner(msg,'+'+fmtMoney(v),2.2);save();}
+function goDepot(){const J=G.job;const d=snapRoad(190,-262);J.stage='load';J.depot=d;J.limit=0;setTarget(d.x,d.z);objective('Ve al <b>almacén de Paquetería Real</b> (Cocheras del Rey) a cargar la furgoneta');}
+function nextDrop(){const J=G.job,c=J.car,z=jobZone(J),a=addrNear(z);J.stage='deliver';J.addr=a;J.hpPrev=c.hp;setTarget(a.x,a.z);jobTimer(J,jobLimit(J,Math.hypot(a.x-c.x,a.z-c.z)));}
+function jobPay(v,msg){const J=G.job;v=Math.round(v*(1+0.04*Math.min(J.lvl,15)));P.money+=v;J.earned+=v;J.trips++;sfx('cash');banner(msg,'+'+fmtMoney(v),2.2);save();}
 function updateJob(dt,I){
   const c=P.car;
-  if(!G.job){if(jobCar(c)&&!G.active&&!G.side&&!P.dead){hintOnce('job_'+(c.type==='taxi'?'taxi':(c.type==='ambulancia'?'amb':'reparto')),`Pulsa ${kb('J','↓','Trabajo')} para trabajar de <b>${c.type==='taxi'?'taxista':(c.type==='ambulancia'?'paramédico':'repartidor')}</b>. Unos 100 € por viaje.`,7);if(I.job)startJob(c);}return;}
+  if(!G.job){if(jobCar(c)&&!G.active&&!G.side&&!P.dead){hintOnce('job_'+(c.type==='taxi'?'taxi':(c.type==='ambulancia'?'amb':'reparto')),`Pulsa ${kb('J','↓','Trabajo','stick der. ↑')} para trabajar de <b>${c.type==='taxi'?'taxista':(c.type==='ambulancia'?'paramédico':'repartidor')}</b>. 6 zonas por ronda y cada viaje con menos tiempo.`,7);if(I.job)startJob(c);}return;}
   const J=G.job;
   if(I.job){endJob('Has terminado la jornada');return;}
   if(!c||c!==J.car||c.dead||G.active||G.side){endJob(c&&c.dead?'El vehículo ha quedado para el desguace':'Has dejado el vehículo');return;}
   J.t+=dt;const sp=Math.abs(c.spd),near=(p,r)=>Math.hypot(c.x-p.x,c.z-p.z)<r&&sp<3;
+  const left=J.limit?Math.ceil(jobLeft(J)):0,tStr=left>0?` · <span style="color:${left<=10?'#E4572E':'#E8B93A'}">${left} s</span>`:'';
   if(J.type==='taxi'){
     if(J.stage==='pickup'){
-      if(!J.pax.alive){toast('El cliente ya no va a necesitar taxi. Nunca más.',3);J.pax=null;nextFare();return;}
+      if(!J.pax.alive){toast('El cliente ya no va a necesitar taxi. Nunca más.',3);J.pax=null;J.queue.push(J.zi);nextFare();return;}
       if(Math.hypot(c.x-J.pax.x,c.z-J.pax.z)<40&&J.pax.sayT<=0)say(J.pax,rpick(PAX_HI),2.5);
       if(near(J.pick,11)){J.pax.remove();J.pax=null;const opts=JOB_PLACES.map(p=>({n:p[0],...snapRoad(p[1],p[2])})).filter(p=>{const d=Math.hypot(p.x-c.x,p.z-c.z);return d>300&&d<1300;});
-        const dst=rpick(opts);J.dest=dst;J.dist=Math.hypot(dst.x-c.x,dst.z-c.z);J.t0=J.t;J.stage='drop';setTarget(dst.x,dst.z);objective(`Lleva al cliente a <b>${dst.n}</b>`);toast(`Cliente: «${rpick(PAX_TALK)}»`,4.5);sfx('pickup');}
-    }else if(J.stage==='drop'&&near(J.dest,12)){
-      const fast=J.t-J.t0<J.dist/12;jobPay(clamp(25+J.dist*0.085,40,140)+(fast?15:0),fast?'¡Carrera rápida! Propina incluida':'Carrera completada');
-      const w=new NPC('civil',c.x+Math.cos(c.h)*2.4,c.z-Math.sin(c.h)*2.4,{});say(w,rpick(['¡Gracias, maestro!','Quédese con el cambio. Bueno, no.','Cinco estrellas. O tres.']),2.5);
-      J.stage='wait';setTimeout(()=>{if(G.job===J)nextFare();},1500);
+        const dst=rpick(opts);J.dest=dst;J.dist=Math.hypot(dst.x-c.x,dst.z-c.z);J.stage='drop';jobTimer(J,jobLimit(J,J.dist));setTarget(dst.x,dst.z);toast(`Cliente: «${rpick(PAX_TALK)}»`,4.5);sfx('pickup');}
+      else objective(`Cliente ${J.doneZ.size+1}/6 (ronda ${J.round}): recógelo en <b>${J.pick.name}</b>`);
+    }else if(J.stage==='drop'){
+      objective(`Lleva al cliente a <b>${J.dest.n}</b>${tStr}`);
+      if(jobLeft(J)<=0){jobFail(J,'El cliente se baja: «¡Así no llego ni a misa de doce!»');const w=new NPC('civil',c.x+Math.cos(c.h)*2.4,c.z-Math.sin(c.h)*2.4,{});say(w,'¡Ni propina ni nada!',2.5);J.stage='wait';setTimeout(()=>{if(G.job===J)nextFare();},1800);}
+      else if(near(J.dest,12)){const fast=jobLeft(J)>J.limit*0.3;jobOk(J);jobPay(clamp(25+J.dist*0.085,40,140)+(fast?15:0),fast?'¡Carrera rápida! Propina incluida':'Carrera completada');
+        const w=new NPC('civil',c.x+Math.cos(c.h)*2.4,c.z-Math.sin(c.h)*2.4,{});say(w,rpick(['¡Gracias, maestro!','Quédese con el cambio. Bueno, no.','Cinco estrellas. O tres.']),2.5);
+        J.stage='wait';setTimeout(()=>{if(G.job===J)nextFare();},1500);}
     }
   }else if(J.type==='amb'){
     if(J.stage==='pickup'){
-      if(!J.pax.alive){toast('Demasiado tarde para ese herido. Siguiente aviso.',3);J.pax=null;nextPatient();return;}
+      objective(`Aviso ${J.doneZ.size+1}/6 (ronda ${J.round}): recoge al herido en <b>${J.pick.name}</b>${tStr}`);
+      if(!J.pax.alive){toast('Demasiado tarde para ese herido. Siguiente aviso.',3);J.pax=null;J.queue.push(J.zi);nextPatient();return;}
+      if(jobLeft(J)<=0){jobFail(J,'Otra ambulancia ha llegado antes a por el herido');J.pax.remove();J.pax=null;J.stage='wait';setTimeout(()=>{if(G.job===J)nextPatient();},1800);return;}
       if(Math.hypot(c.x-J.pax.x,c.z-J.pax.z)<40&&J.pax.sayT<=0)say(J.pax,rpick(['¡Ay, mi pierna!','¡Por aquí, por aquí!','Me he caído en la Lonja… otra vez','¡Una ambulancia, por favor!']),2.5);
-      if(near(J.pick,11)){J.pax.remove();J.pax=null;const hp=SERVICE.hospital||{x:SW(33,6)[0],z:SW(33,6)[1]},d=snapRoad(hp.x,hp.z);J.dest={n:'Hospital del Real Sitio',x:d.x,z:d.z};J.dist=Math.hypot(d.x-c.x,d.z-c.z);J.t0=J.t;J.limit=J.dist/11+25;J.stage='drop';
-        setTarget(d.x,d.z);sfx('pickup');toast('Herido a bordo: ¡al hospital, rápido! (pon la sirena manteniendo el claxon)',4);}
+      if(near(J.pick,11)){J.pax.remove();J.pax=null;const hp=SERVICE.hospital||{x:SW(33,6)[0],z:SW(33,6)[1]},d=snapRoad(hp.x,hp.z);J.dest={n:'Hospital del Real Sitio',x:d.x,z:d.z};J.dist=Math.hypot(d.x-c.x,d.z-c.z);J.stage='drop';
+        jobTimer(J,jobLimit(J,J.dist));setTarget(d.x,d.z);sfx('pickup');toast('Herido a bordo: ¡al hospital, rápido! (pon la sirena manteniendo el claxon)',4);}
     }else if(J.stage==='drop'){
-      const left=Math.ceil(J.limit-(J.t-J.t0));objective(`Lleva al herido al <b>Hospital del Real Sitio</b> · ${left>0?left+' s':'¡date prisa!'}`);
-      if(near(J.dest,14)){const ok=J.t-J.t0<=J.limit;jobPay(clamp(45+J.dist*0.09,60,170)+(ok?30:0),ok?'¡Traslado a tiempo! Plus de urgencias':'Traslado completado (justito)');J.stage='wait';setTimeout(()=>{if(G.job===J)nextPatient();},1500);}
+      objective(`Lleva al herido al <b>Hospital del Real Sitio</b>${tStr}`);
+      if(jobLeft(J)<=0){jobFail(J,'El herido no ha aguantado el viaje… o eso dicen en urgencias');J.stage='wait';setTimeout(()=>{if(G.job===J)nextPatient();},1800);}
+      else if(near(J.dest,14)){const fast=jobLeft(J)>J.limit*0.3;jobOk(J);jobPay(clamp(45+J.dist*0.09,60,170)+(fast?30:0),fast?'¡Traslado rapidísimo! Plus de urgencias':'Traslado a tiempo');J.stage='wait';setTimeout(()=>{if(G.job===J)nextPatient();},1500);}
     }
   }else{
     if(J.stage==='load'&&near(J.depot,12)){J.pk=3;J.dmg=0;toast('Furgoneta cargada con 3 paquetes. ¡Cuidado con los baches, que son frágiles!',4);sfx('pickup');nextDrop();}
-    else if(J.stage==='deliver'&&near(J.addr,11)){
-      const dmg=Math.max(0,J.hpPrev-c.hp),mult=Math.max(0.4,1-dmg/80);J.pk--;
-      jobPay((34+Math.hypot(J.addr.x-J.depot.x,J.addr.z-J.depot.z)*0.014)*mult,mult<1?'Paquete entregado (algo abollado)':'Paquete entregado');toast(rpick(DROP_LINES),3);
-      if(J.pk>0)nextDrop();else goDepot();
+    else if(J.stage==='deliver'){
+      objective(`Paquete ${J.doneZ.size+1}/6 (ronda ${J.round}): entrégalo en <b>${J.addr.name}</b> (quedan ${J.pk})${tStr}`);
+      if(jobLeft(J)<=0){jobFail(J,'Llegas tarde: el cliente ya no está y el paquete vuelve al almacén');J.pk--;if(J.pk>0)nextDrop();else goDepot();}
+      else if(near(J.addr,11)){
+        const dmg=Math.max(0,J.hpPrev-c.hp),mult=Math.max(0.4,1-dmg/80);J.pk--;jobOk(J);
+        jobPay((34+Math.hypot(J.addr.x-J.depot.x,J.addr.z-J.depot.z)*0.014)*mult,mult<1?'Paquete entregado (algo abollado)':'Paquete entregado');toast(rpick(DROP_LINES),3);
+        if(J.pk>0)nextDrop();else goDepot();
+      }
     }
   }
   const hud=$('raceHud');hud.classList.remove('hidden');
-  setH('raceHud',`<b>${J.type==='taxi'?'Taxi':'Reparto'}</b><span>${J.trips} ${J.type==='taxi'?'carreras':'entregas'}</span><span>+${fmtMoney(J.earned)}</span>`);
+  setH('raceHud',`<b>${JOB_NAME[J.type]}</b><span>Ronda ${J.round} · ${J.doneZ.size}/6</span>${left>0?`<span style="color:${left<=10?'#E4572E':'inherit'}">${fmtTime(Math.max(0,jobLeft(J)))}</span>`:''}<span>+${fmtMoney(J.earned)}</span>`);
 }
 // ---------------------------------------------------------------- Detalles: cigüeñas del Monasterio y globo aerostático
 const DET={storks:[],balloon:null,ba:0.6,clackT:6};
@@ -6343,8 +6567,8 @@ function setMute(m){AU.muted=m;if(AU.master)AU.master.gain.setTargetAtTime(m?0:A
 function muteLabel(){const b=$('btnMute');if(b)b.textContent=AU.muted?'Sonido: silenciado':'Sonido: activado';}
 let SHOWFPS=false;
 function setShowFps(v){SHOWFPS=!!v;const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);saveOpts();}
-function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level,dist:GRASS.dist,mute:!!AU.muted,fps:SHOWFPS,vrl:VR.laserOn===false?0:1}));}catch(e){}}
-function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;if(o&&o.dist>=0&&o.dist<GRASS_DIST.length)GRASS.dist=o.dist;if(o&&o.mute)AU.muted=true;if(o&&o.fps)SHOWFPS=true;if(o&&o.vrl===0)VR.laserOn=false;}catch(e){}grassLabels();muteLabel();{const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);}}
+function saveOpts(){try{localStorage.setItem('gte-opts',JSON.stringify({grass:GRASS.level,dist:GRASS.dist,mute:!!AU.muted,fps:SHOWFPS,vrl:VR.laserOn===false?0:1,dens:DENS.i}));}catch(e){}}
+function loadOpts(){try{const o=JSON.parse(localStorage.getItem('gte-opts')||'null');if(o&&o.grass>=0&&o.grass<=3)GRASS.level=o.grass;if(o&&o.dist>=0&&o.dist<GRASS_DIST.length)GRASS.dist=o.dist;if(o&&o.mute)AU.muted=true;if(o&&o.fps)SHOWFPS=true;if(o&&o.vrl===0)VR.laserOn=false;if(o&&o.dens>=0&&o.dens<DENS.lv.length)DENS.i=o.dens;}catch(e){}densLabel();grassLabels();muteLabel();{const b=$('btnFps');if(b)b.textContent='Mostrar FPS: '+(SHOWFPS?'sí':'no');$('fpsBox').classList.toggle('hidden',!SHOWFPS);}}
 function updateGrass(dt){
   if(!GRASS.geo){GRASS.geo=grassGeo();GRASS.mat=grassMat();}
   const U=GRASS.uni;U.uTime.value+=dt;GRASS.wa+=dt*0.03;const gust=0.38+0.3*Math.max(0,Math.sin(U.uTime.value*0.21))+0.12*Math.sin(U.uTime.value*0.77);
