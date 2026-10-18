@@ -1516,8 +1516,78 @@ function lonjaBorde(y,gap){
 //  casa de piedra con interior (cocina, salón, cama y armario con la ropa comprada) y dos garajes con puerta
 //  basculante: al acercarte se levanta; al cerrarse con un coche dentro, el coche queda guardado en la partida
 // =====================================================================
-const CASA={built:false,y:0,shop:{id:'armario',name:'Armario de Nacho',vend:'Nacho'},wardrobe:{x:-494.25,z:-1058.5},mirror:{x:-489,z:-1055},bed:{x:-493.4,z:-1061.6},door:null,doorColl:null,doorOpen:0};
+const CASA={lampMesh:{},lit:{techo:false,mesilla:false,rgb:0},rgbLast:1,built:false,y:0,shop:{id:'armario',name:'Armario de Nacho',vend:'Nacho'},wardrobe:{x:-494.25,z:-1058.5},mirror:{x:-489,z:-1055},bed:{x:-493.4,z:-1061.6},door:null,doorColl:null,doorOpen:0};
 const GAR=[];
+// ---------------- luz del interior de la casa: no le llega el sol a través de las paredes; se ilumina con sus lámparas, la claridad
+// de las ventanas y la puerta y las manchas de sol que entran por ellas (se calcula a mano en el sombreado, por píxel)
+const HN=8,HOUSE_U={uHPos:{value:Array.from({length:HN},()=>new THREE.Vector3(0,-999,0))},uHCol:{value:Array.from({length:HN},()=>new THREE.Vector3())},uHRng:{value:new Array(HN).fill(1)},
+  uHAmb:{value:new THREE.Vector3(0.1,0.094,0.088)},uSunDir:{value:new THREE.Vector3(0,1,0)},uSunCol:{value:new THREE.Vector3()},uWin:{value:Array.from({length:4},()=>new THREE.Vector4())},uWinY:{value:Array.from({length:4},()=>new THREE.Vector2())}};
+function houseMat(m,two){
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,HOUSE_U);sh.uniforms.uHTwo={value:two?1:0};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHW;\nvarying vec3 vHN;')
+      .replace('#include <project_vertex>','#include <project_vertex>\n\tvHW=(modelMatrix*vec4(transformed,1.0)).xyz;vHN=normalize(mat3(modelMatrix)*objectNormal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
+varying vec3 vHW;varying vec3 vHN;uniform vec3 uHPos[${HN}];uniform vec3 uHCol[${HN}];uniform float uHRng[${HN}];uniform vec3 uHAmb;uniform vec3 uSunDir;uniform vec3 uSunCol;uniform vec4 uWin[4];uniform vec2 uWinY[4];uniform float uHTwo;`)
+      .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;',`
+	vec3 hn=normalize(vHN);
+	vec3 hl=uHAmb;
+	for(int i=0;i<${HN};i++){vec3 L=uHPos[i]-vHW;float d=length(L);float a=clamp(1.0-(d*d)/(uHRng[i]*uHRng[i]),0.0,1.0);a*=a;float nl=dot(hn,L)/max(d,1e-4);nl=uHTwo>0.5?abs(nl):clamp(nl*0.8+0.2,0.0,1.0);hl+=uHCol[i]*(a*nl);}
+	float sl=0.0;
+	if(abs(uSunDir.z)>1e-3){for(int w=0;w<4;w++){vec4 W=uWin[w];float t=(W.y-vHW.z)/uSunDir.z;if(t>0.0&&W.w>0.001){vec3 q=vHW+uSunDir*t;
+	  float ex=1.0-smoothstep(W.z-0.05,W.z,abs(q.x-W.x));float ey=smoothstep(uWinY[w].x,uWinY[w].x+0.05,q.y)*(1.0-smoothstep(uWinY[w].y-0.05,uWinY[w].y,q.y));sl+=ex*ey*W.w;}}}
+	hl+=uSunCol*(min(sl,1.0)*max(dot(hn,uSunDir),0.0));
+	vec3 outgoingLight=diffuseColor.rgb*hl+totalEmissiveRadiance;`);};
+  m.customProgramCacheKey=()=>'casaLuz'+(two?2:1);return m;}
+// la lámpara RGB: modos
+const RGB_MODES=['Apagada','Blanca cálida','Arcoíris','Discoteca','Respirar','Policía','Fuego','Atardecer'];
+const _hc=new THREE.Color();
+function rgbColor(m,t){
+  switch(m){
+    case 1:return[1,0.8,0.55,1];
+    case 2:_hc.setHSL((t*0.09)%1,1,0.5);return[_hc.r,_hc.g,_hc.b,1];
+    case 3:{const k=Math.floor(t*3.3),h=((Math.sin(k*12.9898)*43758.5453)%1+1)%1,on=(t*3.3)%1<0.62;_hc.setHSL(h,1,0.5);return[_hc.r,_hc.g,_hc.b,on?1.25:0.12];}
+    case 4:{const ph=t/4.2,k=Math.floor(ph),f=ph-k,b=Math.pow(Math.sin(Math.PI*f),2);_hc.setHSL((k*0.23)%1,0.9,0.52);return[_hc.r,_hc.g,_hc.b,0.08+0.95*b];}
+    case 5:{const ph=(t*1.6)%1,red=Math.floor(t*1.6)%2===0,fl=(ph<0.18||(ph>0.3&&ph<0.48))?1.3:0.06;return red?[1,0.06,0.04,fl]:[0.08,0.2,1,fl];}
+    case 6:{const n=0.62+0.2*Math.sin(t*11.3)+0.12*Math.sin(t*23.7+1.3)+0.08*Math.sin(t*41.1);return[1,0.42+0.1*Math.sin(t*5.1),0.1,n];}
+    case 7:{const k=0.5+0.5*Math.sin(t*0.35);return[1,0.35+0.3*k,0.25+0.45*(1-k),0.9];}
+  }return[0,0,0,0];}
+// cada fotograma (cerca de la casa): colores e intensidades de las luces, el sol por las ventanas y los interruptores
+function casaLights(dt){
+  if(!CASA.L)return;const U=HOUSE_U,t=performance.now()/1000,k=dt?1-Math.exp(-dt*14):1;
+  U.uSunDir.value.set(SD[0],SD[1],SD[2]);U.uSunCol.value.set(LIGHT0.sc.r,LIGHT0.sc.g,LIGHT0.sc.b).multiplyScalar(LIGHT0.si*1.3);
+  CASA.L.forEach((L,i)=>{let c=[0,0,0,0];
+    if(L.id==='rgb'){if(CASA.lit.rgb>0)c=rgbColor(CASA.lit.rgb,t);}else if(CASA.lit[L.id])c=[...L.col,1];
+    const kk=L.id==='rgb'&&CASA.lit.rgb>=2?1:k;for(let j=0;j<3;j++)L.cur[j]+=(c[j]*c[3]-L.cur[j])*kk;
+    U.uHPos.value[i].set(...L.pos);U.uHRng.value[i]=L.rng;U.uHCol.value[i].set(L.cur[0]*L.k,L.cur[1]*L.k,L.cur[2]*L.k);
+    if(L.mesh){const m=L.mesh.material,b=Math.max(L.cur[0],L.cur[1],L.cur[2]);m.emissive.setRGB(L.cur[0]/(b||1),L.cur[1]/(b||1),L.cur[2]/(b||1));m.emissiveIntensity=Math.min(1,b)*0.95;}
+    const on=L.id==='rgb'?CASA.lit.rgb>0:!!CASA.lit[L.id];if(L.sw){L.sw.nub.position.y=on?0.022:-0.022;L.sw.led.visible=!on;}});
+  // claridad que entra por las ventanas (y por la puerta si está abierta) y el brillo azulado de la tele
+  const sky=[0.55,0.6,0.72],dOpen=CASA.doorOpen||0;
+  CASA.win.forEach((w,j)=>{const wt=j===3?dOpen:1;U.uWin.value[j].set(w[0],w[1],w[2],wt);U.uWinY.value[j].set(w[3],w[4]);});
+  CASA.fill.forEach((f,j)=>{const i=3+j;U.uHPos.value[i].set(...f);
+    if(j<4){const wt=(j===3?dOpen:1)*(j===2?0.55:0.62);U.uHRng.value[i]=6.0;U.uHCol.value[i].set(sky[0]*wt,sky[1]*wt,sky[2]*wt);}
+    else{const fl=0.75+0.15*Math.sin(t*7.1)+0.1*Math.sin(t*17.3);U.uHRng.value[i]=3.2;U.uHCol.value[i].set(0.16*fl,0.2*fl,0.3*fl);}});
+}
+// dentro de casa, a Nacho (y a quien entre) le da la luz de la casa, no la de la calle: se baja la luz general según lo que alumbre
+// la casa donde está, y se tiñe con el color de las lámparas (la RGB en modo discoteca, por ejemplo)
+const LIGHT0={hi:hemi.intensity,hc:hemi.color.clone(),si:sun.intensity,sc:sun.color.clone()};
+function casaExposure(dt){
+  const B=CASA.box;if(!B)return;const x=P.car?P.car.x:P.x,z=P.car?P.car.z:P.z,c=camera.position;
+  const inside=(x>B[0]&&x<B[1]&&z>B[2]&&z<B[3]&&P.y<B[4]+3)||(c.x>B[0]&&c.x<B[1]&&c.z>B[2]&&c.z<B[3]&&c.y<B[4]+3.2);
+  let f=1,tr=1,tg=1,tb=1;
+  if(inside){const U=HOUSE_U,py=P.y+1.0,a=U.uHAmb.value;let r=a.x,g=a.y,b=a.z;
+    for(let i=0;i<HN;i++){const q=U.uHPos.value[i],d2=(q.x-x)**2+(q.y-py)**2+(q.z-z)**2,R=U.uHRng.value[i];let w=Math.max(0,1-d2/(R*R));w*=w*0.7;const C=U.uHCol.value[i];r+=C.x*w;g+=C.y*w;b+=C.z*w;}
+    const lum=0.3*r+0.59*g+0.11*b;f=clamp(0.3+lum*0.9,0.3,1);const m=Math.max(r,g,b,1e-3);tr=lerp(1,r/m,0.7);tg=lerp(1,g/m,0.7);tb=lerp(1,b/m,0.7);}
+  const k=dt?1-Math.exp(-dt*6):1;CASA.exp=lerp(CASA.exp===undefined?1:CASA.exp,f,k);CASA.tint=CASA.tint||[1,1,1];const T=CASA.tint;T[0]=lerp(T[0],tr,k);T[1]=lerp(T[1],tg,k);T[2]=lerp(T[2],tb,k);
+  if(Math.abs(CASA.exp-1)<0.002&&!inside&&Math.abs(T[0]-1)+Math.abs(T[1]-1)+Math.abs(T[2]-1)<0.005){if(CASA.expOn){if(CASA.glassMat)CASA.glassMat.emissiveIntensity=0;hemi.intensity=LIGHT0.hi;hemi.color.copy(LIGHT0.hc);sun.intensity=LIGHT0.si;sun.color.copy(LIGHT0.sc);CASA.expOn=false;}return;}
+  CASA.expOn=true;if(CASA.glassMat)CASA.glassMat.emissiveIntensity=(1-CASA.exp)*1.1;hemi.intensity=LIGHT0.hi*CASA.exp;sun.intensity=LIGHT0.si*CASA.exp;hemi.color.setRGB(LIGHT0.hc.r*T[0],LIGHT0.hc.g*T[1],LIGHT0.hc.b*T[2]);sun.color.setRGB(LIGHT0.sc.r*T[0],LIGHT0.sc.g*T[1],LIGHT0.sc.b*T[2]);}
+function casaSwitchUse(L){
+  if(L.id==='rgb'){sfx('click');P.vx=P.vz=0;openShop(CASA.rgbShop);return;}   // la RGB tiene su mando: encender, apagar y elegir el modo
+  CASA.lit[L.id]=!CASA.lit[L.id];
+  sfx('click');if(AU.ctx)aTone(1900,0.025,0.05,'square');save();}
+function casaSwitchHint(L){
+  if(L.id==='rgb'){const m=CASA.lit.rgb;return m?`Lámpara RGB: <b>${RGB_MODES[m]}</b> · Pulsa ${kb('F','Y','Lámpara')} para cambiar el modo o apagarla`:`Pulsa ${kb('F','Y','Lámpara')} para encender ${L.name} y elegir el modo`;}
+  return`Pulsa ${kb('F','Y',CASA.lit[L.id]?'Apagar':'Encender')} para ${CASA.lit[L.id]?'apagar':'encender'} ${L.name}`;}
 function casaBox(B,x0,x1,y0,y1,z0,z1,col,coll,tag='b',tw=2,th=2){if(x1-x0<0.005||y1-y0<0.005||z1-z0<0.005)return;B.box((x0+x1)/2,y0,(z0+z1)/2,(x1-x0)/2,y1-y0,(z1-z0)/2,0,col,tw,th);if(coll)addCollider((x0+x1)/2,(z0+z1)/2,(x1-x0)/2,(z1-z0)/2,0,y0-1,y1+0.3,tag);}
 // muro con huecos. ax='x': corre a lo largo de x (de c0 a c1) con grosor t0..t1 en z; ax='z': a lo largo de z con grosor en x
 // huecos: [a,b,ya,yb,puerta] — las ventanas llevan colisión (cristal), las puertas no
@@ -1531,7 +1601,9 @@ function casaMuro(B,col,ax,c0,c1,t0,t1,yb,yt,holes,coll){
 function casaTex(w,h,draw){const c=mkCanvas(w,h),g=c.getContext('2d');draw(g,w,h);return texFrom(c,false);}
 function buildCasaNacho(){
   const y=groundH(-485,-1040);CASA.y=y;
-  const INT=new GB(new THREE.MeshLambertMaterial({vertexColors:true,emissive:new THREE.Color(0x3b342b)}),false),CEIL=new GB(new THREE.MeshBasicMaterial({vertexColors:true}),false),GLS=new GB(new THREE.MeshLambertMaterial({vertexColors:true,transparent:true,opacity:0.32,depthWrite:false,side:THREE.DoubleSide}),false);
+  const INT=new GB(houseMat(new THREE.MeshLambertMaterial({vertexColors:true})),false),CEIL=new GB(houseMat(new THREE.MeshLambertMaterial({vertexColors:true}),true),false),
+    GLSH=new GB(CASA.glassMat=new THREE.MeshLambertMaterial({vertexColors:true,transparent:true,opacity:0.32,depthWrite:false,side:THREE.DoubleSide,emissive:new THREE.Color(0xd6e6f4),emissiveIntensity:0}),false),
+    INTG=new GB(new THREE.MeshLambertMaterial({vertexColors:true,emissive:new THREE.Color(0x3b342b)}),false),CEILG=new GB(new THREE.MeshBasicMaterial({vertexColors:true}),false),GLS=new GB(new THREE.MeshLambertMaterial({vertexColors:true,transparent:true,opacity:0.32,depthWrite:false,side:THREE.DoubleSide}),false);
   const WOOD=[0.45,0.3,0.18],DKW=[0.3,0.2,0.12],PLAST=[0.93,0.89,0.8],WHITE2=[0.95,0.95,0.93],CREAM=[0.86,0.8,0.68],GLASS=[0.16,0.24,0.32],SHUT=[0.22,0.42,0.27];
   // ---------------- plaza del mirador: empedrado, balcón de grava al sur y zona de merendero al este
   if(!MAT.plaza)MAT.plaza=new THREE.MeshLambertMaterial({map:TEX.street,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
@@ -1561,9 +1633,9 @@ function buildCasaNacho(){
    casaBox(STONE,doorX0-0.2,doorX1+0.2,y+DH,y+DH+0.2,LZ1-0.02,LZ1+0.15,FC,false);}
   // ventanas: cristal, marco, alféizar y contraventanas verdes
   const ventana=(ax,c,pos,out)=>{const w=1.4,h=1.2,y0=y+1.0;
-    if(ax==='x'){GLS.box(c,y0,pos,w/2,h,0.03,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(c+s*(w/2+0.05),y0-0.05,pos+out*0.21,0.06,h+0.1,0.04,0,WOOD);PROPS.box(c+s*(w/2+0.42),y0,pos+out*0.25,0.36,h,0.03,0,SHUT);}
+    if(ax==='x'){GLSH.box(c,y0,pos,w/2,h,0.03,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(c+s*(w/2+0.05),y0-0.05,pos+out*0.21,0.06,h+0.1,0.04,0,WOOD);PROPS.box(c+s*(w/2+0.42),y0,pos+out*0.25,0.36,h,0.03,0,SHUT);}
       PROPS.box(c,y0+h/2-0.03,pos,w/2,0.06,0.05,0,WOOD);PROPS.box(c,y0-0.1,pos+out*0.25,w/2+0.12,0.1,0.18,0,GRAN);PROPS.box(c,y0+h,pos+out*0.21,w/2+0.1,0.08,0.04,0,WOOD);}
-    else{GLS.box(pos,y0,c,0.03,h,w/2,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(pos+out*0.21,y0-0.05,c+s*(w/2+0.05),0.04,h+0.1,0.06,0,WOOD);PROPS.box(pos+out*0.25,y0,c+s*(w/2+0.42),0.03,h,0.36,0,SHUT);}
+    else{GLSH.box(pos,y0,c,0.03,h,w/2,0,[0.62,0.78,0.88]);for(const s of[-1,1]){PROPS.box(pos+out*0.21,y0-0.05,c+s*(w/2+0.05),0.04,h+0.1,0.06,0,WOOD);PROPS.box(pos+out*0.25,y0,c+s*(w/2+0.42),0.03,h,0.36,0,SHUT);}
       PROPS.box(pos,y0+h/2-0.03,c,0.05,0.06,w/2,0,WOOD);PROPS.box(pos+out*0.25,y0-0.1,c,0.18,0.1,w/2+0.12,0,GRAN);}};
   ventana('x',-493,LZ1-0.2,1);ventana('x',-483.5,LZ1-0.2,1);ventana('x',-485.6,LZ0+0.2,-1);
   // porche: dos postes, tejadillo, escalón, farol, felpudo, macetas y el letrero
@@ -1580,7 +1652,7 @@ function buildCasaNacho(){
   const IX0=LX0+WT,IX1=LX1-WT,IZ0=LZ0+WT,IZ1=LZ1-WT,yc=y+3.25,e=0.012;
   {const fl=casaTex(256,256,(g,w,h)=>{g.fillStyle='#8a5f3a';g.fillRect(0,0,w,h);for(let r=0;r<8;r++){const o=(r%2)*64;for(let x=-64+o;x<w;x+=128){g.fillStyle=`rgba(${60+Math.random()*40|0},${35+Math.random()*25|0},15,0.35)`;g.fillRect(x,r*32,128,32);}g.fillStyle='rgba(30,18,8,0.6)';g.fillRect(0,r*32,w,2);}});
    fl.wrapS=fl.wrapT=THREE.RepeatWrapping;fl.repeat.set((IX1-IX0)/3,(IZ1-IZ0)/3);
-   const fm=new THREE.Mesh(new THREE.PlaneGeometry(IX1-IX0,IZ1-IZ0),new THREE.MeshLambertMaterial({map:fl,emissive:new THREE.Color(0x2a1e14),polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));fm.rotation.x=-Math.PI/2;fm.position.set((IX0+IX1)/2,y+0.03,(IZ0+IZ1)/2);fm.receiveShadow=true;scene.add(fm);PAVED.push([LX0,LX1,LZ0,LZ1]);}
+   const fm=new THREE.Mesh(new THREE.PlaneGeometry(IX1-IX0,IZ1-IZ0),houseMat(new THREE.MeshLambertMaterial({map:fl,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2})));fm.rotation.x=-Math.PI/2;fm.position.set((IX0+IX1)/2,y+0.03,(IZ0+IZ1)/2);fm.receiveShadow=true;scene.add(fm);PAVED.push([LX0,LX1,LZ0,LZ1]);}
   CEIL.quad([IX0,yc,IZ0],[IX1,yc,IZ0],[IX1,yc,IZ1],[IX0,yc,IZ1],[0,0],[1,0],[1,1],[0,1],[0.8,0.77,0.71]);            // techo (sin sombra, siempre claro)
   for(let x=IX0+1.5;x<IX1;x+=3){casaBox(CEIL,x-0.09,x+0.09,yc-0.22,yc,IZ0,IZ1,[0.36,0.25,0.16],false);CEIL.quad([x-0.09,yc-0.22,IZ0],[x+0.09,yc-0.22,IZ0],[x+0.09,yc-0.22,IZ1],[x-0.09,yc-0.22,IZ1],[0,0],[1,0],[1,1],[0,1],[0.3,0.2,0.12]);}   // vigas de madera
   // revoco interior de las paredes (con sus huecos)
@@ -1603,7 +1675,7 @@ function buildCasaNacho(){
   casaBox(INT,IX0,-493.9,y,y+0.42,IZ0,IZ0+2.05,DKW,true);casaBox(INT,IX0+0.03,-493.95,y+0.42,y+0.6,IZ0+0.05,IZ0+2.0,[0.95,0.94,0.9],false);
   casaBox(INT,IX0+0.05,-493.95,y+0.58,y+0.66,IZ0+0.75,IZ0+2.02,[0.72,0.18,0.18],false);casaBox(INT,IX0+0.25,-494.15,y+0.6,y+0.75,IZ0+0.12,IZ0+0.55,WHITE2,false);
   casaBox(INT,IX0,-493.9,y+0.42,y+1.25,IZ0,IZ0+0.08,WOOD,false);
-  casaBox(INT,-493.7,-493.2,y,y+0.55,IZ0+0.05,IZ0+0.5,WOOD,true);{const l=new THREE.Mesh(BOXG,ME(0xfff3d0,0xffe2a0,0.8));l.scale.set(0.22,0.25,0.22);l.position.set(-493.45,y+0.85,IZ0+0.28);scene.add(l);casaBox(INT,-493.47,-493.43,y+0.55,y+0.72,IZ0+0.26,IZ0+0.3,[0.2,0.2,0.2],false);}
+  casaBox(INT,-493.7,-493.2,y,y+0.55,IZ0+0.05,IZ0+0.5,WOOD,true);{const l=new THREE.Mesh(BOXG,houseMat(new THREE.MeshLambertMaterial({color:0xfff3d0,emissive:0xffe2a0,emissiveIntensity:0})));l.scale.set(0.22,0.25,0.22);l.position.set(-493.45,y+0.85,IZ0+0.28);scene.add(l);CASA.lampMesh.mesilla=l;casaBox(INT,-493.47,-493.43,y+0.55,y+0.72,IZ0+0.26,IZ0+0.3,[0.2,0.2,0.2],false);}
   // armario (pared de poniente)
   casaBox(INT,IX0,IX0+0.62,y,y+2.25,-1059.5,-1057.5,WOOD,true);casaBox(INT,IX0+0.62,IX0+0.64,y+0.05,y+2.2,-1058.52,-1058.48,DKW,false);
   for(const z of[-1058.75,-1058.25])casaBox(INT,IX0+0.64,IX0+0.68,y+1.0,y+1.3,z-0.02,z+0.02,[0.8,0.65,0.3],false);
@@ -1625,12 +1697,27 @@ function buildCasaNacho(){
   casaBox(INT,-490.6,-489.8,y,y+0.42,-1051.6,-1050.8,[0.55,0.3,0.2],true);casaBox(INT,-490.6,-489.8,y+0.42,y+0.9,-1050.8,-1050.6,[0.55,0.3,0.2],false);
   casaBox(INT,-491.2,-489.0,y,y+2.0,IZ0,IZ0+0.38,WOOD,true);for(let k=1;k<5;k++)casaBox(INT,-491.15,-489.05,y+k*0.4,y+k*0.4+0.03,IZ0+0.02,IZ0+0.37,DKW,false);
   for(let k=0;k<22;k++){const sh=k%4,x=-491.1+((k*0.37)%2.0),h=0.22+((k*7)%5)*0.03;casaBox(INT,x,x+0.07,y+sh*0.4+0.03,y+sh*0.4+0.03+h,IZ0+0.06,IZ0+0.3,[[0.62,0.15,0.15],[0.15,0.32,0.55],[0.2,0.45,0.25],[0.8,0.65,0.25],[0.4,0.25,0.5]][k%5],false);}
-  casaBox(INT,-480.9,-480.75,y,y+1.55,-1051.2,-1051.05,[0.2,0.2,0.2],false);{const l=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,0.3,10),ME(0xfff1cc,0xffe0a0,0.7));l.position.set(-480.83,y+1.7,-1051.12);scene.add(l);}
+  casaBox(INT,-480.9,-480.75,y,y+1.55,-1051.2,-1051.05,[0.2,0.2,0.2],false);{const l=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,0.3,10),houseMat(new THREE.MeshLambertMaterial({color:0xfff1cc,emissive:0xffe0a0,emissiveIntensity:0})));l.position.set(-480.83,y+1.7,-1051.12);scene.add(l);CASA.lampMesh.rgb=l;}
   for(const[px,pz]of[[IX0+0.35,IZ1-0.35],[IX1-0.35,-1055.6]]){casaBox(INT,px-0.2,px+0.2,y,y+0.4,pz-0.2,pz+0.2,[0.65,0.38,0.25],false);casaBox(INT,px-0.28,px+0.28,y+0.4,y+1.1,pz-0.28,pz+0.28,[0.25,0.5,0.24],false);}
   {const pic=casaTex(256,160,(g,w,h)=>{g.fillStyle='#6b4a2a';g.fillRect(0,0,w,h);g.fillStyle='#a9c7e3';g.fillRect(10,10,w-20,h-20);g.fillStyle='#5f7d4d';g.beginPath();g.moveTo(10,110);g.lineTo(90,60);g.lineTo(170,95);g.lineTo(246,70);g.lineTo(246,150);g.lineTo(10,150);g.fill();
      g.fillStyle='#d8cdb5';g.fillRect(70,96,120,34);g.fillStyle='#55606b';g.fillRect(64,90,132,8);g.beginPath();g.arc(130,92,14,Math.PI,0);g.fill();g.fillRect(74,80,8,12);g.fillRect(178,80,8,12);});
-   const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.82),new THREE.MeshLambertMaterial({map:pic,emissive:new THREE.Color(0x222222)}));p.position.set(-490.45,y+1.75,IZ1-0.03);p.rotation.y=Math.PI;scene.add(p);}
-  {const l=new THREE.Mesh(new THREE.SphereGeometry(0.28,12,8),ME(0xfff6dd,0xffe6b0,0.9));l.position.set(-486.6,yc-0.5,-1056.5);scene.add(l);casaBox(INT,-486.62,-486.58,yc-0.24,yc,-1056.52,-1056.48,[0.2,0.2,0.2],false);}
+   const p=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.82),houseMat(new THREE.MeshLambertMaterial({map:pic})));p.position.set(-490.45,y+1.75,IZ1-0.03);p.rotation.y=Math.PI;scene.add(p);}
+  {const l=new THREE.Mesh(new THREE.SphereGeometry(0.28,12,8),houseMat(new THREE.MeshLambertMaterial({color:0xfff6dd,emissive:0xffe6b0,emissiveIntensity:0})));l.position.set(-486.6,yc-0.5,-1056.5);scene.add(l);CASA.lampMesh.techo=l;casaBox(INT,-486.62,-486.58,yc-0.24,yc,-1056.52,-1056.48,[0.2,0.2,0.2],false);}
+  // ---------------- luces de la casa: tres lámparas con su interruptor, la luz que entra por las ventanas y la puerta, y el brillo de la tele
+  {const plate=houseMat(new THREE.MeshLambertMaterial({color:0xf1ede2})),nubM=houseMat(new THREE.MeshLambertMaterial({color:0xd9d3c3}));
+   const sw=(x,yy,z,nx,nz)=>{const g=new THREE.Group();g.position.set(x,yy,z);g.rotation.y=Math.atan2(nx,nz);scene.add(g);const p=new THREE.Mesh(BOXG,plate);p.scale.set(0.085,0.12,0.012);p.position.z=0.006;g.add(p);
+     const n=new THREE.Mesh(BOXG,nubM);n.scale.set(0.03,0.045,0.016);n.position.set(0,-0.022,0.016);g.add(n);
+     const led=new THREE.Mesh(BOXG,new THREE.MeshBasicMaterial({color:0xff9a2a}));led.scale.set(0.008,0.008,0.004);led.position.set(0.028,0.045,0.013);g.add(led);   // pilotito para encontrarlo a oscuras
+     return{x:x+nx*0.25,z:z+nz*0.25,g,nub:n,led};};
+   CASA.L=[
+     {id:'techo',name:'la <b>luz del techo</b>',pos:[-486.6,yc-0.66,-1056.5],col:[1.0,0.96,0.88],k:1.45,rng:10.5,sw:sw(doorX0-0.42,y+1.2,IZ1-0.013,0,-1)},
+     {id:'mesilla',name:'la <b>lámpara de la mesilla</b>',pos:[-493.45,y+0.98,IZ0+0.32],col:[1.0,0.66,0.34],k:1.05,rng:4.0,sw:sw(-492.7,y+0.95,IZ0+0.013,0,1)},
+     {id:'rgb',name:'la <b>lámpara RGB</b> del salón',pos:[-480.95,y+1.62,-1051.25],col:[1.0,0.8,0.55],k:1.3,rng:7.0,sw:sw(IX1-0.013,y+1.2,-1052.3,-1,0)}];
+   for(const L of CASA.L){L.cur=[0,0,0];L.mesh=CASA.lampMesh[L.id];}
+   CASA.box=[IX0,IX1,IZ0,IZ1,y];
+   CASA.win=[[-493,LZ1-0.2,0.7,y+1.0,y+2.2,1],[-483.5,LZ1-0.2,0.7,y+1.0,y+2.2,1],[-485.6,LZ0+0.2,0.7,y+1.0,y+2.2,1],[(doorX0+doorX1)/2,LZ1-0.2,(doorX1-doorX0)/2,y,y+DH,0]];   // centro x, plano z, media anchura, alto, peso
+   CASA.fill=[[-493,y+1.6,LZ1-0.95],[-483.5,y+1.6,LZ1-0.95],[-485.6,y+1.6,LZ0+0.95],[(doorX0+doorX1)/2,y+1.2,LZ1-0.95],[IX0+0.75,y+0.95,-1053.5]];
+   casaLights(0);}
   // ---------------- garajes: dos plazas con puerta basculante
   const GX0=-480,GX1=-468.4,GZ0=-1060,GZ1=-1050,GH=3.2,gyt=y+GH,dH=2.8;
   const bays=[{x0:-480,x1:-474.5,dc:-477.25,dw:4.4},{x0:-473.9,x1:-468.8,dc:-471.35,dw:4.3}];
@@ -1647,12 +1734,12 @@ function buildCasaNacho(){
     const cz=(GZ0+GZ1)/2,inner=[b.x0+(b.x0===-480?0:0),b.x1];
     // dentro: suelo de hormigón, techo, tubo fluorescente, estanterías y bidones
     const fl=new THREE.Mesh(new THREE.PlaneGeometry(b.x1-b.x0,GZ1-WT-(GZ0+WT)),new THREE.MeshLambertMaterial({color:0x8d8b86,emissive:new THREE.Color(0x26251f),polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));fl.rotation.x=-Math.PI/2;fl.position.set((b.x0+b.x1)/2,y+0.03,(GZ0+WT+GZ1-WT)/2);scene.add(fl);
-    CEIL.quad([b.x0,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ1-WT],[b.x0,y+GH-0.14,GZ1-WT],[0,0],[1,0],[1,1],[0,1],[0.66,0.66,0.63]);
-    for(const[a,c]of[[b.x0+0.005,b.x0+0.015],[b.x1-0.015,b.x1-0.005]]){casaBox(INT,a,c,y,y+GH-0.14,GZ0+WT,GZ1-WT,[0.8,0.79,0.75],false);casaBox(INT,a-0.004,c+0.004,y,y+0.45,GZ0+WT,GZ1-WT,[0.42,0.4,0.37],false);}
-    casaBox(INT,b.x0+0.01,b.x1-0.01,y,y+GH-0.14,GZ0+WT+0.005,GZ0+WT+0.015,[0.8,0.79,0.75],false);casaBox(INT,b.x0+0.01,b.x1-0.01,y,y+0.45,GZ0+WT+0.002,GZ0+WT+0.019,[0.42,0.4,0.37],false);
+    CEILG.quad([b.x0,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ0+WT],[b.x1,y+GH-0.14,GZ1-WT],[b.x0,y+GH-0.14,GZ1-WT],[0,0],[1,0],[1,1],[0,1],[0.66,0.66,0.63]);
+    for(const[a,c]of[[b.x0+0.005,b.x0+0.015],[b.x1-0.015,b.x1-0.005]]){casaBox(INTG,a,c,y,y+GH-0.14,GZ0+WT,GZ1-WT,[0.8,0.79,0.75],false);casaBox(INTG,a-0.004,c+0.004,y,y+0.45,GZ0+WT,GZ1-WT,[0.42,0.4,0.37],false);}
+    casaBox(INTG,b.x0+0.01,b.x1-0.01,y,y+GH-0.14,GZ0+WT+0.005,GZ0+WT+0.015,[0.8,0.79,0.75],false);casaBox(INTG,b.x0+0.01,b.x1-0.01,y,y+0.45,GZ0+WT+0.002,GZ0+WT+0.019,[0.42,0.4,0.37],false);
     {const t=new THREE.Mesh(BOXG,ME(0xffffff,0xf2f7ff,1.1));t.scale.set(0.12,0.06,2.4);t.position.set((b.x0+b.x1)/2,y+GH-0.2,cz);scene.add(t);}
-    casaBox(INT,b.x0+0.05,b.x0+0.5,y,y+1.9,GZ0+WT+0.3,GZ0+WT+2.2,[0.35,0.36,0.4],true);for(let k=1;k<4;k++)casaBox(INT,b.x0+0.05,b.x0+0.5,y+k*0.55,y+k*0.55+0.04,GZ0+WT+0.3,GZ0+WT+2.2,[0.55,0.56,0.6],false);
-    for(let k=0;k<5;k++)casaBox(INT,b.x0+0.1,b.x0+0.45,y+0.04+(k%3)*0.55,y+0.3+(k%3)*0.55,GZ0+WT+0.4+k*0.35,GZ0+WT+0.65+k*0.35,[[0.75,0.2,0.15],[0.85,0.68,0.2],[0.2,0.4,0.7]][k%3],false);
+    casaBox(INTG,b.x0+0.05,b.x0+0.5,y,y+1.9,GZ0+WT+0.3,GZ0+WT+2.2,[0.35,0.36,0.4],true);for(let k=1;k<4;k++)casaBox(INTG,b.x0+0.05,b.x0+0.5,y+k*0.55,y+k*0.55+0.04,GZ0+WT+0.3,GZ0+WT+2.2,[0.55,0.56,0.6],false);
+    for(let k=0;k<5;k++)casaBox(INTG,b.x0+0.1,b.x0+0.45,y+0.04+(k%3)*0.55,y+0.3+(k%3)*0.55,GZ0+WT+0.4+k*0.35,GZ0+WT+0.65+k*0.35,[[0.75,0.2,0.15],[0.85,0.68,0.2],[0.2,0.4,0.7]][k%3],false);
     // puerta basculante (gira sobre su borde de arriba hacia dentro)
     const piv=new THREE.Group();piv.position.set(b.dc,y+dH,GZ1-WT/2);scene.add(piv);const dm=new THREE.Mesh(new THREE.BoxGeometry(b.dw,dH,0.07),dmat);dm.position.set(0,-dH/2,0);dm.castShadow=true;piv.add(dm);
     PROPS.box(b.dc,y+dH,GZ1+0.03,b.dw/2+0.12,0.16,0.06,0,[0.3,0.3,0.32]);for(const s of[-1,1])PROPS.box(b.dc+s*(b.dw/2+0.06),y,GZ1+0.03,0.06,dH,0.06,0,[0.3,0.3,0.32]);
@@ -1725,7 +1812,7 @@ function buildCasaNacho(){
   for(const zr of[-1076,-1082])for(let x=-503;x<=-442;x+=5.5){const j=Math.sin(x*12.9+zr)*1.6;tr('pine',x+j,zr+Math.cos(x*7.3)*1.4,0.85+((x*zr)%4+4)%4*0.06);}
   for(const xr of[-507,-513])for(let z=-1070;z<=-1008;z+=6){const j=Math.sin(z*3.7+xr)*1.5;tr('pine',xr+j,z+Math.cos(z*5.1)*1.2,0.9+((z*7)%3+3)%3*0.07);}
   for(const[x,z,s]of[[-489,-1071,1.0],[-471,-1072.5,0.8],[-458,-1070,1.1],[-505,-1043,1.2],[-510,-1024,0.9],[-449,-1072,0.7]])if(roadClear(x,z,1.5))rock(x,z,s);
-  for(const B of[INT,CEIL,GLS]){const im=B.build();if(im){im.receiveShadow=B===INT;im.castShadow=false;}}
+  for(const B of[INT,CEIL,GLS,GLSH,INTG,CEILG]){const im=B.build();if(im){im.receiveShadow=B===INTG;im.castShadow=false;}}
   // pasillo de vista desde los prismáticos hasta el Monasterio: ahí no se plantan pinos (colisiones fantasma, que no chocan con nada)
   {const ox=-475,oz=-1017,yaw=Math.atan2(-ox,-oz);for(let d=8;d<460;d+=16){const w=3+d*0.03;addCollider(ox+Math.sin(yaw)*(d+8),oz+Math.cos(yaw)*(d+8),w,8.5,yaw,1e9,1e9+1,'b');}}
   SPOTS.mirador={x:-476,z:-1021,y};CASA.built=true;
@@ -1754,6 +1841,7 @@ function casaUpdate(dt){
   // puerta de la casa
   {const d=P.car?99:Math.hypot(P.x+488,P.z+1050.2);const prev=CASA.doorOpen;CASA.doorOpen=clamp(CASA.doorOpen+(d<2.7?dt:-dt)*2.2,0,1);
    if(prev!==CASA.doorOpen){const e=CASA.doorOpen*CASA.doorOpen*(3-2*CASA.doorOpen);CASA.door.rotation.y=e*1.55;CASA.doorColl.y0=e>0.6?CASA.y+2.5:CASA.y-1;if(prev===0)sfx('swing',0.4);}}
+  if(Math.hypot(px+488,pz+1057)<45)casaLights(dt);casaExposure(dt);
   if(CASA.tv&&!SNAKE.on&&Math.hypot(px+493.8,pz+1053.5)<22){CASA.tv.t-=dt;if(CASA.tv.t<=0){CASA.tv.t=0.12;tvDraw(G.time);}}
   if(Math.hypot(px+478,pz+1045)<28)hintOnce('casa','Esta es la <b>casa de Nacho</b>. Entra con un coche en uno de los <b>garajes</b> y bájate: al cerrarse la puerta, el coche queda guardado. Dentro tienes la cama (guarda la partida) y el armario con tu ropa.',9);
 }
@@ -1761,6 +1849,8 @@ function casaSleep(){heal(100);save();sfx('pickup');banner('Buenos días, Nacho'
 function casaInteract(I){
   if(P.car||!CASA.built)return false;
   for(const t of TELE.list)if(Math.hypot(P.x-t.x,P.z-t.z)<1.5){hint(`Pulsa ${kb('F','Y','Mirar')} para mirar por los <b>prismáticos</b> del mirador`,0.3);if(I.enter){teleEnter(t);return true;}return false;}
+  if(CASA.L){let best=null,bd=1.05;for(const L of CASA.L){const d=Math.hypot(P.x-L.sw.x,P.z-L.sw.z);if(d<bd&&Math.abs(P.y-CASA.y)<1.5){bd=d;best=L;}}
+    if(best){hint(casaSwitchHint(best),0.3);if(I.enter){casaSwitchUse(best);return true;}return false;}}
   const dW=Math.hypot(P.x-CASA.wardrobe.x,P.z-CASA.wardrobe.z),dB=Math.hypot(P.x-CASA.bed.x,P.z-CASA.bed.z);
   if(dW<1.3){hint(`Pulsa ${kb('F','Y','Abrir')} para abrir el <b>armario</b> y ponerte la ropa que has comprado`,0.3);if(I.enter){P.x=CASA.mirror.x;P.z=CASA.mirror.z;P.y=surfaceH(P.x,P.z);P.vx=P.vz=0;openShop(CASA.shop);return true;}}
   else if(dB<1.5){hint(`Pulsa ${kb('F','Y','Dormir')} para <b>dormir</b>: recuperas la salud y se guarda la partida`,0.3);if(I.enter){casaSleep();return true;}}
@@ -1774,14 +1864,32 @@ function casaLoad(slots){
 }
 // guardado: coches de los garajes y ropa comprada (antes de empezar la partida se conserva lo que ya había guardado)
 let WEAR_PROBE=null;
-function casaSaveData(){if(CASA.loaded)return{garage:GAR.map(g=>g.slot||null),owned:G.owned||{}};const p=loadSave()||{};return{garage:p.garage||[],owned:p.owned};}
+function casaSaveData(){if(CASA.loaded)return{garage:GAR.map(g=>g.slot||null),owned:G.owned||{},luces:{...CASA.lit,last:CASA.rgbLast}};const p=loadSave()||{};return{garage:p.garage||[],owned:p.owned,luces:p.luces};}
 function casaOwn(id,it){if((id==='ropa'||id==='collares')&&priceOf(it)>0)(G.owned||(G.owned={}))[it.n]=1;}
 function casaStart(s){
   G.owned=s&&s.owned?Object.assign({},s.owned):{};
   if(s&&!s.owned&&G.outfit)for(const id of['ropa','collares'])for(const it of SHOP_ITEMS[id].items){if(priceOf(it)===0)continue;   // partidas antiguas: lo que llevas puesto ya es tuyo
     WEAR_PROBE={};try{it.f();}catch(e){}const pt=WEAR_PROBE.p;WEAR_PROBE=null;if(pt&&Object.keys(pt).every(k=>k in G.outfit&&G.outfit[k]===pt[k]))G.owned[it.n]=1;}
   casaLoad(s?s.garage||[]:[]);CASA.loaded=true;
+  {const l=s&&s.luces;CASA.lit={techo:!!(l&&l.techo),mesilla:!!(l&&l.mesilla),rgb:l&&l.rgb>0&&l.rgb<RGB_MODES.length?l.rgb:0};CASA.rgbLast=l&&l.last>0&&l.last<RGB_MODES.length?l.last:1;casaLights(0);}   // por defecto, todo apagado
 }
+// el mando de la lámpara RGB: encender o apagar y elegir cualquier modo directamente (se ve el salón detrás mientras eliges)
+const RGB_DESC=['','La luz de siempre, amarillenta y tranquila','Pasa despacio por todos los colores','Colores a lo loco, con parpadeo','Se enciende y se apaga despacio, cada vez de un color','Destellos rojos y azules, como la Policía Local','Llama naranja que tiembla, como una chimenea','Naranja y rosa, como el cielo sobre Abantos'];
+const RGB_SW=[0,0xffd28a,0xc040ff,0xff2a8a,0x40c8ff,0x2050ff,0xff7a1a,0xff8a70];
+function rgbPanelSetup(){
+  CASA.rgbShop={id:'rgb',name:'Lámpara RGB del salón',vend:'Nacho'};
+  SHOP_ITEMS.rgb={side:true,nomoney:true,tick:rgbCamTick,hola:['¿Qué luz pongo?','A ver qué ambiente le pongo al salón…','Hoy toca discoteca, ¿o no?'],
+    get items(){const m=CASA.lit.rgb,last=CASA.rgbLast||1,out=[];
+      out.push({cat:'Interruptor',n:m?'Apagar la lámpara':'Encender la lámpara',d:m?`Ahora está en «${RGB_MODES[m]}»`:`Se enciende en «${RGB_MODES[last]}», el último que pusiste`,p:0,sw:m?0x2a2a2e:0xffd890,btn:m?'Apagar':'Encender',noPrice:true,quiet:true,
+        f:()=>{if(CASA.lit.rgb){CASA.lit.rgb=0;return'Apagada.';}CASA.lit.rgb=last;return`Encendida en «${RGB_MODES[last]}».`;}});
+      for(let i=1;i<RGB_MODES.length;i++)out.push({cat:'Modos (se enciende sola al elegir uno)',n:RGB_MODES[i],d:RGB_DESC[i]+(m===i?' · <b>puesto</b>':''),p:0,sw:RGB_SW[i],btn:m===i?'Puesto':'Poner',noPrice:true,quiet:true,
+        f:()=>{if(CASA.lit.rgb===i){renderShop(`Ya está en «${RGB_MODES[i]}».`);return false;}CASA.lit.rgb=i;CASA.rgbLast=i;return`Modo «${RGB_MODES[i]}».`;}});
+      return out;}};}
+// mientras eliges: la cámara mira el rincón de la lámpara desde el salón (con la lista a la izquierda, la lámpara a la derecha)
+function rgbCamTick(dt){
+  const L=CASA.L&&CASA.L[2];if(!L||VR.on)return;const y=CASA.y;
+  camera.position.set(-487.6,y+1.9,-1058.6);camera.lookAt(-482.2,y+1.0,-1052.2);if(Math.abs(camera.fov-62)>0.01){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
+  P.h.g.visible=true;const W=LW(),H=LH(),off=gcamOff();if(off>1)camera.setViewOffset(W,H,-off,0,W,H);else if(camera.view&&camera.view.enabled)camera.clearViewOffset();}
 // el armario: la ropa y los collares que tienes (lo gratis, más lo que has comprado)
 function armarioSetup(){
   SHOP_ITEMS.armario={hola:['A ver qué me pongo hoy…','Esto me lo compré en el mercadillo. Y esto también.','Con este modelito no me reconoce ni la Abuela Remedios.'],probador:true,
@@ -2094,7 +2202,7 @@ function buildLandmarks(){
    {const sx=cx+12,sz=cz-16,sy=groundH(sx,sz);signMesh(signTex(['SILLA DE FELIPE II'],512,96,'#3a3024','#f0e3c0','bold 50px Georgia,serif'),3.4,0.65,sx,sy+1.2,sz,2.54);PROPS.box(sx,sy,sz,0.06,0.9,0.06,0,[0.3,0.22,0.14]);}
    const ey=groundH(-548,680);WALLS.box(-548,ey-1,680,5,7,8,0.6,[0.97,0.96,0.93],4,3.2,ey);ROOF.hip(-548,ey+6,680,5,8,0.6,2.6,0.4,TILE);STONE.box(-548+Math.sin(0.6)*7.5,ey+6,680+Math.cos(0.6)*7.5,1.4,3.2,0.5,0.6,GRAN,1,1);addCollider(-548,680,5,8,0.6,ey-2,ey+9);}
   // Mirador de Abantos y casa de Nacho (con sus dos garajes)
-  buildCasaNacho();armarioSetup();
+  buildCasaNacho();armarioSetup();rgbPanelSetup();
   // Presa del Romeral
   {const wl=LAKE.wl;buildLakeWater();
    let da=1e9,db=-1e9;for(let x=LAKE.x0;x<LAKE.x1;x+=1)if(groundH(x,LAKE.z1-3)<wl){da=Math.min(da,x);db=Math.max(db,x);} // la presa cierra el agua de orilla a orilla
@@ -5070,13 +5178,13 @@ function gcamUI(){const sh=$('shop');sh.classList.toggle('carcam',GCAM.on);sh.cl
 function probadorCam(){P.yaw=Math.PI;P.h.g.rotation.y=P.yaw;P.h.g.position.set(P.x,P.y,P.z);animHuman(P.h,0,0,'walk');
   const narrow=LW()<LH()*1.2;camera.position.set(P.x+(narrow?0:1.2),P.y+1.45,P.z-3.6);camera.lookAt(P.x+(narrow?0:1.0),P.y+1.05,P.z);if(camera.fov!==50){camera.fov=50;fovNow=50;camera.updateProjectionMatrix();}}
 const priceOf=it=>typeof it.p==='function'?it.p():it.p;
-function openShop(sh){lockPrompt(false);document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);if(t===P.car&&SERVICE.taller){const T=SERVICE.taller,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=3.6,lz=-4.9,px=T.x+lx*c+lz*s,pz=T.z-lx*s+lz*c;GAMECAM.pos.set(px,groundH(px,pz)+1.75,pz);}GAMECAM.yaw=Math.atan2(t.x-GAMECAM.pos.x,t.z-GAMECAM.pos.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
+function openShop(sh){lockPrompt(false);document.body.classList.add('inshop');G.state='shop';SHOP_OPEN=sh;renderShop(rpick(SHOP_ITEMS[sh.id].hola));$('shop').classList.toggle('probador',!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam||SHOP_ITEMS[sh.id].side));if(SHOP_ITEMS[sh.id].probador)probadorCam();if(SHOP_ITEMS[sh.id].carcam)garageCam();VR.shopCam=!!(SHOP_ITEMS[sh.id].probador||SHOP_ITEMS[sh.id].carcam||SHOP_ITEMS[sh.id].side);if(SHOP_ITEMS[sh.id].probador)P.h.g.visible=true;if(P.car&&SHOP_ITEMS[sh.id].carcam)setCarCab(P.car,false);if(VR.on&&VR.shopCam){const t=P.car&&SHOP_ITEMS[sh.id].carcam?P.car:P;GAMECAM.pos.copy(camera.position);if(t===P.car&&SERVICE.taller){const T=SERVICE.taller,c=Math.cos(T.rot),s=Math.sin(T.rot),lx=3.6,lz=-4.9,px=T.x+lx*c+lz*s,pz=T.z-lx*s+lz*c;GAMECAM.pos.set(px,groundH(px,pz)+1.75,pz);}GAMECAM.yaw=Math.atan2(t.x-GAMECAM.pos.x,t.z-GAMECAM.pos.z);VR.recenter=true;}showScreen('shop',true);menuIdx=1;if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();}
 function renderShop(msg){
   const sh=SHOP_OPEN,S=SHOP_ITEMS[sh.id];
-  let h=`<h2>${sh.name}</h2><div class="shopMsg"><b>${sh.vend}:</b> ${msg}</div><div class="shopMoney">Llevas ${fmtMoney(P.money)}</div><div class="shopList">`;
+  let h=`<h2>${sh.name}</h2><div class="shopMsg"><b>${sh.vend}:</b> ${msg}</div>${S.nomoney?'':`<div class="shopMoney">Llevas ${fmtMoney(P.money)}</div>`}<div class="shopList">`;
   let cat='';
   S.items.forEach((it,i)=>{const pr=priceOf(it);const can=P.money>=pr;if(it.cat&&it.cat!==cat){cat=it.cat;h+=`<div class="shopCat">${cat}</div>`;}
-    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${sh.id==='armario'?'Tuyo':(pr?fmtMoney(pr):'Gratis')}</div><button class="b${can?'':' alt'}" data-i="${i}">${sh.id==='armario'?'Ponérmelo':(can?(it.btn||'Comprar'):'No llega')}</button></div>`;});
+    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${it.noPrice?'':(sh.id==='armario'?'Tuyo':(pr?fmtMoney(pr):'Gratis'))}</div><button class="b${can?'':' alt'}" data-i="${i}">${sh.id==='armario'?'Ponérmelo':(can?(it.btn||'Comprar'):'No llega')}</button></div>`;});
   h+=`</div><div class="btns"><button class="b alt" id="shopClose">Cerrar</button></div>`;
   const sc=$('shop').scrollTop,si0=$('shopInner').scrollTop,ol=$('shopInner').querySelector('.shopList'),ls=ol?ol.scrollTop:0;
   $('shopInner').innerHTML=h;$('shop').scrollTop=sc;$('shopInner').scrollTop=si0;{const nl=$('shopInner').querySelector('.shopList');if(nl)nl.scrollTop=ls;}
@@ -5090,7 +5198,7 @@ function buyItem(i){
   if(typeof r==='string'){renderShop(r);return;}
   renderShop(SHOP_ITEMS[SHOP_OPEN.id].carcam?rpick(['Como nuevo, oiga.','Esto ya no lo reconoce ni su madre.','Listo. Y no me lo traiga en otro estado.']):SHOP_ITEMS[SHOP_OPEN.id].probador?rpick(['¡Qué bien te queda!','Estás hecho un galán.','Ni Felipe II iba tan elegante.','Mírate en el espejo, anda.']):rpick(['¡Gracias, guapo!','¡Que aproveche!','Vuelve cuando quieras.','Buen ojo, sí señor.']));
 }
-function closeShop(){if(VR.on&&VR.shopCam)VR.recenter=true;VR.shopCam=false;gcamEnd();document.body.classList.remove('inshop');showScreen('shop',false);SHOP_OPEN=null;G.state='play';tryLock();lockCheck();}
+function closeShop(){if(VR.on&&VR.shopCam)VR.recenter=true;VR.shopCam=false;gcamEnd();if(camera.view&&camera.view.enabled)camera.clearViewOffset();document.body.classList.remove('inshop');showScreen('shop',false);SHOP_OPEN=null;G.state='play';tryLock();lockCheck();}
 // ---------- saltos con premio
 let bestJump=0;
 function onStunt(dist,airT,ramp){
@@ -6223,7 +6331,7 @@ function frameBody(now,xrf){
     }
     updateBubbles(rdt);updateHUD(rdt);drawMinimap();
   }
-  else if(G.state==='shop'){menuNav();if(GCAM.on)garageCamTick(rdt);if(KP.has('KeyP')){closeShop();openPause();}else if(KP.has('Escape')||padP(1)||tP('pause'))closeShop();}
+  else if(G.state==='shop'){menuNav();if(GCAM.on)garageCamTick(rdt);if(SHOP_OPEN&&SHOP_ITEMS[SHOP_OPEN.id]&&SHOP_ITEMS[SHOP_OPEN.id].tick)SHOP_ITEMS[SHOP_OPEN.id].tick(rdt);if(CASA.built&&Math.hypot(P.x+488,P.z+1057)<45){casaLights(rdt);casaExposure(rdt);}if(KP.has('KeyP')){closeShop();openPause();}else if(KP.has('Escape')||padP(1)||tP('pause'))closeShop();}
   else if(G.state==='paused'||G.state==='credits'){menuNav();if(G.state==='paused'&&KP.has('KeyM')&&!cheatTyping())openMap();}
   else if(G.state==='map'){if(I.map||I.pause||padP(1))closeMap();}
   if(IS_TOUCH&&(wantRot()!==ROT.on||(ROT.on&&(innerWidth!==ROT.w||innerHeight!==ROT.h))))applyRot();   // en vertical se gira solo
