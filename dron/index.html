@@ -151,6 +151,46 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 #bGo:active{transform:translate(2px,3px);box-shadow:2px 2px 0 var(--ink)}
 #bRestart{height:48px;padding:0 18px;font-size:16px;font-weight:600;border:3px solid var(--ink);border-radius:16px;background:var(--paper);box-shadow:3px 3px 0 var(--ink);cursor:pointer;display:none}
 #padInfo{font-size:13px;color:var(--muted)}
+#gfx{margin-top:16px;padding-top:14px;border-top:3px dashed rgba(127,120,170,.45)}
+.presets{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;font-weight:600}
+.presets span{margin-right:2px}
+.pre{padding:4px 13px;border:2px solid var(--ink);border-radius:999px;background:transparent;cursor:pointer;font-weight:600;font-size:13px}
+.pre.sel{background:var(--ink);color:var(--paper)}
+.gfxGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+@media (max-width:560px){.gfxGrid{grid-template-columns:1fr}}
+#aaNote{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#aaNote[hidden]{display:none}
+#bReload{padding:4px 12px;border:2px solid var(--ink);border-radius:999px;background:var(--sun);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+#optRow{margin-top:8px}
+.tog{display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:600;cursor:pointer;position:relative}
+.tog input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.tog .sw{width:46px;height:27px;border:3px solid var(--ink);border-radius:999px;background:var(--paper);position:relative;flex:none;transition:background .15s}
+.tog .sw::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--ink);transition:transform .15s}
+.tog input:checked + .sw{background:var(--mint)}
+.tog input:checked + .sw::after{transform:translateX(19px)}
+.tog input:focus-visible + .sw{outline:3px solid var(--sun);outline-offset:2px}
+.tog small{font-weight:400;color:var(--muted);font-size:13px}
+#fpsChip{display:none;font-variant-numeric:tabular-nums}
+#fpsChip.ok{background:var(--mint)} #fpsChip.mid{background:var(--sun)} #fpsChip.low{background:var(--tomato);color:#fff}
+@media (prefers-reduced-motion: reduce){.tog .sw,.tog .sw::after{transition:none}}
+#bVR{height:48px;padding:0 16px 0 11px;font-size:16px;font-weight:600;border:3px solid var(--ink);border-radius:16px;background:var(--mint);color:var(--ink);box-shadow:3px 3px 0 var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+#bVR svg{width:30px;height:30px;flex:none}
+#bVR:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+#bVR.off{background:var(--paper);color:var(--txt)}
+#vrBox{margin-top:10px}
+#vrCams{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:13px;font-weight:600}
+#vrCams span{margin-right:2px}
+.vc{padding:4px 11px;border:2px solid var(--ink);border-radius:999px;background:transparent;cursor:pointer;font-weight:600;font-size:13px}
+.vc.sel{background:var(--ink);color:var(--paper)}
+#vrInfo{margin:0;font-size:13px;line-height:1.4;color:var(--muted);border-radius:8px;padding:2px 4px;max-width:70ch}
+#vrInfo.pulse{animation:vrp 1.4s ease-out}
+@keyframes vrp{0%{background:rgba(255,210,63,.65);color:var(--txt)}100%{background:transparent}}
+#vrOverlay{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100% - 32px));padding:20px 22px;text-align:center;z-index:10}
+#vrOverlay h2{margin:0 0 8px;font-size:22px}
+#vrOverlay p{margin:0 0 14px;color:var(--muted);font-size:15px;line-height:1.4}
+#bVRExit{height:46px;padding:0 20px;font-size:16px;font-weight:600;border:3px solid var(--ink);border-radius:16px;background:var(--tomato);color:#fff;box-shadow:3px 3px 0 var(--ink);cursor:pointer}
+body.vr #vrOverlay{display:block}
+body.vr #hud,body.vr #menu{display:none}
 #card{touch-action:pan-y}
 #tune{margin-top:16px;padding-top:14px;border-top:3px dashed rgba(127,120,170,.45)}
 .tuneGrid{display:grid;grid-template-columns:1fr 168px;gap:16px;align-items:start}
@@ -193,7 +233,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
     <div class="lbl"></div></div>
 
   <div id="status" class="sticker">
-    <div class="row"><span id="modeChip" class="chip">Principiante</span><span id="armChip" class="chip off">Desarmado</span></div>
+    <div class="row"><span id="modeChip" class="chip">Principiante</span><span id="armChip" class="chip off">Desarmado</span><span id="fpsChip" class="chip ok" aria-live="off">– FPS</span></div>
     <div class="bat"><div class="bar"><i id="batFill"></i></div><span id="batTxt" class="num">16,8 V</span></div>
     <div class="stats"><span>Aros <b id="ringTxt" class="num">0/15</b></span><span>Tiempo <b id="timeTxt" class="num">0:00,0</b></span><span>Récord <b id="bestTxt" class="num">–</b></span><span>Trucos <b id="trickTxt" class="num">0/16</b></span></div>
     <div id="dmgRow">Daños<div class="bar"><i id="dmgFill"></i></div></div>
@@ -232,7 +272,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 
 <div id="menu"><div id="card" class="sticker">
   <h1 id="title">Dron en casa</h1>
-  <p id="sub">Pilota un dron con conductos por una casa de dos plantas. Cruza los 15 aros en orden, o sal por la ventana abierta del salón y busca los 16 trucos de freestyle del barrio: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, un edificio en obras con su grúa, tuberías gigantes, una pista con portería y canasta, y un molino con aspas que giran.</p>
+  <p id="sub">Pilota un dron con conductos por una casa de dos plantas. Cruza los 15 aros en orden, o sal por la ventana abierta del salón y busca los 18 trucos de freestyle del barrio: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, un edificio en obras con su grúa, tuberías gigantes, una pista con portería y canasta, y un molino con aspas que giran y en el que puedes entrar por la puerta o las ventanas y salir por el tejado. También puedes jugar con gafas Meta Quest.</p>
   <div id="result"></div>
   <div class="cols">
     <div>
@@ -246,7 +286,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
     </div>
     <div>
       <h3>Controles</h3>
-      <div class="tabs"><button class="tab" data-t="touch">Táctil</button><button class="tab" data-t="pad">Mando</button><button class="tab" data-t="kb">Teclado</button></div>
+      <div class="tabs"><button class="tab" data-t="touch">Táctil</button><button class="tab" data-t="pad">Mando</button><button class="tab" data-t="kb">Teclado</button><button class="tab" data-t="vr">Gafas VR</button></div>
       <div class="help" id="help"></div>
     </div>
   </div>
@@ -258,8 +298,9 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
         <label class="sl" data-i="1"><span>Suavidad del giro <b id="vRateExpo">40 %</b></span><small>Más alto: con poco stick el dron gira e inclina despacio y los giros rápidos quedan para el final</small><input type="range" id="sRateExpo" min="0" max="95" step="5" aria-label="Suavidad del giro"></label>
         <label class="sl" data-i="2"><span>Sensibilidad de giro <b id="vRate">100 %</b></span><small>Cuánto se inclina y gira el dron con el stick a tope</small><input type="range" id="sRate" min="40" max="150" step="5" aria-label="Sensibilidad de giro"></label>
         <label class="sl" data-i="3"><span>Zona muerta del mando <b id="vDead">8 %</b></span><small>Ignora pequeños movimientos del stick en reposo</small><input type="range" id="sDead" min="0" max="25" step="1" aria-label="Zona muerta del mando"></label>
-        <label class="sl sl-touch" data-i="4"><span>Tamaño de los sticks táctiles <b id="vTouch">100 %</b></span><small>Al 100 % ocupan todo el hueco libre de la pantalla. Más grandes, más precisos</small><input type="range" id="sTouch" min="50" max="100" step="5" aria-label="Tamaño de los sticks táctiles"></label>
-        <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo. Los cambios se guardan solos.</p>
+        <label class="sl" data-i="4"><span>Volumen del sonido <b id="vVol">70 %</b></span><small>También dentro de las gafas VR (en pausa, con el stick izquierdo)</small><input type="range" id="sVol" min="0" max="100" step="5" aria-label="Volumen del sonido"></label>
+        <label class="sl sl-touch" data-i="11"><span>Tamaño de los sticks táctiles <b id="vTouch">100 %</b></span><small>Al 100 % ocupan todo el hueco libre de la pantalla. Más grandes, más precisos</small><input type="range" id="sTouch" min="50" max="100" step="5" aria-label="Tamaño de los sticks táctiles"></label>
+        <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo, y X para mostrar u ocultar los FPS. Los cambios se guardan solos.</p>
       </div>
       <div id="curveBox">
         <h4>Respuesta del gas</h4>
@@ -287,8 +328,25 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
       </div>
     </div>
   </div>
-  <div id="goRow"><button id="bGo">Despegar</button><button id="bRestart">Reiniciar vuelo</button><span id="padInfo">Conecta un mando y pulsa cualquier botón.</span></div>
+  <div id="gfx">
+    <h3>Gráficos</h3>
+    <div class="presets" role="group" aria-label="Calidad gráfica"><span>Calidad</span><button type="button" class="pre" data-p="low">Baja</button><button type="button" class="pre" data-p="mid">Media</button><button type="button" class="pre" data-p="high">Alta</button><button type="button" class="pre" data-p="ultra">Ultra</button></div>
+    <div class="gfxGrid">
+      <label class="sl" data-i="5"><span>Resolución <b id="vRes">100 %</b></span><small>Más alta: imagen más nítida, pero pide más potencia</small><input type="range" id="sRes" min="50" max="200" step="25" aria-label="Resolución"></label>
+      <label class="sl" data-i="6"><span>Antialiasing <b id="vAa">Sí</b></span><small>Suaviza los bordes en dientes de sierra (se aplica al recargar)</small><input type="range" id="sAa" min="0" max="1" step="1" aria-label="Antialiasing"></label>
+      <label class="sl" data-i="7"><span>Distancia de sombras <b id="vSh">Cerca</b></span><small>Hasta dónde se dibujan las sombras alrededor del dron</small><input type="range" id="sSh" min="0" max="4" step="1" aria-label="Distancia de sombras"></label>
+      <label class="sl" data-i="8"><span>Distancia de visión <b id="vView">Normal</b></span><small>Cuánto se ve a lo lejos antes de la neblina</small><input type="range" id="sView" min="0" max="2" step="1" aria-label="Distancia de visión"></label>
+      <label class="sl" data-i="9"><span>Nitidez de texturas <b id="vAniso">8x</b></span><small>Filtro anisotrópico: suelos y paredes nítidos aunque los mires de lado</small><input type="range" id="sAniso" min="0" max="3" step="1" aria-label="Nitidez de texturas"></label>
+      <label class="sl" data-i="10"><span>Distancia de iluminación <b id="vLuz">Cerca</b></span><small>Lámparas encendidas antes de entrar en cada habitación y vistas por las ventanas desde fuera. Más luces piden más potencia</small><input type="range" id="sLuz" min="0" max="3" step="1" aria-label="Distancia de iluminación"></label>
+    </div>
+    <p id="aaNote" class="hint" hidden><span>El antialiasing cambia al volver a cargar el juego.</span><button type="button" id="bReload">Recargar ahora</button></p>
+  <div id="optRow"><label class="tog" for="cFps"><input type="checkbox" id="cFps"><span class="sw" aria-hidden="true"></span><span>Mostrar FPS <small>(imágenes por segundo; tecla F, o X del mando en este menú)</small></span></label></div>
+  </div>
+  <div id="goRow"><button id="bGo">Despegar</button><button id="bVR" type="button" class="off" aria-describedby="vrInfo"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12c0-2.2 1.8-4 4-4h17c2.2 0 4 1.8 4 4v7.5c0 2.2-1.8 4-4 4h-5.3l-2-3.1a1.4 1.4 0 0 0-2.4 0l-2 3.1H7.5c-2.2 0-4-1.8-4-4z"/><circle cx="10.6" cy="15.6" r="2.5"/><circle cx="21.4" cy="15.6" r="2.5"/></svg>Jugar en VR</button><button id="bRestart">Reiniciar vuelo</button><span id="padInfo">Conecta un mando y pulsa cualquier botón.</span></div>
+  <div id="vrBox"><div id="vrCams" role="group" aria-label="Cámara en VR"><span>Cámara en VR</span><button type="button" class="vc" data-vc="pilot">De pie</button><button type="button" class="vc" data-vc="chase">Detrás del dron</button><button type="button" class="vc" data-vc="fpv">FPV 3D</button><button type="button" class="vc" data-vc="fpv2d">FPV 2D</button><button type="button" class="vc" data-vc="bridge">Pasarela</button><button type="button" class="vc" data-vc="halfpipe">Halfpipe</button></div>
+    <p id="vrInfo">Comprobando si hay gafas VR…</p></div>
 </div></div>
+<div id="vrOverlay" class="sticker" role="status"><h2>Jugando con las gafas VR</h2><p>Mira dentro de las gafas. Para volver aquí, mantén pulsados los dos gatillos laterales un segundo, o pulsa el botón de Meta.</p><button id="bVRExit" type="button">Salir de la VR</button></div>
 <div id="err">No se pudo cargar three.js. Revisa la conexión y recarga la página.</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -307,7 +365,8 @@ let _seed = 20240917;
 function rnd(){ _seed = (_seed + 0x6D2B79F5) | 0; let t = Math.imul(_seed ^ (_seed>>>15), 1 | _seed); t = (t + Math.imul(t ^ (t>>>7), 61 | t)) ^ t; return ((t ^ (t>>>14))>>>0)/4294967296; }
 const pick = a => a[Math.floor(rnd()*a.length)];
 
-const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints||0) > 0;
+const isXRBrowser = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent||'');   // navegador dentro de unas gafas VR
+const isTouch = !isXRBrowser && (('ontouchstart' in window) || (navigator.maxTouchPoints||0) > 0);
 const isMobile = isTouch && Math.min(window.screen.width, window.screen.height) < 900;
 if(isTouch) document.body.classList.add('touch');
 
@@ -318,8 +377,10 @@ const store = {
 
 /* ============ Renderer / escena ============ */
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({canvas, antialias: !isMobile, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, isMobile ? 1.5 : 2));
+const AA_NOW = !!store.get('aa', isMobile ? 0 : 1);   // el antialiasing se fija al crear el contexto: cambiarlo pide recargar
+const BASE_PR = Math.min(window.devicePixelRatio||1, isMobile ? 1.5 : 2);
+const renderer = new THREE.WebGLRenderer({canvas, antialias: AA_NOW, powerPreference:'high-performance'});
+renderer.setPixelRatio(clamp(BASE_PR*(+store.get('res',100)||100)/100, 0.5, 4));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -343,7 +404,8 @@ scene.add(sun); scene.add(sun.target);
 // Pool de luces puntuales que se asignan a las lámparas más cercanas (rendimiento constante)
 const POOL = isMobile ? 3 : 4;
 const lightPool = [];
-for(let i=0;i<POOL;i++){ const l = new THREE.PointLight(0xffe0b0, 0, 7.5, 2); scene.add(l); lightPool.push(l); }
+const LIGHT_MAX = 12;   // con «Distancia de iluminación» se usan más luces (las que sobran quedan apagadas e invisibles)
+for(let i=0;i<LIGHT_MAX;i++){ const l = new THREE.PointLight(0xffe0b0, 0, 7.5, 2); l.visible = i<POOL; scene.add(l); lightPool.push(l); }
 const lamps = []; // {x,y,z,f,i}
 
 /* ============ Texturas procedurales ============ */
@@ -471,13 +533,28 @@ function picPhoto(){
   for(let i=0;i<4;i++){ g.fillStyle=`hsla(${rnd()*360},60%,60%,.8)`; g.beginPath(); g.arc(rnd()*W,H*0.5+rnd()*H*0.5,15+rnd()*25,0,Math.PI*2); g.fill(); }
   return toTex(c,false);
 }
+// relojes de pared: marcan la hora real del dispositivo (se redibujan una vez por segundo)
+const clocks = [];
+function drawClock(ck, d){
+  const g=ck.g, S=ck.S, C=S/2, R=S/2-4;
+  g.fillStyle='#fffdf4'; g.fillRect(0,0,S,S);
+  g.strokeStyle='#1f1b3a'; g.lineWidth=S*0.047; g.beginPath(); g.arc(C,C,R-S*0.02,0,Math.PI*2); g.stroke();
+  for(let i=0;i<60;i++){ const a=i*Math.PI/30, big=i%5===0, r0=R*(big?0.74:0.84), r1=R*0.9; g.lineWidth=big?(i%15===0?S*0.035:S*0.02):S*0.008;
+    g.beginPath(); g.moveTo(C+Math.sin(a)*r0, C-Math.cos(a)*r0); g.lineTo(C+Math.sin(a)*r1, C-Math.cos(a)*r1); g.stroke(); }
+  const h=d.getHours()%12, m=d.getMinutes(), sec=d.getSeconds();
+  const hand=(a,len,w,col,back)=>{ g.strokeStyle=col; g.lineWidth=w; g.lineCap='round'; g.beginPath(); g.moveTo(C-Math.sin(a)*back, C+Math.cos(a)*back); g.lineTo(C+Math.sin(a)*len, C-Math.cos(a)*len); g.stroke(); };
+  hand((h+m/60)/12*Math.PI*2, R*0.5, S*0.05, '#1f1b3a', R*0.08);
+  hand((m+sec/60)/60*Math.PI*2, R*0.74, S*0.032, '#1f1b3a', R*0.1);
+  hand(sec/60*Math.PI*2, R*0.8, S*0.012, '#ff6b57', R*0.18);
+  g.fillStyle='#ff6b57'; g.beginPath(); g.arc(C,C,S*0.04,0,Math.PI*2); g.fill();
+}
 function clockTex(){
-  const S=128,c=mkCanvas(S,S),g=c.getContext('2d'); g.fillStyle='#fffdf4'; g.fillRect(0,0,S,S);
-  g.strokeStyle='#1f1b3a'; g.lineWidth=6; g.beginPath(); g.arc(64,64,60,0,Math.PI*2); g.stroke();
-  for(let i=0;i<12;i++){ const a=i*Math.PI/6; g.lineWidth=i%3?2:4; g.beginPath(); g.moveTo(64+Math.cos(a)*48,64+Math.sin(a)*48); g.lineTo(64+Math.cos(a)*56,64+Math.sin(a)*56); g.stroke(); }
-  g.lineWidth=5; g.beginPath(); g.moveTo(64,64); g.lineTo(64,30); g.stroke(); g.lineWidth=3; g.beginPath(); g.moveTo(64,64); g.lineTo(96,70); g.stroke();
-  g.fillStyle='#ff6b57'; g.beginPath(); g.arc(64,64,5,0,Math.PI*2); g.fill();
-  return toTex(c,false);
+  const S=256, c=mkCanvas(S,S), ck={g:c.getContext('2d'), S, t:null, last:-1};
+  ck.t=toTex(c,false); clocks.push(ck); drawClock(ck, new Date()); return ck.t;
+}
+function updateClocks(){
+  if(!clocks.length) return; const d=new Date(), k=d.getSeconds()+60*d.getMinutes();
+  for(const ck of clocks){ if(ck.last!==k){ ck.last=k; drawClock(ck,d); ck.t.needsUpdate=true; } }
 }
 function blobTex(){
   const S=128,c=mkCanvas(S,S),g=c.getContext('2d'); const gr=g.createRadialGradient(64,64,0,64,64,64);
@@ -747,7 +824,7 @@ function ceilLight(x,y,z,f,kind){
   if(kind==='pendant'){ Cyl(x,y-0.75,z,0.006,0.006,0.75,MAT.black,6); Cyl(x,y-0.95,z,0.07,0.24,0.22,MC(0xff6b57,{side:THREE.DoubleSide}),20,false,true); Sph(x,y-0.9,z,0.05,MB(0xfff4cc)); col(x-0.24,y-0.97,z-0.24,x+0.24,y-0.73,z+0.24); lamps.push({x:x+SX,y:y-0.95,z,f,i:0.8}); }
   else { Sph(x,y-0.005,z,0.2,MB(0xfff8dc),1,0.28,1); Cyl(x,y-0.012,z,0.22,0.22,0.012,MAT.trim,24); lamps.push({x:x+SX,y:y-0.12,z,f,i:0.75}); }
 }
-function plant(x,y,z,s){ s=s||1; Cyl(x,y,z,0.16*s,0.12*s,0.3*s,MC(0xc8643b),14,true); Cyl(x,y+0.28*s,z,0.15*s,0.15*s,0.02*s,MC(0x4a2f1c),14);
+function plant(x,y,z,s){ s=s||1; Cyl(x,y,z,0.16*s,0.12*s,0.3*s,MC(0xc8643b,{side:THREE.DoubleSide}),14,true,true); Cyl(x,y,z,0.12*s,0.12*s,0.006,MC(0xc8643b),14); Cyl(x,y+0.235*s,z,0.152*s,0.152*s,0.02*s,MC(0x4a2f1c),14);
   for(let i=0;i<7;i++){ const a=i/7*Math.PI*2; Sph(x+Math.cos(a)*0.12*s, y+(0.45+rnd()*0.25)*s, z+Math.sin(a)*0.12*s, 0.14*s, MC(pick([0x3f9a4a,0x4cae55,0x2f8a3f])), 1,1.3,1, 8); }
   Sph(x,y+0.7*s,z,0.16*s,MC(0x45a04e),1,1.2,1,8); col(x-0.25*s,y,z-0.25*s,x+0.25*s,y+0.9*s,z+0.25*s);
 }
@@ -1512,15 +1589,72 @@ function buildCourt(){
 }
 
 /* ---------- Molino de viento con aspas que giran (detrás de la casa vecina del este) ---------- */
-const MILL={x:22.55, y:GY+8.5, z:-12, R:4.0, w:0.45, ang:0, omega:0.9, sg:null};
+const MILL={x:22.55, y:GY+8.5, z:-12, R:4.0, w:0.45, ang:0, omega:0.9, sg:null, cx:24, H:8.6, R0:1.75, R1:1.15, T:0.2, roofH:1.15, hole:0.5};
+function millR(h){ return MILL.R0+(MILL.R1-MILL.R0)*h/MILL.H; }   // radio exterior de la torre del molino a h metros del suelo
 function buildWindmill(){
-  const Y=GY, cx=24, cz=MILL.z, body=MC(0xf4ead8), roof=MC(0x7a3b2e), wood=MAT.furnDark;
-  Cyl(cx,Y,cz,1.15,1.75,8.6,body,18);
-  for(let k=0;k<4;k++){ const r=(1.75-(k+0.5)*0.15)*0.88; col(cx-r,Y+k*2.15,cz-r,cx+r,Y+(k+1)*2.15,cz+r); }
-  for(const y of [Y+2.2,Y+4.6]){ const r=1.75-(y-Y)/8.6*0.6; B(cx-r-0.03,y,cz-0.3,cx-r+0.12,y+0.7,cz+0.3,MAT.glass); B(cx-r-0.06,y-0.08,cz-0.38,cx-r+0.1,y,cz+0.38,MAT.trim); }
-  B(cx-1.78,Y,cz-0.45,cx-1.6,Y+1.9,cz+0.45,wood);
-  Cone(cx,Y+8.6,cz,1.55,1.7,roof,14); col(cx-1.1,Y+8.6,cz-1.1,cx+1.1,Y+9.6,cz+1.1);
-  CylR(cx-0.9,MILL.y,cz,0.16,0.16,1.7,wood,10,0,0,Math.PI/2);
+  // torre hueca: se puede entrar por la puerta y las ventanas, y salir por el agujero del tejado
+  const Y=GY, cx=MILL.cx, cz=MILL.z, H=MILL.H, T=MILL.T, N=36, DA=Math.PI*2/N;
+  const body=MC(0xf4ead8), roof=MC(0x7a3b2e,{side:THREE.DoubleSide}), rimM=MC(0x5a3a26,{side:THREE.DoubleSide}), wood=MAT.furnDark, light=MAT.furnWood, trim=MAT.trim;
+  const stone=MC(0x9c968c), stone2=MC(0x87817a), sack=MC(0xe8dcc0);
+  const tilt=Math.atan((MILL.R0-MILL.R1)/H);
+  // huecos: ángulo del centro (π = cara de las aspas), segmentos a cada lado y alturas
+  const OPEN=[{a:Math.PI,n:1,y0:0,y1:2.05,door:true},{a:Math.PI,n:1,y0:2.55,y1:3.45},{a:Math.PI,n:1,y0:5.0,y1:5.9},
+              {a:0,n:1,y0:3.4,y1:4.3},{a:Math.PI/2,n:1,y0:2.2,y1:3.1},{a:-Math.PI/2,n:1,y0:5.5,y1:6.4}];
+  const segOf=a=>((Math.round(a/DA)%N)+N)%N;
+  const inOpen=(i,ym)=>OPEN.some(o=>{ let dd=Math.abs(i-segOf(o.a)); dd=Math.min(dd,N-dd); return dd<=o.n && ym>o.y0 && ym<o.y1; });
+  let lv=[0,H]; for(const o of OPEN) lv.push(o.y0,o.y1); lv=[...new Set(lv.map(v=>+v.toFixed(3)))].sort((a,b)=>a-b);
+  const bands=[]; for(let k=0;k<lv.length-1;k++){ const a=lv[k], b=lv[k+1], m=Math.max(1,Math.ceil((b-a)/1.1)); for(let j=0;j<m;j++) bands.push([a+(b-a)*j/m, a+(b-a)*(j+1)/m]); }
+  const q=new QT(), qx=new QT();
+  const slab=(mat,x,y,z,beta,tl,sx,sy,sz)=>{ q.setFromAxisAngle(AX_Y,beta); qx.setFromAxisAngle(AX_X,tl); q.multiply(qx); parts.push({geo:UBOX, mat, m:new THREE.Matrix4().compose(new V3(x,y,z), q, new V3(sx,sy,sz))}); };
+  const ring=(y0,y1,r,thick,n,off)=>{ for(let i=0;i<n;i++){ const th=(i+(off||0))*Math.PI*2/n, x=cx+r*Math.cos(th), z=cz+r*Math.sin(th), w=2*r*Math.tan(Math.PI/n);
+    const hx=w/2*Math.abs(Math.sin(th))+thick/2*Math.abs(Math.cos(th)), hz=w/2*Math.abs(Math.cos(th))+thick/2*Math.abs(Math.sin(th)); col(x-hx,Y+y0,z-hz,x+hx,Y+y1,z+hz); } };
+  // pared: 36 tablas por franja, inclinadas como la torre; cada una con su caja de choque pequeña
+  for(const [ya,yb] of bands){
+    const ym=(ya+yb)/2, ro=millR(ym), rc=ro-T/2, w=2*ro*Math.tan(DA/2)*1.03, hgt=(yb-ya)/Math.cos(tilt);
+    for(let i=0;i<N;i++){
+      if(inOpen(i,ym)) continue;
+      const th=i*DA, x=cx+rc*Math.cos(th), z=cz+rc*Math.sin(th);
+      slab(body, x, Y+ym, z, Math.PI/2-th, -tilt, w, hgt, T);
+      const hx=w/2*Math.abs(Math.sin(th))+T/2*Math.abs(Math.cos(th)), hz=w/2*Math.abs(Math.cos(th))+T/2*Math.abs(Math.sin(th));
+      col(x-hx, Y+ya, z-hz, x+hx, Y+yb, z+hz);
+    }
+  }
+  // marcos, alféizares y contraventanas abiertas
+  for(const o of OPEN){
+    const half=(o.n+0.5)*DA, th=o.a, beta=Math.PI/2-th, ym=(o.y0+o.y1)/2, hO=o.y1-o.y0;
+    const at=(h,r)=>[cx+r*Math.cos(th), cz+r*Math.sin(th)];
+    const wO=2*millR(ym)*Math.sin(half);
+    if(!o.door){ const r=millR(o.y0)-T/2, p=at(o.y0,r); slab(trim, p[0], Y+o.y0+0.03, p[1], beta, 0, wO+0.18, 0.07, T+0.12); }
+    { const r=millR(o.y1)-T/2, p=at(o.y1,r); slab(trim, p[0], Y+o.y1+0.04, p[1], beta, 0, wO+0.16, 0.09, T+0.07); }
+    for(const sgn of [-1,1]){
+      const ta=th+sgn*half, r=millR(ym)-T/2; slab(trim, cx+r*Math.cos(ta), Y+ym, cz+r*Math.sin(ta), Math.PI/2-ta, -tilt, 0.08, hO/Math.cos(tilt), T+0.07);
+      if(!o.door){ const ro=millR(ym)+0.025, tb=th+sgn*(half+wO/4/ro+0.02); slab(wood, cx+ro*Math.cos(tb), Y+ym, cz+ro*Math.sin(tb), Math.PI/2-tb, -tilt, wO/2, hO*0.98, 0.04); }
+    }
+  }
+  // puerta de madera abierta hacia fuera
+  { const thL=Math.PI-1.5*DA, r0=MILL.R0, hx=cx+r0*Math.cos(thL), hz=cz+r0*Math.sin(thL), tx=-Math.sin(thL), tz=Math.cos(thL), nx=Math.cos(thL), nz=Math.sin(thL);
+    const ang=75*Math.PI/180, dx=Math.cos(ang)*tx+Math.sin(ang)*nx, dz=Math.cos(ang)*tz+Math.sin(ang)*nz;
+    slab(wood, hx+dx*0.45, Y+1.0, hz+dz*0.45, Math.atan2(-dz,dx), 0, 0.88, 1.96, 0.05);
+    Sph(hx+dx*0.78+nx*0.05, Y+1.0, hz+dz*0.78+nz*0.05, 0.035, MAT.brass);
+    for(let k=0;k<3;k++){ const px=hx+dx*(0.15+0.3*k), pz=hz+dz*(0.15+0.3*k); col(px-0.16, Y, pz-0.16, px+0.16, Y+1.96, pz+0.16); } }
+  // interior: suelo de madera, muelas de piedra, sacos de harina y una escalera de mano
+  Cyl(cx,Y,cz,MILL.R0-T+0.02,MILL.R0-T+0.02,0.05,light,36);
+  Cyl(cx+0.72,Y+0.05,cz-0.5,0.42,0.42,0.2,stone,20,true); Cyl(cx+0.72,Y+0.25,cz-0.5,0.4,0.4,0.17,stone2,20,true); Cyl(cx+0.72,Y+0.42,cz-0.5,0.05,0.05,0.35,wood,8);
+  for(const [sx,sz,sr] of [[0.55,0.75,0.24],[0.85,0.45,0.22],[0.62,0.98,0.2]]){ Sph(cx+sx,Y+0.05+sr*0.8,cz+sz,sr,sack,1,0.85,1,10); col(cx+sx-sr,Y,cz+sz-sr,cx+sx+sr,Y+0.05+sr*1.6,cz+sz+sr); }
+  { const th=-Math.PI*0.27, tx=-Math.sin(th), tz=Math.cos(th);
+    const P=(h,r,s)=>[cx+r*Math.cos(th)+tx*s, Y+h, cz+r*Math.sin(th)+tz*s];
+    for(const s of [-0.2,0.2]) rod(P(0,1.4,s),P(5.2,1.05,s),0.03,wood,6,4);
+    for(let h=0.3; h<5.1; h+=0.32){ const r=1.4-(1.4-1.05)*h/5.2; rod(P(h,r,-0.2),P(h,r,0.2),0.02,wood,5); } }
+  // tejado cónico con agujero arriba, alero cerrado y rueda dentada en lo alto
+  Cyl(cx,Y+H,cz,MILL.hole,1.55,MILL.roofH,roof,24,false,true);
+  Cyl(cx,Y+H+MILL.roofH-0.05,cz,MILL.hole+0.03,MILL.hole+0.05,0.1,rimM,24,false,true);
+  addPart(new THREE.RingGeometry(MILL.R1-T-0.02,1.56,36), roof, cx,Y+H,cz, -Math.PI/2,0,0, 1,1,1);
+  ring(H-0.05, H+0.12, 1.27, 0.62, 24, 0.5);
+  for(let k=0;k<3;k++){ const ya=H+k*MILL.roofH/3, t=(k+0.5)/3, r=1.55+(MILL.hole-1.55)*t; ring(ya, ya+MILL.roofH/3, r, 0.18, k<2?24:16, 0.5); }
+  CylR(cx-1.3,MILL.y,cz,0.16,0.16,1.1,wood,10,0,0,Math.PI/2);
+  addPart(new THREE.TorusGeometry(0.42,0.06,6,24), wood, cx-0.75,MILL.y,cz, 0,Math.PI/2,0, 1,1,1);
+  for(let k=0;k<4;k++){ const a=k*Math.PI/4; addPart(UBOX, wood, cx-0.75, MILL.y, cz, a,0,0, 0.05, 0.84, 0.05); }
+  col(cx-0.82, MILL.y-0.48, cz-0.48, cx-0.68, MILL.y+0.48, cz+0.48);
   // rotor (grupo dinámico): las aspas giran en el plano x = MILL.x
   const g=new THREE.Group(); g.position.set(MILL.x,MILL.y,MILL.z); g.rotation.y=Math.PI/2; scene.add(g);
   const sg=new THREE.Group(); g.add(sg); MILL.sg=sg;
@@ -1770,7 +1904,8 @@ const DR = { m:0.32, I:0.0016, twr:4.0, kd1:0.05, kd2:0.011, hk:0.10, tau:0.035,
   rateMax:11.0, yawMax:4.2, expo:0.42, angKp:10, rateK:50, aMax:170, aMaxYaw:35, mu:0.5 };
 const HOVER_T = DR.m*G, T_NOM = HOVER_T*DR.twr;   // T_NOM: empuje máximo nominal (centro del gas = vuelo estático)
 // Ajustes del mando (se guardan en el navegador)
-const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rateExpo: clamp(+store.get('rateExpo',40)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25), touchSize: clamp(+store.get('touchSize',100)||100,50,100) };
+const SET = { thrExpo: clamp(+store.get('thrExpo',65)||0,0,95), rateExpo: clamp(+store.get('rateExpo',40)||0,0,95), rate: clamp(+store.get('rate',100)||100,40,150), dead: clamp(+store.get('dead',8)||0,0,25), touchSize: clamp(+store.get('touchSize',100)||100,50,100), vol: (v=>Number.isFinite(v)?clamp(v,0,100):70)(+store.get('vol',70)),
+  res: clamp(+store.get('res',100)||100,50,200), aa: AA_NOW?1:0, sh: clamp(+store.get('sh',1)|0,0,4), view: clamp(+store.get('view',1)|0,0,2), aniso: clamp(+store.get('aniso',2)|0,0,3), luz: clamp(+store.get('luz',0)|0,0,3) };
 // Acro ángulo: autonivelado que se desvanece al mover el stick (a partir del 85 % de recorrido es Acro puro)
 const HZ = { kp:8, maxRate:7, fade:0.85 };
 // Curva de gas: plana alrededor del centro del stick (vuelo estático) y empinada solo al final del recorrido
@@ -2061,6 +2196,8 @@ const TRICKS = [
   {id:'gol', name:'Gol en la portería', ax:'x', at:COURT.x1, dir:-1, inside:(z,y)=> Math.abs(z-COURT.zc)<1.4 && y>GY && y<GY+1.95},
   {id:'canasta', name:'Canasta desde arriba', ax:'y', at:COURT.rimY, dir:-1, inside:(x,z)=> Math.hypot(x-COURT.rimX,z-COURT.zc)<COURT.rimR-0.04},
   {id:'molino', name:'Entre las aspas del molino', ax:'x', at:MILL.x, inside:(z,y)=>{ const r=Math.hypot(z-MILL.z,y-MILL.y); return r>0.6 && r<MILL.R; }},
+  {id:'molino_puerta', name:'Por la puerta del molino', ax:'x', at:MILL.cx-millR(1.0), inside:(z,y)=> Math.abs(z-MILL.z)<0.42 && y>GY+0.05 && y<GY+2.0},
+  {id:'molino_techo', name:'Por el agujero del tejado del molino', ax:'y', at:GY+MILL.H+MILL.roofH, inside:(x,z)=> Math.hypot(x-MILL.cx,z-MILL.z)<MILL.hole},
 ];
 const tricksFound = new Set((store.get('tricks',[])||[]).filter(id=>TRICKS.some(t=>t.id===id)));
 function checkTricks(a,b,dt){
@@ -2097,16 +2234,20 @@ let trainAng = 0;
 
 /* ============ Estado de juego ============ */
 let state = 'menu';
-const CAMS = ['chase','fpv','pilot'], CAMNAME = {chase:'Seguir', fpv:'FPV', pilot:'Piloto'};
+const CAMS = ['chase','fpv','pilot','bridge','halfpipe'], CAMNAME = {chase:'Seguir', fpv:'FPV', pilot:'Piloto', bridge:'Pasarela', halfpipe:'Halfpipe'};
+// sitios para mirar de pie como un espectador (cámaras fijas en 2D y en VR)
+const SPOTS = { bridge:{x:-8.2, z:22.4, floor:GY+4.35}, halfpipe:{x:6.05, z:17.3, floor:GY+2.4} };
 const MODES = ['beginner','angle','horizon','acro'], MODENAME = {beginner:'Principiante', angle:'Ángulo', horizon:'Acro ángulo', acro:'Acro'};
 let camMode = store.get('cam','chase'); if(!CAMS.includes(camMode)) camMode='chase';
 if(!MODES.includes(flightMode)) flightMode='beginner';
 let fenceT = 0, flashA = 0, toastT = 0, hudT = 0, tvT = 0, rotHintT = 0;
 const prevPos = new V3();
 
-function toast(msg, ms){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); toastT=(ms||1500)/1000; }
+let toastMsg='';
+function toast(msg, ms){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); toastT=(ms||1500)/1000; toastMsg=msg; if(XR.on) XR.hudDirty=true; }
 function vibrate(ms, strong){
   try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
+  if(XR.on) vrPulse(ms, strong);
   try{ const p=gp.pad; if(p && p.vibrationActuator && p.vibrationActuator.playEffect) p.vibrationActuator.playEffect('dual-rumble',{duration:ms,strongMagnitude:strong,weakMagnitude:strong*0.6}); }catch(e){}
 }
 
@@ -2129,6 +2270,7 @@ window.addEventListener('keydown', e=>{
     case 'KeyC': cycleCam(); break;
     case 'KeyM': cycleMode(); break;
     case 'KeyR': if(state==='play') resetFlight(); break;
+    case 'KeyF': setFps(!FPS.on, state==='play'); break;
     case 'KeyP': case 'Escape': togglePause(); break;
     case 'Enter': if(state!=='play') startGame(); break;
   }
@@ -2181,24 +2323,49 @@ bindZone($('zoneL'), sticks.L, true); bindZone($('zoneR'), sticks.R, false);
 for(const el of [canvas,$('zoneL'),$('zoneR')]) el.addEventListener('contextmenu', e=>e.preventDefault());
 
 function dz(v){ const D=SET.dead/100, a=Math.abs(v); return a<D ? 0 : Math.sign(v)*(a-D)/(1-D); }
-function pollPad(){
+function pollPad(dt){
+  // en VR se leen a la vez los mandos de las gafas y un mando normal del PC (Xbox, PlayStation…): vale cualquiera
+  const xrPad = XR.on && pollXRPad(dt||0);
   let pads=[]; try{ pads = navigator.getGamepads ? navigator.getGamepads() : []; }catch(e){}
   let p=null; if(pads) for(const x of pads){ if(x && x.connected){ p=x; break; } }
-  if(!p){ if(gp.connected){ gp.connected=false; gp.pad=null; document.body.classList.remove('pad'); updatePadInfo(); toast('Mando desconectado'); layoutSticks(); } return; }
-  if(!gp.connected){ gp.connected=true; gp.name=p.id; document.body.classList.add('pad'); lastSrc='gp'; for(const k of ['L','R']){ const S=sticks[k]; S.id=null; S.x=0; S.y=0; } updatePadInfo(); toast('Mando conectado'); if(state!=='play') selectTab('pad'); }
-  gp.pad=p;
-  gp.lx=dz(p.axes[0]||0); gp.ly=dz(p.axes[1]||0); gp.rx=dz(p.axes[2]||0); gp.ry=dz(p.axes[3]||0);
-  if(Math.abs(gp.lx)+Math.abs(gp.ly)+Math.abs(gp.rx)+Math.abs(gp.ry)>0.25) lastSrc='gp';
-  const n=Math.min(p.buttons.length,17);
-  for(let i=0;i<n;i++){ const now=!!(p.buttons[i] && p.buttons[i].pressed); if(now && !gp.prev[i]) onPadButton(i); gp.prev[i]=now; }
+  const was=gp.connected;
+  if(p && !gp.pad){ gp.name=p.id; document.body.classList.add('pad'); lastSrc='gp'; for(const k of ['L','R']){ const S=sticks[k]; S.id=null; S.x=0; S.y=0; } toast('Mando conectado'); if(state!=='play' && !XR.on) selectTab('pad'); }
+  else if(!p && gp.pad){ document.body.classList.remove('pad'); if(!xrPad) toast('Mando desconectado'); layoutSticks(); }
+  gp.pad=p; gp.connected = !!p || xrPad;
+  if(!p) gp.name = xrPad ? 'Mandos de las gafas VR' : '';
+  if(gp.connected!==was) updatePadInfo();
+  if(!gp.connected){ gp.lx=gp.ly=gp.rx=gp.ry=0; return; }
+  let lx=0, ly=0, rx=0, ry=0;
+  if(p){ lx=dz(p.axes[0]||0); ly=dz(p.axes[1]||0); rx=dz(p.axes[2]||0); ry=dz(p.axes[3]||0); }
+  if(xrPad){ const a=XR.ax; if(Math.abs(a[0])>Math.abs(lx)) lx=a[0]; if(Math.abs(a[1])>Math.abs(ly)) ly=a[1]; if(Math.abs(a[2])>Math.abs(rx)) rx=a[2]; if(Math.abs(a[3])>Math.abs(ry)) ry=a[3]; }
+  gp.lx=lx; gp.ly=ly; gp.rx=rx; gp.ry=ry;
+  if(xrPad || Math.abs(lx)+Math.abs(ly)+Math.abs(rx)+Math.abs(ry)>0.25) lastSrc='gp';
+  if(XR.on && state==='pause'){ if(Math.abs(lx)>0.6){ XR.volT-=(dt||0); if(XR.volT<=0){ setVol(SET.vol+(lx>0?5:-5)); XR.volT=0.16; } } else XR.volT=0; }
+  if(p){ const n=Math.min(p.buttons.length,17);
+    for(let i=0;i<n;i++){ const now=!!(p.buttons[i] && p.buttons[i].pressed); if(now && !gp.prev[i]) onPadButton(i); gp.prev[i]=now; } }
 }
 function onPadButton(i){
   lastSrc='gp'; initAudio();
+  if(XR.on){
+    // mando normal dentro de la VR: mismos botones que fuera (A armar, B reiniciar, X o RB cámara, Y modo, Start pausa)
+    // y LB o clic de un stick para ponerte junto al dron (de pie) o recentrar (detrás del dron)
+    if(i===12||i===13){ setVol(SET.vol+(i===12?10:-10)); toast('Volumen '+SET.vol+' %',900); return; }
+    if(state==='play'){
+      if(i===0) toggleArm(); else if(i===1){ resetFlight(); vrAfterReset(); }
+      else if(i===2||i===5) cycleVRCam(); else if(i===3) cycleMode();
+      else if(i===4||i===10||i===11) vrAction();
+      else if(i===9||i===8){ state='pause'; XR.hudDirty=true; }
+    } else if(state==='pause'){
+      if(i===0||i===9) startGame(); else if(i===3){ cycleMode(); XR.hudDirty=true; } else if(i===2||i===5){ cycleVRCam(); XR.hudDirty=true; } else if(i===4) setFps(!FPS.on);
+      else if(i===1){ resetFlight(); startGame(); vrAfterReset(); }
+    }
+    return;
+  }
   if(state!=='play'){
     if(i===12){ focusSlider(slFocus<=0 ? SL.length-1 : slFocus-1); return; }
     if(i===13){ focusSlider((slFocus+1)%SL.length); return; }
     if(i===14||i===15){ if(slFocus<0) focusSlider(0); const o=SL[slFocus]; setSetting(slFocus, SET[o.k]+(i===15?o.step:-o.step)); sfxBeep(i===15?740:560,0.04); return; }
-    if(i===0||i===9) startGame(); else if(i===3) cycleMode(); else if(i===1 && state==='pause'){ resetFlight(); startGame(); }
+    if(i===0||i===9) startGame(); else if(i===3) cycleMode(); else if(i===2) setFps(!FPS.on); else if(i===1 && state==='pause'){ resetFlight(); startGame(); }
     return;
   }
   if(i===0) toggleArm(); else if(i===1) resetFlight(); else if(i===2||i===5) cycleCam(); else if(i===3) cycleMode(); else if(i===9||i===8) togglePause();
@@ -2224,23 +2391,37 @@ function initAudio(){
   const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
   try{
     const ctx=new AC(); AU.ctx=ctx;
-    const master=ctx.createGain(); master.gain.value=AU.on?0.8:0; master.connect(ctx.destination);
+    const master=ctx.createGain(); master.gain.value=AU.on?volGain():0; master.connect(ctx.destination);
     const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700; lp.Q.value=1.4;
     const mg=ctx.createGain(); mg.gain.value=0;
     const o1=ctx.createOscillator(); o1.type='sawtooth'; o1.frequency.value=80;
     const o2=ctx.createOscillator(); o2.type='square'; o2.frequency.value=120; const g2=ctx.createGain(); g2.gain.value=0.22;
     const o3=ctx.createOscillator(); o3.type='triangle'; o3.frequency.value=160; const g3=ctx.createGain(); g3.gain.value=0.35;
-    o1.connect(lp); o2.connect(g2); g2.connect(lp); o3.connect(g3); g3.connect(lp); lp.connect(mg); mg.connect(master);
+    // el zumbido del motor pasa por un panoramizador 3D: en VR (y en 2D) suena desde donde está el dron
+    let pan=null; try{ pan=ctx.createPanner(); pan.panningModel='HRTF'; pan.distanceModel='inverse'; pan.refDistance=1; pan.rolloffFactor=0; }catch(e){ pan=null; }
+    o1.connect(lp); o2.connect(g2); g2.connect(lp); o3.connect(g3); g3.connect(lp); lp.connect(mg); if(pan){ mg.connect(pan); pan.connect(master); } else mg.connect(master);
     const len=ctx.sampleRate*2, buf=ctx.createBuffer(1,len,ctx.sampleRate), ch=buf.getChannelData(0); for(let i=0;i<len;i++) ch[i]=Math.random()*2-1;
     const ns=ctx.createBufferSource(); ns.buffer=buf; ns.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=900; bp.Q.value=0.6; const ng=ctx.createGain(); ng.gain.value=0;
     ns.connect(bp); bp.connect(ng); ng.connect(master);
     o1.start(); o2.start(); o3.start(); ns.start();
-    Object.assign(AU,{master,lp,mg,o1,o2,o3,bp,ng,buf});
+    Object.assign(AU,{master,lp,mg,o1,o2,o3,bp,ng,buf,pan});
   }catch(e){ AU.ctx=null; }
 }
+const volGain = ()=> SET.vol/100*1.15;
+const _af=new V3(), _au=new V3(), _ap=new V3();
+function setAP(n,p){ try{ if(n.positionX){ n.positionX.value=p.x; n.positionY.value=p.y; n.positionZ.value=p.z; } else if(n.setPosition) n.setPosition(p.x,p.y,p.z); }catch(e){} }
+function setOri(L,f,u){ try{ if(L.forwardX){ L.forwardX.value=f.x; L.forwardY.value=f.y; L.forwardZ.value=f.z; L.upX.value=u.x; L.upY.value=u.y; L.upZ.value=u.z; } else if(L.setOrientation) L.setOrientation(f.x,f.y,f.z,u.x,u.y,u.z); }catch(e){} }
 function updateAudio(){
   if(!AU.ctx || !AU.mg) return; const t=AU.ctx.currentTime, d=drone, playing=state==='play';
-  const rpm=d.spin, near = camMode==='fpv' ? 1 : clamp(1.3/(camera.position.distanceTo(d.pos)+0.35),0.12,1);
+  const fpvLike = XR.on ? (XR.cam==='fpv' || XR.cam==='fpv2d') : camMode==='fpv';
+  const rpm=d.spin, near = fpvLike ? 1 : clamp(1.3/(viewPos.distanceTo(d.pos)+0.35),0.12,1);
+  if(AU.pan){
+    const q = XR.on ? XR.viewQ : camera.quaternion;
+    _af.set(0,0,-1).applyQuaternion(q); _au.set(0,1,0).applyQuaternion(q);
+    const L=AU.ctx.listener; setAP(L, viewPos); setOri(L, _af, _au);
+    if(fpvLike) _ap.copy(viewPos).addScaledVector(_af,0.5); else _ap.copy(d.pos);
+    setAP(AU.pan, _ap);
+  }
   const vol = playing && rpm>0.01 ? (0.035+0.15*rpm)*near : 0;
   const f = 55 + 430*rpm + d.damage*10*Math.sin(t*83);
   AU.mg.gain.setTargetAtTime(vol,t,0.04);
@@ -2362,6 +2543,7 @@ function setFov(f,force){ fovReq=f; let v=f; if(camera.aspect<1) v=Math.min(112,
 const _cA=new V3(), _cB=new V3();
 function updateCamera(dt){
   const d=drone;
+  if(XR.on){ updateVR(dt); return; }
   if(state==='menu'){
     const t=performance.now()*0.00013;
     camera.position.set(START.x+Math.cos(t)*1.25, 0.7+Math.sin(t*1.7)*0.12, START.z+Math.sin(t)*0.95);
@@ -2386,7 +2568,7 @@ function updateCamera(dt){
     camera.position.copy(cam.pos);
     _cB.set(d.pos.x-sy*0.45, d.pos.y+0.03, d.pos.z-cy*0.45); camera.lookAt(_cB);
     setFov(72);
-  } else {
+  } else if(!SPOTS[camMode]){
     droneMesh.g.visible=true;
     cam.pilotT-=dt;
     if(cam.pilotT<=0 || !cam.init){
@@ -2400,6 +2582,14 @@ function updateCamera(dt){
     }
     camera.position.copy(cam.pos); cam.look.lerp(d.pos, 1-Math.exp(-dt*9)); camera.lookAt(cam.look);
     setFov(clamp(72 - cam.pos.distanceTo(d.pos)*7, 36, 72));
+  }
+  if(SPOTS[camMode]){
+    // de pie en la pasarela o en el halfpipe, siguiendo al dron con la mirada
+    const sp=SPOTS[camMode]; droneMesh.g.visible=true;
+    camera.position.set(sp.x, sp.floor+1.62, sp.z);
+    if(!cam.init) cam.look.copy(d.pos); else cam.look.lerp(d.pos, 1-Math.exp(-dt*7));
+    camera.lookAt(cam.look);
+    setFov(clamp(70 - camera.position.distanceTo(d.pos)*1.6, 28, 70));
   }
   cam.init=true;
   if(cam.shake>0.0005){ camera.position.x+=(rnd()-0.5)*cam.shake; camera.position.y+=(rnd()-0.5)*cam.shake; camera.position.z+=(rnd()-0.5)*cam.shake; cam.shake*=Math.exp(-dt*9); }
@@ -2434,6 +2624,7 @@ function drawTV(t){
 }
 function animate(dt, now){
   const t=now*0.001;
+  updateClocks();
   for(const f of fans) f.g.rotation.y += f.omega*dt;
   MILL.ang += MILL.omega*dt; if(MILL.sg) MILL.sg.rotation.z = MILL.ang;
   trainAng += dt*0.7;
@@ -2444,12 +2635,18 @@ function animate(dt, now){
 }
 const _lampSort=[];
 function updateLights(){
-  const cp=camera.position, fl = cp.y<2.8 ? 0 : 1;
-  if(!insideHouse(cp)){ for(const L of lightPool) L.intensity=0; return; }
-  _lampSort.length=0; for(const l of lamps) if(l.f===fl){ l.d=(l.x-cp.x)**2+(l.y-cp.y)**2+(l.z-cp.z)**2; _lampSort.push(l); }
+  // dentro de casa: lámparas de tu planta, las más cercanas. Fuera: con distancia de iluminación Media o más,
+  // también se encienden las de las dos plantas que estén a tu alcance, y se ven por las ventanas
+  const cp=viewPos, fl = cp.y<2.8 ? 0 : 1, cfg=LIGHT_CFG[SET.luz], inside=insideHouse(cp);
+  if(!inside && !cfg.dist){ for(const L of lightPool) L.intensity=0; return; }
+  const maxD=cfg.dist||1e9, maxD2=maxD*maxD;
+  _lampSort.length=0;
+  for(const l of lamps){ if(inside && l.f!==fl) continue; l.d=(l.x-cp.x)**2+(l.y-cp.y)**2+(l.z-cp.z)**2; if(!inside && l.d>maxD2) continue; _lampSort.push(l); }
   _lampSort.sort((a,b)=>a.d-b.d);
-  for(let i=0;i<lightPool.length;i++){ const L=lightPool[i], l=_lampSort[i];
-    if(l){ L.position.set(l.x,l.y,l.z); L.intensity=(l.i||0.7)*(l.tv?0.8+0.2*Math.sin(performance.now()*0.013):1); L.color.setHex(l.tv?0x9fd8ff:0xffe0b0); } else L.intensity=0; }
+  for(let i=0;i<lightPool.length;i++){ const L=lightPool[i], l = i<LIGHT_ACTIVE ? _lampSort[i] : null;
+    if(l){ const fade = inside ? 1 : clamp((maxD-Math.sqrt(l.d))/4, 0, 1);
+      L.position.set(l.x,l.y,l.z); L.intensity=(l.i||0.7)*fade*(l.tv?0.8+0.2*Math.sin(performance.now()*0.013):1); L.color.setHex(l.tv?0x9fd8ff:0xffe0b0); }
+    else L.intensity=0; }
 }
 
 /* ============ HUD ============ */
@@ -2536,11 +2733,70 @@ const HELP = {
     <tr><td>Flechas o I J K L</td><td>Avanzar, retroceder y moverse de lado</td></tr>
     <tr><td>Espacio</td><td>Armar o parar motores</td></tr>
     <tr><td>C / M / R</td><td>Cámara, modo de vuelo, reiniciar</td></tr>
-    <tr><td>P o Esc</td><td>Pausa</td></tr></table>`
+    <tr><td>F</td><td>Mostrar u ocultar los FPS</td></tr>
+    <tr><td>P o Esc</td><td>Pausa</td></tr></table>`,
+  vr: `<table>
+    <tr><td>Stick izquierdo</td><td>Gas o subir y bajar, y girar (modo 2, como una emisora). Al soltarlo vuelve al centro, que es el punto de vuelo estático.</td></tr>
+    <tr><td>Stick derecho</td><td>Avanzar, retroceder y moverte de lado.</td></tr>
+    <tr><td>A</td><td>Armar o parar motores. Con gas manual, baja antes el stick izquierdo del todo.</td></tr>
+    <tr><td>B o clic del stick derecho</td><td>Cámara: de pie, detrás del dron, FPV 3D, FPV 2D, pasarela y halfpipe</td></tr>
+    <tr><td>X / Y</td><td>Cambiar modo de vuelo / reiniciar en la base</td></tr>
+    <tr><td>Gatillo derecho</td><td>De pie, pasarela o halfpipe: girarte hacia el dron (de pie, además, te acerca a él). Detrás del dron: fijar tu frente actual. FPV 2D: poner la pantalla delante de ti</td></tr>
+    <tr><td>Clic del stick izquierdo</td><td>Volumen: 0, 25, 50, 75 o 100 %. En pausa, el stick izquierdo a los lados lo ajusta de 5 en 5</td></tr>
+    <tr><td>Gatillo izquierdo</td><td>Pausa</td></tr>
+    <tr><td>Gatillos laterales</td><td>Mantén los dos un segundo para salir de la VR</td></tr>
+    <tr><td>Mando del PC</td><td>También vale en VR un mando normal (Xbox, PlayStation…), con los mismos botones que fuera: A armar, B reiniciar, X o RB cámara, Y modo, Start pausa, cruceta arriba y abajo volumen. LB o el clic de un stick hace lo mismo que el gatillo derecho de las gafas.</td></tr></table>
+    <p><b>En las gafas</b> (Quest 2, 3 o 3S): abre esta página en el navegador de Meta Quest y pulsa «Jugar en VR». <b>Con el PC</b>: conecta las gafas con Quest Link o Air Link, abre la página en Chrome o Edge y pulsa «Jugar en VR».</p>
+    <p><b>De pie</b>: estás dentro de la casa viendo el dron y te recolocas solo, con un fundido, cuando se aleja o lo pierdes de vista. <b>Pasarela</b> y <b>Halfpipe</b>: te quedas de pie encima de la pasarela o en lo alto del halfpipe mirando cómo vuela. <b>Detrás del dron</b>: la cámara le sigue por detrás; puedes mirar a los lados y al mirar al frente lo tienes delante. <b>FPV 3D</b>: ves en 3D lo que ve el dron, mires donde mires. <b>FPV 2D</b>: como unas gafas FPV de verdad, la imagen del dron en una pantalla dentro de una sala quieta; al mover la cabeza no se mueve nada más, así que es la FPV que menos marea.</p>
+    <p><b>Sonido</b>: el zumbido del dron suena desde donde está. Con Quest Link o Air Link, el sonido sale por la salida de sonido de Windows: si lo oyes por el PC, elige las gafas como salida de sonido en Windows y vuelve a entrar en la VR. En las gafas sin PC el juego baja algo la calidad para ir fluido.</p>`
 };
 /* ---------- Ajustes del mando ---------- */
 const SL=[{k:'thrExpo',id:'sThrExpo',v:'vThrExpo',min:0,max:95,step:5},{k:'rateExpo',id:'sRateExpo',v:'vRateExpo',min:0,max:95,step:5},{k:'rate',id:'sRate',v:'vRate',min:40,max:150,step:5},{k:'dead',id:'sDead',v:'vDead',min:0,max:25,step:1}];
+SL.push({k:'vol',id:'sVol',v:'vVol',min:0,max:100,step:5});
+/* ---------- Gráficos ---------- */
+const LIGHT_CFG=[{n:POOL,dist:0,name:'Cerca'},{n:6,dist:18,name:'Media'},{n:8,dist:35,name:'Lejos'},{n:12,dist:70,name:'Muy lejos'}];
+let LIGHT_ACTIVE=POOL, LIGHT_CAP=99;
+function applyLights(){ LIGHT_ACTIVE=Math.min(LIGHT_CFG[SET.luz].n, LIGHT_CAP, lightPool.length); lightPool.forEach((L,i)=>{ L.visible = i<LIGHT_ACTIVE; if(i>=LIGHT_ACTIVE) L.intensity=0; }); }
+const SH_NAMES=['No','Cerca','Media','Lejos','Muy lejos'], SH_EXT=[0,10,18,30,50], VIEW_NAMES=['Corta','Normal','Lejana'], VIEW_FOG=[[45,170,260],[90,330,420],[170,640,800]], ANISO_V=[1,4,8,16];
+SL.push({k:'res',id:'sRes',v:'vRes',min:50,max:200,step:25});
+SL.push({k:'aa',id:'sAa',v:'vAa',min:0,max:1,step:1,fmt:v=>v?'Sí':'No'});
+SL.push({k:'sh',id:'sSh',v:'vSh',min:0,max:4,step:1,fmt:v=>SH_NAMES[v]});
+SL.push({k:'view',id:'sView',v:'vView',min:0,max:2,step:1,fmt:v=>VIEW_NAMES[v]});
+SL.push({k:'aniso',id:'sAniso',v:'vAniso',min:0,max:3,step:1,fmt:v=>ANISO_V[v]+'x'});
+SL.push({k:'luz',id:'sLuz',v:'vLuz',min:0,max:3,step:1,fmt:v=>LIGHT_CFG[v].name});
 if(isTouch) SL.push({k:'touchSize',id:'sTouch',v:'vTouch',min:50,max:100,step:5});
+const PRESETS={ low:{res:75,aa:0,sh:0,view:0,aniso:0,luz:0}, mid:{res:100,aa:isMobile?0:1,sh:1,view:1,aniso:2,luz:0}, high:{res:100,aa:1,sh:2,view:2,aniso:3,luz:1}, ultra:{res:150,aa:1,sh:4,view:2,aniso:3,luz:2} };
+let SUN_K=1;
+function applyShadows(){
+  const lv=SET.sh; sun.castShadow = lv>0; if(!lv) return;
+  const e=SH_EXT[lv], k=e/10, c=sun.shadow.camera;
+  c.left=-e; c.right=e; c.top=e; c.bottom=-e; c.near=1; c.far=45*k+15; c.updateProjectionMatrix();
+  sun.shadow.normalBias=0.03*Math.max(1,Math.sqrt(k));
+  const maxT=(renderer.capabilities && renderer.capabilities.maxTextureSize) || 4096;
+  const ms=Math.min(isMobile ? (lv>=3?2048:1024) : (lv>=3?4096:2048), maxT);
+  if(sun.shadow.mapSize.x!==ms){ sun.shadow.mapSize.set(ms,ms); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } }
+  SUN_K=k;
+}
+function applyView(){ const v=VIEW_FOG[SET.view]; scene.fog.near=v[0]; scene.fog.far=v[1]; camera.far=v[2]; camera.updateProjectionMatrix(); }
+function applyAniso(){
+  const mx=(renderer.capabilities.getMaxAnisotropy && renderer.capabilities.getMaxAnisotropy()) || 1, a=Math.max(1, Math.min(ANISO_V[SET.aniso], mx));
+  const seen=new Set();
+  const visit=o=>{ const ms=o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for(const m of ms){ const t=m && m.map; if(t && !seen.has(t)){ seen.add(t); if(t.anisotropy!==a){ t.anisotropy=a; t.needsUpdate=true; } } }
+    if(o.children) for(const ch of o.children) visit(ch); };
+  visit(scene);
+}
+function applyRes(){
+  if(renderer.xr && renderer.xr.isPresenting) return;
+  renderer.setPixelRatio(clamp(BASE_PR*SET.res/100, 0.5, 4)); renderer.setSize(window.innerWidth, window.innerHeight, false);
+}
+function applyGfx(k){
+  if(k==='res') applyRes(); else if(k==='sh') applyShadows(); else if(k==='view') applyView(); else if(k==='aniso') applyAniso(); else if(k==='luz') applyLights();
+  else if(k==='aa'){ const n=$('aaNote'); if(n) n.hidden = (!!SET.aa)===AA_NOW; }
+  for(const b of document.querySelectorAll('.pre')){ const P=PRESETS[b.dataset.p]; b.classList.toggle('sel', Object.keys(P).every(q=>SET[q]===P[q])); }
+}
+document.querySelectorAll('.pre').forEach(b=>b.addEventListener('click',()=>{ const P=PRESETS[b.dataset.p]; for(const k in P){ const i=SL.findIndex(o=>o.k===k); if(i>=0) setSetting(i,P[k]); } }));
+$('bReload').addEventListener('click',()=>{ try{ location.reload(); }catch(e){} });
 let slFocus=-1;
 const CV={x0:22,x1:144,y0:106,y1:6};
 const cvX=s=>CV.x0+s*(CV.x1-CV.x0), cvY=f=>CV.y0-clamp(f,0,1)*(CV.y0-CV.y1);
@@ -2562,10 +2818,12 @@ function updateCurveDot(){
 }
 function setSetting(i,val){
   const o=SL[i]; val=clamp(Math.round(val/o.step)*o.step,o.min,o.max);
-  SET[o.k]=val; store.set(o.k,val); $(o.id).value=String(val); $(o.v).textContent=val+' %';
+  SET[o.k]=val; store.set(o.k,val); $(o.id).value=String(val); $(o.v).textContent = o.fmt ? o.fmt(val) : val+' %';
+  if(o.k==='res'||o.k==='aa'||o.k==='sh'||o.k==='view'||o.k==='aniso'||o.k==='luz') applyGfx(o.k);
   if(o.k==='thrExpo') drawCurve();
   if(o.k==='rateExpo') drawRateCurve();
   if(o.k==='touchSize') layoutSticks();
+  if(o.k==='vol' && AU.master) AU.master.gain.value = AU.on ? volGain() : 0;
 }
 function focusSlider(i){ slFocus=i; document.querySelectorAll('.sl').forEach(el=>el.classList.toggle('focus', +el.dataset.i===i)); }
 SL.forEach((o,i)=>{ $(o.id).addEventListener('input',e=>{ setSetting(i,+e.target.value); focusSlider(i); }); setSetting(i,SET[o.k]); });
@@ -2618,26 +2876,466 @@ $('bMode').addEventListener('click',()=>cycleMode());
 $('bReset').addEventListener('click',()=>{ if(state==='play') resetFlight(); });
 $('bPause').addEventListener('click',()=>togglePause());
 $('bArm').addEventListener('click',()=>{ initAudio(); if(state==='play'){ if(lastSrc!=='touch' && isTouch) lastSrc='touch'; toggleArm(); } });
-function setSound(on){ AU.on=on; store.set('snd',on); if(AU.master) AU.master.gain.value=on?0.8:0; $('sndWave').style.display=on?'':'none'; }
+function setSound(on){ AU.on=on; store.set('snd',on); if(AU.master) AU.master.gain.value=on?volGain():0; $('sndWave').style.display=on?'':'none'; }
 $('bSound').addEventListener('click',()=>{ initAudio(); setSound(!AU.on); toast(AU.on?'Sonido activado':'Sonido silenciado',900); });
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(state==='play') togglePause(); if(AU.ctx && AU.ctx.state==='running') AU.ctx.suspend(); } else if(AU.ctx && state==='play') AU.ctx.resume(); });
+document.addEventListener('visibilitychange',()=>{ if(XR.on || XR.starting) return; if(document.hidden){ if(state==='play') togglePause(); if(AU.ctx && AU.ctx.state==='running') AU.ctx.suspend(); } else if(AU.ctx && state==='play') AU.ctx.resume(); });
 window.addEventListener('gamepadconnected',()=>{ pollPad(); });
 function onResize(){
+  if(XR.on) return;
   const w=window.innerWidth, h=window.innerHeight;
   renderer.setSize(w,h,false); camera.aspect=w/h; setFov(fovReq,true); measureHud(); layoutSticks();
   if(state==='play' && isMobile && h>w){ el.rotHint.style.display='block'; rotHintT=4; }
 }
 window.addEventListener('resize',onResize); window.addEventListener('orientationchange',()=>setTimeout(onResize,250));
 
+/* ============ Realidad virtual (WebXR): Meta Quest 2, 3 y 3S, en su navegador o con Link / Air Link desde el PC ============ */
+const VRCAMS=['pilot','chase','fpv','fpv2d','bridge','halfpipe'], VRCAMNAME={pilot:'Piloto de pie', chase:'Detrás del dron', fpv:'FPV 3D', fpv2d:'FPV 2D', bridge:'Pasarela', halfpipe:'Halfpipe'};
+const XR = {on:false, starting:false, session:null, supported:null, standalone:isXRBrowser, refLocal:false, posed:false,
+  rig:null, hud:null, yaw:0, pos:new V3(), head:new V3(0,1.6,0), headQ:new QT(), headYaw:0, refHead:new V3(0,1.6,0), refYaw:0,
+  cam:store.get('vrcam','pilot'), blockT:0, tpCool:0, fade:0, fadeDir:0, hudYaw:0, hudT:0, hudDirty:true, hudSnap:true,
+  gripT:0, prevBtn:{}, padL:null, padR:null, saved:null, rigQ:new QT(), camQ:new QT(), viewQ:new QT(), camPos:new V3(), ax:[0,0,0,0], volT:0, audT:0, room:null, osdT:0, osdDirty:true};
+if(!VRCAMS.includes(XR.cam)) XR.cam='pilot';
+const viewPos = new V3(START.x, 0.7, START.z);   // ojo del jugador en el mundo (en VR, su cabeza)
+const _xv1=new V3(), _xv2=new V3(), _xv3=new V3(), _xv4=new V3(), _xq=new QT();
+const framed = (()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
+
+function insideAny(p, pad){
+  for(const b of colliders){ if(p.x>b.x1-pad && p.x<b.x2+pad && p.y>b.y1-pad && p.y<b.y2+pad && p.z>b.z1-pad && p.z<b.z2+pad) return true; }
+  return false;
+}
+// del espacio de las gafas (rig) al mundo: giro en y + desplazamiento
+function rigToWorld(l, out){ const c=Math.cos(XR.yaw), s=Math.sin(XR.yaw); return out.set(XR.pos.x+c*l.x+s*l.z, XR.pos.y+l.y, XR.pos.z-s*l.x+c*l.z); }
+// coloca el rig para que la cabeza de referencia quede exactamente en 'target'
+function rigAt(target, ref){ const c=Math.cos(XR.yaw), s=Math.sin(XR.yaw); XR.pos.set(target.x-(c*ref.x+s*ref.z), target.y-ref.y, target.z-(-s*ref.x+c*ref.z)); }
+function vrRecenter(){ XR.refHead.copy(XR.head); XR.refYaw=XR.headYaw; cam.init=false; XR.hudSnap=true; }
+
+// sitio libre en el suelo, cerca del dron y con vista directa, para el modo piloto de pie
+function findPilotSpot(){
+  // prueba sitios alrededor del dron (primero detrás de él) y se queda con el de suelo más bajo:
+  // así el piloto pisa el suelo de la habitación y no la encimera o la mesa
+  const d=drone, psi=headingOf(d.q);
+  const eyeH = XR.refLocal ? 1.6 : clamp(XR.head.y, 1.0, 1.9);
+  let best=null;
+  for(const R of [2.0,1.5,2.6,1.1]) for(const a of [0,0.5,-0.5,1.0,-1.0,1.6,-1.6,2.3,-2.3,Math.PI]){
+    const ang=psi+a, x=d.pos.x+Math.sin(ang)*R, z=d.pos.z+Math.cos(ang)*R;
+    const pv=probeVertical(_xv2.set(x, d.pos.y+0.2, z)), fl=pv[0];
+    if(fl<GY-0.05 || fl>d.pos.y+0.5 || (best && fl>=best.floor-0.05)) continue;
+    if(pv[1] < fl+eyeH+0.12) continue;                            // sin sitio para la cabeza
+    const eye=_xv3.set(x, fl+eyeH, z);
+    if(insideAny(eye,0.14) || insideAny(_xv4.set(x,fl+0.95,z),0.16) || insideAny(_xv4.set(x,fl+0.35,z),0.14)) continue;
+    if(segHit(eye, d.pos, 0) < 0.97) continue;                    // hay que ver el dron
+    best={x, z, floor:fl};
+  }
+  return best || {x:d.pos.x+Math.sin(psi)*0.9, z:d.pos.z+Math.cos(psi)*0.9, floor:d.pos.y+0.35-eyeH};
+}
+function standAt(x, z, floor){
+  const d=drone;
+  XR.yaw = Math.atan2(-(d.pos.x-x), -(d.pos.z-z)) - XR.headYaw;   // tu mirada actual apunta al dron
+  const c=Math.cos(XR.yaw), s=Math.sin(XR.yaw), hx=XR.head.x, hz=XR.head.z;
+  XR.pos.set(x-(c*hx+s*hz), floor+(XR.refLocal?1.6-XR.head.y:0), z-(-s*hx+c*hz));
+  XR.hudSnap=true;
+}
+function pilotTeleport(){ const sp=findPilotSpot(); standAt(sp.x, sp.z, sp.floor); XR.blockT=0; XR.tpCool=1.2; }
+function vrPlace(){ if(XR.cam==='pilot') pilotTeleport(); else if(SPOTS[XR.cam]) standAt(SPOTS[XR.cam].x, SPOTS[XR.cam].z, SPOTS[XR.cam].floor); }
+function startTeleport(){ if(!XR.fadeDir) XR.fadeDir=1; }
+function setVRCam(c){
+  if(!VRCAMS.includes(c)) return;
+  XR.cam=c; store.set('vrcam',c);
+  document.querySelectorAll('.vc').forEach(b=>b.classList.toggle('sel', b.dataset.vc===c));
+  if(!XR.on) return;
+  vrRecenter();
+  if(c==='pilot' || SPOTS[c]) startTeleport();
+  if(c==='fpv2d') enterRoom();
+  toast('Cámara: '+VRCAMNAME[c], 1100);
+}
+// acción del gatillo derecho (o LB / clic de stick en un mando de PC)
+function vrAction(){
+  const c=XR.cam;
+  if(c==='pilot' || SPOTS[c]) startTeleport();
+  else if(c==='chase'){ vrRecenter(); toast('Centro: detrás del dron',900); }
+  else if(c==='fpv2d'){ placeScreen(); toast('Pantalla delante de ti',900); }
+}
+function vrAfterReset(){ if(XR.cam==='pilot' || SPOTS[XR.cam]) startTeleport(); else if(XR.cam==='chase') vrRecenter(); }
+function setVol(v){ const i=SL.findIndex(o=>o.k==='vol'); if(i>=0) setSetting(i, v); XR.hudDirty=true; XR.osdDirty=true; }
+
+/* ---------- FPV 2D: una sala oscura y quieta con una pantalla delante que muestra la cámara del dron ---------- */
+function makeVRRoom(){
+  const room=new THREE.Scene(); room.background=new THREE.Color(0x0c0a16);
+  const RTC = (renderer.capabilities && renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget) ? THREE.WebGLMultisampleRenderTarget : THREE.WebGLRenderTarget;
+  const W2 = XR.standalone ? 1024 : 1280, H2 = Math.round(W2*9/16);
+  const rt=new RTC(W2, H2, {minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter});
+  const fcam=new THREE.PerspectiveCamera(74, 16/9, 0.03, 420);
+  const scr=new THREE.Group();
+  const bezel=new THREE.Mesh(new THREE.PlaneGeometry(2.52,1.47), new THREE.MeshBasicMaterial({color:0x221e36})); bezel.position.z=-0.01; scr.add(bezel);
+  const screen=new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.35), new THREE.MeshBasicMaterial({map:rt.texture})); scr.add(screen);
+  const ocv=document.createElement('canvas'); ocv.width=1280; ocv.height=720;
+  const otex=new THREE.CanvasTexture(ocv); otex.minFilter=THREE.LinearFilter; otex.generateMipmaps=false;
+  const osd=new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.35), new THREE.MeshBasicMaterial({map:otex, transparent:true, depthWrite:false})); osd.position.z=0.006; scr.add(osd);
+  room.add(scr);
+  const gcv=document.createElement('canvas'); gcv.width=gcv.height=128; const gg=gcv.getContext('2d');
+  gg.fillStyle='#14111f'; gg.fillRect(0,0,128,128); gg.strokeStyle='rgba(130,120,200,0.5)'; gg.lineWidth=2; gg.strokeRect(1,1,126,126);
+  const gtex=new THREE.CanvasTexture(gcv); gtex.wrapS=gtex.wrapT=THREE.RepeatWrapping; if(gtex.repeat) gtex.repeat.set(20,20);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshBasicMaterial({map:gtex})); floor.rotation.x=-Math.PI/2; room.add(floor);
+  return {room, rt, fcam, scr, og:ocv.getContext('2d'), otex, floor};
+}
+function placeScreen(){
+  const R=XR.room; if(!R) return; const D=2.0;
+  R.scr.position.set(XR.head.x-Math.sin(XR.headYaw)*D, XR.head.y-0.05, XR.head.z-Math.cos(XR.headYaw)*D);
+  R.scr.rotation.set(0, XR.headYaw, 0);
+}
+function enterRoom(){
+  if(!XR.room) XR.room=makeVRRoom();
+  XR.room.floor.position.y = XR.refLocal ? -1.6 : 0;
+  placeScreen(); XR.osdDirty=true; XR.fade=0; XR.fadeDir=0;
+}
+function renderFpv2d(){
+  const R=XR.room;
+  R.fcam.position.copy(XR.camPos); R.fcam.quaternion.copy(XR.camQ); R.fcam.updateMatrixWorld();
+  // la imagen del dron se dibuja en una textura (una sola vista, plana, como unas gafas FPV) y luego la sala en estéreo
+  renderer.xr.enabled=false; renderer.setRenderTarget(R.rt); renderer.render(scene, R.fcam);
+  renderer.setRenderTarget(null); renderer.xr.enabled=true;
+  renderer.render(R.room, camera);
+}
+function pauseLines(){
+  return (XR.padL || XR.padR) ? [
+    'A o gatillo izquierdo: seguir  ·  Y: reiniciar',
+    'X: modo ('+MODENAME[flightMode]+')  ·  B: cámara ('+VRCAMNAME[XR.cam]+')',
+    'Stick izq. a los lados: volumen  ·  Gatillo dcho.: FPS ('+(FPS.on?'sí':'no')+')',
+    'Mantén los dos gatillos laterales para salir de la VR'
+  ] : [
+    'A o Start: seguir  ·  B: reiniciar',
+    'Y: modo ('+MODENAME[flightMode]+')  ·  X o RB: cámara ('+VRCAMNAME[XR.cam]+')',
+    'Stick izq. o cruceta: volumen  ·  LB: FPS ('+(FPS.on?'sí':'no')+')',
+    'Para salir de la VR, pulsa el botón de Meta de las gafas'
+  ];
+}
+function drawOSD(){
+  const R=XR.room, g=R.og, W=1280, H=720, d=drone, F='Fredoka, "Segoe UI", sans-serif';
+  g.clearRect(0,0,W,H); g.textBaseline='middle';
+  const txt=(t,x,y,al,sz,col)=>{ g.font='700 '+sz+'px '+F; g.textAlign=al; g.lineWidth=7; g.strokeStyle='rgba(0,0,0,0.75)'; g.strokeText(t,x,y); g.fillStyle=col||'#ffffff'; g.fillText(t,x,y); };
+  const v=volts(), kmh=d.vel.length()*3.6, alt=Math.max(0,d.pos.y-d.groundY-0.014);
+  txt(v.toFixed(1).replace('.',',')+' V', 40, 48, 'left', 42, d.battery>0.2 ? '#ffffff' : '#ff6b57');
+  txt(fmtTime(raceT), W/2, 48, 'center', 38);
+  txt(MODENAME[flightMode], W-40, 48, 'right', 38);
+  if(FPS.on) txt(FPS.val+' FPS', W-40, 96, 'right', 34, FPS.val>=55?'#3ddc97':FPS.val>=30?'#ffd23f':'#ff6b57');
+  txt(kmh.toFixed(0)+' km/h', 40, H-48, 'left', 42);
+  txt(alt.toFixed(1).replace('.',',')+' m', 290, H-48, 'left', 42);
+  txt('Aros '+Math.min(nextRing,rings.length)+'/'+rings.length+'  ·  Trucos '+tricksFound.size+'/'+TRICKS.length, W-40, H-48, 'right', 34);
+  g.strokeStyle='rgba(255,255,255,0.75)'; g.lineWidth=3; g.beginPath();
+  g.moveTo(W/2-28,H/2); g.lineTo(W/2-9,H/2); g.moveTo(W/2+9,H/2); g.lineTo(W/2+28,H/2); g.moveTo(W/2,H/2-9); g.lineTo(W/2,H/2-22); g.stroke();
+  if(!d.armed) txt(d.crashed ? 'ESTRELLADO' : 'DESARMADO', W/2, H/2+92, 'center', 50, d.crashed ? '#ff6b57' : '#ffd23f');
+  if(toastT>0 && toastMsg) txt(toastMsg, W/2, 128, 'center', 40, '#ffd23f');
+  else if(!XR.padL && !XR.padR && !gp.pad) txt('Coge los mandos para pilotar', W/2, 128, 'center', 40, '#ffd23f');
+  if(state==='pause'){
+    g.fillStyle='rgba(12,10,22,0.74)'; g.fillRect(0,0,W,H);
+    txt('Pausa', W/2, 190, 'center', 80, '#ffd23f');
+    pauseLines().forEach((t,i)=>txt(t, W/2, 300+i*64, 'center', 36, i===3 ? '#c3bdf0' : '#ffffff'));
+    txt('Volumen '+SET.vol+' %', W/2, 600, 'center', 38);
+  }
+  R.otex.needsUpdate=true;
+}
+function cycleVRCam(){ setVRCam(VRCAMS[(VRCAMS.indexOf(XR.cam)+1)%VRCAMS.length]); }
+
+// cámara en VR: mueve el "rig" (las gafas miran libremente dentro de él)
+function updateVR(dt){
+  const d=drone, psi=headingOf(d.q), c=XR.cam;
+  if(!cam.init) cam.yaw=psi;
+  if(XR.fadeDir){
+    XR.fade=clamp(XR.fade+XR.fadeDir*dt*(XR.fadeDir>0?9:5),0,1);
+    if(XR.fadeDir>0 && XR.fade>=1){ vrPlace(); XR.fadeDir=-1; }
+    else if(XR.fadeDir<0 && XR.fade<=0) XR.fadeDir=0;
+  }
+  const fpv = c==='fpv' || c==='fpv2d';
+  droneMesh.g.visible = !fpv;
+  if(fpv){
+    const tilt = flightMode==='acro' ? 24 : flightMode==='horizon' ? 18 : flightMode==='angle' ? 12 : 5;
+    XR.camQ.copy(d.q).multiply(_xq.setFromAxisAngle(AX_X, tilt*D2R));          // orientación de la cámara del dron
+    XR.camPos.set(0,0.022,-0.05).applyQuaternion(d.q).add(d.pos);
+    viewPos.copy(XR.camPos); cam.yaw=psi; cam.init=true;
+    if(c==='fpv'){
+      // FPV 3D: ves justo lo que ve la cámara del dron, mires donde mires; el rig deshace el giro de la cabeza
+      XR.rigQ.copy(XR.camQ).multiply(_xq.copy(XR.headQ).conjugate());
+      _xv1.copy(XR.head).applyQuaternion(XR.rigQ); XR.pos.copy(XR.camPos).sub(_xv1);
+      XR.viewQ.copy(XR.camQ);
+    } else {
+      // FPV 2D: tú quieto en una sala oscura; nada se mueve al girar la cabeza salvo la imagen de la pantalla
+      XR.pos.set(0,0,0); XR.yaw=0; XR.rigQ.set(0,0,0,1); XR.viewQ.copy(XR.headQ);
+    }
+  } else if(state==='play'){
+    if(c==='pilot'){
+      rigToWorld(XR.head, viewPos);
+      const hd=Math.hypot(d.pos.x-viewPos.x, d.pos.z-viewPos.z), blocked=segHit(viewPos, d.pos, 0)<0.97;
+      XR.blockT = blocked ? XR.blockT+dt : 0; XR.tpCool=Math.max(0, XR.tpCool-dt);
+      if(XR.tpCool<=0 && (hd>6.5 || XR.blockT>0.9)) startTeleport();
+    } else if(c==='chase'){
+      // detrás del dron: la cámara va detrás y mira hacia donde mira el dron; con la cabeza puedes mirar
+      // alrededor, pero tu "frente" (el que tenías al elegir la cámara o al recentrar) es siempre detrás del dron
+      cam.yaw += wrapPi(psi-cam.yaw)*(1-Math.exp(-dt*3));
+      const sy=Math.sin(cam.yaw), cy=Math.cos(cam.yaw);
+      _cA.set(d.pos.x+sy*1.3, d.pos.y+0.28, d.pos.z+cy*1.3);
+      if(!cam.init) cam.pos.copy(_cA); else cam.pos.lerp(_cA, 1-Math.exp(-dt*6));
+      const h=segHit(d.pos, cam.pos, 0.06), target = h<1 ? _cB.lerpVectors(d.pos, cam.pos, Math.max(0.1,h-0.05)) : cam.pos;
+      XR.yaw = cam.yaw - XR.refYaw;
+      rigAt(target, XR.refHead);
+    }
+    // pasarela y halfpipe: te quedas de pie donde estás
+    cam.init=true;
+  }
+  XR.rig.position.copy(XR.pos);
+  if(fpv) XR.rig.quaternion.copy(XR.rigQ);
+  else { XR.rig.rotation.set(0, XR.yaw, 0); rigToWorld(XR.head, viewPos); XR.viewQ.setFromAxisAngle(AX_Y, XR.yaw).multiply(XR.headQ); }
+  placeVRHud(dt);
+}
+
+/* ---------- Panel de datos dentro de las gafas ---------- */
+function makeVRHud(){
+  const cv=document.createElement('canvas'); cv.width=1024; cv.height=320;
+  const tex=new THREE.CanvasTexture(cv); tex.minFilter=THREE.LinearFilter; tex.generateMipmaps=false;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.194), new THREE.MeshBasicMaterial({map:tex, transparent:true, depthTest:false, depthWrite:false, fog:false}));
+  mesh.renderOrder=999; mesh.frustumCulled=false;
+  const fade=new THREE.Mesh(new THREE.SphereGeometry(0.25,16,10), new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0, side:THREE.BackSide, depthTest:false, depthWrite:false, fog:false}));
+  fade.renderOrder=1000; fade.frustumCulled=false; fade.visible=false;
+  return {cv, g:cv.getContext('2d'), tex, mesh, fade};
+}
+function placeVRHud(dt){
+  const h=XR.hud; if(!h) return;
+  h.fade.position.copy(viewPos); h.fade.visible = XR.fade>0.003; h.fade.material.opacity = XR.fade;
+  if(XR.cam==='fpv2d'){ XR.hudSnap=true; return; }
+  if(XR.cam==='fpv'){
+    // en FPV el panel va fijo abajo en la vista, como el OSD de unas gafas FPV
+    h.mesh.position.set(0,-0.31,-0.9).applyQuaternion(XR.camQ).add(viewPos);
+    h.mesh.quaternion.copy(XR.camQ).multiply(_xq.setFromAxisAngle(AX_X, -0.33));
+    h.mesh.scale.set(0.8,0.8,0.8); XR.hudSnap=true; return;
+  }
+  h.mesh.scale.set(1,1,1);
+  const gy=XR.yaw+XR.headYaw;
+  if(XR.hudSnap){ XR.hudYaw=gy; XR.hudSnap=false; } else XR.hudYaw += wrapPi(gy-XR.hudYaw)*(1-Math.exp(-dt*2.2));
+  h.mesh.position.set(viewPos.x-Math.sin(XR.hudYaw)*0.9, viewPos.y-0.36, viewPos.z-Math.cos(XR.hudYaw)*0.9);
+  h.mesh.lookAt(viewPos);
+}
+function rrect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function textW(g,s,px){ try{ const m=g.measureText(s); if(m && m.width) return m.width; }catch(e){} return s.length*px*0.55; }
+function drawVRHud(){
+  const h=XR.hud, g=h.g, W=1024, H=320, d=drone, F='Fredoka, "Segoe UI", sans-serif';
+  g.clearRect(0,0,W,H);
+  rrect(g,6,6,W-12,H-12,34); g.fillStyle='rgba(31,27,58,0.84)'; g.fill(); g.lineWidth=6; g.strokeStyle='#ffd23f'; g.stroke();
+  g.textBaseline='middle'; g.textAlign='left';
+  if(state==='pause'){
+    g.fillStyle='#ffd23f'; g.font='700 54px '+F; g.fillText('Pausa', 40, 56);
+    g.textAlign='right'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText('Volumen '+SET.vol+' %', W-40, 56); g.textAlign='left';
+    g.font='500 32px '+F;
+    pauseLines().forEach((t,i)=>{ g.fillStyle = i===3 ? '#c3bdf0' : '#ffffff'; g.fillText(t, 40, 120+i*52); });
+    if(FPS.on){ g.textAlign='center'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText(FPS.val+' FPS', W/2, 56); g.textAlign='left'; }
+  } else {
+    const st = d.armed ? ['ARMADO','#3ddc97'] : d.crashed ? ['ESTRELLADO','#ff6b57'] : ['DESARMADO','#9a95b8'];
+    g.font='700 38px '+F; const cw=textW(g,st[0],38)+44;
+    rrect(g,32,34,cw,60,30); g.fillStyle=st[1]; g.fill(); g.fillStyle='#1f1b3a'; g.fillText(st[0],54,65);
+    g.fillStyle='#ffffff'; g.font='600 40px '+F; g.fillText(MODENAME[flightMode], 32+cw+22, 65);
+    if(FPS.on){ g.textAlign='right'; g.fillStyle=FPS.val>=55?'#3ddc97':FPS.val>=30?'#ffd23f':'#ff6b57'; g.font='700 36px '+F; g.fillText(FPS.val+' FPS', W-292, 65); g.textAlign='left'; }
+    // batería
+    const b=d.battery, bx=W-262, v=volts();
+    rrect(g,bx,40,150,48,10); g.lineWidth=5; g.strokeStyle='#ffffff'; g.stroke(); g.fillStyle='#ffffff'; g.fillRect(bx+150,54,10,20);
+    g.fillStyle = b>0.5 ? '#3ddc97' : b>0.2 ? '#ffd23f' : '#ff6b57'; g.fillRect(bx+7,47,Math.max(0,136*b),34);
+    g.textAlign='right'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText(v.toFixed(1).replace('.',',')+' V', W-36, 128);
+    g.textAlign='left'; g.font='600 40px '+F;
+    const kmh=d.vel.length()*3.6, alt=Math.max(0,d.pos.y-d.groundY-0.014);
+    g.fillText(kmh.toFixed(0)+' km/h    '+alt.toFixed(1).replace('.',',')+' m    Aros '+Math.min(nextRing,rings.length)+'/'+rings.length+'    '+fmtTime(raceT), 32, 160);
+    if(toastT>0 && toastMsg){ g.fillStyle='#ffd23f'; g.font='700 42px '+F; g.fillText(toastMsg, 32, 248); }
+    else if(!XR.padL && !XR.padR && !gp.pad){ g.fillStyle='#ffd23f'; g.font='700 40px '+F; g.fillText('Coge los mandos de las gafas para pilotar', 32, 248); }
+    else {
+      let s='Trucos '+tricksFound.size+'/'+TRICKS.length+'   ·   '+VRCAMNAME[XR.cam];
+      if(nextRing<rings.length) s+='   ·   Aro '+(nextRing+1)+' a '+rings[nextRing].pos.distanceTo(d.pos).toFixed(1).replace('.',',')+' m';
+      if(d.damage>0.05) s+='   ·   Daños '+(d.damage*100).toFixed(0)+' %';
+      g.fillStyle='#c3bdf0'; g.font='500 34px '+F; g.fillText(s, 32, 248);
+    }
+  }
+  h.tex.needsUpdate=true;
+}
+function updateVRHud(dt){
+  flashA=Math.max(0,flashA-dt*1.8);
+  if(toastT>0){ toastT-=dt; if(toastT<=0){ $('toast').classList.remove('show'); XR.hudDirty=true; XR.osdDirty=true; } }
+  if(XR.cam==='fpv2d' && XR.room){ XR.osdT+=dt; if(XR.osdDirty || XR.hudDirty || XR.osdT>0.12){ XR.osdT=0; XR.osdDirty=false; XR.hudDirty=false; drawOSD(); } }
+  else { XR.hudT+=dt; if(XR.hudDirty || XR.hudT>0.15){ XR.hudT=0; XR.hudDirty=false; drawVRHud(); } }
+  // el navegador puede dejar el sonido en pausa al entrar en las gafas: lo reanudamos
+  if(AU.ctx && AU.ctx.state==='suspended' && XR.session && XR.session.visibilityState!=='hidden'){ XR.audT-=dt; if(XR.audT<=0){ XR.audT=1; try{ AU.ctx.resume(); }catch(e){} } }
+}
+
+/* ---------- Mandos de las gafas (perfil xr-standard) ---------- */
+function pollXRPad(dt){
+  const s=XR.session; if(!s || !s.inputSources) return false;
+  let L=null, R=null;
+  for(const src of s.inputSources){ if(!src || !src.gamepad) continue; if(src.handedness==='left') L=src.gamepad; else if(src.handedness==='right') R=src.gamepad; }
+  XR.padL=L; XR.padR=R;
+  if(!L && !R) return false;
+  const ax=(g,i)=> g && g.axes ? (g.axes.length>=4 ? (g.axes[2+i]||0) : (g.axes[i]||0)) : 0;
+  XR.ax[0]=dz(ax(L,0)); XR.ax[1]=dz(ax(L,1)); XR.ax[2]=dz(ax(R,0)); XR.ax[3]=dz(ax(R,1));
+  const btn=(g,i)=> !!(g && g.buttons && g.buttons[i] && g.buttons[i].pressed);
+  const now={rA:btn(R,4), rB:btn(R,5), lX:btn(L,4), lY:btn(L,5), rT:btn(R,0), lT:btn(L,0), rS:btn(R,3), lS:btn(L,3)};
+  for(const k in now){ if(now[k] && !XR.prevBtn[k]) onVRButton(k); XR.prevBtn[k]=now[k]; }
+  if(btn(L,1) && btn(R,1)){ XR.gripT+=dt; if(XR.gripT>1.2){ XR.gripT=-1e9; exitVR(); } } else XR.gripT=0;
+  return true;
+}
+function onVRButton(k){
+  initAudio();
+  if(k==='lS'){ const st=[0,25,50,75,100], i=st.findIndex(v=>v>SET.vol); setVol(i<0 ? 0 : st[i]); toast('Volumen '+SET.vol+' %',900); return; }
+  if(state==='play'){
+    if(k==='rA') toggleArm(); else if(k==='rB' || k==='rS') cycleVRCam(); else if(k==='lX') cycleMode();
+    else if(k==='lY'){ resetFlight(); vrAfterReset(); }
+    else if(k==='rT') vrAction();
+    else if(k==='lT'){ state='pause'; XR.hudDirty=true; }
+  } else if(state==='pause'){
+    if(k==='rA' || k==='lT') startGame();
+    else if(k==='lY'){ resetFlight(); startGame(); vrAfterReset(); }
+    else if(k==='lX'){ cycleMode(); XR.hudDirty=true; }
+    else if(k==='rB' || k==='rS'){ cycleVRCam(); XR.hudDirty=true; }
+    else if(k==='rT') setFps(!FPS.on);
+  }
+}
+function vrPulse(ms, strong){
+  for(const g of [XR.padL, XR.padR]){ try{ const h=g && g.hapticActuators && g.hapticActuators[0]; if(h && h.pulse) h.pulse(clamp(strong,0.05,1), ms); }catch(e){} }
+}
+
+/* ---------- Entrar y salir ---------- */
+function readXRPose(xrFrame){
+  const ref = XR.ref || (renderer.xr.getReferenceSpace ? renderer.xr.getReferenceSpace() : null);
+  if(!ref || !xrFrame) return;
+  let pose=null; try{ pose=xrFrame.getViewerPose(ref); }catch(e){}
+  if(!pose) return;
+  const p=pose.transform.position, o=pose.transform.orientation;
+  XR.head.set(p.x,p.y,p.z); XR.headQ.set(o.x,o.y,o.z,o.w);
+  XR.headYaw=headingOf(XR.headQ);
+  if(!XR.posed){ XR.posed=true; vrRecenter(); vrPlace(); if(XR.cam==='fpv2d') enterRoom(); }
+}
+function vrQuality(on){
+  if(on){
+    XR.saved={shadow:sun.castShadow};
+    if(XR.standalone){ sun.castShadow=false; LIGHT_CAP=2; applyLights(); }
+  } else if(XR.saved){
+    applyShadows(); LIGHT_CAP=99; applyLights(); XR.saved=null;
+  }
+}
+async function startVR(){
+  const xr=navigator.xr;
+  if(XR.on || XR.starting) return;
+  if(!xr || !xr.requestSession){ setVRInfo('none', true); return; }
+  XR.starting=true; initAudio();
+  let session;
+  try{ session = await xr.requestSession('immersive-vr', {optionalFeatures:['local-floor']}); }
+  catch(e){ XR.starting=false; const n=e && e.name; setVRInfo(n==='SecurityError' ? 'blocked' : n==='NotAllowedError' ? 'denied' : framed ? 'maybe' : 'nodevice', true); return; }
+  try{ await enterVR(session); }
+  catch(e){ if(XR.on) onVREnd(); renderer.xr.enabled=false; XR.starting=false; XR.on=false; try{ session.end(); }catch(_){} setVRInfo('error', true); }
+}
+async function enterVR(session){
+  let floor=true, ref=null;
+  try{ ref=await session.requestReferenceSpace('local-floor'); }catch(e){ floor=false; try{ ref=await session.requestReferenceSpace('local'); }catch(_){} }
+  XR.refLocal=!floor; XR.ref=ref;
+  renderer.xr.enabled=true;
+  renderer.xr.setReferenceSpaceType(floor ? 'local-floor' : 'local');
+  if(renderer.xr.setFramebufferScaleFactor) renderer.xr.setFramebufferScaleFactor(clamp((XR.standalone ? (/Quest 2/.test(navigator.userAgent||'') ? 0.75 : 0.85) : 1)*SET.res/100, 0.5, 1.6));
+  await renderer.xr.setSession(session);
+  XR.session=session; XR.on=true; XR.starting=false; XR.posed=false; XR.prevBtn={rA:true,lT:true,rT:true,rS:true,lS:true}; XR.gripT=0; XR.fade=0; XR.fadeDir=0; XR.hudDirty=true;
+  try{ const bl=session.renderState && session.renderState.baseLayer; if(bl && 'fixedFoveation' in bl) bl.fixedFoveation = XR.standalone ? 1 : 0; }catch(e){}
+  if(!XR.rig){ XR.rig=new THREE.Group(); XR.hud=makeVRHud(); }
+  scene.add(XR.rig); XR.rig.add(camera); scene.add(XR.hud.mesh); scene.add(XR.hud.fade);
+  vrQuality(true);
+  session.addEventListener('end', onVREnd);
+  session.addEventListener('visibilitychange', ()=>{
+    const v=session.visibilityState;
+    if(v!=='visible' && state==='play'){ state='pause'; XR.hudDirty=true; }
+    if(AU.ctx){ if(v==='hidden'){ if(AU.ctx.state==='running') AU.ctx.suspend(); } else if(AU.ctx.state==='suspended') AU.ctx.resume(); }
+  });
+  // recentrado del sistema (mantener el botón de Meta): la pose salta, así que recolocamos
+  try{ if(ref && ref.addEventListener) ref.addEventListener('reset', ()=>{ vrRecenter(); if(XR.cam==='pilot' || SPOTS[XR.cam]) startTeleport(); if(XR.cam==='fpv2d') placeScreen(); }); }catch(e){}
+  // pulsar el gatillo cuenta como gesto del usuario: aprovechamos para (re)activar el sonido
+  for(const ev of ['selectstart','squeezestart']) session.addEventListener(ev, ()=>initAudio());
+  document.body.classList.add('vr');
+  initAudio();
+  if(state!=='play') startGame();
+  cam.init=false;
+  renderer.setAnimationLoop(xrTick);
+  toast(flightMode==='beginner' ? 'Pulsa A o sube el stick izquierdo para despegar' : 'Stick izquierdo abajo y pulsa A para armar', 3000);
+}
+function exitVR(){ try{ if(XR.session) XR.session.end(); }catch(e){ onVREnd(); } }
+function onVREnd(){
+  if(!XR.on) return;
+  renderer.setAnimationLoop(null);
+  renderer.xr.enabled=false;
+  XR.on=false; XR.session=null; XR.ref=null; XR.starting=false; XR.padL=XR.padR=null;
+  if(XR.rig){ XR.rig.remove(camera); scene.remove(XR.rig); scene.remove(XR.hud.mesh); scene.remove(XR.hud.fade); }
+  camera.position.copy(viewPos); camera.quaternion.set(0,0,0,1); camera.scale.set(1,1,1);
+  vrQuality(false); document.body.classList.remove('vr');
+  XR.ax.fill(0); gp.connected=!!gp.pad; if(!gp.pad) gp.name=''; gp.lx=gp.ly=gp.rx=gp.ry=0; updatePadInfo();
+  cam.init=false; droneMesh.g.visible=true;
+  if(state==='play') state='pause';
+  if(state!=='menu'){ $('result').style.display = raceDone ? 'block' : 'none'; showMenu(); }
+  last=performance.now(); onResize();
+}
+// three r128 también llama a este bucle desde el requestAnimationFrame de la ventana (sin XRFrame): esas llamadas se ignoran
+function xrTick(now, xrFrame){ if(!XR.on || !xrFrame || !renderer.xr.isPresenting) return; tick(now, xrFrame); }
+
+/* ---------- Botón y avisos del menú ---------- */
+const VRMSG = {
+  ok:'Gafas VR listas. Pulsa «Jugar en VR» y ponte las gafas.',
+  nodevice:'No se detectan gafas VR. En el PC, conecta las Quest con Quest Link o Air Link y abre el juego en Chrome o Edge. En las gafas, ábrelo en su navegador.',
+  maybe:'No se detectan gafas VR. En el PC, conecta las Quest con Quest Link o Air Link y abre el juego en Chrome o Edge. En las gafas, ábrelo en su navegador.',
+  blocked:'Esta vista no deja usar la VR. Abre el juego en el navegador de las gafas, o en Chrome o Edge del PC con Quest Link.',
+  none:'Este navegador no tiene WebXR. Abre el juego en el navegador de las Meta Quest, o en Chrome o Edge del PC con Quest Link.',
+  denied:'Las gafas no dieron permiso para entrar en VR. Pulsa «Jugar en VR» otra vez y acepta el aviso dentro de las gafas.',
+  error:'No se pudo abrir la VR. Comprueba que las gafas están encendidas y conectadas, y vuelve a intentarlo.'
+};
+function setVRInfo(kind, flash){
+  const box=$('vrInfo'); if(!box) return;
+  box.textContent=VRMSG[kind]||''; $('bVR').classList.toggle('off', kind!=='ok');
+  if(flash){ box.classList.remove('pulse'); void box.offsetWidth; box.classList.add('pulse'); }
+}
+function checkVR(){
+  const xr=navigator.xr;
+  if(!xr || !xr.isSessionSupported){ XR.supported=false; setVRInfo('none'); return; }
+  let p; try{ p=xr.isSessionSupported('immersive-vr'); }catch(e){ setVRInfo('blocked'); return; }
+  Promise.resolve(p).then(ok=>{ XR.supported=!!ok; setVRInfo(ok ? 'ok' : framed ? 'maybe' : 'nodevice'); if(ok && state==='menu') selectTab('vr'); },
+    e=>{ XR.supported=false; setVRInfo(e && e.name==='SecurityError' ? 'blocked' : 'nodevice'); });
+}
+$('bVR').addEventListener('click', ()=>{ startVR(); });
+document.querySelectorAll('.vc').forEach(b=>b.addEventListener('click', ()=>setVRCam(b.dataset.vc)));
+setVRCam(XR.cam);
+$('bVRExit').addEventListener('click', ()=>exitVR());
+try{ if(navigator.xr && navigator.xr.addEventListener) navigator.xr.addEventListener('devicechange', checkVR); }catch(e){}
+checkVR();
+
+/* ---------- Contador de FPS (se activa en el menú de pausa, con F o desde la pausa de la VR) ---------- */
+const FPS = {on:!!store.get('fps',false), val:0, n:0, t:0, last:0};
+function setFps(on, say){
+  FPS.on=!!on; store.set('fps',FPS.on);
+  $('fpsChip').style.display = FPS.on ? 'inline-block' : 'none'; $('cFps').checked = FPS.on;
+  XR.hudDirty=true; XR.osdDirty=true;
+  if(say) toast(FPS.on ? 'FPS visibles' : 'FPS ocultos', 900);
+}
+function fpsTick(now){
+  if(FPS.last){ const g=(now-FPS.last)/1000; if(g<1){ FPS.t+=g; FPS.n++; } else { FPS.t=0; FPS.n=0; } }
+  FPS.last=now;
+  if(FPS.t>=0.5){
+    FPS.val=Math.round(FPS.n/FPS.t); FPS.n=0; FPS.t=0;
+    if(FPS.on){ const c=$('fpsChip'); c.textContent=FPS.val+' FPS'; c.className='chip '+(FPS.val>=55?'ok':FPS.val>=30?'mid':'low'); XR.hudDirty=true; XR.osdDirty=true; }
+  }
+}
+$('cFps').addEventListener('change', e=>setFps(e.target.checked));
+setFps(FPS.on);
+
 setMode(flightMode); $('camLbl').textContent=CAMNAME[camMode]; setSound(AU.on);
-selectTab(isTouch ? 'touch' : 'kb'); updatePadInfo(); measureHud(); onResize();
+selectTab(isXRBrowser ? 'vr' : isTouch ? 'touch' : 'kb'); updatePadInfo(); measureHud(); onResize();
 
 /* ============ Bucle principal ============ */
 let last=performance.now(), acc=0;
 function frame(now){
   requestAnimationFrame(frame);
+  if(XR.on) return;            // en VR manda el bucle de la sesión (xrTick)
+  tick(now, null);
+}
+function tick(now, xrFrame){
   const dt=Math.min(0.05, Math.max(0,(now-last)/1000)); last=now;
-  pollPad(); readInput(dt);
+  fpsTick(now);
+  if(xrFrame) readXRPose(xrFrame);   // primero la cabeza, para que los botones (recentrar) usen la pose de este fotograma
+  pollPad(dt); readInput(dt);
   const d=drone;
   if(state==='play'){
     if(!d.armed && flightMode==='beginner'){ if(input.climb<0.2) d.autoArmOK=true; else if(input.climb>0.55 && d.autoArmOK && !d.crashed) toggleArm(); }
@@ -2653,10 +3351,11 @@ function frame(now){
     if(racing) raceT+=dt;
   }
   if(state!=='play') updateCurveDot();
-  animate(dt, now); updateDroneVisual(dt, now); updateCamera(dt); updateLights(); updateHUD(dt); updateAudio();
+  animate(dt, now); updateDroneVisual(dt, now); updateCamera(dt); if(!XR.on) viewPos.copy(camera.position);
+  updateLights(); if(XR.on) updateVRHud(dt); else updateHUD(dt); updateAudio();
   { const fp = state==='play' ? d.pos : START, sx=Math.round(fp.x*4)/4, sz=Math.round(fp.z*4)/4;
-    sun.target.position.set(sx,2.2,sz); sun.position.set(sx+9,13,sz+10); sun.target.updateMatrixWorld(); }
-  renderer.render(scene, camera);
+    sun.target.position.set(sx,2.2,sz); sun.position.set(sx+9*SUN_K,2.2+10.8*SUN_K,sz+10*SUN_K); sun.target.updateMatrixWorld(); }
+  if(XR.on && XR.cam==='fpv2d' && XR.room) renderFpv2d(); else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
 })();
