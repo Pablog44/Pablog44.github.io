@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -142,7 +141,7 @@ body.touch .kbpad{ display:none; }
 #title .sub{ font-size:22px; font-weight:600; color:var(--oro); margin:14px 0 18px; }
 #title p{ font-size:19px; line-height:1.45; max-width:64ch; margin:0 0 22px; color:#e4ddcf; font-weight:500; }
 .btns{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:26px; }
-button.b{ font-family:var(--ui); font-size:22px; font-weight:800; padding:10px 28px; border:2px solid var(--oro); background:var(--oro); color:#1d1a12; cursor:pointer; clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
+button.b,a.b{ display:inline-block; text-align:center; font-family:var(--ui); font-size:22px; font-weight:800; padding:10px 28px; border:2px solid var(--oro); background:var(--oro); color:#1d1a12; cursor:pointer; clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
 button.b.alt{ background:transparent; color:var(--oro); }
 button.b.vr{ background:#71A9DE; border-color:#71A9DE; color:#10161d; }
 button.b.red{ background:#C8402F; border-color:#C8402F; color:#fff; }
@@ -177,7 +176,8 @@ button.b.dim{ opacity:0.45; }
 .shopList{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .shopRow{ display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center; background:rgba(255,255,255,.05); padding:7px 10px; }
 .shopName{ font-size:19px; font-weight:700; } .shopDesc{ font-size:14px; color:var(--granito); } .shopPrice{ font-size:19px; font-weight:800; color:var(--oro); }
-.shopRow button.b{ font-size:16px; padding:6px 14px; }
+.shopRow button.b,.shopRow a.b{ font-size:16px; padding:6px 14px; }
+.shopIn{ display:block; width:100%; box-sizing:border-box; margin-top:6px; padding:7px 9px; font:600 14px var(--ui); color:#F3EEE3; background:#0d0f12; border:1px solid var(--oro); outline:none; } .shopIn:focus{ box-shadow:0 0 0 2px rgba(232,185,58,.35); }
 body.inshop #hud{ visibility:hidden; }
 .shopCat{ font-size:15px; color:var(--oro); font-weight:800; margin:8px 0 0; letter-spacing:.05em; text-transform:uppercase; }
 .sw{ display:inline-block; width:16px; height:16px; border-radius:3px; border:1px solid rgba(0,0,0,.7); box-shadow:0 0 0 1px rgba(255,255,255,.25); margin-right:9px; vertical-align:-2px; }
@@ -458,7 +458,7 @@ const tpos=e=>ROT.on?{x:e.clientY,y:innerWidth-e.clientX}:{x:e.clientX,y:e.clien
   document.addEventListener('touchstart',e=>{if(!ROT.on||e.touches.length!==1){el=null;return;}const t=e.target;if(!t.closest||!t.closest('.screen'))return;el=scroller(t);last=tpos(e.touches[0]);},{passive:true});
   document.addEventListener('touchmove',e=>{if(!ROT.on||!el||e.touches.length!==1)return;const p=tpos(e.touches[0]);el.scrollTop-=p.y-last.y;el.scrollLeft-=p.x-last.x;last=p;e.preventDefault();},{passive:false});
   document.addEventListener('touchend',()=>{el=null;},{passive:true});})();
-const renderer=new THREE.WebGLRenderer({antialias:gfxBootAA(),powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:gfxBootAA(),alpha:true,powerPreference:'high-performance'});   // alpha: el cine abre un hueco transparente para el vídeo de YouTube
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,IS_TOUCH?1.25:1.5));
 renderer.setSize(window.innerWidth,window.innerHeight);
 renderer.shadowMap.enabled=true;
@@ -798,7 +798,8 @@ const HLOCK=[]; // rectángulos donde la altura del terreno se fija después de 
 // Escalinata de la puerta principal: de la Lonja (H0) sube hacia el oeste hasta la calle Floridablanca
 const STAIR=(()=>{const r=nearestRoad(-138,0),htop=(r?r.h:H0+3)+0.12,N=Math.max(1,Math.ceil((htop-H0)/0.18));return{x0:-120,run:0.36,hw:5.2,htop,N,rise:(htop-H0)/N,xl:-129.2};})();
 HLOCK.push({x0:-120.5,x1:116,z0:-147.5,z1:96,f:()=>H0});               // la Lonja, llana de verdad hasta el muro
-HLOCK.push({x0:-121.9,x1:93.9,z0:96.1,z1:152.4,f:()=>H0-0.4});         // Jardín de los Frailes: el Paseo de Carlos III corre junto a su muro
+HLOCK.push({x0:-121.9,x1:93.9,z0:96.1,z1:152.4,f:()=>H0-0.4});
+HLOCK.push({x0:-248.5,x1:-183.5,z0:-248.5,z1:-175.5,f:()=>FMANSION.h});   // la finca de la mansión, llana aunque al lado pase la Calle de los Chalets         // Jardín de los Frailes: el Paseo de Carlos III corre junto a su muro
 HLOCK.push({x0:-129,x1:-127,z0:-9,z1:9,f:()=>STAIR.htop-0.15});           // bajo la escalinata, por debajo de los peldaños
 HLOCK.push({x0:-497,x1:-466,z0:-1065,z1:-1049,f:(x,z,h)=>{const F=FLAT.find(f=>f.x0===-500&&f.z0===-1068);return F?F.h:h;}});   // casa de Nacho: el talud de la vía no se mete dentro
 HLOCK.push({x0:-489,x1:-466,z0:-1009,z1:-1007,f:(x,z,h)=>{const F=FLAT.find(f=>f.x0===-500&&f.z0===-1068);return F?Math.min(h,F.h-3.5):h;}});   // mirador: el terreno cae delante del balcón y se ve el valle
@@ -2083,16 +2084,19 @@ function teleVR(){
 // ---------------- consola de la casa: el Snake de toda la vida, en la tele del salón (y en grande en la pantalla, menos en VR)
 const SNAKE={tv:(()=>{try{return localStorage.getItem('gte-snake-tv')==='1';}catch(e){return false;}})(),on:false,cv:null,g:null,tex:null,el:null,cap:null,dir:[1,0],q:[],body:[],food:null,t:0,score:0,over:false,prev:{},flash:0};
 const SN_C=32,SN_R=15,SN_S=12;
+// dónde se juega: el sofá del salón de Nacho o la butaca del medio del cine de la mansión (y en qué pantalla)
+const SNAKE_LOC={casa:{seat:[-491.85,-1053.5,-Math.PI/2],exit:[-492.75,-1053.5],mesh:()=>CASA.tvMesh,back:()=>CASA.tv&&CASA.tv.tex,y:()=>null},
+  cine:{seat:[-233.32,-200.6,Math.PI/2],exit:[-233.6,-199.2],mesh:()=>{const s=MAN.cineScreen;if(s&&MAN.cineMatBasic)s.material=MAN.cineMatBasic;return s;},back:()=>cineTex(),y:()=>MAN.y+5.1}};
 function snakeReset(){SNAKE.body=[[10,7],[9,7],[8,7],[7,7]];SNAKE.dir=[1,0];SNAKE.q=[];SNAKE.score=0;SNAKE.over=false;SNAKE.t=0;snakeFood();}
 function snakeFood(){for(let k=0;k<500;k++){const f=[Math.floor(Math.random()*SN_C),Math.floor(Math.random()*SN_R)];if(!SNAKE.body.some(b=>b[0]===f[0]&&b[1]===f[1])){SNAKE.food=f;return;}}}
-function snakeEnter(){
+function snakeEnter(where='casa'){const L=SNAKE_LOC[where]||SNAKE_LOC.casa;SNAKE.loc=L;
   if(!SNAKE.cv){SNAKE.cv=mkCanvas(SN_C*SN_S,SN_R*SN_S+12);SNAKE.g=SNAKE.cv.getContext('2d');SNAKE.tex=texFrom(SNAKE.cv,false);SNAKE.tex.magFilter=THREE.NearestFilter;
     const el=document.createElement('div');el.id='snakeBox';el.style.cssText='position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);width:min(calc(88*var(--vw)),760px);z-index:5;pointer-events:none;padding:14px 14px 10px;border-radius:18px;background:#1b1c20;box-shadow:0 10px 40px rgba(0,0,0,0.6),inset 0 0 0 3px #2c2e34;display:none';
     SNAKE.cv.style.cssText='width:100%;display:block;border-radius:6px;image-rendering:pixelated;image-rendering:crisp-edges';el.appendChild(SNAKE.cv);
     const cap=document.createElement('div');cap.style.cssText='margin-top:8px;text-align:center;color:#cfd3c8;font:600 14px Georgia,serif';el.appendChild(cap);SNAKE.cap=cap;document.body.appendChild(el);SNAKE.el=el;}
   SNAKE.on=true;snakeReset();SNAKE.prev={};SNAKE.flash=0;P.vx=P.vz=0;
-  P.x=-491.85;P.z=-1053.5;P.y=surfaceH(P.x,P.z);P.yaw=camYaw=-Math.PI/2;camPitch=-0.12;   // sentado en el sofá, mirando a la tele
-  if(CASA.tvMesh){CASA.tvMesh.material.map=SNAKE.tex;CASA.tvMesh.material.needsUpdate=true;}
+  P.x=L.seat[0];P.z=L.seat[1];P.y=L.y()??surfaceH(P.x,P.z);P.yaw=camYaw=L.seat[2];camPitch=-0.12;   // sentado en el sofá (o en la butaca), mirando a la pantalla
+  {const m=L.mesh();if(m){m.material.map=SNAKE.tex;m.material.needsUpdate=true;if(where==='cine')cineFit(2);}}
   snakeView();
   hint(`<b>Snake.</b> Come la comida sin chocarte con las paredes ni contigo mismo. ${kb('F','Y','Salir','B')} para dejarlo${VR.on?' (stick izquierdo para mover, A para otra partida)':''}.`,5);sfx('pickup');snakeDraw();
 }
@@ -2102,7 +2106,7 @@ function snakeView(){
   SNAKE.el.style.display=SNAKE.tv?'none':'block';
   SNAKE.cap.innerHTML=`${kb('Flechas o WASD','cruceta o stick izq.','joystick')}: mover · ${kb('Espacio','A','Saltar')}: otra partida · ${kb('V','R3','Vista')}: jugar en primera persona viendo la tele · ${kb('F','Y','Salir')}: dejar la consola`;
   P.h.g.visible=!SNAKE.tv;
-  if(SNAKE.tv){camYaw=P.yaw;camPitch=-0.1;hint(`<b>Primera persona</b>: juegas mirando la tele del salón. Gira la vista con ${kb('el ratón','el stick derecho','el dedo')} para ver la casa (${kb('clic derecho','LT','Apuntar')}: acercar). ${kb('V','R3','Vista')}: pantalla grande · ${kb('F','Y','Salir')}: dejar la consola`,7);}
+  if(SNAKE.tv){camYaw=P.yaw;camPitch=-0.1;hint(`<b>Primera persona</b>: juegas mirando ${SNAKE.loc===SNAKE_LOC.cine?'la pantalla del cine':'la tele del salón'}. Gira la vista con ${kb('el ratón','el stick derecho','el dedo')} para ver la casa (${kb('clic derecho','LT','Apuntar')}: acercar). ${kb('V','R3','Vista')}: pantalla grande · ${kb('F','Y','Salir')}: dejar la consola`,7);}
   else{camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}
 }
 function snakeCamera(){   // primera persona: los ojos de Nacho sentado en el sofá; se puede mirar alrededor
@@ -2112,8 +2116,8 @@ function snakeCamera(){   // primera persona: los ojos de Nacho sentado en el so
 }
 function snakeExit(){
   if(SNAKE.tv&&!VR.on){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();P.h.g.visible=true;camPitch=-0.12;}
-  SNAKE.on=false;if(SNAKE.el)SNAKE.el.style.display='none';if(CASA.tvMesh&&CASA.tv){CASA.tvMesh.material.map=CASA.tv.tex;CASA.tvMesh.material.needsUpdate=true;}
-  P.x=-492.75;P.z=-1053.5;P.y=surfaceH(P.x,P.z);P.h.body.position.y=0;P.h.lLeg.rotation.x=P.h.rLeg.rotation.x=0;save();sfx('click');
+  const L=SNAKE.loc||SNAKE_LOC.casa;SNAKE.on=false;if(SNAKE.el)SNAKE.el.style.display='none';{const m=L.mesh(),t=L.back();if(m&&t){m.material.map=t;m.material.needsUpdate=true;}if(L===SNAKE_LOC.cine)cineAfterSnake();}
+  P.x=L.exit[0];P.z=L.exit[1];P.y=L.y()??surfaceH(P.x,P.z);P.h.body.position.y=0;P.h.lLeg.rotation.x=P.h.rLeg.rotation.x=0;save();sfx('click');
 }
 function snakeUpdate(dt,I){
   if(P.dead||P.car){snakeExit();return;}
@@ -2481,7 +2485,9 @@ function buildMansion(){
    bu(-217.6,-215.4,0.72,0.77,IZ0,IZ0+0.7,WALNUT,true);for(const dx of[-217.5,-215.5])bu(dx-0.04,dx+0.04,0,0.72,IZ0+0.05,IZ0+0.65,WALNUT,false);bu(-216.8,-216.2,0,0.45,IZ0+0.85,IZ0+1.35,[0.55,0.68,0.58],false);bu(-216.8,-216.2,0.45,0.95,IZ0+1.3,IZ0+1.38,[0.55,0.68,0.58],false);
    bu(-214.0,-213.2,0,0.45,-221.3,-220.5,[0.85,0.78,0.62],true);bu(-213.35,-213.2,0.45,1.0,-221.3,-220.5,[0.85,0.78,0.62],false);bu(-218.4,-214.2,0.04,0.06,-227.6,-223.4,[0.74,0.66,0.5],false);}
   // ---------------- sala de cine: pantalla grande, butacas rojas en tres filas, altavoces y máquina de palomitas
-  {const xs=-226.12;const sc=new THREE.Mesh(new THREE.PlaneGeometry(7.0,2.9),CASA.tv?new THREE.MeshBasicMaterial({map:CASA.tv.tex}):hm(0x111111,null,0,1));sc.position.set(xs-0.08,FY[1]+2.85,-199.2);sc.rotation.y=-Math.PI/2;scene.add(sc);
+  {const xs=-226.12;const sc=new THREE.Mesh(new THREE.PlaneGeometry(7.0,2.9),CASA.tv?new THREE.MeshBasicMaterial({map:CASA.tv.tex}):hm(0x111111,null,0,1));sc.position.set(xs-0.08,FY[1]+2.85,-199.2);sc.rotation.y=-Math.PI/2;scene.add(sc);MAN.cineScreen=sc;MAN.cineMatBasic=sc.material;sc.scale.x=5.8/7.0;
+   bu(-239.4,-238.6,0,0.85,-199.9,-198.5,WALNUT,true);bu(-239.3,-238.7,0.85,1.15,-199.55,-198.85,[0.12,0.12,0.14],false);{const ln=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.12,14),ME(0xdfeaff,0xbfd4ff,0.9));ln.rotation.z=Math.PI/2;ln.position.set(-238.62,FY[1]+1.0,-199.2);scene.add(ln);}
+   bu(-238.95,-238.75,0.85,0.88,-198.4,-198.0,[0.08,0.08,0.09],false);MAN.cineCtl={x:-238.0,z:-199.2};
    bu(xs-0.05,xs,1.3,4.4,-202.85,-195.55,BLACK,false);bu(xs-0.6,xs,0,0.35,-203.2,-195.2,[0.1,0.06,0.06],false);
    for(const z of[-204.4,-194.0]){bu(xs-0.5,xs,0,1.6,z-0.35,z+0.35,BLACK,true);bu(xs-0.52,xs-0.5,0.3,1.4,z-0.2,z+0.2,[0.25,0.25,0.27],false);}
    const SEAT=[0.55,0.06,0.08];for(const x of[-230.5,-233.4,-236.3])for(const z of[-202.5,-200.6,-197.8,-195.9]){bu(x-0.45,x+0.45,0,0.45,z-0.42,z+0.42,SEAT,true);bu(x-0.58,x-0.4,0.45,1.15,z-0.42,z+0.42,SEAT,false);for(const dz of[-0.42,0.36])bu(x-0.45,x+0.35,0.45,0.66,z+dz,z+dz+0.06,[0.2,0.05,0.05],false);}
@@ -2624,7 +2630,7 @@ function mansionLights(dt){
 // ---------------- cada fotograma: cancela, puerta, fuente, luces y avisos
 function mansionUpdate(dt){
   if(!MAN.built)return;const px=P.car?P.car.x:P.x,pz=P.car?P.car.z:P.z,d=Math.hypot(px+216,pz+212),E=MAN_E;if(d>140)return;
-  if(d<90)mansionLights(dt);
+  if(d<90)mansionLights(dt);cineTick();
   const act=!P.dead&&!P.plane&&!P.train;
   // cancela: se abre sola si la mansión es tuya y llegas (a pie o en coche)
   {const dg=Math.hypot(px-E.x1,pz-(E.gz0+E.gz1)/2),want=MAN.owned&&act&&dg<(P.car?17:7);const prev=MAN.gateOpen;MAN.gateOpen=clamp(MAN.gateOpen+(want?dt:-dt)/1.6,0,1);
@@ -2650,9 +2656,143 @@ function mansionInteract(I){
   for(const w of[MAN.sw,MAN.sw2])if(w&&w.f===fl&&Math.hypot(P.x-w.x,P.z-w.z)<1.05){hint(`Pulsa ${kb('F','Y',MAN.lit?'Apagar':'Encender')} para ${MAN.lit?'apagar':'encender'} las <b>lámparas de araña</b> de la mansión`,0.3);if(I.enter){MAN.lit=!MAN.lit;sfx('click');save();return true;}return false;}
   if(fl===0&&MAN.fridge&&Math.hypot(P.x-MAN.fridge.x,P.z-MAN.fridge.z)<1.3){const ok=G.time-MAN.snackT>25;hint(ok?`Pulsa ${kb('F','Y','Nevera')} para <b>picar algo de la nevera</b>: recuperas algo de salud`:'La nevera está bien llena, pero acabas de comer',0.3);
     if(I.enter&&ok){MAN.snackT=G.time;heal(35);sfx('pickup');toast(rpick(['Un poco de tortilla de patatas','Jamón del bueno y un vaso de leche','Croquetas de la abuela, recalentadas']),2.4);return true;}return false;}
+  if(fl===1&&MAN.cineCtl&&Math.hypot(P.x-MAN.cineCtl.x,P.z-MAN.cineCtl.z)<1.5){hint(`Pulsa ${kb('F','Y','Cine')} para usar el <b>cine</b>: la tele, un vídeo tuyo o el <b>Snake</b> en la pantalla grande`,0.3);if(I.enter){P.vx=P.vz=0;sfx('click');openShop(MAN.cineShop);return true;}return false;}
   if(fl===1&&MAN.bed&&Math.hypot(P.x-MAN.bed.x,P.z-MAN.bed.z)<1.9){hint(`Pulsa ${kb('F','Y','Dormir')} para <b>dormir</b> en la cama con dosel: recuperas la salud y se guarda la partida`,0.3);if(I.enter){casaSleep();return true;}}
   return false;
 }
+
+// =====================================================================
+//  CINE DE LA MANSIÓN: en la pantalla de 7 m se ve la tele, un vídeo tuyo (del móvil o del ordenador, con sonido),
+//  un vídeo de YouTube (cuando el juego está en una web normal) o se juega al Snake desde la butaca del medio.
+//  YouTube va en un iframe de verdad colocado en 3D con CSS justo detrás del lienzo: la pantalla del cine «abre un agujero»
+//  transparente en el dibujo, así las butacas, Nacho y las paredes lo tapan como si estuviera en la sala.
+// =====================================================================
+MAN.cine={mode:'tv',v:null,vt:null,name:'',url:null,autoPaused:false};
+const YT={id:null,list:null,t:0,name:'',layer:null,cam:null,obj:null,fr:null,big:false,paused:false,autoPaused:false,vol:-1,muted:null,lastUrl:'',W:1280,H:720,
+  blocked:/claudeusercontent|claude\.(ai|site)|anthropic/i.test(location.hostname),file:location.protocol==='file:',hole:null,vrTex:null,lastVR:null,m4:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),sv:new THREE.Vector3(),key:''};
+function cineTex(){const C=MAN.cine;return C.mode==='video'&&C.vt?C.vt:(CASA.tv&&CASA.tv.tex);}
+// la imagen se ajusta a su proporción dentro del marco negro (7 × 2,9 m), como en un cine de verdad
+function cineFit(asp){const sc=MAN.cineScreen;if(!sc)return;const W=7.0,H=2.9;let w=H*asp,h=H;if(w>W){w=W;h=W/asp;}sc.scale.set(w/W,h/H,1);}
+function ytHole(){return YT.hole||(YT.hole=new THREE.MeshBasicMaterial({color:0x000000,opacity:0,blending:THREE.NoBlending,fog:false,toneMapped:false}));}
+function ytVrTex(){if(YT.vrTex)return YT.vrTex;YT.vrTex=casaTex(512,256,(g,w,h)=>{g.fillStyle='#0b0c10';g.fillRect(0,0,w,h);g.fillStyle='#ff0033';g.fillRect(w/2-46,52,92,64);g.fillStyle='#fff';g.beginPath();g.moveTo(w/2-14,66);g.lineTo(w/2+20,84);g.lineTo(w/2-14,102);g.fill();
+  g.textAlign='center';g.font='bold 26px Georgia,serif';g.fillText('YouTube no se ve dentro de las gafas',w/2,160);g.font='20px Georgia,serif';g.fillStyle='#cfd3c8';g.fillText('El sonido sí: quítatelas para ver el vídeo',w/2,196);});return YT.vrTex;}
+function cineShow(){const C=MAN.cine,sc=MAN.cineScreen;if(!sc||(SNAKE.on&&SNAKE.loc===SNAKE_LOC.cine))return;YT.lastVR=VR.on;
+  if(YT.id&&!VR.on){if(sc.material!==ytHole())sc.material=ytHole();cineFit(16/9);return;}
+  if(MAN.cineMatBasic&&sc.material!==MAN.cineMatBasic)sc.material=MAN.cineMatBasic;
+  const t=YT.id?ytVrTex():cineTex();if(t&&sc.material.map!==t){sc.material.map=t;sc.material.needsUpdate=true;}
+  if(YT.id)cineFit(2);else if(C.mode==='video'&&C.v&&C.v.videoWidth)cineFit(C.v.videoWidth/C.v.videoHeight);else cineFit(2);}
+function cineVideoStop(){const C=MAN.cine;if(C.v){try{C.v.pause();C.v.removeAttribute('src');C.v.load();}catch(e){}}if(C.vt)C.vt.dispose();if(C.url)URL.revokeObjectURL(C.url);C.v=C.vt=C.url=null;C.name='';C.mode='tv';cineShow();}
+function cineVideoPick(){let inp=MAN.cineInp;
+  if(!inp){inp=document.createElement('input');inp.type='file';inp.accept='video/*';inp.id='cineFile';inp.style.cssText='position:fixed;left:-9999px;width:1px;height:1px;opacity:0';document.body.appendChild(inp);
+    inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.value='';if(f)cineVideoLoad(f);};MAN.cineInp=inp;}
+  inp.click();}
+const cineMsg=s=>{if(SHOP_OPEN&&SHOP_OPEN.id==='cine')renderShop(s);else toast(s,4.5);};
+function cineVideoLoad(f){
+  ytStop();cineVideoStop();const C=MAN.cine,v=document.createElement('video');v.playsInline=true;v.setAttribute('playsinline','');v.loop=true;v.preload='auto';
+  C.url=URL.createObjectURL(f);C.name=f.name.replace(/\.[^.]+$/,'').slice(0,40);v.src=C.url;C.v=v;C.mode='video';cineVol();
+  const t=new THREE.VideoTexture(v);t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;t.generateMipmaps=false;C.vt=t;
+  v.onloadedmetadata=()=>cineShow();
+  v.onerror=()=>{if(MAN.cine.v!==v)return;cineVideoStop();cineMsg('Ese vídeo no se puede ver aquí. Prueba con otro (MP4 o WebM suelen ir bien).');};
+  const p=v.play();if(p&&p.then)p.then(()=>{cineShow();cineMsg(`En pantalla: <b>${C.name}</b>. Que aproveche la peli.`);}).catch(()=>{cineShow();cineMsg(`<b>${C.name}</b> está listo: pulsa «Seguir» para que empiece.`);});
+  cineShow();}
+// ---------------- YouTube
+// enlaces que valen: youtube.com/watch?v=…, youtu.be/…, /shorts/…, /live/…, /embed/… (con su lista y su minuto si los llevan) o el código de 11 letras
+function ytParse(s){s=(s||'').trim();const m=s.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/);
+  const id=m?m[1]:(/^[A-Za-z0-9_-]{11}$/.test(s)?s:null);if(!id)return null;
+  const tt=(s.match(/[?&#](?:t|start)=(\d+)(?:s)?/)||[])[1],list=(s.match(/[?&]list=([A-Za-z0-9_-]+)/)||[])[1];return{id,t:tt?+tt:0,list:list||null};}
+const YT_ERR={2:'Ese enlace de YouTube no es válido.',5:'El reproductor de YouTube ha fallado con este vídeo. Prueba otro.',100:'Ese vídeo no existe o es privado.',101:'El dueño de ese vídeo no deja verlo fuera de YouTube. Prueba con otro.',150:'El dueño de ese vídeo no deja verlo fuera de YouTube. Prueba con otro.',153:'YouTube no deja verlo así: abre el juego desde tu web (https), no como archivo suelto.',
+  blocked:'Aquí, dentro de Claude, la página no deja cargar YouTube. Cuando subas el juego a tu propia web, se verá en esta pantalla.'};
+function ytBuild(){
+  if(YT.layer)return;const L=document.createElement('div');L.id='ytLayer';L.style.cssText='position:fixed;left:0;top:0;overflow:hidden;z-index:-1;pointer-events:none;display:none';
+  const C=document.createElement('div');C.style.cssText='position:absolute;left:0;top:0;transform-style:preserve-3d;pointer-events:none';
+  const O=document.createElement('div');O.style.cssText=`position:absolute;left:0;top:0;width:${YT.W}px;height:${YT.H}px;background:#000;pointer-events:none;backface-visibility:hidden`;
+  C.appendChild(O);L.appendChild(C);document.body.appendChild(L);YT.layer=L;YT.cam=C;YT.obj=O;
+  const b=document.createElement('button');b.className='b';b.id='ytBack';b.textContent='Volver a la sala';b.style.cssText='position:fixed;right:max(16px, env(safe-area-inset-right, 0px));top:calc(12px + env(safe-area-inset-top, 0px));z-index:42;display:none';
+  b.onclick=()=>ytBig(false);document.body.appendChild(b);YT.back=b;
+  addEventListener('keydown',e=>{if(YT.big&&(e.key==='Escape'||e.code==='KeyF')){e.preventDefault();e.stopPropagation();ytBig(false);}},true);
+  addEventListener('message',e=>{if(!YT.fr||e.source!==YT.fr.contentWindow)return;let d=e.data;try{if(typeof d==='string')d=JSON.parse(d);}catch(_){return;}if(!d||typeof d!=='object')return;
+    if(d.event==='onError')ytFail(d.info);else if(d.event==='onReady'){YT.ready=true;YT.vol=-1;}
+    else if(d.event==='onStateChange'||(d.event==='infoDelivery'&&d.info&&d.info.playerState!==undefined)){const st=d.event==='onStateChange'?d.info:d.info.playerState;if(st===1)YT.paused=false;else if(st===2)YT.paused=true;}
+    if(d.event==='infoDelivery'&&d.info&&d.info.videoData&&d.info.videoData.title)YT.name=String(d.info.videoData.title).slice(0,60);});
+  document.addEventListener('securitypolicyviolation',e=>{if(/youtube/i.test(e.blockedURI||'')&&YT.id){YT.blocked=true;ytFail('blocked');}});
+}
+function ytCmd(func,args){const f=YT.fr;if(!f||!f.contentWindow)return;try{f.contentWindow.postMessage(JSON.stringify(func==='listening'?{event:'listening',id:'cine',channel:'widget'}:{event:'command',func,args:args||[]}),'*');}catch(e){}}
+function ytLoad(p){
+  if(YT.blocked){cineMsg(YT_ERR.blocked);return false;}
+  ytBuild();cineVideoStop();ytStop(true);YT.id=p.id;YT.list=p.list;YT.t=p.t;YT.name='';YT.paused=false;YT.autoPaused=false;YT.vol=-1;YT.muted=null;YT.ready=false;
+  const f=document.createElement('iframe');f.title='YouTube';f.setAttribute('allow','autoplay; encrypted-media; picture-in-picture; fullscreen');f.setAttribute('allowfullscreen','');f.referrerPolicy='strict-origin-when-cross-origin';
+  f.style.cssText='width:100%;height:100%;border:0;display:block;pointer-events:none';
+  const q=new URLSearchParams({autoplay:'1',playsinline:'1',rel:'0',modestbranding:'1',enablejsapi:'1',iv_load_policy:'3'});if(/^https?:/.test(location.protocol))q.set('origin',location.origin);if(p.t)q.set('start',String(p.t));if(p.list)q.set('list',p.list);
+  f.src=`https://www.youtube.com/embed/${p.id}?${q}`;f.onload=()=>{ytCmd('listening');setTimeout(()=>ytCmd('listening'),600);};
+  YT.obj.innerHTML='';YT.obj.appendChild(f);YT.fr=f;cineShow();ytFrame();
+  if(YT.file)setTimeout(()=>{if(YT.id===p.id&&!YT.ready)cineMsg('Si YouTube no arranca es porque el juego está abierto como archivo: súbelo a una web (https) y funcionará.');},4000);
+  return true;}
+// al dejar el Snake del cine, la peli sigue donde estaba
+function cineAfterSnake(){const C=MAN.cine,r=C.resume;C.resume=null;cineShow();if(!r)return;if(r[0]&&C.v){const p=C.v.play();if(p&&p.catch)p.catch(()=>{});}if(r[1]&&YT.id){ytCmd('playVideo');YT.paused=false;}}
+function ytStop(keepLayer){if(!YT.id&&!YT.fr)return;if(YT.big)ytBig(false);if(YT.fr){try{YT.fr.src='about:blank';}catch(e){}YT.fr.remove();}YT.fr=null;YT.id=null;YT.name='';if(YT.layer&&!keepLayer)YT.layer.style.display='none';cineShow();}
+function ytFail(code){const m=YT_ERR[code]||'YouTube no ha podido poner ese vídeo.';ytStop();cineMsg(m);}
+// pantalla grande: el mismo iframe se pone delante de todo, con los mandos de YouTube a mano (pantalla completa incluida)
+function ytBig(on){if(!YT.layer||!YT.id)return;YT.big=on;const L=YT.layer,fr=YT.fr;
+  L.style.zIndex=on?'41':'-1';L.style.background=on?'rgba(8,9,12,0.94)':'transparent';L.style.pointerEvents=on?'auto':'none';YT.obj.style.pointerEvents=on?'auto':'none';if(fr)fr.style.pointerEvents=on?'auto':'none';
+  YT.back.style.display=on?'block':'none';YT.key='';if(on){lockPrompt(false);if(document.pointerLockElement&&document.exitPointerLock)document.exitPointerLock();toast('Pulsa <kbd>Esc</kbd> o «Volver a la sala» para seguir jugando',3);}else{tryLock&&tryLock();}
+  ytFrame();}
+const _ycss=v=>Math.abs(v)<1e-10?0:v;
+// cada fotograma, después de dibujar: el iframe se coloca con CSS 3D exactamente donde está la pantalla del cine
+function ytFrame(){
+  if(!YT.layer)return;const L=YT.layer;if(!YT.id){if(L.style.display!=='none')L.style.display='none';return;}
+  const W=LW(),H=LH();
+  if(YT.big){const s=Math.min(W*0.94/YT.W,(H-70)*0.96/YT.H),k='big'+W+'x'+H;if(YT.key!==k){YT.key=k;L.style.display='block';L.style.width=W+'px';L.style.height=H+'px';L.style.perspective='none';L.style.transform='none';
+      YT.cam.style.transform='none';YT.cam.style.width=W+'px';YT.cam.style.height=H+'px';YT.obj.style.transform=`translate(${(W-YT.W*s)/2}px,${(H-YT.H*s)/2+20}px) scale(${s})`;YT.obj.style.transformOrigin='0 0';}return;}
+  const sc=MAN.cineScreen,px=P.car?P.car.x:P.x,pz=P.car?P.car.z:P.z,far=Math.hypot(px+232,pz+199)>70;
+  if(VR.on||!sc||far||G.state==='title'){if(L.style.display!=='none')L.style.display='none';return;}
+  if(L.style.display!=='block')L.style.display='block';
+  const fov=camera.projectionMatrix.elements[5]*H/2;let tx=0,ty=0;if(camera.view&&camera.view.enabled){tx=-camera.view.offsetX*W/camera.view.fullWidth;ty=-camera.view.offsetY*H/camera.view.fullHeight;}
+  const e=camera.matrixWorldInverse.elements;
+  const camT=`translateZ(${fov}px) matrix3d(${_ycss(e[0])},${_ycss(-e[1])},${_ycss(e[2])},${_ycss(e[3])},${_ycss(e[4])},${_ycss(-e[5])},${_ycss(e[6])},${_ycss(e[7])},${_ycss(e[8])},${_ycss(-e[9])},${_ycss(e[10])},${_ycss(e[11])},${_ycss(e[12])},${_ycss(-e[13])},${_ycss(e[14])},${_ycss(e[15])}) translate(${W/2}px,${H/2}px)`;
+  sc.updateMatrixWorld();sc.matrixWorld.decompose(YT.v,YT.q,YT.sv);const sw=7.0*sc.scale.x,sh=2.9*sc.scale.y;YT.sv.set(sw/YT.W,sh/YT.H,1);YT.m4.compose(YT.v,YT.q,YT.sv);const o=YT.m4.elements;
+  const objT=`translate(-50%,-50%) matrix3d(${_ycss(o[0])},${_ycss(o[1])},${_ycss(o[2])},${_ycss(o[3])},${_ycss(-o[4])},${_ycss(-o[5])},${_ycss(-o[6])},${_ycss(-o[7])},${_ycss(o[8])},${_ycss(o[9])},${_ycss(o[10])},${_ycss(o[11])},${_ycss(o[12])},${_ycss(o[13])},${_ycss(o[14])},${_ycss(o[15])})`;
+  if(YT.key!=='3d'+W+'x'+H){YT.key='3d'+W+'x'+H;L.style.width=W+'px';L.style.height=H+'px';YT.cam.style.width=W+'px';YT.cam.style.height=H+'px';YT.obj.style.transformOrigin='';}
+  L.style.perspective=fov+'px';L.style.transform=tx||ty?`translate(${tx}px,${ty}px)`:'none';YT.cam.style.transform=camT;YT.obj.style.transform=objT;
+}
+// el sonido (de tu vídeo o de YouTube): según lo cerca que estés de la sala, con el volumen general del juego
+function cineVolK(){const px=P.car?P.car.x:P.x,pz=P.car?P.car.z:P.z,d=Math.hypot(px+232,pz+199.2),up=Math.abs(P.y-(MAN.y+5.1))<2.5;
+  const inRoom=up&&px>-239.6&&px<-226&&pz>-206&&pz<-192.4;return clamp((AU.vol??0.7)*(YT.big||inRoom?1:clamp(1-d/40,0,1)*(up?0.4:0.15)),0,1);}
+function cineVol(){const v=MAN.cine.v;if(!v)return;v.muted=!!AU.muted;v.volume=cineVolK();}
+function cineTick(){if(MAN.cine.v)cineVol();
+  if(YT.id){if(YT.lastVR!==VR.on)cineShow();const vol=Math.round(cineVolK()*100),mu=!!AU.muted;
+    if(Math.abs(vol-YT.vol)>=3||(vol===0&&YT.vol!==0)){YT.vol=vol;ytCmd('setVolume',[vol]);}if(mu!==YT.muted){YT.muted=mu;ytCmd(mu?'mute':'unMute');}}}
+// al pausar el juego (o ir al menú) la peli también se para, y sigue al volver
+setInterval(()=>{const stop=G.state==='paused'||G.state==='map'||G.state==='title'||document.hidden;const C=MAN.cine;
+  if(C&&C.v){if(stop&&!C.v.paused){C.v.pause();C.autoPaused=true;}else if(!stop&&C.autoPaused){C.autoPaused=false;const p=C.v.play();if(p&&p.catch)p.catch(()=>{});}}
+  if(YT.id&&!YT.big){if(stop&&!YT.paused&&!YT.autoPaused){ytCmd('pauseVideo');YT.autoPaused=true;}else if(!stop&&YT.autoPaused){YT.autoPaused=false;ytCmd('playVideo');}}},300);
+function cinePanelSetup(){
+  MAN.cineShop={id:'cine',name:'Sala de cine',vend:'Nacho'};
+  SHOP_ITEMS.cine={side:true,nomoney:true,tick:cineCamTick,hola:['¿Qué ponemos en la pantalla grande?','Palomitas listas. ¿Peli, YouTube, tele o Snake?','Butacas de terciopelo y siete metros de pantalla. Tú eliges.'],
+    get items(){const C=MAN.cine,out=[],vid=C.mode==='video'&&C.v;
+      out.push({cat:'Pantalla',n:'Canal Real Sitio',d:'La tele de siempre: el Monasterio del día a la noche'+(C.mode==='tv'&&!YT.id?' · <b>puesto</b>':''),p:0,sw:0x7fa7d8,btn:C.mode==='tv'&&!YT.id?'Puesto':'Poner',noPrice:true,quiet:true,
+        f:()=>{ytStop();if(C.v)cineVideoStop();C.mode='tv';cineShow();return'Puesto el Canal Real Sitio.';}});
+      out.push({cat:'YouTube',n:'Vídeo de YouTube',d:(YT.blocked?'<b>Aquí, dentro de Claude, no se puede:</b> la página bloquea YouTube. Cuando subas el juego a tu propia web, funcionará. ':'Pega el enlace del vídeo (o de una lista) y pulsa «Poner». ')+'Con las gafas de VR solo se oye.',
+        input:{id:'ytUrl',ph:'https://www.youtube.com/watch?v=…',v:YT.lastUrl},p:0,sw:0xff0033,btn:'Poner',noPrice:true,quiet:true,
+        f:()=>{const el=$('ytUrl'),txt=el?el.value:YT.lastUrl;YT.lastUrl=txt;const p=ytParse(txt);if(!p){renderShop('Eso no parece un enlace de YouTube. Copia el enlace del vídeo (el de «Compartir» vale) y pégalo.');return false;}
+          if(!ytLoad(p))return false;return'¡Marchando! En la pantalla grande en un momento.';}});
+      if(YT.id){out.push({cat:'YouTube',n:'Ahora: '+(YT.name||'vídeo de YouTube'),d:YT.paused?'En pausa':'Reproduciéndose',p:0,sw:0x3a3a40,btn:YT.paused?'Seguir':'Pausa',noPrice:true,quiet:true,
+          f:()=>{YT.autoPaused=false;if(YT.paused){ytCmd('playVideo');YT.paused=false;return'¡Acción!';}ytCmd('pauseVideo');YT.paused=true;return'En pausa.';}});
+        out.push({cat:'YouTube',n:'Ver en grande',d:'El vídeo delante de todo, con los mandos de YouTube (pantalla completa, subtítulos, saltar anuncios…). Esc para volver',p:0,btn:'En grande',noPrice:true,quiet:true,f:()=>{YT.big=true;closeShop();ytBig(true);return false;}});
+        out.push({cat:'YouTube',n:'Quitar YouTube',d:'Vuelve a poner la tele',p:0,btn:'Quitar',noPrice:true,quiet:true,f:()=>{ytStop();return'YouTube quitado: vuelve la tele.';}});}
+      out.push({cat:'YouTube',n:'Buscar en YouTube',d:'Se abre en otra pestaña: busca el vídeo, copia su enlace y pégalo arriba',p:0,link:'https://www.youtube.com/',btn:'Abrir YouTube',noPrice:true});
+      out.push({cat:'Tus vídeos',n:'Un vídeo tuyo',d:'Elige un vídeo de tu móvil o de tu ordenador (MP4, WebM…) y se ve aquí en grande, con sonido',p:0,sw:0xe8b93a,btn:'Elegir vídeo',noPrice:true,quiet:true,
+        f:()=>{cineVideoPick();return'Elige el vídeo en la ventana que se abre…';}});
+      if(vid){out.push({cat:'Tus vídeos',n:C.name||'Tu vídeo',d:C.v.paused?'En pausa':'Reproduciéndose',p:0,sw:0x3a3a40,btn:C.v.paused?'Seguir':'Pausa',noPrice:true,quiet:true,
+          f:()=>{C.autoPaused=false;if(C.v.paused){const p=C.v.play();if(p&&p.catch)p.catch(()=>renderShop('El navegador no deja reproducirlo todavía: vuelve a pulsar «Seguir».'));return'¡Acción!';}C.v.pause();return'En pausa.';}});
+        out.push({cat:'Tus vídeos',n:'Volver a empezar',d:'Desde el principio',p:0,btn:'Empezar',noPrice:true,quiet:true,f:()=>{C.v.currentTime=0;const p=C.v.play();if(p&&p.catch)p.catch(()=>{});return'Otra vez desde el principio.';}});
+        out.push({cat:'Tus vídeos',n:'Quitar el vídeo',d:'Vuelve a poner la tele',p:0,btn:'Quitar',noPrice:true,quiet:true,f:()=>{cineVideoStop();return'Vídeo quitado: vuelve la tele.';}});}
+      out.push({cat:'Consola',n:'Snake en la pantalla grande',d:'El mismo Snake de la casa de Nacho, jugando desde la butaca del medio',p:0,sw:0x9bbc0f,btn:'Jugar',noPrice:true,quiet:true,
+        f:()=>{C.resume=[!!(C.v&&!C.v.paused),!!(YT.id&&!YT.paused)];if(C.resume[1]){ytCmd('pauseVideo');YT.paused=true;}if(C.resume[0])C.v.pause();closeShop();snakeEnter('cine');return false;}});
+      return out;}};}
+// mientras eliges: la cámara mira la pantalla desde el fondo de la sala (la lista, a la izquierda)
+function cineCamTick(){if(VR.on)return;const y=MAN.y+5.1;camera.position.set(-238.6,y+2.0,-199.2);camera.lookAt(-226.2,y+2.6,-199.2);
+  if(Math.abs(camera.fov-62)>0.01){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}P.h.g.visible=false;cineTick();
+  const W=LW(),H=LH(),off=gcamOff();if(off>1)camera.setViewOffset(W,H,-off,0,W,H);else if(camera.view&&camera.view.enabled)camera.clearViewOffset();}
 // =====================================================================
 //  CALLES JUNTO AL MONASTERIO, como en el plano del pueblo:
 //  · Calle Floridablanca: fila continua de casas de tres y cuatro plantas con tiendas en el bajo (escaparates encendidos,
@@ -2776,12 +2916,28 @@ function buildCalles(){
    const t=signTex(['PARQUE','ADOLFO SUÁREZ'],512,200,'#245a32','#ffffff','bold 52px Arial,sans-serif','#ffffff');const gy=groundH(X1-0.5,cz+3);STONE.box(X1-0.6,gy,cz+3.2,0.18,1.0,0.9,0,GRAN,1,1);signMesh(t,1.6,0.62,X1-0.4,gy+1.45,cz+3.2,Math.PI/2);}
   // ---------------- la Escolanía del Escorial, en la fachada de poniente del Monasterio
   {const y=groundH(-73.5,76);woodDoor(-72.08,y+0.04,76,-Math.PI/2,2.2,3.6);signMesh(signTex(['ESCOLANÍA','DEL ESCORIAL'],512,180,'#2b2d31','#e8d9b0','bold 50px Georgia,serif','#b99a52'),2.4,0.84,-72.45,y+4.75,76,-Math.PI/2);}
-  // esquina de la Lonja entre el muro de contención y la primera Casa de Oficios: un macizo de sillería con su pretil tapa el talud de tierra
-  {const y=H0,x0=-120.6,x1=-111,z0=-160.5,z1=-147.0,top=Math.max(minGround(x0,x1,z0-1,z0)+0.2,y+3);
-   STONE.box((x0+x1)/2,y-1,(z0+z1)/2,(x1-x0)/2,top-(y-1),(z1-z0)/2,0,GRAN,2,2,y-1);
-   STONE.box((x0+x1)/2,top,z1-0.5,(x1-x0)/2,1.0,0.5,0,GRAN,1,1);STONE.box(x0+0.5,top,(z0+z1)/2,0.5,1.0,(z1-z0)/2,0,GRAN,1,1);
-   for(let x=x0+1.8;x<x1;x+=3.2)STONE.box(x,y+0.0,z1+0.12,0.3,top-y-0.4,0.12,0,[0.9,0.88,0.84],1,1);
-   addCollider((x0+x1)/2,(z0+z1)/2,(x1-x0)/2,(z1-z0)/2,0,y-2,top+1,'wall');}
+  // esquina de la Lonja entre la acera de Floridablanca, el borde de la Lonja y la primera Casa de Oficios: un macizo de sillería
+  // que llega hasta el bordillo (siguiendo la curva de la calle) tapa el talud; arriba, una jardinera con césped y setos
+  {const y=H0,FL=ROADS.find(r=>r.n==='Calle Floridablanca'),XE=-111,ZN=-147.2,ZS=-160.8,lim=FL.w+2.2;
+   const dFL=(x,z)=>{let d=1e9;for(let k=0;k<FL.pts.length-1;k++){const a=FL.pts[k],b=FL.pts[k+1];if(Math.max(a[1],b[1])<-185||Math.min(a[1],b[1])>-120)continue;const vx=b[0]-a[0],vz=b[1]-a[1],L2=vx*vx+vz*vz||1,t=clamp(((x-a[0])*vx+(z-a[1])*vz)/L2,0,1);d=Math.min(d,Math.hypot(x-a[0]-vx*t,z-a[1]-vz*t));}return d;};
+   const B=[];for(let z=ZN;z>=ZS-0.01;z-=0.8){let xb=XE-4;for(let x=XE-4;x>-136;x-=0.1){if(dFL(x,z)<lim+0.05)break;xb=x;}B.push([xb,Math.max(z,ZS)]);}
+   if(B[B.length-1][1]>ZS)B.push([B[B.length-1][0],ZS]);
+   const top=z=>{const pz=B.reduce((a,b)=>Math.abs(b[1]-z)<Math.abs(a[1]-z)?b:a);return Math.max(groundH(pz[0]-1.2,z),y+3)+0.12;};
+   const T=B.map(b=>top(b[1])),bot=y-1,GRN=[0.3,0.46,0.22];
+   for(let k=0;k<B.length-1;k++){const[xa,za]=B[k],[xb,zb]=B[k+1],ta=T[k],tb=T[k+1];
+     STONE.quad([xa,bot,za],[xa,ta,za],[xb,tb,zb],[xb,bot,zb],[0,bot/2],[0,ta/2],[Math.hypot(xb-xa,zb-za)/2,tb/2],[Math.hypot(xb-xa,zb-za)/2,bot/2],GRAN);   // cara hacia la acera
+     HEDGE.quad([xa,ta,za],[XE,ta,za],[XE,tb,zb],[xb,tb,zb],[xa/3,za/3],[XE/3,za/3],[XE/3,zb/3],[xb/3,zb/3],GRN);   // césped de la jardinera
+     const mx=(xa+xb)/2,mz=(za+zb)/2,L=Math.hypot(xb-xa,zb-za)/2+0.06,rot=Math.atan2(-(zb-za),xb-xa);
+     STONE.box(mx+0.22*Math.sign(XE-mx),Math.min(ta,tb)-0.05,mz,L,0.55,0.25,rot,GRAN,1,1);   // bordillo alto de granito
+     HEDGE.box(mx+1.0,Math.min(ta,tb),mz,L,0.85,0.45,rot,[0.24,0.42,0.2],2,1);}            // seto junto al bordillo
+   STONE.quad([B[0][0],bot,ZN],[XE,bot,ZN],[XE,T[0],ZN],[B[0][0],T[0],ZN],[0,0],[5,0],[5,5],[0,5],GRAN);   // cara hacia la Lonja
+   {const xs=B[B.length-1][0];STONE.quad([XE,bot,ZS],[xs,bot,ZS],[xs,T[T.length-1],ZS],[XE,T[T.length-1],ZS],[0,0],[5,0],[5,5],[0,5],GRAN);}
+   STONE.box((-120.4+XE)/2,T[0],ZN+0.45,(XE+120.4)/2,1.0,0.45,0,GRAN,1,1);   // pretil sobre la Lonja, que sigue el del borde
+   for(let x=-119;x<XE;x+=3.2)STONE.box(x,y,ZN+0.12,0.3,T[0]-y-0.4,0.12,0,[0.9,0.88,0.84],1,1);   // pilastras del muro
+   for(const[x,z]of[[-116,-151.5],[-114,-156.5],[-118.5,-157.5]]){const t=top(z);HEDGE.box(x,t,z,0.55,1.6,0.55,0,[0.2,0.38,0.18],1,1);HEDGE.box(x,t+1.6,z,0.38,0.7,0.38,0,[0.22,0.42,0.2],1,1);}   // bojes recortados
+   // colisión: el macizo entero (no se sube a la jardinera) en trozos que siguen la curva
+   for(let k=0;k<B.length-1;k++){const z0=Math.min(B[k][1],B[k+1][1]),z1=Math.max(B[k][1],B[k+1][1]),x0=Math.max(B[k][0],B[k+1][0]);addCollider((x0+XE)/2,(z0+z1)/2,(XE-x0)/2,(z1-z0)/2+0.02,0,y-2,Math.max(T[k],T[k+1])+1.2,'wall');}
+   PAVED.push([B.reduce((a,b)=>Math.min(a,b[0]),0)-1,XE+1,ZS-1,ZN+1]);}
   buildVecinos();
   SHOPGB.build();
 }
@@ -3017,7 +3173,7 @@ function buildLandmarks(){
   // Mirador de Abantos y casa de Nacho (con sus dos garajes)
   buildCasaNacho();armarioSetup();rgbPanelSetup();
   // mansión en venta junto al Ayuntamiento
-  buildMansion();
+  buildMansion();cinePanelSetup();
   // Floridablanca con sus tiendas, Casa de las Pizarras, Plaza Virgen de Gracia, Fuente del Águila Bicéfala, Parque Adolfo Suárez, Escolanía
   buildCalles();
   // Presa del Romeral
@@ -4118,8 +4274,8 @@ function lockPrompt(show){let el=document.getElementById('lockPrompt');
       el.addEventListener('mousedown',e=>{e.preventDefault();e.stopPropagation();lastDevice='kb';lockPrompt(false);tryLock();});document.body.appendChild(el);}
     el.style.display='flex';}
   else if(el)el.style.display='none';}
-function lockCheck(){setTimeout(()=>{if(G.state==='play'&&!locked&&lastDevice==='kb')lockPrompt(true);},450);}
-function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH||VR.on)return;if(!CANVAS.requestPointerLock){lockOK=false;return;}
+function lockCheck(){setTimeout(()=>{if(G.state==='play'&&!locked&&lastDevice==='kb'&&!YT.big)lockPrompt(true);},450);}
+function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH||VR.on||YT.big)return;if(!CANVAS.requestPointerLock){lockOK=false;return;}
   const plain=gesture=>{try{const p=CANVAS.requestPointerLock();if(p&&p.catch)p.catch(()=>{if(gesture)lockFail();});}catch(e){if(gesture)lockFail();}};
   if(!rawOK){plain(true);return;}
   // movimiento del ratón en crudo (sin aceleración del sistema): evita casi todos los saltos; si no se admite, captura normal
@@ -4127,7 +4283,7 @@ function tryLock(){if(G.state!=='play'||locked||!lockOK||IS_TOUCH||VR.on)return;
   if(p&&p.catch){lockPromise=true;p.catch(()=>{rawOK=false;plain(false);});}else rawOK=false; // sin promesas, la petición ya fue normal
 }
 
-document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(locked){lockT=performance.now();MOUSE.dx=MOUSE.dy=0;mEma=8;lockFails=0;lockPrompt(false);}if(!locked&&wasLocked&&G.state==='play')openPause();wasLocked=locked;});
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===CANVAS;if(locked){lockT=performance.now();MOUSE.dx=MOUSE.dy=0;mEma=8;lockFails=0;lockPrompt(false);}if(!locked&&wasLocked&&G.state==='play'&&!YT.big)openPause();wasLocked=locked;});
 document.addEventListener('pointerlockerror',()=>{if(lockPromise)return;lockFail();}); // con promesas, los fallos se gestionan en tryLock
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play')openPause();});
 const PAD={b:[],pb:[],ax:[0,0,0,0],lt:0,rt:0,plt:0,prt:0,on:false};
@@ -6000,11 +6156,13 @@ function renderShop(msg){
   let h=`<h2>${sh.name}</h2><div class="shopMsg"><b>${sh.vend}:</b> ${msg}</div>${S.nomoney?'':`<div class="shopMoney">Llevas ${fmtMoney(P.money)}</div>`}<div class="shopList">`;
   let cat='';
   S.items.forEach((it,i)=>{const pr=priceOf(it);const can=P.money>=pr;if(it.cat&&it.cat!==cat){cat=it.cat;h+=`<div class="shopCat">${cat}</div>`;}
-    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${it.noPrice?'':(sh.id==='armario'?'Tuyo':(pr?fmtMoney(pr):'Gratis'))}</div><button class="b${can?'':' alt'}" data-i="${i}">${sh.id==='armario'?'Ponérmelo':(can?(it.btn||'Comprar'):'No llega')}</button></div>`;});
+    h+=`<div class="shopRow"><div><div class="shopName">${it.sw!==undefined?`<span class="sw" style="background:#${it.sw.toString(16).padStart(6,'0')}"></span>`:''}${it.n}</div><div class="shopDesc">${it.d}${it.input?`<input class="shopIn" id="${it.input.id}" data-i="${i}" type="text" placeholder="${it.input.ph||''}" value="${(it.input.v||'').replace(/"/g,'&quot;')}" autocomplete="off" autocapitalize="off" spellcheck="false">`:''}${it.ammoOnly&&!P.weapons[it.ammoOnly]?' (aún no tienes esta arma)':''}</div></div><div class="shopPrice">${it.noPrice?'':(sh.id==='armario'?'Tuyo':(pr?fmtMoney(pr):'Gratis'))}</div>${it.link?`<a class="b" href="${it.link}" target="_blank" rel="noopener" style="text-decoration:none">${it.btn||'Abrir'}</a>`:`<button class="b${can?'':' alt'}" data-i="${i}">${sh.id==='armario'?'Ponérmelo':(can?(it.btn||'Comprar'):'No llega')}</button>`}</div>`;});
   h+=`</div><div class="btns"><button class="b alt" id="shopClose">Cerrar</button></div>`;
   const sc=$('shop').scrollTop,si0=$('shopInner').scrollTop,ol=$('shopInner').querySelector('.shopList'),ls=ol?ol.scrollTop:0;
   $('shopInner').innerHTML=h;$('shop').scrollTop=sc;$('shopInner').scrollTop=si0;{const nl=$('shopInner').querySelector('.shopList');if(nl)nl.scrollTop=ls;}
   for(const b of $('shopInner').querySelectorAll('button[data-i]'))b.onclick=()=>buyItem(+b.dataset.i);
+  for(const n of $('shopInner').querySelectorAll('input.shopIn')){const st=e=>e.stopPropagation();n.addEventListener('keyup',st);n.addEventListener('keypress',st);
+    n.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();buyItem(+n.dataset.i);}else if(e.key==='Escape'){n.blur();}});n.addEventListener('input',()=>{const it=S.items[+n.dataset.i];if(it&&it.input&&it.input.id==='ytUrl')YT.lastUrl=n.value;});}
   $('shopClose').onclick=closeShop;
 }
 function buyItem(i){
@@ -7157,7 +7315,7 @@ function frameBody(now,xrf){
   updateAudio(rdt);if(G.state==='play')updateBells(rdt);syncWorldToCamera();
   if(VR.on){vrRig(rdt);vrMenu(rdt);vrProps(rdt);vrHud(rdt);vrScope();teleVR();}
   if(P.car&&P.car.type==='geo'&&G.geoIn!==P.car){G.geoIn=P.car;toast('<b>Furgón blindado del GEO</b>: aguanta muchos tiros y aquí dentro no te hacen daño',4);}else if(!P.car)G.geoIn=null;
-  updateViewModel(rdt);fpFlashTick(rdt);fpsTick(rawDt);placeDriveBy();updateGrass(rdt);updateLakeWater(rdt);gfxTick(rawDt);gfxRender();if(VR.on)vrAfterRender(xrf);endInputFrame();
+  updateViewModel(rdt);fpFlashTick(rdt);fpsTick(rawDt);placeDriveBy();updateGrass(rdt);updateLakeWater(rdt);gfxTick(rawDt);gfxRender();ytFrame();if(VR.on)vrAfterRender(xrf);endInputFrame();
 }
 // ================================================================ extra: densidad, malhechores, IA de conducción y misiones nuevas
 // ---------------------------------------------------------------- densidad de gente y tráfico (menú de pausa)
@@ -8010,7 +8168,7 @@ void main(){vec2 inv=resolution;vec3 rgbNW=texture2D(tDiffuse,vUv+vec2(-1.,-1.)*
   dir=min(vec2(8.),max(vec2(-8.),dir*rc))*inv;
   vec3 A=0.5*(texture2D(tDiffuse,vUv+dir*(1./3.-.5)).rgb+texture2D(tDiffuse,vUv+dir*(2./3.-.5)).rgb);
   vec3 B=A*0.5+0.25*(texture2D(tDiffuse,vUv+dir*-.5).rgb+texture2D(tDiffuse,vUv+dir*.5).rgb);float lB=dot(B,L);
-  gl_FragColor=vec4((lB<lMin||lB>lMax)?A:B,1.);}`;
+  gl_FragColor=vec4((lB<lMin||lB>lMax)?A:B,texture2D(tDiffuse,vUv).a);}`;   // conserva el hueco transparente del cine
 function gfxPostInit(){
   const vs='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
   GFX.fxMat=new THREE.ShaderMaterial({uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()}},vertexShader:vs,fragmentShader:GFX_FXAA,depthTest:false,depthWrite:false});
@@ -8145,5 +8303,3 @@ function updateLakeWater(dt){if(!LAKEW)return;const u=LAKEW.material.uniforms;u.
 </script>
 </body>
 </html>
-
-</body></html>
