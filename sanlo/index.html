@@ -2742,7 +2742,7 @@ function cineVideoLoad(f){
 // enlaces que valen: youtube.com/watch?v=…, youtu.be/…, /shorts/…, /live/…, /embed/… (con su lista y su minuto si los llevan) o el código de 11 letras
 function ytParse(s){s=(s||'').trim();const m=s.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/);
   const id=m?m[1]:(/^[A-Za-z0-9_-]{11}$/.test(s)?s:null);if(!id)return null;
-  const tt=(s.match(/[?&#](?:t|start)=(\d+)(?:s)?/)||[])[1],list=(s.match(/[?&]list=([A-Za-z0-9_-]+)/)||[])[1];return{id,t:tt?+tt:0,list:list||null};}
+  const tt=(s.match(/[?&#](?:t|start)=(\d+)(?:s)?/)||[])[1],list=(s.match(/[?&]list=([A-Za-z0-9_-]+)/)||[])[1];return{id,t:tt?+tt:0,list:list&&!/^RD/.test(list)?list:null};}   // las «mix» (RD…) de YouTube no se incrustan
 const YT_ERR={2:'Ese enlace de YouTube no es válido.',5:'El reproductor de YouTube ha fallado con este vídeo. Prueba otro.',100:'Ese vídeo no existe o es privado.',101:'El dueño de ese vídeo no deja verlo fuera de YouTube. Prueba con otro.',150:'El dueño de ese vídeo no deja verlo fuera de YouTube. Prueba con otro.',153:'YouTube no deja verlo así: abre el juego desde tu web (https), no como archivo suelto.',
   blocked:'Aquí, dentro de Claude, la página no deja cargar YouTube. Cuando subas el juego a tu propia web, se verá en esta pantalla.'};
 function ytBuild(){
@@ -2757,7 +2757,9 @@ function ytBuild(){
     if(d.event==='onError')ytFail(d.info);else if(d.event==='onReady'){YT.ready=true;YT.vol=-1;}
     else if(d.event==='onStateChange'||(d.event==='infoDelivery'&&d.info&&d.info.playerState!==undefined)){const st=d.event==='onStateChange'?d.info:d.info.playerState;if(st===1)YT.paused=false;else if(st===2)YT.paused=true;}
     if(d.event==='infoDelivery'&&d.info&&d.info.videoData&&d.info.videoData.title)YT.name=String(d.info.videoData.title).slice(0,60);});
-  document.addEventListener('securitypolicyviolation',e=>{if(/youtube/i.test(e.blockedURI||'')&&YT.id){YT.blocked=true;ytFail('blocked');}});
+  addEventListener('message',e=>{if(!RYT.fr||e.source!==RYT.fr.contentWindow)return;let d=e.data;try{if(typeof d==='string')d=JSON.parse(d);}catch(_){return;}if(!d||typeof d!=='object')return;
+    if(d.event==='onError'){RYT.bad[RYT.id]=true;toast(`<b>${RYT.st?RYT.st.name:'Radio'}</b>: YouTube no deja ponerla fuera de su web`,3.5);radioYtStop();}else if(d.event==='onReady'){RYT.vol=-1;RYT.mu=null;}});
+  document.addEventListener('securitypolicyviolation',e=>{if(!/youtube/i.test(e.blockedURI||''))return;YT.blocked=true;if(YT.id)ytFail('blocked');if(RYT.id)radioYtStop();});
 }
 function ytCmd(func,args){const f=YT.fr;if(!f||!f.contentWindow)return;try{f.contentWindow.postMessage(JSON.stringify(func==='listening'?{event:'listening',id:'cine',channel:'widget'}:{event:'command',func,args:args||[]}),'*');}catch(e){}}
 function ytLoad(p){
@@ -2822,6 +2824,8 @@ function cinePanelSetup(){
           f:()=>{YT.autoPaused=false;if(YT.paused){ytCmd('playVideo');YT.paused=false;return'¡Acción!';}ytCmd('pauseVideo');YT.paused=true;return'En pausa.';}});
         out.push({cat:'YouTube',n:'Ver en grande',d:'El vídeo delante de todo, con los mandos de YouTube (pantalla completa, subtítulos, saltar anuncios…). Esc para volver',p:0,btn:'En grande',noPrice:true,quiet:true,f:()=>{YT.big=true;closeShop();ytBig(true);return false;}});
         out.push({cat:'YouTube',n:'Quitar YouTube',d:'Vuelve a poner la tele',p:0,btn:'Quitar',noPrice:true,quiet:true,f:()=>{ytStop();return'YouTube quitado: vuelve la tele.';}});}
+      for(const v of CINE_SAVED)out.push({cat:'Vídeos guardados',n:v.n,d:v.d+(YT.id===v.id?' · <b>puesto</b>':''),p:0,sw:v.sw,btn:YT.id===v.id?'Puesto':'Poner',noPrice:true,quiet:true,
+        f:()=>{if(YT.id===v.id)return false;if(!ytLoad({id:v.id,t:0,list:null}))return false;return`¡Marchando! <b>${v.n}</b> en la pantalla grande.`;}});
       out.push({cat:'YouTube',n:'Buscar en YouTube',d:'Se abre en otra pestaña: busca el vídeo, copia su enlace y pégalo arriba',p:0,link:'https://www.youtube.com/',btn:'Abrir YouTube',noPrice:true});
       out.push({cat:'Tus vídeos',n:'Un vídeo tuyo',d:'Elige un vídeo de tu móvil o de tu ordenador (MP4, WebM…) y se ve aquí en grande, con sonido',p:0,sw:0xe8b93a,btn:'Elegir vídeo',noPrice:true,quiet:true,
         f:()=>{cineVideoPick();return'Elige el vídeo en la ventana que se abre…';}});
@@ -2836,6 +2840,32 @@ function cinePanelSetup(){
 function cineCamTick(){if(VR.on)return;const y=MAN.y+5.1;camera.position.set(-238.6,y+1.9,-199.2);camera.lookAt(-226.2,y+2.1,-199.2);
   if(Math.abs(camera.fov-62)>0.01){camera.fov=62;fovNow=62;camera.updateProjectionMatrix();}P.h.g.visible=false;cineTick();
   const W=LW(),H=LH(),off=gcamOff();if(off>1)camera.setViewOffset(W,H,-off,0,W,H);else if(camera.view&&camera.view.enabled)camera.clearViewOffset();}
+
+// vídeos que ya están puestos en el cine (sin tener que pegar el enlace) y las radios de YouTube del coche
+const CINE_SAVED=[{id:'zMprELBTrcg',n:'Tu vídeo guardado',d:'El que pediste para el proyector',sw:0xe8b93a},
+  {id:'0MOkLkTP-Jk',n:'Radio Hip Hop',d:'La emisora de hip hop de los coches, en grande',sw:0x8a5cd8},{id:'zhHspslIn2A',n:'Radio Blues',d:'La de blues de los coches',sw:0x3a6bd8},
+  {id:'BuB9SaS2cWE',n:'Radio Rock',d:'La de rock de los coches',sw:0xd83a3a},{id:'v_dnWLENzVI',n:'Radio Tecno',d:'La de tecno de los coches',sw:0x2ad8b8}];
+// ---------------- radio del coche con emisoras de YouTube: un reproductor pequeño en la esquina (se ve lo que suena) que solo
+// suena dentro del coche con esa emisora puesta; al bajarte, pausar el juego o cambiar de emisora, se para
+const RYT={id:null,st:null,fr:null,box:null,cap:null,paused:false,vol:-1,mu:null,bad:{}};
+function radioYtBox(){if(RYT.box)return;const b=document.createElement('div');b.id='radioYT';
+  b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom, 0px));width:168px;z-index:6;pointer-events:none;display:none;background:#101318;border:2px solid #E8B93A;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.5)';
+  const v=document.createElement('div');v.style.cssText='width:160px;height:90px;background:#000';const c=document.createElement('div');c.style.cssText='font:700 12px/1.2 Barlow Condensed,Arial Narrow,Arial,sans-serif;color:#E8B93A;padding:4px 2px 1px;letter-spacing:.04em;text-transform:uppercase';
+  b.appendChild(v);b.appendChild(c);document.body.appendChild(b);RYT.box=b;RYT.vbox=v;RYT.cap=c;}
+function radioYtPost(func,args){const f=RYT.fr;if(!f||!f.contentWindow)return;try{f.contentWindow.postMessage(JSON.stringify(func==='listening'?{event:'listening',id:'radio',channel:'widget'}:{event:'command',func,args:args||[]}),'*');}catch(e){}}
+function radioYtStop(){if(RYT.fr){try{RYT.fr.src='about:blank';}catch(e){}RYT.fr.remove();}RYT.fr=null;RYT.id=null;RYT.st=null;if(RYT.box)RYT.box.style.display='none';}
+function radioYtTick(){
+  const st=RADIO.stations[RADIO.cur],on=!!(P.car&&G.state==='play'&&st&&st.yt&&!YT.blocked&&!RYT.bad[st.yt]);
+  if(!on){if(RYT.fr&&!RYT.paused){radioYtPost('pauseVideo');RYT.paused=true;}if(RYT.box&&RYT.box.style.display!=='none')RYT.box.style.display='none';
+    if(RYT.fr&&(!st||!st.yt))radioYtStop();return;}
+  if(RYT.id!==st.yt){radioYtStop();radioYtBox();ytBuild();RYT.id=st.yt;RYT.st=st;RYT.paused=false;RYT.vol=-1;RYT.mu=null;
+    const f=document.createElement('iframe');f.title='Radio';f.setAttribute('allow','autoplay; encrypted-media');f.referrerPolicy='strict-origin-when-cross-origin';f.style.cssText='width:160px;height:90px;border:0;display:block';
+    const q=new URLSearchParams({autoplay:'1',playsinline:'1',rel:'0',controls:'0',modestbranding:'1',enablejsapi:'1',iv_load_policy:'3',disablekb:'1'});if(/^https?:/.test(location.protocol))q.set('origin',location.origin);
+    f.src=`https://www.youtube.com/embed/${st.yt}?${q}`;f.onload=()=>{radioYtPost('listening');setTimeout(()=>radioYtPost('listening'),600);};RYT.vbox.innerHTML='';RYT.vbox.appendChild(f);RYT.fr=f;RYT.cap.textContent='♪ '+st.name;}
+  else if(RYT.paused){radioYtPost('playVideo');RYT.paused=false;}
+  if(RYT.box.style.display!=='block')RYT.box.style.display=VR.on?'none':'block';
+  const vol=Math.round(clamp((AU.vol??0.7)*0.85,0,1)*100),mu=!!AU.muted;if(vol!==RYT.vol){RYT.vol=vol;radioYtPost('setVolume',[vol]);}if(mu!==RYT.mu){RYT.mu=mu;radioYtPost(mu?'mute':'unMute');}
+}
 // =====================================================================
 //  CALLES JUNTO AL MONASTERIO, como en el plano del pueblo:
 //  · Calle Floridablanca: fila continua de casas de tres y cuatro plantas con tiendas en el bajo (escaparates encendidos,
@@ -2998,6 +3028,11 @@ function callesUpdate(dt){
 //  · casa almagra con terraza arriba cubierta por un toldo blanco y cancela de hierro con remate
 // =====================================================================
 function buildVecinos(){
+  // ladrillo visto de verdad (sin ventanas pintadas): sogas de 24 × 7,5 cm a matajunta, con su llaga de mortero
+  const bc=mkCanvas(160,144),bg=bc.getContext('2d');bg.fillStyle='#c9bba5';bg.fillRect(0,0,160,144);
+  for(let r=0;r<12;r++){const o=r%2?16:0;for(let x=-32+o;x<160;x+=32){const k=0.82+Math.random()*0.3;bg.fillStyle=`rgb(${(168*k)|0},${(78*k)|0},${(54*k)|0})`;bg.fillRect(x+1.5,r*12+1.5,29,9);
+    bg.fillStyle=`rgba(40,18,10,${0.08+Math.random()*0.12})`;bg.fillRect(x+1.5,r*12+8,29,2.5);}}
+  const BRICKP=new GB(new THREE.MeshLambertMaterial({map:texFrom(bc),vertexColors:true}));
   const RZ=-172.6;   // eje de la calle
   const glassC=[0.13,0.17,0.22],WF=[0.95,0.94,0.9];
   // tejado a dos aguas con teja: caballete a lo largo de x («x») o de z («z»), con aleros y piñones del color del muro
@@ -3024,7 +3059,8 @@ function buildVecinos(){
     if(o.shut)for(const s2 of[-1,1])PROPS.box(x+s2*(hw+hw/2+0.06),y,zf-0.06,hw/2,h,0.03,0,o.shut);
     const fc=o.frame||GRAN,B=o.frame?PROPS:STONE;B.box(x,y-0.12,zf-0.09,hw+0.2,0.12,0.11,0,fc,1,1);B.box(x,y+h,zf-0.07,hw+0.16,0.2,0.09,0,fc,1,1);for(const s2 of[-1,1])B.box(x+s2*(hw+0.08),y,zf-0.07,0.09,h,0.09,0,fc,1,1);
     if(o.reja){for(let xx=x-hw+0.1;xx<x+hw-0.05;xx+=0.14)PROPS.box(xx,y,zf-0.2,0.012,h,0.012,0,IRON);for(const yy of[0.08,h*0.5,h-0.08])PROPS.box(x,y+yy,zf-0.2,hw,0.025,0.015,0,IRON);}
-    if(o.balcon){const d=o.balcon,bw=hw+0.35;PROPS.box(x,y-0.16,zf-d/2,bw,0.12,d/2,0,[0.85,0.84,0.8]);PROPS.box(x,y+0.95,zf-d,bw,0.04,0.025,0,IRON);
+    if(o.balcon){const d=o.balcon,bw=hw+0.35,SC=[0.87,0.86,0.82];STONE.box(x,y-0.18,zf-d/2,bw,0.14,d/2,0,SC,1,1,null,true,true);STONE.box(x,y-0.26,zf-d/2+0.03,bw-0.06,0.08,d/2-0.03,0,[0.8,0.79,0.75],1,1,null,true,true);
+      for(const s2 of[-1,1]){const cx2=x+s2*(bw-0.18);STONE.box(cx2,y-0.48,zf-d*0.36,0.08,0.22,d*0.36,0,SC,1,1,null,true,true);STONE.box(cx2,y-0.66,zf-d*0.2,0.06,0.18,d*0.2,0,[0.8,0.79,0.75],1,1,null,true,true);}PROPS.box(x,y+0.95,zf-d,bw,0.04,0.025,0,IRON);
       for(let xx=x-bw;xx<=x+bw+0.01;xx+=0.12)PROPS.box(xx,y-0.04,zf-d,0.012,1.0,0.012,0,IRON);for(const s2 of[-1,1])for(let z=zf-0.06;z>zf-d;z-=0.12)PROPS.box(x+s2*bw,y-0.04,z,0.012,1.0,0.012,0,IRON);
       for(const s2 of[-1,1])PROPS.box(x+s2*bw,y+0.95,zf-d/2,0.025,0.04,d/2,0,IRON);
       if(o.flores)for(const s2 of[-0.4,0.4]){PROPS.box(x+s2*bw,y-0.04,zf-d+0.18,0.13,0.2,0.1,0,[0.62,0.32,0.2]);PROPS.box(x+s2*bw,y+0.16,zf-d+0.18,0.16,0.18,0.12,0,[[0.85,0.15,0.2],[0.3,0.6,0.25],[0.95,0.75,0.2]][((x*7)|0)&1?0:1]);}}};
@@ -3051,18 +3087,18 @@ function buildVecinos(){
     return{vb,top,cx};};
   // ---------------- 2) chalet de ladrillo visto con mirador y óculo
   const chalet=(x0,x1,zf,D,opt={})=>{const cx=(x0+x1)/2,hx=(x1-x0)/2,zb=zf+D,cz=zf+D/2,vb=vbAt(x0,x1,zf)+0.4,lo=minGround(x0,x1,zf,zb)-0.6,H0=3.4,HU=3.1,top=vb+H0+HU,W1=[1,1,1];
-    BRICK.box(cx,lo,cz,hx,top-lo,D/2,0,W1,1.2,0.9,vb);STONE.box(cx,lo,cz,hx+0.06,vb+0.55-lo,D/2+0.06,0,[0.8,0.78,0.74],2,2,lo);
-    BRICK.box(cx,vb+H0-0.1,cz,hx+0.08,0.2,D/2+0.08,0,[0.9,0.85,0.8],1.2,0.9);   // faja de ladrillo entre plantas
+    BRICKP.box(cx,lo,cz,hx,top-lo,D/2,0,W1,1.2,0.9,vb);STONE.box(cx,lo,cz,hx+0.06,vb+0.55-lo,D/2+0.06,0,[0.8,0.78,0.74],2,2,lo);
+    BRICKP.box(cx,vb+H0-0.1,cz,hx+0.08,0.2,D/2+0.08,0,[0.9,0.85,0.8],1.2,0.9);   // faja de ladrillo entre plantas
     // paños de mampostería enlucida, enmarcados por el ladrillo (los cuadros claros de la foto)
     const panel=(x,y,w,h)=>{STONE.box(x,y,zf-0.03,w/2,h,0.03,0,[0.86,0.85,0.8],1,1);for(const yy of[y,y+h-0.06])PROPS.box(x,yy,zf-0.065,w/2,0.06,0.008,0,[0.62,0.3,0.2]);};
     // mirador central que sobresale, con balcón encima
-    const bw=1.7,bd=1.1;BRICK.box(cx,lo,zf-bd/2,bw,vb+H0-0.1-lo,bd/2,0,W1,1.2,0.9,vb);STONE.box(cx,vb+H0-0.15,zf-bd/2,bw+0.1,0.18,bd/2+0.1,0,[0.88,0.86,0.82],1,1);
+    const bw=1.7,bd=1.1;BRICKP.box(cx,lo,zf-bd/2,bw,vb+H0-0.1-lo,bd/2,0,W1,1.2,0.9,vb);STONE.box(cx,vb+H0-0.15,zf-bd/2,bw+0.1,0.18,bd/2+0.1,0,[0.88,0.86,0.82],1,1);
     for(const s2 of[-1,0,1])ventana(cx+s2*1.05,vb+0.9,zf-bd,0.85,1.9,{frame:WF});
     ventana(cx,vb+H0+0.1,zf,1.2,2.3,{frame:WF,balcon:bd+0.05});
     for(const s2 of[-1,1]){const x=cx+s2*hx*0.62;ventana(x,vb+1.0,zf,1.0,1.6,{frame:WF,reja:true});ventana(x,vb+H0+0.3,zf,1.0,1.9,{frame:WF,balcon:0.45,shut:[0.32,0.4,0.48]});
       panel(cx+s2*(hx*0.62+1.15),vb+0.9,0.75,1.6);panel(cx+s2*(hx*0.62+1.15),vb+H0+0.3,0.75,1.9);panel(cx+s2*(bw+0.75),vb+H0+0.3,0.7,1.9);}
     // tejado con el piñón a la calle, óculo con su moldura blanca y aleros de madera
-    const rise=3.2;gable(cx,top,cz,hx,D/2,rise,0.6,'z',BRICK,W1);
+    const rise=3.2;gable(cx,top,cz,hx,D/2,rise,0.6,'z',BRICKP,W1);
     {const ring=new THREE.Mesh(new THREE.TorusGeometry(0.42,0.08,8,20),M(0xf3f0e8));ring.position.set(cx,top+1.25,zf-0.06);scene.add(ring);
      const og=new THREE.Mesh(new THREE.CircleGeometry(0.38,20),M(0x1d2630));og.position.set(cx,top+1.25,zf-0.03);og.rotation.y=Math.PI;scene.add(og);
      for(const s2 of[-1,1]){const sc=new THREE.Mesh(new THREE.TorusGeometry(0.18,0.05,6,12,Math.PI),M(0xf3f0e8));sc.position.set(cx+s2*0.62,top+0.92,zf-0.07);sc.rotation.z=s2>0?Math.PI*0.75:Math.PI*0.25;scene.add(sc);}}
@@ -3071,26 +3107,42 @@ function buildVecinos(){
     addCollider(cx,cz,hx,D/2,0,lo-1,top+rise+1,'b');addCollider(cx,zf-bd/2,bw,bd/2,0,lo-1,vb+H0,'b');
     // escalinata a la puerta del mirador no: se entra por el lateral; delante, jardín con verja entre pilares de ladrillo
     return{vb,top,cx};};
-  // verja de hierro sobre murete, con pilares (de ladrillo o de granito) y cancela de dos hojas con remate de volutas
-  const verja=(x0,x1,z,gate,pil)=>{const L=x1-x0,n=Math.max(1,Math.round(L/3)),y=groundH((x0+x1)/2,z),isB=pil==='brick';
-    const pillar=(x,h=2.0)=>{(isB?BRICK:STONE).box(x,y-0.4,z,0.28,h+0.4,0.28,0,isB?[1,1,1]:GRAN,1.2,0.9);STONE.box(x,y+h,z,0.36,0.14,0.36,0,isB?[0.86,0.84,0.8]:GRAN,1,1);if(!isB)STONE.pyramid(x,y+h+0.14,z,0.3,0.32,GRAN);};
-    const seg=(a,b)=>{if(b-a<0.2)return;(isB?BRICK:STONE).box((a+b)/2,y-0.4,z,(b-a)/2,1.0,0.16,0,isB?[1,1,1]:[0.86,0.84,0.8],1.2,0.9);for(let x=a+0.08;x<b;x+=0.13)PROPS.box(x,y+0.6,z,0.012,1.2,0.012,0,IRON);
-      for(const yy of[0.66,1.72])PROPS.box((a+b)/2,y+yy,z,(b-a)/2,0.03,0.02,0,IRON);for(let x=a+0.08;x<b;x+=0.26){const t=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.1,5),M(0x1c1d20));t.position.set(x,y+1.86,z);scene.add(t);}
-      addCollider((a+b)/2,z,(b-a)/2,0.2,0,y-1,y+1.9,'wall');};
-    let c=x0;const gs=gate?[gate[0]-gate[1]/2,gate[0]+gate[1]/2]:null;
-    for(let k=0;k<=n;k++){const x=x0+k*L/n;if(gs&&x>gs[0]-0.3&&x<gs[1]+0.3)continue;pillar(x);}
-    if(gs){seg(x0,gs[0]-0.3);seg(gs[1]+0.3,x1);for(const x of gs)pillar(x+(x<gate[0]?-0.3:0.3),2.5);
-      // cancela cerrada: barrotes con lanzas doradas y un remate de volutas
-      const gw=gs[1]-gs[0];for(let x=gs[0]+0.06;x<gs[1];x+=0.11){const h=1.9+0.35*Math.sin((x-gs[0])/gw*Math.PI);PROPS.box(x,y+0.08,z,0.013,h,0.013,0,IRON);const t=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.1,5),M(0xc9a13a));t.position.set(x,y+0.13+h,z);scene.add(t);}
-      for(const yy of[0.15,0.95,1.75])PROPS.box(gate[0],y+yy,z,gw/2,0.035,0.022,0,IRON);PROPS.box(gate[0],y,z,0.02,2.2,0.02,0,IRON);
-      for(const s2 of[-1,1]){const v=new THREE.Mesh(new THREE.TorusGeometry(0.22,0.025,6,14,Math.PI*1.5),M(0x1c1d20));v.position.set(gate[0]+s2*0.35,y+2.45,z);v.rotation.z=s2>0?0:Math.PI/2;scene.add(v);}
-      addCollider(gate[0],z,gw/2,0.15,0,y-1,y+2.3,'b');}
-    else seg(x0,x1);};
+  // valla de parcela por tramos: ax='x' corre a lo largo de x (en z=at), ax='z' a lo largo de z (en x=at). Estilos: 'brick' (verja sobre
+  // murete de ladrillo), 'gran' (verja sobre granito, pilares con pirámide), 'piedra' (verja sobre piedra, pilares con bola) y
+  // 'tapia' (muro de ladrillo ciego con albardilla). La cancela (gate=[centro,ancho]) es de hierro o, en la tapia, una puerta de chapa
+  const valla=(ax,at,c0,c1,sty,gate)=>{const X=ax==='x',P3=(a,n)=>X?[a,n]:[n,a],tap=sty==='tapia',isB=sty==='brick'||tap,BC=[1,1,1],SB=sty==='gran'?GRAN:[0.86,0.84,0.8];
+    const gyAt=a=>{const[x,z]=P3(a,at);return groundH(x,z);};
+    const bx=(a0,a1,n0,n1,y0,y1,col,B,tw=1.2,th=0.9)=>{const[xa,za]=P3((a0+a1)/2,(n0+n1)/2);B.box(xa,y0,za,X?(a1-a0)/2:(n1-n0)/2,y1-y0,X?(n1-n0)/2:(a1-a0)/2,0,col,tw,th,null,true,true);};
+    const coll=(a0,a1,y0,y1,tag)=>{const[xa,za]=P3((a0+a1)/2,at);addCollider(xa,za,X?(a1-a0)/2:0.22,X?0.22:(a1-a0)/2,0,y0,y1,tag);};
+    const pillar=(a,h)=>{const y=gyAt(a);bx(a-0.27,a+0.27,at-0.27,at+0.27,y-0.5,y+h,isB?BC:SB,isB?BRICKP:STONE);bx(a-0.34,a+0.34,at-0.34,at+0.34,y+h,y+h+0.13,isB?[0.86,0.84,0.8]:SB,STONE,1,1);
+      const[px,pz]=P3(a,at);if(sty==='gran')STONE.pyramid(px,y+h+0.13,pz,0.28,0.3,GRAN);else if(sty==='piedra'){const b=new THREE.Mesh(ballG2(),MAT.granBall);b.scale.setScalar(0.32);b.position.set(px,y+h+0.13+0.29,pz);scene.add(b);}};
+    const seg=(a,b)=>{if(b-a<0.25)return;const y=Math.min(gyAt(a),gyAt(b),gyAt((a+b)/2)),yT=Math.max(gyAt(a),gyAt(b));
+      if(tap){bx(a,b,at-0.13,at+0.13,y-0.5,yT+2.05,BC,BRICKP);bx(a-0.02,b+0.02,at-0.19,at+0.19,yT+2.05,yT+2.17,[0.86,0.84,0.8],STONE,1,1);coll(a,b,y-1,yT+2.2,'wall');return;}
+      bx(a,b,at-0.16,at+0.16,y-0.5,yT+0.62,isB?BC:SB,isB?BRICKP:STONE);bx(a-0.01,b+0.01,at-0.19,at+0.19,yT+0.62,yT+0.7,isB?[0.86,0.84,0.8]:SB,STONE,1,1);
+      for(let v=a+0.08;v<b;v+=0.13){const[x,z]=P3(v,at);PROPS.box(x,yT+0.7,z,0.012,1.15,0.012,0,IRON);}
+      for(const yy of[0.76,1.78]){const[x,z]=P3((a+b)/2,at);PROPS.box(x,yT+yy,z,X?(b-a)/2:0.02,0.03,X?0.02:(b-a)/2,0,IRON);}
+      for(let v=a+0.08;v<b;v+=0.26){const[x,z]=P3(v,at);const t=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.1,5),M(0x1c1d20));t.position.set(x,yT+1.9,z);scene.add(t);}
+      coll(a,b,y-1,yT+1.95,'wall');};
+    const gs=gate?[gate[0]-gate[1]/2,gate[0]+gate[1]/2]:null,L=c1-c0,n=Math.max(1,Math.round(L/3.2)),ph=tap?2.2:2.0;
+    const marks=[];for(let k=0;k<=n;k++){const a=c0+k*L/n;if(gs&&a>gs[0]-0.35&&a<gs[1]+0.35)continue;marks.push(a);}
+    if(gs){marks.push(gs[0]-0.3,gs[1]+0.3);marks.sort((p,q)=>p-q);}
+    for(let k=0;k<marks.length-1;k++){const a=marks[k],b=marks[k+1];if(gs&&a>=gs[0]-0.31&&b<=gs[1]+0.31)continue;seg(a+0.27,b-0.27);}
+    for(const a of marks)pillar(a,gs&&(Math.abs(a-gs[0]+0.3)<0.01||Math.abs(a-gs[1]-0.3)<0.01)?ph+0.4:ph);
+    if(gs){const gw=gs[1]-gs[0],y=gyAt(gate[0]),[gx,gz]=P3(gate[0],at);
+      if(tap){bx(gs[0],gs[1],at-0.04,at+0.04,y,y+2.15,[0.16,0.26,0.2],PROPS);for(const yy of[0.55,1.2,1.85])bx(gs[0]+0.08,gs[1]-0.08,at-0.06,at+0.06,y+yy,y+yy+0.05,[0.12,0.2,0.15],PROPS);
+        const kn=new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6),M(0xc9a13a));const[kx,kz]=P3(gate[0]+gw*0.32,at-0.09);kn.position.set(kx,y+1.05,kz);scene.add(kn);}
+      else{for(let v=gs[0]+0.06;v<gs[1];v+=0.11){const h=1.9+0.35*Math.sin((v-gs[0])/gw*Math.PI),[x,z]=P3(v,at);PROPS.box(x,y+0.08,z,0.013,h,0.013,0,IRON);const t=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.1,5),M(0xc9a13a));t.position.set(x,y+0.13+h,z);scene.add(t);}
+        for(const yy of[0.15,0.95,1.75])PROPS.box(gx,y+yy,gz,X?gw/2:0.022,0.035,X?0.022:gw/2,0,IRON);
+        for(const s2 of[-1,1]){const[vx,vz]=P3(gate[0]+s2*0.35,at),v=new THREE.Mesh(new THREE.TorusGeometry(0.22,0.025,6,14,Math.PI*1.5),M(0x1c1d20));v.position.set(vx,y+2.45,vz);v.rotation.z=s2>0?0:Math.PI/2;if(!X)v.rotation.y=Math.PI/2;scene.add(v);}}
+      coll(gs[0],gs[1],y-1,y+2.3,'b');}};
+  // parcela completa: delante (con la cancela), los dos costados y el fondo
+  const parcela=(x0,x1,zf,zb,sty,gate)=>{valla('x',zf,x0,x1,sty,gate);valla('z',x0,zf,zb,sty);valla('z',x1,zf,zb,sty);valla('x',zb,x0,x1,sty);};
   // ---------------- 3) casa almagra con terraza arriba bajo un toldo blanco
   const casaToldo=(x0,x1,zf,D,col)=>{const r=casaNaranja(x0,x1,zf,D,col,{nf:3,noDorm:true,rise:2.4,door:1,bal:1});
     const {vb,top,cx}=r,hx=(x1-x0)/2,ya=top-0.25-2.75,yb=top-0.1,za=zf-0.02,zo=zf-1.6,Rr=1.25;
     // terraza volada de la última planta con barandilla de forja
-    PROPS.box(cx,ya-0.18,zf-0.8,hx-0.3,0.16,0.8,0,[0.85,0.84,0.8]);PROPS.box(cx,ya+1.0,zo,hx-0.3,0.04,0.03,0,IRON);for(let x=cx-hx+0.3;x<=cx+hx-0.29;x+=0.12)PROPS.box(x,ya,zo,0.012,1.0,0.012,0,IRON);
+    STONE.box(cx,ya-0.2,zf-0.8,hx-0.3,0.18,0.8,0,[0.87,0.86,0.82],1,1,null,true,true);STONE.box(cx,ya-0.3,zf-0.77,hx-0.38,0.1,0.75,0,[0.8,0.79,0.75],1,1,null,true,true);
+    for(let x=cx-hx+0.6;x<=cx+hx-0.59;x+=(2*hx-1.2)/4){STONE.box(x,ya-0.62,zf-0.5,0.1,0.32,0.5,0,[0.87,0.86,0.82],1,1,null,true,true);STONE.box(x,ya-0.9,zf-0.26,0.08,0.28,0.26,0,[0.8,0.79,0.75],1,1,null,true,true);}   // ménsulas bajo la terrazaPROPS.box(cx,ya+1.0,zo,hx-0.3,0.04,0.03,0,IRON);for(let x=cx-hx+0.3;x<=cx+hx-0.29;x+=0.12)PROPS.box(x,ya,zo,0.012,1.0,0.012,0,IRON);
     for(const s2 of[-1,1])for(let z=zf-0.1;z>zo;z-=0.12)PROPS.box(cx+s2*(hx-0.3),ya,z,0.012,1.0,0.012,0,IRON);
     // toldo: cuarto de bóveda de lona blanca (por dentro y por fuera) con arcos de hierro y faldón festoneado
     const N=8,W=[0.96,0.95,0.91],xa=cx-hx+0.3,xb=cx+hx-0.3,pt=a=>[za-Math.sin(a)*Rr*1.25,ya+1.3+Math.cos(a)*Rr];
@@ -3102,13 +3154,14 @@ function buildVecinos(){
     return r;};
   // ---------------- la calle: cuatro casas y sus jardines, farolas y árboles
   const ZF=RZ+3.0+2.2+3.2;   // fachadas a 3 m de la acera
-  casaNaranja(-198.5,-187.2,ZF,10.5,[0.8,0.43,0.31],{door:0,dorm:[-0.3,0.3]});
+  casaNaranja(-198.5,-187.2,ZF,10.5,[0.8,0.43,0.31],{door:0,dorm:[-0.3,0.3]});parcela(-200.6,-185.6,ZF-2.0,-150.6,'brick',[-197.09,1.5]);
   signMesh(signTex(['CALLE DE','LOS CHALETS'],512,200,'#1e3f7a','#ffffff','bold 52px Arial,sans-serif','#ffffff'),0.9,0.36,-187.3,vbAt(-198.5,-187.2,ZF)+2.6,ZF+0.6,Math.PI/2);
-  chalet(-219,-205,ZF+3.4,10.5);verja(-220.5,-203.5,ZF-0.6,[-212,2.6],'brick');
-  casaToldo(-237.5,-226,ZF,10,[0.74,0.33,0.24]);verja(-238,-225.5,ZF-1.9,[-229,1.4],'gran');
-  casaNaranja(-256,-243.5,ZF+0.5,10.5,[0.86,0.62,0.36],{door:2,dorm:[0],rise:3.3,bal:1});
+  chalet(-219,-205,ZF+3.4,10.5);parcela(-221.5,-202.6,ZF-0.6,-149.2,'tapia',[-212,2.6]);   // el chalet de ladrillo: tapia ciega de ladrillo alrededor
+  casaToldo(-237.5,-226,ZF,10,[0.74,0.33,0.24]);parcela(-239.6,-223.6,ZF-1.9,-150.4,'gran',[-229,1.4]);
+  casaNaranja(-256,-243.5,ZF+0.5,10.5,[0.86,0.62,0.36],{door:2,dorm:[0],rise:3.3,bal:1});parcela(-258.2,-241.6,ZF-1.6,-150.2,'piedra',[-248.19,1.5]);
   for(const x of[-192,-215,-240,-252])lamp(x,RZ-3.0-1.4);for(const x of[-202,-232])lamp(x,RZ+3.0+1.4);
   for(const[x,z,k]of[[-202.5,ZF+1.2,'oak'],[-208.5,ZF+0.6,'plane'],[-216,ZF+0.8,'oak'],[-241,ZF+1.2,'plane'],[-222,ZF+1.4,'oak']])if(roadClear(x,z,1.2))addTree(k,x,z,0.75);
+  BRICKP.build();
 }
 
 // ---------------------------------------------------------------- monumentos y edificios singulares
@@ -4248,13 +4301,16 @@ const RADIO={cur:-1,play:-1,next:0,step:0,show:0,stations:[
   {name:'Radio Abantos FM',sub:'Rumba electrónica de la Sierra',bpm:108,prog:[[57,60,64],[55,59,62],[53,57,60],[52,56,59]],bass:[45,43,41,40],kick:'x...x...x...x...',clap:'..x..x.x..x..x..',hat:'x.xxx.xxx.xxx.xx'},
   {name:'Onda Herreriana',sub:'Pasodobles con sintetizador',bpm:126,prog:[[60,64,67],[62,65,69],[55,59,62],[60,64,67]],bass:[48,50,43,48],kick:'x...x...x...x...',clap:'....x.......x...',hat:'..x...x...x...x.'},
   {name:'Rock Monasterio 97.3',sub:'Rock urbano de la Sierra, sin parar',rock:true,bpm:140,prog:[[52,59,64],[48,55,60],[50,57,62],[55,62,67]],bass:[40,36,38,43],kick:'x.....x.x.x.....',clap:'....x.......x...',hat:'x.x.x.x.x.x.x.x.'},
+  // emisoras de YouTube (suenan cuando el juego está en una web normal; dentro de Claude, YouTube está bloqueado)
+  {name:'Radio Hip Hop',sub:'Hip hop sin parar, desde YouTube',yt:'0MOkLkTP-Jk'},{name:'Radio Blues',sub:'Blues para la carretera, desde YouTube',yt:'zhHspslIn2A'},
+  {name:'Radio Rock',sub:'Rock a todo volumen, desde YouTube',yt:'BuB9SaS2cWE'},{name:'Radio Tecno',sub:'Tecno para pisar el acelerador, desde YouTube',yt:'v_dnWLENzVI'},
 ]};
 function rockIn(){ // cadena de distorsión (una sola vez)
   if(AU.rockIn)return AU.rockIn;const c=AU.ctx,ws=c.createWaveShaper(),cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;cv[i]=Math.tanh(x*7);}ws.curve=cv;
   const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2600;const g=c.createGain();g.gain.value=0.5;ws.connect(lp);lp.connect(g);g.connect(AU.radioGain);AU.rockIn=ws;return ws;
 }
 function radioTick(){
-  const c=AU.ctx;if(!c||RADIO.play<0)return;const st=RADIO.stations[RADIO.play];const spb=60/st.bpm/4;const out=AU.radioGain;
+  const c=AU.ctx;if(!c||RADIO.play<0)return;const st=RADIO.stations[RADIO.play];if(st.yt)return;const spb=60/st.bpm/4;const out=AU.radioGain;
   if(RADIO.next<c.currentTime-0.2)RADIO.next=c.currentTime+0.05;
   while(RADIO.next<c.currentTime+0.15){
     const s=RADIO.step%16,bar=Math.floor(RADIO.step/16)%4,t=RADIO.next;
@@ -7114,7 +7170,7 @@ function updateHUD(dt){
   hurtFlash=Math.max(0,hurtFlash-dt*1.4);const low=P.hp<30&&!P.dead?0.35+Math.sin(G.time*6)*0.15:0;$('dmgVignette').style.opacity=Math.max(hurtFlash,low);
   toastT-=dt;if(toastT<=0)$('toast').classList.remove('show');hintT-=dt;if(hintT<=0)$('hint').classList.remove('show');
   bannerT-=dt;if(bannerT<=0)$('banner').classList.remove('show');
-  radioT-=dt;if(radioT>0&&P.car){const s=RADIO.stations[RADIO.cur];setH('radioName',s?`${s.name}<small>${s.sub}</small>`:'Radio apagada');$('radioName').style.opacity=1;}else $('radioName').style.opacity=0;
+  radioT-=dt;if(radioT>0&&P.car){const s=RADIO.stations[RADIO.cur];setH('radioName',s?`${s.name}<small>${s.yt&&YT.blocked?'Solo cuando el juego está en tu web: aquí YouTube está bloqueado':(s.yt&&RYT.bad[s.yt]?'YouTube no deja ponerla fuera de su web':s.sub)}</small>`:'Radio apagada');$('radioName').style.opacity=1;}else $('radioName').style.opacity=0;
   if(PHONE.t>0){PHONE.t-=dt;if(PHONE.t<=0)nextPhone();}
 }
 const MM=$('minimap'),MMC=MM.getContext('2d');
@@ -7306,7 +7362,7 @@ function updateAudio(dt){
   let party=0;if(G.active&&G.active.party&&G.active.stage<=1&&NPCS.some(n=>n.mission&&n.alive&&n.state==='idle')){const d=Math.hypot(P.x-SPOTS.casita.x,P.z-SPOTS.casita.z);party=clamp(1-d/170,0,1)*0.55;}
   const carRadio=P.car&&RADIO.cur>=0&&G.state==='play';const play=carRadio?RADIO.cur:(party>0.01&&G.state==='play'?0:-1);
   if(play!==RADIO.play){RADIO.play=play;RADIO.next=t+0.05;}
-  AU.radioGain.gain.setTargetAtTime(carRadio?0.32:party,t,0.15);radioTick();
+  AU.radioGain.gain.setTargetAtTime(carRadio?0.32:party,t,0.15);radioTick();radioYtTick();
 }
 function titleCam(tt){const a=tt*0.045+2.4;camera.position.set(Math.cos(a)*300,H0+105,Math.sin(a)*300);camera.lookAt(0,H0+20,0);}
 function syncWorldToCamera(){
