@@ -1197,7 +1197,8 @@ function buildTrain(){
 /* ============ Exterior ============ */
 let cloudGroup = null;
 const GY = -0.3;   // altura del césped
-const FLY = {x1:-32, x2:32, z1:-42, z2:40, y2:28};   // zona de vuelo exterior (colchón invisible en los bordes)
+const FLY = {x1:-62, x2:62, z1:-68, z2:78, y2:90};   // zona de vuelo exterior (colchón invisible en los bordes)
+const inFlyZone=(x1,z1,x2,z2,m)=> x2>FLY.x1-(m||6) && x1<FLY.x2+(m||6) && z2>FLY.z1-(m||6) && z1<FLY.z2+(m||6);   // ¿esta caja queda al alcance del dron?
 function insideHouse(p){ return p.x>-6.15 && p.x<7.15 && p.z>-5.15 && p.z<5.15 && p.y<5.85; }
 // cajas de colisión a lo largo de un segmento (tubos, patas inclinadas, cuerdas)
 function colSeg(a,b,r,n){
@@ -1478,7 +1479,12 @@ function buildExterior(){
   prettyHouse(-40,41,-1,5,-1); prettyHouse(52,41,-1,0,1); prettyHouse(-46,0,1,4,-1); prettyHouse(46,0,1,2,1);
   prettyHouse(-30,-62,1,3,0); prettyHouse(-6,-62,1,5,1); prettyHouse(18,-62,1,1,-1);
   // colinas lejanas (solo al sur; al norte está la ciudad)
-  for(let i=0;i<14;i++){ const a=i/14*Math.PI*2, r=110+rnd()*25; if(Math.sin(a)>-0.25) continue; Sph(Math.cos(a)*r,-8,Math.sin(a)*r,22+rnd()*18,MC(pick([0x7fbf6a,0x6aae5c,0x8fcf7a])),1,0.55,1,10); }
+  for(let i=0;i<14;i++){ const a=i/14*Math.PI*2, r=110+rnd()*25; if(Math.sin(a)>-0.25) continue;
+    const hx=Math.cos(a)*r, hz=Math.sin(a)*r, R=22+rnd()*18, hm=MC(pick([0x7fbf6a,0x6aae5c,0x8fcf7a]));
+    Sph(hx,-8,hz,R,hm,1,0.55,1,10);
+    if(inFlyZone(hx-R,hz-R,hx+R,hz+R)){ const top=-8+0.55*R, L=4;
+      for(let k=0;k<L;k++){ const ya=GY+(top-GY)*k/L, yb=GY+(top-GY)*(k+1)/L, e=(yb+8)/(0.55*R), rr=R*Math.sqrt(Math.max(0,1-e*e))*0.97;
+        if(rr<1) continue; col(hx-rr*0.92,ya,hz-rr*0.4,hx+rr*0.92,yb,hz+rr*0.4); col(hx-rr*0.4,ya,hz-rr*0.92,hx+rr*0.4,yb,hz+rr*0.92); col(hx-rr*0.7,ya,hz-rr*0.7,hx+rr*0.7,yb,hz+rr*0.7); } } }
 }
 
 /* ---------- Mobiliario de la calle ---------- */
@@ -1704,21 +1710,22 @@ function buildSkyline(){
   // suelo de la ciudad y calle trasera
   B(-320,GY-0.1,56,320,GY+0.02,320,ns(MC(0x9a9fa6))); B(-320,GY-0.1,49,320,GY+0.01,56,MAT.asphalt);
   const tower=(x,z,w,d,h,m)=>{
-    B(x-w/2-1,GY,z-d/2-1,x+w/2+1,GY+5,z+d/2+1,podium);
+    const cl=inFlyZone(x-w/2-1,z-d/2-1,x+w/2+1,z+d/2+1);   // los que quedan al alcance del dron tienen colisión
+    B(x-w/2-1,GY,z-d/2-1,x+w/2+1,GY+5,z+d/2+1,podium,cl);
     let y=GY+5, ww=w, dd=d; const tiers=h>70?3:h>32?2:1;
     for(let t=0;t<tiers;t++){
       const th = t===tiers-1 ? Math.max(3,GY+h-y) : (GY+h-y)*(0.55+rnd()*0.15);
-      B(x-ww/2,y,z-dd/2,x+ww/2,y+th,z+dd/2,m); y+=th;
-      B(x-ww/2-0.3,y,z-dd/2-0.3,x+ww/2+0.3,y+0.6,z+dd/2+0.3,cap); y+=0.6;
+      B(x-ww/2,y,z-dd/2,x+ww/2,y+th,z+dd/2,m,cl); y+=th;
+      B(x-ww/2-0.3,y,z-dd/2-0.3,x+ww/2+0.3,y+0.6,z+dd/2+0.3,cap,cl); y+=0.6;
       ww*=0.74; dd*=0.74;
     }
     const r=rnd(), q=Math.min(ww,dd);
-    if(r<0.3){ rod([x,y,z],[x,y+h*0.22,z],0.25,dark,6); Sph(x,y+h*0.22,z,0.7,redL); }
-    else if(r<0.55){ Cyl(x+ww*0.2,y,z-dd*0.2,q*0.2,q*0.2,3.5,cap,10); Cone(x+ww*0.2,y+3.5,z-dd*0.2,q*0.22,1.5,dark,10); }
-    else if(r<0.75){ B(x-ww*0.3,y,z-dd*0.3,x+ww*0.3,y+2.5,z+dd*0.3,dark); }
-    else { Cyl(x,y,z,q*0.42,q*0.42,0.3,white,20); }
+    if(r<0.3){ rod([x,y,z],[x,y+h*0.22,z],0.25,dark,6,cl?3:false); Sph(x,y+h*0.22,z,0.7,redL); }
+    else if(r<0.55){ Cyl(x+ww*0.2,y,z-dd*0.2,q*0.2,q*0.2,3.5,cap,10,cl); Cone(x+ww*0.2,y+3.5,z-dd*0.2,q*0.22,1.5,dark,10); }
+    else if(r<0.75){ B(x-ww*0.3,y,z-dd*0.3,x+ww*0.3,y+2.5,z+dd*0.3,dark,cl); }
+    else { Cyl(x,y,z,q*0.42,q*0.42,0.3,white,20,cl); }
   };
-  const roundTower=(x,z,r,h,m)=>{ B(x-r-2,GY,z-r-2,x+r+2,GY+5,z+r+2,podium); Cyl(x,GY+5,z,r,r,h-5,m,24); Cyl(x,GY+h,z,r+0.4,r+0.4,0.8,cap,24); Cone(x,GY+h+0.8,z,r*0.6,h*0.12,dark,16); };
+  const roundTower=(x,z,r,h,m)=>{ const cl=inFlyZone(x-r-2,z-r-2,x+r+2,z+r+2); B(x-r-2,GY,z-r-2,x+r+2,GY+5,z+r+2,podium,cl); Cyl(x,GY+5,z,r,r,h-5,m,24,cl); Cyl(x,GY+h,z,r+0.4,r+0.4,0.8,cap,24,cl); Cone(x,GY+h+0.8,z,r*0.6,h*0.12,dark,16); };
   // centro de la ciudad al norte
   for(let gx=-288; gx<=288; gx+=24) for(let gz=70; gz<=300; gz+=24){
     if(rnd()<0.22) continue;
@@ -2766,7 +2773,7 @@ SL.push({k:'aniso',id:'sAniso',v:'vAniso',min:0,max:3,step:1,fmt:v=>ANISO_V[v]+'
 SL.push({k:'luz',id:'sLuz',v:'vLuz',min:0,max:3,step:1,fmt:v=>LIGHT_CFG[v].name});
 if(isTouch) SL.push({k:'touchSize',id:'sTouch',v:'vTouch',min:50,max:100,step:5});
 const PRESETS={ low:{res:75,aa:0,sh:0,view:0,aniso:0,luz:0}, mid:{res:100,aa:isMobile?0:1,sh:1,view:1,aniso:2,luz:0}, high:{res:100,aa:1,sh:2,view:2,aniso:3,luz:1}, ultra:{res:150,aa:1,sh:4,view:2,aniso:3,luz:2} };
-let SUN_K=1;
+let SUN_K=1, sunKUsed=1;
 function applyShadows(){
   const lv=SET.sh; sun.castShadow = lv>0; if(!lv) return;
   const e=SH_EXT[lv], k=e/10, c=sun.shadow.camera;
@@ -2775,7 +2782,7 @@ function applyShadows(){
   const maxT=(renderer.capabilities && renderer.capabilities.maxTextureSize) || 4096;
   const ms=Math.min(isMobile ? (lv>=3?2048:1024) : (lv>=3?4096:2048), maxT);
   if(sun.shadow.mapSize.x!==ms){ sun.shadow.mapSize.set(ms,ms); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } }
-  SUN_K=k;
+  SUN_K=k; sunKUsed=k;
 }
 function applyView(){ const v=VIEW_FOG[SET.view]; scene.fog.near=v[0]; scene.fog.far=v[1]; camera.far=v[2]; camera.updateProjectionMatrix(); }
 function applyAniso(){
@@ -3354,7 +3361,9 @@ function tick(now, xrFrame){
   animate(dt, now); updateDroneVisual(dt, now); updateCamera(dt); if(!XR.on) viewPos.copy(camera.position);
   updateLights(); if(XR.on) updateVRHud(dt); else updateHUD(dt); updateAudio();
   { const fp = state==='play' ? d.pos : START, sx=Math.round(fp.x*4)/4, sz=Math.round(fp.z*4)/4;
-    sun.target.position.set(sx,2.2,sz); sun.position.set(sx+9*SUN_K,2.2+10.8*SUN_K,sz+10*SUN_K); sun.target.updateMatrixWorld(); }
+    const kk=Math.max(SUN_K, (fp.y-2.2+5)/10.8);   // si el dron sube por encima del sol de las sombras, lo alejamos
+    if(Math.abs(kk-sunKUsed)>0.05){ sunKUsed=kk; sun.shadow.camera.far=45*kk+15; sun.shadow.camera.updateProjectionMatrix(); }
+    sun.target.position.set(sx,2.2,sz); sun.position.set(sx+9*kk,2.2+10.8*kk,sz+10*kk); sun.target.updateMatrixWorld(); }
   if(XR.on && XR.cam==='fpv2d' && XR.room) renderFpv2d(); else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
