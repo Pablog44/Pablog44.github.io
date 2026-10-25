@@ -109,6 +109,23 @@ table.sc tfoot td{font-weight:800;border-top:2px solid var(--ink);border-bottom:
 .pbtn.alt{background:#e3eaee;color:var(--ink)}
 .pbtn.go{background:var(--pin);color:#fff}
 #vrMsg{font-size:12px;color:var(--mist);margin:0}
+/* ---------- panel de gráficos ---------- */
+.dock{position:absolute;z-index:30;top:calc(12px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));width:min(340px,calc(100% - 24px));max-height:calc(100% - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;touch-action:pan-y;
+  background:rgba(13,33,49,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:16px;padding:14px 16px 16px;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:10px}
+.dock-head{display:flex;align-items:center;justify-content:space-between}
+.dock h2{font-family:var(--f-display);font-size:22px;margin:0;line-height:1}
+.xbtn{border:0;background:rgba(255,255,255,.12);width:34px;height:34px;border-radius:10px;font-size:20px;line-height:1}
+.seg.wide{width:100%}.seg.wide button{flex:1}
+.gsec{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--flag);margin-top:6px}
+.rng{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.rng span{display:flex;justify-content:space-between;gap:8px}
+.rng b{font-family:var(--f-mono);font-weight:500;color:var(--mist);font-variant-numeric:tabular-nums}
+.rng input{width:100%;accent-color:var(--flag);margin:0;height:22px}
+#fps{position:absolute;z-index:31;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top,0px));font-family:var(--f-mono);font-size:12px;background:rgba(13,33,49,.8);padding:4px 10px;border-radius:999px;pointer-events:none}
+.gbtn{border:0;border-radius:10px;padding:9px 14px;font-weight:700;background:rgba(255,255,255,.14);font-size:13px}
+@media (max-width:620px){
+  .dock{top:auto;bottom:0;right:0;left:0;width:100%;max-height:58%;border-radius:18px 18px 0 0;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
 @media (max-width:620px){
   #holeCard{gap:8px;padding:8px 10px 8px 8px}
   #holeCard img{width:34px;height:23px}
@@ -147,6 +164,7 @@ table.sc tfoot td{font-weight:800;border-top:2px solid var(--ink);border-bottom:
       <button class="tbtn" id="btnContour" aria-pressed="false" title="Curvas de nivel del green (K)"><svg viewBox="0 0 24 24"><path d="M3 18c4-6 14-6 18 0"/><path d="M6 14c3-4 9-4 12 0"/><path d="M9 10c2-2 4-2 6 0"/></svg><span class="lb">Curvas</span></button>
       <button class="tbtn" id="btnPlace" aria-pressed="false" title="Colocar la bola en cualquier punto" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"/></svg><span class="lb">Colocar</span></button>
       <button class="tbtn" id="btnReset" title="Devolver la bola al tee" hidden><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M20 12a8 8 0 10-3 6.2M4 10a8 8 0 012-3"/></svg><span class="lb">Tee</span></button>
+      <button class="tbtn" id="btnGfx" title="Ajustes gráficos"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg><span class="lb">Gráficos</span></button>
       <button class="tbtn" id="btnCard" title="Tarjeta de puntuación"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="lb">Tarjeta</span></button>
       <button class="tbtn" id="btnMenu" title="Menú"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="lb">Menú</span></button>
     </div>
@@ -159,6 +177,25 @@ table.sc tfoot td{font-weight:800;border-top:2px solid var(--ink);border-bottom:
   </div>
 
   <div id="toast" hidden></div>
+  <div id="fps" hidden></div>
+  <div id="gfxPanel" class="dock" hidden role="dialog" aria-label="Ajustes gráficos">
+    <div class="dock-head"><h2>Gráficos</h2><button class="xbtn" id="gfxClose" aria-label="Cerrar">×</button></div>
+    <div class="seg wide" id="gfxPreset"><button data-p="bajo">Bajo</button><button data-p="medio">Medio</button><button data-p="alto">Alto</button><button data-p="ultra">Ultra</button></div>
+    <div class="gsec">Césped del green</div>
+    <label class="rng"><span>Densidad <b id="v_greenD"></b></span><input type="range" id="r_greenD" min="0" max="16000" step="500"></label>
+    <label class="rng"><span>Altura <b id="v_greenH"></b></span><input type="range" id="r_greenH" min="3" max="25" step="1"></label>
+    <div class="gsec">Hierba alta fuera del green</div>
+    <label class="rng"><span>Densidad <b id="v_tallD"></b></span><input type="range" id="r_tallD" min="0" max="160" step="5"></label>
+    <label class="rng"><span>Altura <b id="v_tallH"></b></span><input type="range" id="r_tallH" min="5" max="60" step="1"></label>
+    <label class="rng"><span>Distancia de dibujo <b id="v_tallDist"></b></span><input type="range" id="r_tallDist" min="8" max="40" step="1"></label>
+    <div class="gsec">Ambiente y rendimiento</div>
+    <label class="rng"><span>Viento <b id="v_wind"></b></span><input type="range" id="r_wind" min="0" max="100" step="5"></label>
+    <div class="setrow"><label for="g_react">La bola aplasta el césped</label><input type="checkbox" class="switch" id="g_react"></div>
+    <div class="setrow"><label for="g_shadows">Sombras</label><input type="checkbox" class="switch" id="g_shadows"></div>
+    <label class="rng"><span>Resolución <b id="v_res"></b></span><input type="range" id="r_res" min="50" max="100" step="5"></label>
+    <div class="setrow"><label for="g_fps">Mostrar FPS</label><input type="checkbox" class="switch" id="g_fps"></div>
+    <p class="note" id="gfxCount"></p>
+  </div>
 
   <div id="menu" class="overlay">
     <div class="menu-inner">
@@ -178,6 +215,7 @@ table.sc tfoot td{font-weight:800;border-top:2px solid var(--ink);border-bottom:
         <div class="setrow"><label for="optLine">Línea de previsión<small style="display:block;font-weight:400;color:var(--mist);font-size:12px">Dibuja el recorrido de la bola al apuntar</small></label><input type="checkbox" class="switch" id="optLine"></div>
         <div class="setrow"><label for="optContour">Curvas de nivel<small style="display:block;font-weight:400;color:var(--mist);font-size:12px">Una línea cada 2 cm de desnivel</small></label><input type="checkbox" class="switch" id="optContour"></div>
         <div class="setrow"><label for="optSound">Sonido</label><input type="checkbox" class="switch" id="optSound" checked></div>
+        <div class="setrow"><span class="lbl">Gráficos<small>Césped, viento, sombras y resolución</small></span><button class="gbtn" id="openGfx">Ajustes gráficos</button></div>
       </div>
       <p class="note" id="bestNote"></p>
       <p class="note">Móvil y PC: arrastra desde la bola hacia atrás y suelta. Arrastra fuera de la bola para girar la cámara; pellizca o usa la rueda para acercar.</p>
@@ -522,7 +560,7 @@ renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
 renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local-floor');
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(55,1,.02,600);
+const camera=new THREE.PerspectiveCamera(55,1,.05,600);
 const dolly=new THREE.Group();dolly.add(camera);scene.add(dolly);
 const hemi=new THREE.HemisphereLight(0xffffff,0x4a5a3a,1.15);scene.add(hemi);
 const sunL=new THREE.DirectionalLight(0xfff4e0,2.7);sunL.castShadow=true;
@@ -714,7 +752,7 @@ function instanced(p,geo,mat,items,colorFn){const im=new THREE.InstancedMesh(geo
 function firs(p,pts,snow=false,col='#1f4d2b'){const it=pts.map(([x,y,z,s])=>({x,y,z,s:s||1,ry:rnd()*6}));
   instanced(p,new THREE.CylinderGeometry(.08,.12,.6,5).translate(0,.3,0),M('#5a3d24'),it);
   [[1.0,.5,1.3],[.78,1.1,1.1],[.52,1.65,.9]].forEach(([r,y,h])=>instanced(p,new THREE.ConeGeometry(r,h,7).translate(0,y+h/2,0),M(col),it));
-  if(snow)instanced(p,new THREE.ConeGeometry(.3,.5,7).translate(0,2.25,0),M('#f4f8fb'),it)}
+}
 function roundTrees(p,pts,col='#4f7d3a',trunk='#6b4a2e'){const it=pts.map(([x,y,z,s])=>({x,y,z,s:s||1,ry:rnd()*6}));
   instanced(p,new THREE.CylinderGeometry(.09,.14,1.2,6).translate(0,.6,0),M(trunk),it);
   instanced(p,new THREE.IcosahedronGeometry(.85,0).translate(0,1.65,0),M(col),it,()=>new THREE.Color(col).offsetHSL(rr(-.02,.02),0,rr(-.06,.06)).getHex())}
@@ -743,22 +781,23 @@ function setupWorld(){
   const gm=new THREE.MeshStandardMaterial({color:'#5f9a44',map:groundTex('grass'),roughness:1});const gp=addM(W,new THREE.CircleGeometry(460,64),gm,parkCenter.x,0,parkCenter.z,0,false);gp.rotation.x=-Math.PI/2;
   /* caminos de grava que unen los tees en serpentina */
   const pm=new THREE.MeshStandardMaterial({color:'#d8ccb0',map:groundTex('sand'),roughness:1,polygonOffset:true,polygonOffsetFactor:-1});
-  const strip=(x0,x1,z0,z1)=>{const m=addM(W,new THREE.PlaneGeometry(Math.abs(x1-x0),Math.abs(z1-z0)),pm,(x0+x1)/2,.006,(z0+z1)/2,0,false);m.rotation.x=-Math.PI/2};
+  const strip=(x0,x1,z0,z1,y=.03)=>{const m=addM(W,new THREE.PlaneGeometry(Math.abs(x1-x0),Math.abs(z1-z0)),pm,(x0+x1)/2,y,(z0+z1)/2,0,false);m.rotation.x=-Math.PI/2;maskRects.push([x0,x1,z0,z1])};
   const XE=3*PW+1;for(let r=0;r<3;r++)strip(-XE,XE,-r*PD+1.4,-r*PD-.6);
-  strip(XE-2,XE,-.6+1.4,-PD-.6);strip(-XE,-XE+2,-PD+1.4,-2*PD-.6);
+  strip(XE-2,XE,-.6+1.4,-PD-.6,.045);strip(-XE,-XE+2,-PD+1.4,-2*PD-.6,.045);
   /* árboles en el perímetro y colinas lejanas */
   const ring=[];for(let x=-XE-6;x<=XE+6;x+=4.5){ring.push([x+rr(-1,1),0,9+rr(-1,1),rr(1,1.5)]);ring.push([x+rr(-1,1),0,-3*PD-4+rr(-1,1),rr(1,1.6)])}
   for(let z=6;z>=-3*PD-2;z-=4.5){ring.push([-XE-7+rr(-1,1),0,z,rr(1,1.5)]);ring.push([XE+7+rr(-1,1),0,z,rr(1,1.5)])}
   roundTrees(W,ring.filter((_,i)=>i%2),'#4c7d38');firs(W,ring.filter((_,i)=>!(i%2)));
   for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=rr(150,210);sph(W,rr(28,48),i%3?'#6b9a55':'#7da564',parkCenter.x+Math.cos(a)*r,-14,parkCenter.z+Math.sin(a)*r,{},10).scale.set(1.8,.55,1.2)}
-  for(const [x,z,r,h] of [[-120,-200,40,70],[-40,-230,46,90],[60,-215,40,64],[140,-190,38,58]]){cone(W,r,h,6,'#7b8189',x,0,z);cone(W,r*.4,h*.4,6,'#f4f8fb',x,h*.6,z)}
+  for(const [x,z,r,h] of [[-120,-200,40,70],[-40,-230,46,90],[60,-215,40,64],[140,-190,38,58]]){cone(W,r,h,6,'#7b8189',x,0,z)}
 }
 /* la sombra sigue al hoyo activo */
 function focusShadow(h){const c=h.c,cx=c.bb.cx+h.off.x,cz=c.bb.cz+h.off.z-2,sd=sunL.userData.dir;
   sunL.position.set(cx+sd.x*40,sd.y*40,cz+sd.z*40);sunL.target.position.set(cx,0,cz);
   const span=Math.max(c.bb.w,c.bb.d)/2+7,sc=sunL.shadow.camera;sc.left=-span;sc.right=span;sc.top=span;sc.bottom=-span;sc.near=1;sc.far=110;sc.updateProjectionMatrix()}
 function landPad(grp,c,col,tex,x0,x1,z0,z1,y){const m=new THREE.MeshStandardMaterial({color:col,map:tex?groundTex(tex):null,roughness:1});const b=addM(grp,new THREE.BoxGeometry(x1-x0,1,z1-z0),m,(x0+x1)/2,y-.5,(z0+z1)/2,0,false);return b}
-function waterStrip(grp,x0,x1,z0,z1,y,col){const wm=waterMat.clone();if(col)wm.color.set(col);const m=addM(grp,new THREE.PlaneGeometry(x1-x0,z1-z0),wm,(x0+x1)/2,y,(z0+z1)/2,0,false);m.rotation.x=-Math.PI/2;return m}
+const maskRects=[];   // zonas sin césped alto (caminos y agua), en coordenadas del mundo
+function waterStrip(grp,x0,x1,z0,z1,y,col){y=Math.max(y,y+.012);maskRects.push([x0+grp.position.x,x1+grp.position.x,z0+grp.position.z,z1+grp.position.z]);const wm=waterMat.clone();if(col)wm.color.set(col);const m=addM(grp,new THREE.PlaneGeometry(x1-x0,z1-z0),wm,(x0+x1)/2,y,(z0+z1)/2,0,false);m.rotation.x=-Math.PI/2;return m}
 
 /* ---------- obstáculos visibles ---------- */
 function buildObstacles(c,grp){
@@ -793,7 +832,7 @@ function buildObstacles(c,grp){
       const col=addM(grp,new THREE.CylinderGeometry(.06,.16,1,12,1,true).translate(0,.5,0),new THREE.MeshStandardMaterial({color:'#eaf6fb',transparent:true,opacity:.55,depthWrite:false,roughness:.3,side:THREE.DoubleSide}),o.x,h,o.z,0,false);
       const steam=sph(grp,.25,new THREE.MeshStandardMaterial({color:'#f2f6f8',transparent:true,opacity:.0,roughness:1}),o.x,h+1,o.z);
       animators.push((t)=>{const ph=ob.ph||0;const on=ob.active;const k=on?Math.sin(Math.min(ph/1.1,1)*Math.PI):0;const pre=!on&&ph>o.period-1.2?(ph-(o.period-1.2))/1.2:0;
-        col.scale.set(1+k*.6,.02+k*2.4+pre*.12*Math.abs(Math.sin(t*20)),1+k*.6);col.visible=k>.01||pre>0;steam.material.opacity=k*.5;steam.position.y=h+.6+k*2;steam.scale.setScalar(1+k*2.5)})}
+        col.scale.set(1+k*.6,.02+k*2.4+pre*.08*(.6+.4*Math.sin(t*4)),1+k*.6);col.visible=k>.01||pre>0;steam.material.opacity=k*.5;steam.position.y=h+.6+k*2;steam.scale.setScalar(1+k*2.5)})}
   }
 }
 
@@ -887,17 +926,17 @@ DECO.gr=(g,c,G)=>{const X=c.bb.cx,Z0=c.bb.z0;
   olives(g,around(c,3,1.5,4,G));
 };
 DECO.ch=(g,c,G)=>{const X=c.bb.cx,Z0=c.bb.z0;
-  const mh=(x,z,r,h)=>{const m=cone(g,r,h,5,'#6f7378',x,G,z);m.rotation.y=.3;const cp=cone(g,r*.4,h*.4,5,'#f7fbff',x,G+h*.6,z);cp.rotation.y=.3};
+  const mh=(x,z,r,h)=>{const m=cone(g,r,h,5,'#6f7378',x,G,z);m.rotation.y=.3};
   mh(X+2.6,Z0-6,4.2,10);mh(X-3.4,Z0-4.8,2.8,6);
-  const h=house(g,3.2,2.2,2.6,'#9a6a3e','#5a3a26',X-4.2,G,-3,.5);addM(h,prism(3.6,.25,3.1),M('#f4f8fb'),0,3.0,0);box(h,3.4,.12,.6,'#7a4f2c',0,1.15,1.5);
+  const h=house(g,3.2,2.2,2.6,'#9a6a3e','#5a3a26',X-4.2,G,-3,.5);box(h,3.4,.12,.6,'#7a4f2c',0,1.15,1.5);
   const cow=(x,z,ry)=>{const k=new THREE.Group();k.position.set(x,G,z);k.rotation.y=ry;g.add(k);const sp=canvasTex(64,64,(q,w,hh)=>{q.fillStyle='#fafafa';q.fillRect(0,0,w,hh);q.fillStyle='#1d1d1d';for(let i=0;i<6;i++){q.beginPath();q.ellipse(rnd()*w,rnd()*hh,rr(5,12),rr(4,9),rnd()*3,0,7);q.fill()}});
     box(k,.5,.45,.95,new THREE.MeshStandardMaterial({map:sp}),0,.45,0);box(k,.3,.3,.35,'#f2f2f2',0,.75,.58);for(const [a,b] of [[-.18,-.35],[.18,-.35],[-.18,.35],[.18,.35]])box(k,.1,.45,.1,'#f2f2f2',a,0,b);sph(k,.06,'#d9b13a',0,.55,.6,{m:.7,r:.3})};
   cow(X+2.6,-1.5,-1);cow(X-2.8,Z0+3,2);
-  firs(g,around(c,8,1.5,5,G,[.8,1.2]),true);
+  firs(g,around(c,8,1.5,5,G,[.8,1.2]));
 };
 DECO.no=(g,c,G)=>{const X=c.bb.cx,Z0=c.bb.z0;
   waterStrip(g,X-4.8,X+4.8,-1.7,Z0-1.4,G+.02,'#2a6f9a');
-  const r=addM(g,new THREE.DodecahedronGeometry(3.4,0),M('#3a4148'),X-2.8,G+1.4,Z0-5);r.scale.set(1,1.5,.9);cone(g,1.6,1.8,5,'#e8eef4',X-2.8,G+5,Z0-5);
+  const r=addM(g,new THREE.DodecahedronGeometry(3.4,0),M('#3a4148'),X-2.8,G+1.4,Z0-5);r.scale.set(1,1.5,.9);
   const S=new THREE.Group();S.position.set(X-3.4,G,-5.5);S.rotation.y=.2;S.scale.setScalar(.5);g.add(S);
   const hull=sph(S,1,'#5b3a22',0,0,0,{},14);hull.scale.set(.75,.55,3.6);const prow=addM(S,new THREE.TorusGeometry(.6,.09,6,12,Math.PI),M('#5b3a22'),0,.6,3.2);prow.rotation.y=Math.PI/2;
   cyl(S,.06,.07,3.2,6,'#4a3020',0,.2,0);addM(S,new THREE.PlaneGeometry(2.2,1.6),new THREE.MeshStandardMaterial({side:THREE.DoubleSide,map:canvasTex(64,64,(q,w,h)=>{for(let i=0;i<6;i++){q.fillStyle=i%2?'#f2e8d5':'#b52a2a';q.fillRect(i*w/6,0,w/6+1,h)}},false)}),0,2.3,0);
@@ -1009,6 +1048,139 @@ function buildPark(){
   });
 }
 
+/* ================= césped 3D ================= */
+/* Hierba alta: un campo de briznas instanciadas que sigue a la cámara (se repite en mosaico sin saltos visibles)
+   y que no crece donde la máscara lo impide (greens, caminos, agua).
+   Césped del green: briznas cortas y densas generadas sobre el hoyo activo; se aplastan al pasar la bola. */
+const GFX_PRESETS={
+  bajo:{greenD:0,greenH:9,tallD:0,tallH:22,tallDist:12,wind:40,react:true,shadows:false,res:75},
+  medio:{greenD:4000,greenH:9,tallD:40,tallH:22,tallDist:15,wind:50,react:true,shadows:true,res:90},
+  alto:{greenD:10000,greenH:11,tallD:65,tallH:24,tallDist:22,wind:55,react:true,shadows:true,res:100},
+  ultra:{greenD:16000,greenH:12,tallD:110,tallH:26,tallDist:30,wind:60,react:true,shadows:true,res:100}};
+const gfx=Object.assign({preset:isMobile?'medio':'alto',fps:false},GFX_PRESETS[isMobile?'medio':'alto']);
+try{const s=JSON.parse(localStorage.getItem('mg_gfx')||'null');if(s)Object.assign(gfx,s)}catch(e){}
+
+const GR={tall:null,green:null,greenFor:null,mask:null,last:null,trail:Array.from({length:16},()=>new THREE.Vector4(0,-99,0,0))};
+const grassU={uTime:{value:0},uWind:{value:.5},uReact:{value:1},uCam:{value:new THREE.Vector3()},uTrail:{value:GR.trail}};
+const GRASS_COMMON=`
+uniform float uTime,uWind,uReact,uH,uW,uRT;uniform vec3 uCam;uniform vec4 uTrail[16];
+varying float vT,vHue,vFar,vFlat;
+vec2 trailBend(vec2 p,inout float fl){vec2 b=vec2(0.0);for(int i=0;i<16;i++){vec2 d=p-uTrail[i].xz;float r=length(d);float k=uTrail[i].w*(1.0-smoothstep(uRT*.35,uRT,r))*uReact;b+=d/(r+1e-4)*k*2.2;fl=max(fl,k);}return b;}
+`;
+const GRASS_FRAG=`
+uniform vec3 uBase,uTip,uFar;varying float vT,vHue,vFar,vFlat;
+#include <fog_pars_fragment>
+void main(){vec3 c=mix(uBase,uTip,pow(vT,1.25))*(.8+.4*vHue);c=mix(c,c*vec3(1.18,1.22,1.05)+vec3(.05,.06,.01),vFlat*.85);c=mix(c,uFar,vFar);gl_FragColor=vec4(c,1.0);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+#include <fog_fragment>
+}`;
+function grassMat(vert,extra){return new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,extra]),vertexShader:vert,fragmentShader:GRASS_FRAG,side:THREE.DoubleSide,fog:true})}
+/* --- hierba alta --- */
+const tallMat=grassMat(`${GRASS_COMMON}
+attribute vec2 aOff;attribute vec4 aRnd;uniform vec2 uCenter,uMaskO,uMaskS;uniform float uTile,uDist;uniform sampler2D uMask;
+#include <fog_pars_vertex>
+void main(){
+  vec2 o=aOff*uTile;vec2 p=o+floor((uCenter-o)/uTile+.5)*uTile;
+  float dc=distance(vec3(p.x,0.0,p.y),uCam);float fade=1.0-smoothstep(uDist*.62,uDist,dc);
+  float m=texture2D(uMask,(p-uMaskO)/uMaskS).r;
+  float h=uH*aRnd.y*fade*step(.5,m);float t=position.y;
+  float ang=aRnd.x*6.2832;vec2 dir=vec2(cos(ang),sin(ang)),sd=vec2(-dir.y,dir.x);
+  float w=uW*(1.0-t*.85)*(.7+.6*aRnd.w)*step(.0005,h);
+  float wv=sin(uTime*1.5+p.x*.33+p.y*.27)*.6+sin(uTime*2.6+p.x*.9-p.y*.5)*.25;
+  float fl=0.0;vec2 bend=dir*(aRnd.z-.5)*.55+vec2(.8,.5)*wv*uWind+trailBend(p,fl);
+  vec3 pos=vec3(p.x,0.0,p.y);pos.xz+=sd*position.x*w*.5;pos.xz+=bend*h*t*t;pos.y+=h*t*(1.0-.2*min(dot(bend,bend),1.0))*(1.0-.7*fl);
+  vT=t;vHue=aRnd.w;vFlat=fl;vFar=smoothstep(uDist*.35,uDist*.95,dc);
+  vec4 mvPosition=viewMatrix*vec4(pos,1.0);gl_Position=projectionMatrix*mvPosition;
+  #include <fog_vertex>
+}`,{uH:{value:.24},uW:{value:.014},uRT:{value:.4},uCenter:{value:new THREE.Vector2()},uTile:{value:40},uDist:{value:20},uMask:{value:null},uMaskO:{value:new THREE.Vector2()},uMaskS:{value:new THREE.Vector2(1,1)},
+  uBase:{value:new THREE.Color('#2a5422')},uTip:{value:new THREE.Color('#a9cf62')},uFar:{value:new THREE.Color('#4f8238')}});
+/* --- césped del green --- */
+const greenGrassMat=grassMat(`${GRASS_COMMON}
+attribute vec3 aBase,aRnd;
+#include <fog_pars_vertex>
+void main(){
+  vec3 b=(modelMatrix*vec4(aBase,1.0)).xyz;float dc=distance(b,uCam);float fade=1.0-smoothstep(5.5,9.0,dc);
+  float t=position.y;float h=uH*(.55+.9*aRnd.y)*fade;
+  float ang=aRnd.x*6.2832;vec2 dir=vec2(cos(ang),sin(ang)),sd=vec2(-dir.y,dir.x);
+  float fl=0.0;vec2 bend=dir*(aRnd.z-.5)*.7+vec2(.6,.4)*sin(uTime*2.2+b.x*3.0+b.z*2.0)*uWind*.22+trailBend(b.xz,fl);
+  float bl=length(bend);if(bl>1.0)bend/=bl;h*=1.0-.12*fl;vec3 p=b;p.xz+=sd*position.x*uW*.5*(1.0-t)*step(.0001,h);p.xz+=bend*h*mix(t*t,t,fl);p.y+=h*t*(1.0-.88*fl)+.0008;
+  vT=t;vHue=aRnd.z;vFlat=fl;vFar=0.0;
+  vec4 mvPosition=viewMatrix*vec4(p,1.0);gl_Position=projectionMatrix*mvPosition;
+  #include <fog_vertex>
+}`,{uH:{value:.01},uW:{value:.0062},uRT:{value:.058},uBase:{value:new THREE.Color('#22602c')},uTip:{value:new THREE.Color('#a4dc74')},uFar:{value:new THREE.Color('#4b8f4d')}});
+for(const m of [tallMat,greenGrassMat])for(const k in grassU)m.uniforms[k]=grassU[k];
+
+/* máscara vista desde arriba: blanco = hierba alta, negro = nada */
+const MASK={x0:-56,x1:56,z0:16,z1:-104};
+function buildGrassMask(){
+  const S=1024,cv=document.createElement('canvas');cv.width=cv.height=S;const q=cv.getContext('2d');q.fillStyle='#fff';q.fillRect(0,0,S,S);
+  const px=x=>(x-MASK.x0)/(MASK.x1-MASK.x0)*S,pz=z=>(z-MASK.z0)/(MASK.z1-MASK.z0)*S,k=S/(MASK.x1-MASK.x0);
+  q.fillStyle='#000';q.strokeStyle='#000';q.lineJoin='round';
+  for(const h of park){const P=h.c.poly;q.beginPath();P.forEach((p,i)=>{const X=px(p[0]+h.off.x),Z=pz(p[1]+h.off.z);i?q.lineTo(X,Z):q.moveTo(X,Z)});q.closePath();q.fill();q.lineWidth=.32*k;q.stroke()}
+  for(const [x0,x1,z0,z1] of maskRects){const a=px(Math.min(x0,x1)),b=px(Math.max(x0,x1)),c=pz(Math.max(z0,z1)),d=pz(Math.min(z0,z1));q.fillRect(a-1,c-1,b-a+2,d-c+2)}
+  const t=new THREE.CanvasTexture(cv);t.flipY=false;t.generateMipmaps=false;t.minFilter=t.magFilter=THREE.LinearFilter;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  tallMat.uniforms.uMask.value=t;tallMat.uniforms.uMaskO.value.set(MASK.x0,MASK.z0);tallMat.uniforms.uMaskS.value.set(MASK.x1-MASK.x0,MASK.z1-MASK.z0);GR.mask=t;
+}
+function tallCount(){const T=gfx.tallDist*2.1;return Math.min(700000,Math.round(gfx.tallD*T*T))}
+function buildTall(){
+  if(GR.tall){scene.remove(GR.tall);GR.tall.geometry.dispose();GR.tall=null}
+  const n=tallCount();if(n<1)return;const T=gfx.tallDist*2.1;
+  const g=new THREE.InstancedBufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([-1,0,0,1,0,0,-.62,.5,0,.62,.5,0,0,1,0],3));g.setIndex([0,1,2,1,3,2,2,3,4]);
+  const off=new Float32Array(n*2),rn=new Float32Array(n*4);for(let i=0;i<n;i++){off[i*2]=Math.random();off[i*2+1]=Math.random();rn[i*4]=Math.random();rn[i*4+1]=.5+Math.random()*.75;rn[i*4+2]=Math.random();rn[i*4+3]=Math.random()}
+  g.setAttribute('aOff',new THREE.InstancedBufferAttribute(off,2));g.setAttribute('aRnd',new THREE.InstancedBufferAttribute(rn,4));g.instanceCount=n;
+  const m=new THREE.Mesh(g,tallMat);m.frustumCulled=false;scene.add(m);GR.tall=m;tallMat.uniforms.uTile.value=T;tallMat.uniforms.uDist.value=gfx.tallDist;
+}
+function polyArea(P){let a=0;for(let i=0;i<P.length;i++){const p=P[i],q=P[(i+1)%P.length];a+=p[0]*q[1]-q[0]*p[1]}return Math.abs(a)/2}
+function greenCount(h){return h?Math.min(450000,Math.round(gfx.greenD*polyArea(h.c.poly))):0}
+function buildGreenGrass(h){
+  if(GR.green){GR.green.parent?.remove(GR.green);GR.green.geometry.dispose();GR.green=null}GR.greenFor=h;
+  const n0=greenCount(h);if(!h||n0<1)return;const c=h.c,bb=c.bb;
+  const base=new Float32Array(n0*3),rn=new Float32Array(n0*3);let n=0,tries=0;const cr=(CUP_R+.004)**2;
+  while(n<n0&&tries<n0*5){tries++;const x=bb.x0+Math.random()*bb.w,z=bb.z0+Math.random()*bb.d;
+    if(!pip(c.poly,x,z)||(x-c.cup.x)**2+(z-c.cup.z)**2<cr||(Math.abs(x-c.tee.x)<.18&&Math.abs(z-c.tee.z)<.14)||c.water.some(w=>w.contains(x,z))||c.sand.some(s=>s.contains(x,z)))continue;
+    base[n*3]=x;base[n*3+1]=c.H(x,z);base[n*3+2]=z;rn[n*3]=Math.random();rn[n*3+1]=Math.random();rn[n*3+2]=Math.random();n++}
+  const g=new THREE.InstancedBufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([-1,0,0,1,0,0,0,1,0],3));
+  g.setAttribute('aBase',new THREE.InstancedBufferAttribute(base,3));g.setAttribute('aRnd',new THREE.InstancedBufferAttribute(rn,3));g.instanceCount=n;
+  const m=new THREE.Mesh(g,greenGrassMat);m.frustumCulled=false;m.renderOrder=1;h.grp.add(m);GR.green=m;
+}
+/* rastro de la bola: el punto 0 es la bola; los demás, posiciones recientes que se van recuperando */
+function updateGrass(dt,camPos){
+  grassU.uTime.value+=dt;grassU.uWind.value=gfx.wind/100;grassU.uReact.value=gfx.react?1:0;grassU.uCam.value.copy(camPos);
+  tallMat.uniforms.uCenter.value.set(camPos.x,camPos.z);tallMat.uniforms.uH.value=gfx.tallH/100;greenGrassMat.uniforms.uH.value=gfx.greenH/1000;
+  const tr=GR.trail,N=tr.length;for(let i=1;i<N;i++)tr[i].w=Math.max(0,tr[i].w-dt/2.4);
+  const b=game.b,h=game.h;
+  if(b&&h&&!b.air&&(game.state==='ready'||game.state==='moving'||game.state==='placing')){
+    const x=b.x+h.off.x,y=b.y+h.off.y,z=b.z+h.off.z;tr[0].set(x,y,z,1);
+    if(!GR.last||Math.hypot(x-GR.last.x,z-GR.last.z)>.045){if(GR.last){for(let i=N-1;i>1;i--)tr[i].copy(tr[i-1]);tr[1].set(GR.last.x,GR.last.y,GR.last.z,1)}GR.last={x,y,z}}
+  }else{tr[0].w=0;GR.last=null}
+}
+
+/* ---------- ajustes gráficos ---------- */
+const GFX_FIELDS=[['greenD',v=>v?(+v).toLocaleString('es-ES')+' /m²':'apagado'],['greenH',v=>v+' mm'],['tallD',v=>v?v+' /m²':'apagado'],['tallH',v=>v+' cm'],['tallDist',v=>v+' m'],['wind',v=>v+' %'],['res',v=>v+' %']];
+let gfxT=null;
+function applyGfx(rebuild){
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2)*gfx.res/100);resize();sunL.castShadow=!!gfx.shadows;
+  if(rebuild){clearTimeout(gfxT);gfxT=setTimeout(()=>{buildTall();buildGreenGrass(game.h);gfxUI()},120)}
+  try{localStorage.setItem('mg_gfx',JSON.stringify(gfx))}catch(e){}gfxUI();
+}
+function gfxUI(){
+  for(const [k,f] of GFX_FIELDS){const r=$('r_'+k);if(r&&+r.value!==gfx[k])r.value=gfx[k];const v=$('v_'+k);if(v)v.textContent=f(gfx[k])}
+  $('g_react').checked=!!gfx.react;$('g_shadows').checked=!!gfx.shadows;$('g_fps').checked=!!gfx.fps;$('fps').hidden=!gfx.fps;
+  document.querySelectorAll('#gfxPreset button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===gfx.preset));
+  const t=tallCount(),gg=greenCount(game.h);$('gfxCount').textContent=`≈ ${t.toLocaleString('es-ES')} briznas de hierba alta alrededor de la cámara · ${gg.toLocaleString('es-ES')} en este green`;
+}
+function initGfxUI(){
+  for(const [k] of GFX_FIELDS){const r=$('r_'+k);r.addEventListener('input',()=>{gfx[k]=+r.value;gfx.preset='custom';applyGfx(['greenD','tallD','tallDist'].includes(k))})}
+  $('g_react').onchange=e=>{gfx.react=e.target.checked;gfx.preset='custom';applyGfx(false)};
+  $('g_shadows').onchange=e=>{gfx.shadows=e.target.checked;gfx.preset='custom';applyGfx(false)};
+  $('g_fps').onchange=e=>{gfx.fps=e.target.checked;applyGfx(false)};
+  $('gfxPreset').onclick=e=>{const b=e.target.closest('button');if(!b)return;Object.assign(gfx,GFX_PRESETS[b.dataset.p]);gfx.preset=b.dataset.p;applyGfx(true)};
+  const open=()=>{$('gfxPanel').hidden=false;gfxUI()};$('openGfx').onclick=open;$('btnGfx').onclick=open;$('gfxClose').onclick=()=>{$('gfxPanel').hidden=true};
+}
+let fpsN=0,fpsT=0;function tickFps(dt){if(!gfx.fps)return;fpsN++;fpsT+=dt;if(fpsT>=.5){$('fps').textContent=Math.round(fpsN/fpsT)+' fps';fpsN=0;fpsT=0}}
+function initGrass(){buildGrassMask();initGfxUI();applyGfx(false);buildTall();}
+
 /* ================= partida ================= */
 const game={mode:'menu',list:LONG,pos:0,scores:[],strokes:0,state:'ready',c:null,flag:null,b:null,last:{x:0,z:0},simT:0,acc:0,timer:0,moveT:0,holed:0,shots:0,inRound:false};
 /* todo lo de la bola vive en playG, que se coloca sobre el hoyo activo (coordenadas locales del hoyo) */
@@ -1031,7 +1203,7 @@ function loadHole(i){
   placeBall(h.c.tee.x,h.c.tee.z);game.last={x:h.c.tee.x,z:h.c.tee.z};
   setCamMode(0);const port=innerWidth<innerHeight;cam.yaw=yawTo(h.c.tee,h.c.cup);cam.yawGoal=null;cam.dist=port?3.1:isMobile?2.6:2.3;cam.pitch=port?.56:.42;
   if(prev&&prev!==h)cam.fly=1.6;else if(!prev){cam.target.set(h.c.tee.x,0,h.c.tee.z).add(h.off);cam.cd=cam.dist;cam.cp=cam.pitch}
-  focusShadow(h);updateHUD();if(vr.active)vrTeleport();
+  focusShadow(h);if(GR.greenFor!==h)buildGreenGrass(h);updateHUD();if(vr.active)vrTeleport();
 }
 function placeBall(x,z){game.b=newBall(x,z,game.c);game.state='ready';game.c.update(game.simT)}
 const yawTo=(a,b)=>Math.atan2(-(b.x-a.x),-(b.z-a.z));
@@ -1345,11 +1517,11 @@ renderer.setAnimationLoop((t)=>{
   if(game.b){ballMesh.position.set(game.b.x,game.b.y,game.b.z);
     if(game.b.vx||game.b.vz){const sp=Math.hypot(game.b.vx,game.b.vz);if(sp>1e-4){const ax=new THREE.Vector3(game.b.vz,0,-game.b.vx).normalize();ballMesh.rotateOnWorldAxis(ax,sp*dt/R)}}
     const ready=game.state==='ready'&&game.mode!=='menu';marker.visible=ready&&!vr.active;
-    if(marker.visible){const d=camera.position.distanceTo(ballMesh.getWorldPosition(_v));const s=Math.max(R*1.7,d*.014)*(1+.12*Math.sin(now/300));marker.scale.setScalar(s);marker.position.set(game.b.x,game.b.y-R+.003,game.b.z)}
+    if(marker.visible){const d=camera.position.distanceTo(ballMesh.getWorldPosition(_v));const s=Math.max(R*1.7,d*.014);marker.scale.setScalar(s);marker.position.set(game.b.x,game.b.y-R+.003,game.b.z)}
     const f=game.flag;if(f){const dd=Math.hypot(game.b.x-game.c.cup.x,game.b.z-game.c.cup.z);const k=(dd<1.6&&game.state!=='sinking')?1:0;f.userData.k=lerp(f.userData.k||0,k,Math.min(1,dt*5));
       const ux=(game.c.cup.x-game.b.x)/(dd||1),uz=(game.c.cup.z-game.b.z)/(dd||1);if(k)f.rotation.y=Math.atan2(-uz,ux);f.userData.pv.rotation.z=-f.userData.k*1.5;f.userData.pv.position.y=f.userData.k*.11}}
   if(vr.active)vrUpdate(dt);else updateCamera(dt);
-  camera.getWorldPosition(sky.position);
+  camera.getWorldPosition(sky.position);updateGrass(dt,sky.position);tickFps(dt);
   renderer.render(scene,camera);
 });
 
@@ -1358,6 +1530,6 @@ renderer.setAnimationLoop((t)=>{
   if(navigator.xr){try{const ok=await navigator.xr.isSessionSupported('immersive-vr');$('vrMsg').textContent=ok?'Gafas VR detectadas: pulsa el billete amarillo y ponte las gafas.':'Para VR abre este juego desde el navegador de tus gafas (Meta Quest, Pico…).'}catch(e){}}
   else $('vrMsg').textContent='Para VR abre este juego desde el navegador de tus gafas (Meta Quest, Pico…).';
 })();
-setupWorld();park=buildPark();game.mode='menu';game.idx=0;loadHole(0);refreshMenu();
+setupWorld();park=buildPark();initGrass();game.mode='menu';game.idx=0;loadHole(0);refreshMenu();
 </script>
 </body></html>
