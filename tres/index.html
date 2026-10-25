@@ -75,6 +75,8 @@ button{font:inherit;color:inherit}
 #toast{position:absolute;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:8px 14px;font-size:13px;opacity:0;transition:opacity .35s;max-width:min(560px,80vw);text-align:center}
 #toast.show{opacity:1}
 #legtime{position:absolute;left:50%;top:calc(50px + env(safe-area-inset-top,0px));transform:translateX(-50%);font-family:var(--mono);font-size:12px;color:var(--magenta);padding:4px 10px;letter-spacing:.06em}
+#cptip{position:fixed;left:0;top:0;z-index:5;pointer-events:none;padding:5px 9px;border-radius:7px;background:rgba(6,12,20,.86);border:1px solid var(--line-strong);
+  font-family:var(--mono);font-size:12px;color:var(--cyan);white-space:nowrap}
 #fps{position:absolute;right:calc(196px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-family:var(--mono);font-size:11px;color:var(--muted)}
 #clock{font-family:var(--mono);color:var(--muted)}
 #crash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
@@ -237,12 +239,13 @@ body.touch #quick{max-width:60vw}
     <span class="l">RPM</span><span class="v" id="sRpm">0</span>
     <span class="l">Flaps</span><span class="v" id="sFlaps">0°</span>
     <span class="l">Compensador</span><span class="v" id="sTrim">0</span>
-    <span class="l">Tren</span><span class="gear-lights up" id="sGear"><i></i><i></i><i></i><i></i></span>
+    <span class="l">Tren</span><span class="gear-lights up" id="sGear"><i></i><i></i><i></i><i></i></span><span class="v" id="sGearV" hidden>—</span>
     <span class="l">Frenos</span><span class="v" id="sBrk">—</span>
     <span class="l">Luces</span><span class="v" id="sLights">OFF</span>
     <div class="state" id="sState">EN AGUA</div>
   </div>
   <div id="msg"></div>
+  <div id="cptip" hidden></div>
   <div id="toast" class="hud-panel"></div>
 </div>
 
@@ -291,6 +294,13 @@ body.touch #quick{max-width:60vw}
       <div class="islands" id="islandPick"></div>
     </div>
     <div>
+      <div class="sect-t">Vehículo</div>
+      <div class="seg" id="vehPick">
+        <button data-v="plane" aria-pressed="true">Hidroavión</button>
+        <button data-v="boat" aria-pressed="false">Velero</button>
+      </div>
+    </div>
+    <div id="spawnWrap">
       <div class="sect-t">Salida</div>
       <div class="seg" id="spawnPick">
         <button data-v="runway" aria-pressed="true">En pista</button>
@@ -326,6 +336,7 @@ body.touch #quick{max-width:60vw}
       <button class="btn" id="pSettings">Ajustes y shaders</button>
       <button class="btn" id="pHelp">Controles</button>
       <button class="btn" id="pVR" hidden>Entrar en VR</button>
+      <button class="btn" id="pSwitch">Cambiar a velero</button>
       <button class="btn" id="pMenu">Menú principal</button>
     </div>
     <div class="fine" id="vrnote"></div>
@@ -957,6 +968,108 @@ function spawnWater(isl) {
 }
 
 // ============================================================================
+// Wind field shared by the aircraft, the sailboat, the water (cat's paws) and the HUD.
+//  - trade wind from the NE that slowly veers and pulses
+//  - gust cells (~300 m) that drift downwind; visible as darker patches on the water
+//  - island effects: lee wind shadow, acceleration round the flanks, blocking upwind,
+//    friction over land, daytime sea breeze / night land breeze
+//  - vertical air: thermals over sunny land, ridge lift on windward slopes, sink in the lee
+//  - turbulence: frozen eddies advected with the wind, stronger over land and in wakes
+// ============================================================================
+const ISL_WIND = { brasa: { R: 1350, H: 1.0 }, palma: { R: 950, H: 0.55 }, faro: { R: 820, H: 0.75 } };
+const WIND_NOW = { base: new V3(), sigma: 0.3, U: 5, dir: new V3(1, 0, 0), gust: 1, lee: 0, info: null };
+const GUST_SCALE = 1 / 5200;
+// direction (unit, horizontal) and 10 m speed of the undisturbed trade wind
+function tradeWind(t) {
+  const a0 = Math.atan2(WIND_DIR.z, WIND_DIR.x);
+  const a = a0 + 0.09 * Math.sin(t * 0.0031) + 0.05 * Math.sin(t * 0.0113 + 1.7);
+  const U = (typeof ENV !== 'undefined' ? ENV.windSpeed : 5) * (1 + 0.1 * (typeof ENV !== 'undefined' ? ENV.gust : 0));
+  return { dx: Math.cos(a), dz: Math.sin(a), U };
+}
+// drifting gust cells, 0..1 (same texture lookup as the water shader)
+function gustOffset(t) { const tw = tradeWind(0); const U = typeof ENV !== 'undefined' ? ENV.windSpeed : 5; return [tw.dx * U * 0.85 * t, tw.dz * U * 0.85 * t]; }
+function gustCell(x, z, t) {
+  if (typeof NOISE_CPU === 'undefined' || !NOISE_CPU) return 0.5;
+  const o = gustOffset(t), u = (x - o[0]) * GUST_SCALE, v = (z - o[1]) * GUST_SCALE;
+  return NOISE_CPU(u, v, 1) * 0.65 + NOISE_CPU(u * 1.9 + 0.31, v * 1.9 + 0.17, 0) * 0.35;
+}
+// island influence for a point: speed factor, lee amount, swirl, breeze vector
+function islandEffect(isl, x, y, z, tw, out) {
+  const P = ISL_WIND[isl.id] || { R: 900, H: 0.6 };
+  const R = P.R, H = P.H;
+  const dx = x - isl.cx, dz = z - isl.cz;
+  const a = dx * tw.dx + dz * tw.dz, c = -dx * tw.dz + dz * tw.dx;
+  if (a > 9 * R || Math.abs(c) > 3 * R || a < -3 * R) return;
+  const hFade = 1 - sstep(H * 450, H * 1150, y);
+  const wake = Math.exp(-((c / (0.85 * R)) ** 2)) * sstep(-0.3 * R, 0.6 * R, a) * Math.exp(-Math.max(a, 0) / (4.5 * R)) * hFade;
+  const corner = Math.exp(-(((Math.abs(c) - 1.15 * R) / (0.42 * R)) ** 2)) * Math.exp(-((a / (1.3 * R)) ** 2)) * hFade;
+  const block = Math.exp(-(((a + 1.15 * R) / (0.5 * R)) ** 2)) * Math.exp(-((c / R) ** 2)) * hFade;
+  out.k *= (1 - 0.62 * H * wake) * (1 + 0.32 * H * corner) * (1 - 0.18 * H * block);
+  out.lee = Math.max(out.lee, wake * H);
+  out.swirl += 0.45 * H * wake * NZ3.noise(x * 0.0021 + 3.3, z * 0.0021 - (out.t || 0) * 0.004);
+  out.turb += 0.7 * H * wake + 0.2 * H * corner;
+  // sea breeze by day (onshore), weak land breeze at night (offshore)
+  if (typeof ENV !== 'undefined') {
+    const d = Math.hypot(dx, dz) || 1;
+    const band = sstep(3.2 * R, 1.25 * R, d) * sstep(0.25 * R, 0.85 * R, d) * (1 - sstep(150, 550, y));
+    const day = sstep(0.05, 0.35, ENV.sunDir.y), night = 1 - sstep(-0.1, 0.08, ENV.sunDir.y);
+    const m = (2.3 * day - 1.1 * night) * band;
+    out.bx -= dx / d * m; out.bz -= dz / d * m;
+  }
+}
+// slow wind field at a point (no turbulence). Returns V3 (m/s) and fills WIND_INFO-like data in `info`
+function windField(x, y, z, t, info) {
+  const tw = tradeWind(t);
+  const gh = terrainH(x, z), land = gh > 0.5;
+  const surf = Math.max(gh, 0), hs = Math.max(y - surf, 0.4);
+  const alpha = land ? 0.2 : 0.11;
+  const prof = Math.min(Math.pow(Math.min(hs, 700) / 10, alpha), 1.55);
+  const e = { k: 1, lee: 0, swirl: 0, turb: 0, bx: 0, bz: 0, t };
+  for (const isl of ISLANDS) islandEffect(isl, x, y, z, tw, e);
+  const g = gustCell(x, z, t);
+  const gf = 1 + 0.6 * (g - 0.5) * (1 - 0.6 * sstep(300, 900, y));
+  let k = e.k * gf * prof * (land ? 0.82 : 1);
+  const ca = Math.cos(e.swirl), sa = Math.sin(e.swirl);
+  const dx = tw.dx * ca - tw.dz * sa, dz = tw.dx * sa + tw.dz * ca;
+  const v = new V3(dx * tw.U * k + e.bx * prof, 0, dz * tw.U * k + e.bz * prof);
+  // vertical: ridge lift / lee sink and thermals
+  if (gh > -5) {
+    const n = terrainNormal(x, z);
+    const up = (v.x * -n.x + v.z * -n.z) / Math.max(n.y, 0.3);
+    v.y += up * Math.exp(-hs / 160);
+    if (typeof ENV !== 'undefined' && land) {
+      const day = sstep(0.1, 0.45, ENV.sunDir.y);
+      const cell = NZ2.noise(x / 380 + t * 0.0012, z / 380 - t * 0.0009);
+      v.y += day * (sstep(0.15, 0.55, cell) * 2.2 - 0.45) * sstep(20, 120, hs) * (1 - sstep(900, 1500, y));
+    }
+  }
+  v.y -= 1.2 * e.lee * sstep(50, 250, hs) * (1 - sstep(700, 1200, y));
+  if (info) {
+    info.lee = e.lee; info.gust = gf; info.land = land;
+    info.sigma = tw.U * (0.07 + 0.22 * Math.min(e.turb, 1.5) + (land ? 0.12 : 0)) + (land && typeof ENV !== 'undefined' ? 0.5 * sstep(0.1, 0.45, ENV.sunDir.y) : 0);
+    info.U = Math.hypot(v.x, v.z);
+  }
+  return v;
+}
+// frozen turbulence advected with the mean wind (cheap; sampled at several points per physics step)
+function turbAt(p, t, sigma, base) {
+  if (sigma <= 0.01) return new V3();
+  const qx = p.x - base.x * t, qz = p.z - base.z * t, qy = p.y;
+  const n = (s, o) => NZ.noise(qx / s + o, qz / s - o * 0.7 + qy / (s * 1.7)) + 0.5 * NZ2.noise(qx / (s * 0.31) - o, qz / (s * 0.31) + qy / (s * 0.5) + o);
+  return new V3(n(46, 1.3) * sigma, n(38, 7.9) * sigma * 0.75, n(46, 4.1) * sigma);
+}
+// per-frame update around the active vehicle (cheap enough for 60 Hz)
+function updateWindNow(pos, t) {
+  const info = {};
+  WIND_NOW.base = windField(pos.x, pos.y, pos.z, t, info);
+  WIND_NOW.sigma = info.sigma; WIND_NOW.U = info.U; WIND_NOW.lee = info.lee; WIND_NOW.gust = info.gust;
+  WIND_NOW.dir = new V3(WIND_NOW.base.x, 0, WIND_NOW.base.z).norm();
+  WIND_NOW.info = info;
+}
+// wind at the 10 m level for HUD / windsocks (no turbulence)
+function windSurface(x, z, t) { return windField(x, Math.max(terrainH(x, z), 0) + 10, z, t); }
+
+// ============================================================================
 // Sea state: Gerstner wave set shared by GPU (uniforms) and CPU (buoyancy)
 // ============================================================================
 const NWMAX = 12;
@@ -1083,8 +1196,15 @@ class Aircraft {
     this.impact = 0; this.lastImpact = 0; this.hardLanding = 0; this.overG = 0;
     this.stall = 0; this.waterSpeed = 0; this.sprayPts = []; this.groundSpeed = speed;
     this.prevContact = false; this.propAngle = 0; this.gearInWater = 0; this.scrape = 0;
+    // cockpit switches (clickable in the cockpit view)
+    this.sw = { batt: 1, gen: 1, avion: 1, ign: 1, pump: 1, pitot: 0, cabin: 0, beacon: 1, nav: 0, strobe: 0, land: 0, taxi: 0, deice: 0 };
+    this.propLever = 1; this.condLever = 1;
     this.lights = false;
   }
+  // exterior lights master (L key): nav, strobes, landing and taxi together
+  get lights() { return !!(this.sw && (this.sw.nav || this.sw.land)); }
+  set lights(v) { if (!this.sw) return; const k = v ? 1 : 0; this.sw.nav = k; this.sw.strobe = k; this.sw.land = k; this.sw.taxi = k; }
+  get engineOn() { return !!(this.sw.ign && this.sw.batt && this.condLever > 0.08); }
   fwd() { return this.q.rot(new V3(0, 0, -1)); }
   up() { return this.q.rot(new V3(0, 1, 0)); }
   right() { return this.q.rot(new V3(1, 0, 0)); }
@@ -1099,7 +1219,7 @@ class Aircraft {
     const q = this.q, m = AC.mass;
     // ---------------- systems ----------------
     this.throttle = clamp(this.throttle, 0, 1);
-    const rpmTarget = 0.18 + 0.82 * this.throttle;
+    const rpmTarget = this.engineOn ? (0.18 + 0.82 * this.throttle) * lerp(0.86, 1, this.propLever) : 0;
     this.rpm += (rpmTarget - this.rpm) * (1 - Math.exp(-dt / 0.9));
     const flapTarget = AC.flapDetents[this.flapsSet];
     this.flaps += clamp(flapTarget - this.flaps, -5 * dt, 5 * dt);
@@ -1118,7 +1238,10 @@ class Aircraft {
       Mb.add(rb.cross(fb));
     };
     // ---------------- aerodynamics ----------------
-    const air = vsub(this.vel, env.wind);
+    // air-relative velocity: mean wind + turbulence at the centre of gravity
+    const windCG = env.windAt ? env.windAt(this.pos) : env.wind;
+    this.windCG = windCG;
+    const air = vsub(this.vel, windCG);
     const vb = q.invRot(air);
     const V = vb.len();
     this.ias = V;
@@ -1154,7 +1277,14 @@ class Aircraft {
       const Mpitch = qd * S * AC.c * Cm + qt * S * AC.c * AC.Cmde * eDefl;
       // wing drop near stall
       const drop = st > 0.2 ? Math.sin(env.t * 1.7) * 0.012 * st : 0;
-      const Cl = AC.Clb * beta + AC.Clp * (p * AC.b / (2 * Vd)) + AC.Clr * (r * AC.b / (2 * Vd)) + AC.Clda * this.surf.a * (1 - 0.6 * st) + drop;
+      // gusts hitting one wing harder than the other roll the aircraft
+      let gustRoll = 0;
+      if (env.turbAt && V > 12) {
+        const rgt = this.right(), upv = this.up();
+        const wl = env.turbAt(vadd(this.pos, vscale(rgt, -6.5))), wr = env.turbAt(vadd(this.pos, vscale(rgt, 6.5)));
+        gustRoll = -AC.CLa * (wr.dot(upv) - wl.dot(upv)) / (8 * Vd);
+      }
+      const Cl = AC.Clb * beta + AC.Clp * (p * AC.b / (2 * Vd)) + AC.Clr * (r * AC.b / (2 * Vd)) + AC.Clda * this.surf.a * (1 - 0.6 * st) + drop + gustRoll;
       const Cn = AC.Cnb * beta + AC.Cnr * (r * AC.b / (2 * Vd)) + AC.Cnp * (p * AC.b / (2 * Vd)) + AC.Cnda * this.surf.a;
       const Lroll = qd * S * AC.b * Cl;
       const Nyaw = qd * S * AC.b * Cn + qt * S * AC.b * AC.Cndr * this.surf.r;
@@ -1163,7 +1293,7 @@ class Aircraft {
     this.alpha = alpha; this.beta = beta;
     // thrust
     const u = Math.max(0, -vb.z);
-    const thrustFrac = 0.035 + 0.965 * clamp((this.rpm - 0.18) / 0.82, 0, 1);
+    const thrustFrac = this.engineOn ? 0.035 + 0.965 * clamp((this.rpm - 0.18) / 0.82, 0, 1) : 0;
     const T = AC.Tstatic * thrustFrac * Math.max(0.05, 1 - u / AC.Vprop);
     this.thrust = T;
     F.add(q.rot(new V3(0, 0, -T)));
@@ -1338,6 +1468,258 @@ function applyAssist(ac, raw, level, dt, st) {
     }
   }
   return out;
+}
+
+// ============================================================================
+// Sailboat: 6 m keelboat daysailer (sloop rig). Body axes as the aircraft:
+// +X starboard, +Y up, -Z bow. Origin on the waterline amidships.
+// Physics in the horizontal plane (surge u, sway v, yaw r) plus heel with
+// righting moment, crew hiking and wave-following heave/pitch.
+// Sails: soft-sail lift/drag from the apparent wind angle of attack, with the
+// boom free to swing to leeward up to the sheet limit (luffing, tacks and gybes
+// fall out of that). Keel and rudder are lifting foils working on leeway.
+// ============================================================================
+const RHO_W = 1025;
+const BOAT_SPEC = {
+  mass: 820, Iyaw: 2700, Iroll: 1150, LWL: 5.3, beam: 2.2,
+  mastZ: -0.35, mastH: 8.9, boomH: 1.38, boomL: 2.95,
+  main: { A: 13.5, ceH: 3.25, ceD: 0.95, maxAng: 1.45, minAng: 0.04 },
+  jib: { A: 7.2, ceH: 2.15, tackZ: -2.95, tackY: 0.76, foot: 2.55, ceD: 0.95, maxAng: 1.2, minAng: 0.15 },
+  keel: { A: 0.74, z: -0.36, AR: 2.6, depth: 1.3 },
+  rudder: { A: 0.2, z: 2.95, max: 0.6 },
+  hullLat: 1.6, wetted: 8.6, GM: 0.78, crewMass: 160, hikeMax: 0.95,
+};
+function sailCL(a) { // a in radians, soft sail
+  const d = a * RAD;
+  if (d < 4) return 0.15 * d / 4;
+  if (d < 22) return 0.15 + 1.27 * Math.sin((d - 4) / 18 * PI / 2);
+  if (d < 45) return 1.42 - 0.5 * (d - 22) / 23;
+  if (d < 90) return 0.92 * (1 - (d - 45) / 45);
+  return 0;
+}
+function foilCL(a, slope, maxCL, stall) {
+  const aa = Math.abs(a);
+  const lin = Math.min(slope * aa, maxCL);
+  const post = aa > stall ? lerp(maxCL, maxCL * 0.55, clamp((aa - stall) / 0.25, 0, 1)) : lin;
+  return Math.sign(a) * (aa > stall ? post : lin);
+}
+class Boat {
+  constructor() { this.reset(new V3(), 0); }
+  reset(pos, heading, speed = 0) {
+    this.pos = pos.clone(); this.pos.y = 0;
+    this.psi = heading; this.u = speed; this.v = 0; this.r = 0; this.phi = 0; this.p = 0;
+    this.pitch = 0; this.heave = 0; this.heaveV = 0; this.waveRoll = 0;
+    this.helm = 0; this.rudder = 0;
+    this.mainSheet = 0.45; this.jibSheet = 0.45;
+    this.boom = 0.4; this.jibAng = 0.35; this.boomSide = 1; this.jibSide = 1;
+    this.hike = 0; this.crewSide = 1; this.crewPos = 1; this.heelF = 0; this.heelS = 0; this.mheelF = 0; this.jibBacked = 0;
+    this.crashed = false; this.crashReason = '';
+    this.q = Quat.fromHPR(heading, 0, 0); this.vel = new V3(); this.w = new V3();
+    this.onWater = true; this.onGround = false; this.floatsWet = 1; this.groundSpeed = 0; this.ias = 0;
+    this.awa = 0; this.aws = 0; this.twa = 0; this.tws = 0; this.twd = 0;
+    this.aoaMain = 0; this.aoaJib = 0; this.luffMain = 0; this.luffJib = 0; this.clMain = 0; this.clJib = 0;
+    this.optMain = 0.5; this.optJib = 0.5;
+    this.sprayPts = []; this.impact = 0; this.lights = false; this.gybeT = 0; this.tackT = 0; this.grounded = 0;
+    this.ctl = { pitch: 0, roll: 0, yaw: 0 }; this.gload = 1; this.beta = 0; this.rpm = 0; this.thrust = 0; this.alpha = 0;
+    this.depth = 20; this.drive = 0; this.heelMoment = 0; this.vmg = 0;
+    this.updateQ();
+  }
+  fwd() { return this.q.rot(new V3(0, 0, -1)); }
+  up() { return this.q.rot(new V3(0, 1, 0)); }
+  right() { return this.q.rot(new V3(1, 0, 0)); }
+  heading() { let h = this.psi % TAU; if (h < 0) h += TAU; return h; }
+  pitchAng() { return this.pitch; }
+  bankAng() { return this.phi; }
+  updateQ() { this.q = Quat.fromHPR(this.psi, this.pitch, this.phi); }
+  // optimal sheet (0 tight .. 1 eased) for a sail at the current apparent wind
+  optimalSheet(free, sp, aoa) {
+    const want = Math.max(Math.abs(free) - aoa, sp.minAng);
+    return clamp((Math.min(want, sp.maxAng) - sp.minAng) / (sp.maxAng - sp.minAng), 0, 1);
+  }
+  step(dt, env, input, assist = 0) {
+    if (this.crashed) return;
+    const S = BOAT_SPEC, m = S.mass;
+    const psi = this.psi;
+    const fx = Math.sin(psi), fz = -Math.cos(psi), rx = Math.cos(psi), rz = Math.sin(psi);
+    // ---------------- controls ----------------
+    this.helm = clamp(input.helm, -1, 1);
+    const rTarget = this.helm * S.rudder.max;
+    this.rudder += clamp(rTarget - this.rudder, -1.4 * dt, 1.4 * dt);
+    this.mainSheet = clamp(this.mainSheet + input.main * 0.32 * dt, 0, 1);
+    this.jibSheet = clamp(this.jibSheet + input.jib * 0.32 * dt, 0, 1);
+    // ---------------- wind ----------------
+    const ceW = new V3(this.pos.x, 3.4, this.pos.z);
+    const TW = env.windAt ? env.windAt(ceW) : env.wind;
+    const twx = TW.x * rx + TW.z * rz, twy = TW.x * fx + TW.z * fz;     // true wind (air velocity) in boat frame
+    const ax = twx - this.v, ay = twy - this.u;                          // apparent wind (air relative to the boat)
+    const aws = Math.hypot(ax, ay);
+    this.aws = aws; this.tws = Math.hypot(twx, twy);
+    this.awa = Math.atan2(-ax, -ay); this.twa = Math.atan2(-twx, -twy);
+    this.twd = Math.atan2(-TW.x, TW.z); // direction the wind comes from, as a compass heading
+    const cph = Math.cos(this.phi);
+    const qa = 0.5 * RHO * (ax * ax * cph * cph + ay * ay);
+    const ahx = aws > 0.05 ? ax / aws : 0, ahy = aws > 0.05 ? ay / aws : -1;
+    const windSide = this.awa >= 0 ? 1 : -1;             // +1: wind from starboard
+    const leeHeel = -this.phi * windSide;                 // heel towards leeward (positive = normal)
+    this.heelF += (leeHeel - this.heelF) * (1 - Math.exp(-dt * 1.2));
+    // the crew reacts to the average heel, not to every roll (a fast reaction pumps the boat into rolling)
+    this.heelS = (this.heelS || 0) + (leeHeel - (this.heelS || 0)) * (1 - Math.exp(-dt * 0.45));
+    // ---------------- sails ----------------
+    let Fx = 0, Fy = 0, Myaw = 0, Mheel = 0;
+    const sails = [
+      { sp: S.main, key: 'boom', side: 'boomSide', sheet: this.mainSheet, aoa: 20 * DEG },
+      { sp: S.jib, key: 'jibAng', side: 'jibSide', sheet: this.jibSheet, aoa: 17 * DEG },
+    ];
+    let jibDrawing = 0;
+    for (let si = 1; si >= 0; si--) {
+      const s = sails[si], sp = s.sp;
+      const free = Math.atan2(ahx, -ahy);                  // boom angle that weathervanes into the flow
+      let side = Math.sign(free) || this[s.side];
+      if (Math.abs(free) > PI - 0.2) side = this[s.side];   // dead downwind: stay on the current side
+      const lim = lerp(sp.minAng, sp.maxAng, s.sheet);
+      // assisted trim keeps the sail at a good angle of attack
+      if ((si === 1 && assist >= 1) || (si === 0 && assist >= 2)) {
+        const opt = this.optimalSheet(free, sp, s.aoa);
+        // depower the main when the boat is overpowered (too much heel)
+        const dep = clamp((this.heelS - 18 * DEG) / (14 * DEG), 0, 1) * (si === 0 ? 0.75 : 0.25);
+        if (si === 0) this.mainSheet += clamp(opt + dep - this.mainSheet, -0.5 * dt, 0.5 * dt); else this.jibSheet += clamp(opt + dep - this.jibSheet, -0.5 * dt, 0.5 * dt);
+      }
+      let target = side * Math.min(Math.abs(free) > PI - 0.2 ? sp.maxAng : Math.abs(free), lim);
+      // in irons (head to wind, no way on) the crew backs the jib to windward so the bow pays off;
+      // it falls off towards the side the helmsman is steering, or the side it is already drifting to
+      if (si === 1 && assist >= 1) {
+        const irons = Math.abs(this.awa) < 30 * DEG && this.u < 0.7;
+        if (irons && !this.jibBacked) this.jibBacked = Math.abs(this.helm) > 0.2 ? -Math.sign(this.helm) : (this.r !== 0 ? -Math.sign(this.r) : side);
+        if (!irons && (Math.abs(this.awa) > 42 * DEG || this.u > 1.1)) this.jibBacked = 0;
+        if (this.jibBacked) target = this.jibBacked * 0.42;
+      } else if (si === 1) this.jibBacked = 0;
+      const prev = this[s.key];
+      const wmax = 0.6 + aws * 0.32;
+      this[s.key] += clamp((target - prev) * (2.5 + aws * 0.6) * dt, -wmax * dt, wmax * dt);
+      if (Math.sign(this[s.key]) !== Math.sign(prev) && prev !== 0) {
+        if (si === 0 && Math.abs(prev) > 0.5) { this.gybeT = 1.5; this.p -= side * 0.12; this.r += -side * 0.05; }
+        else if (si === 0) this.tackT = 1.5;
+      }
+      this[s.side] = side;
+      const th = this[s.key];
+      let cx = Math.sin(th), cy = -Math.cos(th);           // chord (luff -> leech) in boat frame
+      let dot = ahx * cx + ahy * cy;
+      if (dot < 0) { cx = -cx; cy = -cy; dot = -dot; }
+      const alpha = Math.acos(clamp(dot, -1, 1));
+      // the crew flattens and twists the sails off as the breeze builds
+      const flat = clamp(1 - (aws - 8) / 16, 0.55, 1);
+      let cl = sailCL(alpha) * (si === 0 ? 1 + 0.08 * jibDrawing : 1) * flat;
+      const cd = 0.06 + 1.2 * Math.sin(alpha) ** 2 + 0.07 * cl * cl;
+      const cr = ahx * cy - ahy * cx;
+      const lx = (cr > 0 ? 1 : -1) * ahy, ly = (cr > 0 ? 1 : -1) * -ahx;
+      const A = sp.A * qa;
+      const sfx = A * (cl * lx + cd * ahx), sfy = A * (cl * ly + cd * ahy);
+      Fx += sfx; Fy += sfy;
+      // centre of effort: along the boom/clew line, raised and shifted to leeward by heel
+      const baseZ = si === 0 ? S.mastZ : sp.tackZ;
+      const cex = Math.sin(th) * sp.ceD + sp.ceH * Math.sin(this.phi);
+      const cez = baseZ + Math.cos(th) * sp.ceD;
+      Myaw += -cex * sfy - cez * sfx;
+      Mheel += sfx * sp.ceH * cph;
+      const luff = 1 - sstep(3 * DEG, 9 * DEG, alpha);
+      if (si === 0) { this.aoaMain = alpha; this.luffMain = aws > 1 ? luff : 0; this.clMain = cl; this.optMain = this.optimalSheet(free, sp, s.aoa); }
+      else { this.aoaJib = alpha; this.luffJib = aws > 1 ? luff : 0; this.clJib = cl; this.optJib = this.optimalSheet(free, sp, s.aoa); jibDrawing = clamp(cl / 1.2, 0, 1); }
+    }
+    this.drive = Fy; this.heelMoment = Mheel;
+    // ---------------- hydrodynamics ----------------
+    const u = this.u, v = this.v, r = this.r;
+    const uu = Math.abs(u) + 0.05;
+    // keel
+    const vk = v - r * S.keel.z;
+    const bk = Math.atan2(vk, uu);
+    const qk = 0.5 * RHO_W * (u * u + vk * vk);
+    const clk = foilCL(bk, 2 * PI * S.keel.AR / (S.keel.AR + 2), 1.1, 0.26) * cph;
+    const fkx = -qk * S.keel.A * clk;
+    const dk = qk * S.keel.A * (0.012 + clk * clk / (PI * S.keel.AR * 0.85));
+    // rudder (reversed when sailing backwards)
+    const vr = v - r * S.rudder.z;
+    const br = Math.atan2(vr, uu);
+    const qr = 0.5 * RHO_W * (u * u + vr * vr);
+    const del = u >= 0 ? this.rudder : -this.rudder * 0.6;
+    const clr = foilCL(br + del, 5.0, 1.15, 0.42);
+    const frx = -qr * S.rudder.A * clr;
+    const dr = qr * S.rudder.A * (0.015 + 0.12 * clr * clr);
+    // hull
+    const fhx = -0.5 * RHO_W * 1.0 * S.hullLat * v * Math.abs(v);
+    const Fn = Math.abs(u) / Math.sqrt(G * S.LWL);
+    const heelK = 1 + 0.7 * Math.sin(this.phi) ** 2;
+    const Rf = 0.5 * RHO_W * S.wetted * 0.0042 * u * Math.abs(u) * heelK;
+    const Rw = m * G * 0.035 * Math.pow(Fn / 0.36, 5) * Math.sign(u) * heelK;
+    let Fu = Fy - Rf - Rw - (dk + dr) * Math.sign(u) - 40 * u;
+    let Fv = Fx * cph + fkx + frx + fhx - 60 * v;
+    // a heeled hull is asymmetric in the water and wants to round up into the wind
+    let Mz = Myaw - S.keel.z * fkx - S.rudder.z * frx - 380 * r - 1600 * r * Math.abs(r) - 230 * this.phi * u * Math.abs(u);
+    // ---------------- heel ----------------
+    // the crew moves across to keep the boat flat: to windward as the sails load up, to the middle when
+    // they flog in irons, a little to leeward on a run in light air
+    this.mheelF = (this.mheelF || 0) + (Mheel - (this.mheelF || 0)) * (1 - Math.exp(-dt * 1.5));
+    this.crewSide = clamp(-this.mheelF / (S.crewMass * G * 0.38 * cph), -1, 1);
+    if (assist >= 1) {
+      const want = clamp((this.heelS - 8 * DEG) / (12 * DEG), 0, 1);
+      this.hike += clamp(want - this.hike, -0.35 * dt, 0.35 * dt);
+    } else this.hike = clamp(this.hike + input.hike * 0.7 * dt, 0, 1);
+    this.crewPos += clamp(this.crewSide - this.crewPos, -1.2 * dt, 1.2 * dt);
+    const arm = this.crewPos * (0.38 + this.hike * S.hikeMax);
+    const Mcrew = S.crewMass * G * arm * cph;
+    const rel = this.phi - this.waveRoll;
+    const GZ = S.GM * Math.sin(rel) * (1 - (rel / 2.3) ** 2);
+    // rolling swings the rig through the air: the sails damp the roll strongly when they are drawing
+    const aeroDamp = 0.5 * RHO * (S.main.A * S.main.ceH ** 2 + S.jib.A * S.jib.ceH ** 2) * 2.0 * Math.max(aws, 1);
+    const Mroll = Mheel + Mcrew - m * G * GZ - (2600 + aeroDamp) * this.p - 500 * this.p * Math.abs(this.p);
+    // ---------------- grounding ----------------
+    const P = this.pos;
+    const gh = env.terrainH(P.x, P.z);
+    const bowx = P.x + fx * 2.7, bowz = P.z + fz * 2.7;
+    const ghb = env.terrainH(bowx, bowz);
+    this.depth = -Math.max(gh, ghb) - S.keel.depth;
+    const spd = Math.hypot(u, v);
+    if (Math.max(gh, ghb) > -S.keel.depth) {
+      if (!this.grounded && spd > 1.6) { this.crash(Math.max(gh, ghb) > -0.3 ? 'Varado en la costa' : 'Encallado: la quilla tocó fondo'); return; }
+      this.grounded = 1;
+      Fu -= 2500 * u; Fv -= 2500 * v; Mz -= 3000 * r;
+    } else this.grounded = 0;
+    // ---------------- integrate (rotating frame) ----------------
+    this.u += (Fu / (m * 1.08) + v * r) * dt;
+    this.v += (Fv / (m * 1.6) - u * r) * dt;
+    this.r += Mz / S.Iyaw * dt;
+    this.p += Mroll / S.Iroll * dt;
+    this.phi += this.p * dt;
+    this.psi += this.r * dt;
+    // knockdown: a keelboat comes back up unless it stays pinned down
+    this.knock = Math.abs(this.phi) > 1.25 ? (this.knock || 0) + dt : 0;
+    if (this.knock > 2.5 || Math.abs(this.phi) > 1.6) { this.crash('Tumbado por una racha'); return; }
+    const vx = fx * this.u + rx * this.v, vz = fz * this.u + rz * this.v;
+    P.x += vx * dt; P.z += vz * dt;
+    // ---------------- waves: heave, pitch, roll forcing ----------------
+    const wh = (x, z) => env.waterH(x, z);
+    const hc = wh(P.x, P.z), hb = wh(P.x + fx * 2.4, P.z + fz * 2.4), hs = wh(P.x - fx * 2.4, P.z - fz * 2.4);
+    const hp = wh(P.x - rx * 1.0, P.z - rz * 1.0), hsb = wh(P.x + rx * 1.0, P.z + rz * 1.0);
+    const yTarget = (hc * 2 + hb + hs + hp + hsb) / 6 - 0.03 * Math.abs(Math.sin(this.phi));
+    const k = 28, c = 2 * Math.sqrt(k) * 0.55;
+    const prevVy = this.heaveV;
+    this.heaveV += (k * (yTarget - P.y) - c * this.heaveV) * dt;
+    P.y += this.heaveV * dt;
+    const pitchT = Math.atan2(hb - hs, 4.8);
+    this.pitch += (pitchT - this.pitch) * (1 - Math.exp(-dt * 3.5));
+    this.waveRoll += (Math.atan2(hp - hsb, 2.0) * 0.8 - this.waveRoll) * (1 - Math.exp(-dt * 3));
+    this.updateQ();
+    this.vel.set(vx, this.heaveV, vz);
+    this.w.set(0, -this.r, -this.p);
+    this.groundSpeed = Math.hypot(vx, vz);
+    this.ias = this.aws;
+    this.beta = Math.atan2(this.v, Math.abs(this.u) + 0.1);
+    this.gload = 1 + (this.heaveV - prevVy) / dt / G * 0.3;
+    this.gybeT = Math.max(0, this.gybeT - dt); this.tackT = Math.max(0, this.tackT - dt);
+    // spray at the bow when punching into waves
+    this.sprayPts.length = 0;
+    if (this.u > 2.2 && hb - (P.y + 0.15) > -0.05) this.sprayPts.push({ P: new V3(P.x + fx * 2.7, Math.max(hb, 0), P.z + fz * 2.7), s: 1, v: this.u * 0.8 });
+  }
+  crash(reason) { this.crashed = true; this.crashReason = reason; }
 }
 
 // ============================================================================
@@ -1600,6 +1982,8 @@ function setCull(on) { if (on) { gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); 
 // ============================================================================
 const GLSL_VS_COMMON = `
 uniform mat4 uViewProj;
+uniform mat4 uVPR;      // projection * view rotation only (camera-relative rendering, see drawObj)
+uniform vec3 uEyeW;     // eye position the camera-relative matrices are measured from
 uniform mat4 uView;
 uniform vec3 uCamPos;
 uniform float uTime;
@@ -1763,7 +2147,7 @@ void main(){
     vec3 sc = mix(vec3(0.72, 0.82, 1.0), vec3(1.0, 0.86, 0.72), fract(h * 37.0));
     col += sc * star * (h - 0.972) * 60.0 * uNight * hor;
     vec3 mwN = normalize(vec3(0.35, 0.25, 0.9));
-    float band = exp(-pow(dot(rd, mwN) / 0.17, 2.0));
+    float bq = dot(rd, mwN) / 0.17; float band = exp(-bq * bq);
     vec2 muv = vec2(atan(rd.z, rd.x) / 6.2831853 * 3.0, rd.y * 0.9);
     float mn = textureLod(uNoise, muv * 0.8, 0.0).r * textureLod(uNoise, muv * 2.1 + 0.2, 0.0).g;
     col += vec3(0.5, 0.56, 0.78) * band * mn * 0.07 * uNight * hor;
@@ -1890,6 +2274,17 @@ uniform vec3 uWaterSSS;
 uniform float uSea;
 uniform float uWaveAmp;
 uniform vec4 uLavaEntry;
+uniform vec2 uGustOff;
+uniform vec4 uWindW;      // trade wind dir x, z, speed
+uniform vec4 uLeeI;       // nearest island: centre x, z, radius, height factor
+// wind on the water: drifting gust cells (cat's paws) and the calm lee of the islands
+float windRough(vec2 p){
+  vec2 u = (p - uGustOff) / 5200.0;
+  float g = texture(uNoise, u).g * 0.65 + texture(uNoise, u * 1.9 + vec2(0.31, 0.17)).r * 0.35;
+  vec2 d = p - uLeeI.xy; float a = dot(d, uWindW.xy), c = -d.x * uWindW.y + d.y * uWindW.x, R = uLeeI.z;
+  float wq = c / (0.85 * R); float wake = exp(-wq * wq) * smoothstep(-0.3 * R, 0.6 * R, a) * exp(-max(a, 0.0) / (4.5 * R));
+  return (1.0 + 0.9 * (g - 0.5)) * (1.0 - 0.7 * uLeeI.w * wake) * clamp(uWindW.z / 6.0, 0.15, 2.0);
+}
 float wakeFoam(vec2 p){
   if (uWakeInfo.w < 0.5) return 0.0;
   if (distance(p, uWakeInfo.xy) > 450.0) return 0.0;
@@ -1934,6 +2329,8 @@ void main(){
   vec2 r2 = texture(uRipple, vXZ * 0.083 + uTime * vec2(-0.011, 0.017)).rg * 2.0 - 1.0;
   vec2 r3 = texture(uRipple, vXZ * 0.0047 + uTime * vec2(0.002, -0.0015)).rg * 2.0 - 1.0;
   vec2 sl = (r1 * 0.55 + r2 * 0.45) * dfade * (0.28 + 0.3 * uSea) + r3 * 0.1 * (0.4 + uSea);
+  float wr = windRough(vXZ);
+  sl *= 0.25 + 0.75 * clamp(wr, 0.0, 1.7);
   N = normalize(N + vec3(sl.x, 0.0, sl.y) * vSF);
 #endif
   float sb = seabed(vXZ);
@@ -2198,12 +2595,12 @@ float winSD(vec3 lp){
 // ---------------- generic lit objects (plane, buildings) ----------------
 const OBJ_VS = `
 in vec3 aPos; in vec3 aNormal; in vec4 aColor; in vec2 aMat;
-uniform mat4 uModel;
+uniform mat4 uModel;   // camera-relative: translation already has the eye subtracted (double precision on the CPU)
 out vec3 vWP; out vec3 vN; out vec4 vCol; out vec2 vMat; out vec3 vLP; out vec3 vLN;
 void main(){
-  vec4 wp = uModel * vec4(aPos, 1.0);
-  vWP = wp.xyz; vN = mat3(uModel) * aNormal; vCol = aColor; vMat = aMat; vLP = aPos; vLN = aNormal;
-  gl_Position = uViewProj * wp;
+  vec4 rp = uModel * vec4(aPos, 1.0);
+  vWP = rp.xyz + uEyeW; vN = mat3(uModel) * aNormal; vCol = aColor; vMat = aMat; vLP = aPos; vLN = aNormal;
+  gl_Position = uVPR * rp;
 }
 `;
 const OBJ_FS = WIN_GLSL + `
@@ -2216,6 +2613,7 @@ uniform float uInterior;  // hull: back faces show the cabin lining
 uniform vec3 uCabin;      // cabin lights
 uniform float uLivery;    // project the livery texture on vertices flagged with alpha 1
 uniform float uAO;        // cabin occlusion approximation from the plane-local position
+uniform float uTrans;     // thin cloth (sails): light passing through from behind
 uniform sampler2D uLivTex;
 void main(){
   if (vWP.y < uClipY) discard;
@@ -2253,6 +2651,7 @@ void main(){
   float sh = planeShadow(vWP + N * 0.04) * cloudShadow(vWP) * lk.x;
   vec3 c = lighting(alb, N, V, vWP, rough, 1.0 - rough, sh);
   c += alb * uCabin * ao;
+  if (uTrans > 0.5) c += alb * uSunCol * 0.45 * max(dot(-N, uSunDir), 0.0) * cloudShadow(vWP) + alb * (uAmbSky * 0.25);
   float F = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
   vec3 R = reflect(-V, N);
   vec3 env = skyBase(normalize(vec3(R.x, abs(R.y), R.z)));
@@ -2670,7 +3069,7 @@ const PANEL_VS = `
 in vec3 aPos; in vec3 aNormal; in vec2 aUV;
 uniform mat4 uModel;
 out vec2 vUV; out vec3 vWP; out vec3 vN;
-void main(){ vec4 wp = uModel * vec4(aPos, 1.0); vWP = wp.xyz; vN = mat3(uModel) * aNormal; vUV = aUV; gl_Position = uViewProj * wp; }
+void main(){ vec4 rp = uModel * vec4(aPos, 1.0); vWP = rp.xyz + uEyeW; vN = mat3(uModel) * aNormal; vUV = aUV; gl_Position = uVPR * rp; }
 `;
 const PANEL_FS = `
 in vec2 vUV; in vec3 vWP; in vec3 vN;
@@ -2980,6 +3379,46 @@ vec3 styleCol(vec2 uv, vec3 real){
   float d = linD(uv);
   vec3 neon = mix(vec3(1.0, 0.2, 0.85), vec3(0.15, 0.95, 1.0), smoothstep(40.0, 2500.0, d));
   return b + neon * e * 1.4 + texture(uBloom, uv).rgb * 0.15;
+#elif STYLE == 11
+  // ---- Ukiyo-e woodblock print: flat pigments, ink keylines, bokashi sky, paper ----
+  const vec3 PAPER = vec3(0.93, 0.87, 0.74), PRUSSIAN = vec3(0.09, 0.21, 0.37), INDIGO = vec3(0.06, 0.1, 0.19);
+  const vec3 PALEBLUE = vec3(0.55, 0.69, 0.73), SAGE = vec3(0.48, 0.55, 0.37), PINE = vec3(0.2, 0.3, 0.21);
+  const vec3 OCHRE = vec3(0.8, 0.62, 0.38), VERMILION = vec3(0.79, 0.27, 0.15), INK = vec3(0.08, 0.07, 0.08), PINK = vec3(0.9, 0.66, 0.58);
+  vec2 wob = (texture(uNoise, uv * asp * 2.3).rg - 0.5) * 0.0022;
+  vec2 u2 = uv + wob;
+  vec3 c = tm(base(u2));
+  vec3 hsv = rgb2hsv(c);
+  float h = hsv.x, sat = hsv.y, v = hsv.z;
+  float vb = floor(v * 4.0 + 0.5) / 4.0;
+  float bluish = smoothstep(0.42, 0.5, h) * (1.0 - smoothstep(0.74, 0.8, h));
+  float greenish = smoothstep(0.16, 0.22, h) * (1.0 - smoothstep(0.42, 0.47, h));
+  float warm = (1.0 - smoothstep(0.1, 0.15, h)) + smoothstep(0.92, 0.96, h);
+  vec3 blues = mix(INDIGO, mix(PRUSSIAN, PALEBLUE, smoothstep(0.5, 0.85, vb)), smoothstep(0.12, 0.4, vb));
+  vec3 greens = mix(PINE, SAGE, smoothstep(0.35, 0.7, vb));
+  vec3 warms = mix(VERMILION * 0.75, mix(VERMILION, OCHRE, 0.45), smoothstep(0.45, 0.85, vb));
+  vec3 col = mix(INK * 1.8, PAPER, smoothstep(0.18, 0.85, vb));
+  col = mix(col, blues, bluish * smoothstep(0.06, 0.22, sat));
+  col = mix(col, greens, greenish * smoothstep(0.1, 0.28, sat));
+  col = mix(col, warms, clamp(warm, 0.0, 1.0) * smoothstep(0.25, 0.5, sat));
+  // bokashi sky gradient with paper-white clouds
+  vec3 skyc = mix(PAPER, PRUSSIAN, smoothstep(0.42, 1.0, uv.y));
+  skyc = mix(skyc, PINK, (1.0 - smoothstep(0.0, 0.4, abs(uv.y - 0.42))) * 0.18 * (1.0 - uNight));
+  skyc = mix(skyc, PAPER, smoothstep(0.55, 0.78, luma(c)) * (1.0 - uNight * 0.6));
+  skyc = mix(skyc, mix(INDIGO, PRUSSIAN, uv.y * 0.6), uNight * 0.8);
+  col = mix(col, skyc, isSky);
+  // lava, lamps and the sun keep a vermilion glow
+  float hot = smoothstep(0.12, 0.35, c.r - max(c.g, c.b)) * smoothstep(0.35, 0.65, c.r);
+  col = mix(col, VERMILION * 1.2, hot);
+  col += texture(uBloom, uv).rgb * uBloomI * vec3(1.0, 0.45, 0.25) * 0.6;
+  // ink keylines
+  float near = 1.0 - smoothstep(200.0, 2200.0, linD(uv));
+  float e = max(depthEdge(u2, lw * 1.4), lumaEdge(u2, lw * 1.2) * 0.75 * near) * (1.0 - isSky);
+  col = mix(col, INK, e * 0.92);
+  // paper fibres and woodgrain
+  float fib = texture(uNoise, uv * asp * vec2(18.0, 5.0)).b;
+  float grain = texture(uNoise, vec2(uv.x * asp.x * 2.0, uv.y * 38.0)).r;
+  col *= 0.9 + 0.08 * fib + 0.05 * (grain - 0.5);
+  return mix(col, PAPER, 0.05);
 #else
   return real;
 #endif
@@ -3475,9 +3914,17 @@ function buildStatics() {
   const win = (r, g2, b) => Object.assign([r, g2, b, 0], { mat: [0.08, 1] }); // glowing window at night
   const glass = Object.assign([0.03, 0.045, 0.06, 0], { mat: [0.06, 0] });
   const W = (isl, u, v, y = null) => { const l = rwyToLocal(isl.rwy, u, v); const p = islandWorld(isl, l.x, l.z); p.y = y === null ? terrainH(p.x, p.z) : y; return p; };
+  SCENE.windsocks = [];
   for (const isl of ISLANDS) {
     const r = isl.rwy, a = isl.apron, s = a.side, ang = r.ang, e = r.elev;
     const ry = -ang; // rotate local X along runway u axis
+    // windsocks near both thresholds, on the side away from the apron
+    for (const end of [-1, 1]) {
+      const wp = W(isl, end * (r.len / 2 - 130), -s * (r.wid / 2 + 42));
+      g.add(PRIM.cyl(0.07, 0.05, 6.3, 8), TRS(wp.x, wp.y, wp.z), C(0.85, 0.85, 0.82), [0.4, 0]);
+      g.add(PRIM.cyl(0.35, 0.35, 0.08, 10), TRS(wp.x, wp.y, wp.z), C(0.5, 0.5, 0.5), [0.7, 0]);
+      SCENE.windsocks.push({ x: wp.x, y: wp.y, z: wp.z });
+    }
     const vA = s * (r.wid / 2 + 32 + a.depth * 0.62);
     // hangar
     {
@@ -3659,7 +4106,7 @@ function buildStatics() {
   SCENE.lights = makeMesh({ aPos: { data: quad, size: 2 }, iA: { data: iA, size: 4, divisor: 1 }, iB: { data: iB, size: 4, divisor: 1 }, iC: { data: iC, size: 4, divisor: 1 } }, new Uint16Array([0, 1, 2, 0, 2, 3]));
   SCENE.lights.instances = n;
   // dynamic lights (aircraft): 8 slots
-  SCENE.dynLightsData = { a: new Float32Array(32), b: new Float32Array(32), c: new Float32Array(32) };
+  SCENE.dynLightsData = { a: new Float32Array(48), b: new Float32Array(48), c: new Float32Array(48) };
   SCENE.dynLights = makeMesh({ aPos: { data: quad, size: 2 }, iA: { data: SCENE.dynLightsData.a, size: 4, divisor: 1, dynamic: true }, iB: { data: SCENE.dynLightsData.b, size: 4, divisor: 1, dynamic: true }, iC: { data: SCENE.dynLightsData.c, size: 4, divisor: 1, dynamic: true } }, new Uint16Array([0, 1, 2, 0, 2, 3]));
   // lighthouse beam (cone along +Z)
   if (SCENE.lighthouse) {
@@ -3669,6 +4116,19 @@ function buildStatics() {
     for (let s2 = 0; s2 < seg; s2++) idx.push(0, 1 + s2, 1 + (s2 + 1) % seg);
     SCENE.beam = makeMesh({ aPos: { data: new Float32Array(p), size: 3 } }, new Uint16Array(idx));
   }
+}
+
+// windsock: striped cone along +Z from the pole top (mouth) to the tail
+function buildWindsockMesh() {
+  const g = new Geo();
+  const N = 5, L = 3.6;
+  for (let i = 0; i < N; i++) {
+    const z0 = i / N * L, z1 = (i + 1) / N * L, r0 = lerp(0.42, 0.2, i / N), r1 = lerp(0.42, 0.2, (i + 1) / N);
+    const c = PRIM.cyl(r0, r1, z1 - z0, 14, false);
+    g.add(c, TRS(0, 0, z0, PI / 2), i % 2 ? Object.assign([0.95, 0.95, 0.92, 0], { mat: [0.8, 0] }) : Object.assign([0.98, 0.35, 0.05, 0], { mat: [0.8, 0] }));
+  }
+  g.add(PRIM.cyl(0.44, 0.44, 0.05, 14, false), TRS(0, 0, -0.02, PI / 2), Object.assign([0.3, 0.3, 0.32, 0], { mat: [0.4, 0] }));
+  return g.mesh();
 }
 
 // ============================================================================
@@ -4230,7 +4690,10 @@ const PANEL_LAYOUT = {
   gauges: [[0.437, 0.137], [0.562, 0.137], [0.687, 0.137]], gaugeR: 0.05,
   ann: [0.378, -0.088, 0.735, 0.068],
   yokes: [[-0.36, -0.152], [0.36, -0.152]], collarR: 0.036,
-  switchesY: -0.158, switchX0: -0.07, switchDX: 0.041, switches: ['BATT', 'GEN', 'AVIÓN', 'BOMBA', 'BALIZA', 'NAV', 'STROBE', 'ATERR', 'TAXI'],
+  switchesY: -0.158, switchX0: -0.07, switchDX: 0.041,
+  switches: [['BOMBA', 'pump'], ['PITOT', 'pitot'], ['CABINA', 'cabin'], ['BALIZA', 'beacon'], ['NAV', 'nav'], ['STROBE', 'strobe'], ['ATERR', 'land'], ['TAXI', 'taxi'], ['HIELO', 'deice']],
+  master: [['BATT', 'batt'], ['GEN', 'gen'], ['AVIÓN', 'avion'], ['MOTOR', 'ign']], masterX: -0.705, masterY0: 0.165, masterDY: -0.055,
+  park: [-0.445, -0.152],
   fuel: [[-0.655, -0.152], [-0.53, -0.152]], fuelR: 0.036,
   gear: [-0.225, -0.158],
   leftCol: [-0.735, -0.06, -0.6, 0.195],
@@ -4249,7 +4712,7 @@ function seatGeo(g, x, zh, crew) {
   const w = crew ? 0.48 : 0.44, rec = 0.21;
   const cushion = inPM(c, 0.72), insert = inPM(cd, 0.8);
   g.add(PRIM.soft(w, 0.12, 0.47, 5), TRS(x, -0.185, zh - 0.22, 0.07), cushion);
-  for (const s of [-1, 1]) g.add(PRIM.soft(0.075, 0.15, 0.45, 4), TRS(x + s * (w / 2 - 0.035), -0.165, zh - 0.22, 0.07), insert);
+  for (const s of [-1, 1]) g.add(PRIM.soft(0.08, 0.15, 0.45, 4), TRS(x + s * (w / 2 - 0.022), -0.165, zh - 0.22, 0.07), insert);
   g.add(PRIM.soft(w * 0.5, 0.025, 0.36, 4), TRS(x, -0.122, zh - 0.24, 0.07), insert);                          // centre insert
   const back = M4.mul(M4.create(), TRS(x, -0.12, zh + 0.03, rec), TRS(0, 0.36, 0));
   g.add(PRIM.soft(w, 0.68, 0.12, 5), back, cushion);
@@ -4263,9 +4726,9 @@ function seatGeo(g, x, zh, crew) {
   for (const s of [-1, 1]) g.add(PRIM.box(0.03, 0.18, 0.46), TRS(x + s * (w * 0.43 - 0.02), -0.42, zh - 0.22), inPM([0.18, 0.18, 0.19], 0.4));
   g.add(PRIM.box(0.012, 0.012, 0.1), TRS(x + w / 2 + 0.006, -0.24, zh - 0.05), inPM(COL_IN.metal, 0.3));
   if (crew) { // shoulder harness lying on the seat back + lap belt buckle
-    for (const s of [-1, 1]) g.add(PRIM.box(0.045, 0.6, 0.008), M4.mul(M4.create(), back, TRS(s * 0.1, 0.03, -0.068, 0, 0, s * 0.1)), inPM([0.06, 0.06, 0.08], 0.7));
-    g.add(PRIM.box(w * 0.8, 0.04, 0.01), TRS(x, -0.12, zh - 0.02), inPM([0.06, 0.06, 0.08], 0.7));
-    g.add(PRIM.box(0.07, 0.045, 0.016), TRS(x, -0.12, zh - 0.03), inPM(COL_IN.metal, 0.2));
+    for (const s of [-1, 1]) g.add(PRIM.box(0.045, 0.6, 0.008), M4.mul(M4.create(), back, TRS(s * 0.1, 0.03, -0.082, 0, 0, s * 0.1)), inPM([0.06, 0.06, 0.08], 0.7));
+    g.add(PRIM.box(w * 0.8, 0.035, 0.012), TRS(x, -0.098, zh - 0.05, 0.07), inPM([0.06, 0.06, 0.08], 0.7));
+    g.add(PRIM.box(0.07, 0.045, 0.02), TRS(x, -0.092, zh - 0.06, 0.07), inPM(COL_IN.metal, 0.2));
   }
 }
 function figureGeo(x, yokeHub) {
@@ -4316,12 +4779,12 @@ function revealFrame(g, map, a0, a1, b0, b1, r, kb, nA, nB, col) {
 }
 function revealPoly(g, map, W, col) {
   const r = W.r;
-  loopStrip(g, map, [polyLoop(W, r - 0.012), polyLoop(W, r - 0.012), polyLoop(W, r + 0.022), polyLoop(W, r + 0.052)], [-0.004, -0.032, -0.038, -0.006], col);
+  loopStrip(g, map, [polyLoop(W, r - 0.012), polyLoop(W, r - 0.012), polyLoop(W, r + 0.018), polyLoop(W, r + 0.04)], [-0.005, -0.03, -0.034, -0.007], col);
 }
 // band across the roof at a fixed station (headliner frames)
 function roofBand(g, z, w, th0, th1, inset, col) {
   const L = o => { const P = []; for (let i = 0; i <= 24; i++) P.push([z + o, lerp(th0, th1, i / 24)]); return P; };
-  loopStrip(g, hullThetaMap, [L(-w / 2), L(-w / 2), L(w / 2), L(w / 2)], [-0.002, -inset, -inset, -0.002], col, false);
+  loopStrip(g, hullThetaMap, [L(-w / 2), L(-w / 2), L(w / 2), L(w / 2)], [-0.006, -inset, -inset, -0.006], col, false);
 }
 
 function buildInterior(P, mk) {
@@ -4375,25 +4838,23 @@ function buildInterior(P, mk) {
   const rim = inPM([0.08, 0.08, 0.09], 0.35);
   for (const [gx, gy] of L.gauges) pAdd(PRIM.cyl(L.gaugeR + 0.006, L.gaugeR + 0.006, 0.014, 28, false), TRS(gx, gy, 0.0, PI / 2), rim);
   for (const [gx, gy] of L.fuel) pAdd(PRIM.cyl(L.fuelR + 0.005, L.fuelR + 0.005, 0.01, 24, false), TRS(gx, gy, 0.0, PI / 2), rim);
-  pAdd(PRIM.soft(L.ann[2] - L.ann[0] + 0.012, L.ann[3] - L.ann[1] + 0.012, 0.008, 6), TRS((L.ann[0] + L.ann[2]) / 2, (L.ann[1] + L.ann[3]) / 2, 0.0), inPM([0.05, 0.05, 0.056], 0.5));
-  for (let i = 0; i < L.switches.length; i++) {
-    const sx = L.switchX0 + i * L.switchDX;
-    pAdd(PRIM.cyl(0.0035, 0.0055, 0.026, 8), TRS(sx, L.switchesY, 0.002, PI / 2 + 0.45), inPM(COL_IN.metal, 0.2));
-    pAdd(PRIM.cyl(0.009, 0.009, 0.005, 10), TRS(sx, L.switchesY, 0.0, PI / 2), inPM(COL_IN.black, 0.5));
-  }
-  for (let i = 0; i < 4; i++) pAdd(PRIM.soft(0.032, 0.024, 0.012, 4), TRS(-0.705, 0.165 - i * 0.055, 0.006), inPM([0.14, 0.14, 0.15], 0.5));   // master rockers
+  { const [a0, b0, a1, b1] = L.ann, t = 0.008, cx = (a0 + a1) / 2, cy = (b0 + b1) / 2, bz = inPM([0.05, 0.05, 0.056], 0.5);
+    pAdd(PRIM.box(a1 - a0 + 2 * t, t, 0.01), TRS(cx, b1 + t / 2, 0.005), bz); pAdd(PRIM.box(a1 - a0 + 2 * t, t, 0.01), TRS(cx, b0 - t / 2, 0.005), bz);
+    pAdd(PRIM.box(t, b1 - b0, 0.01), TRS(a0 - t / 2, cy, 0.005), bz); pAdd(PRIM.box(t, b1 - b0, 0.01), TRS(a1 + t / 2, cy, 0.005), bz); }
+  // switch bezel nuts (toggles and rockers are drawn live so they can flip)
+  for (let i = 0; i < L.switches.length; i++) pAdd(PRIM.cyl(0.009, 0.009, 0.005, 12), TRS(L.switchX0 + i * L.switchDX, L.switchesY, 0.0, PI / 2), inPM(COL_IN.black, 0.5));
+  for (let i = 0; i < L.master.length; i++) pAdd(PRIM.box(0.04, 0.032, 0.004), TRS(L.masterX, L.masterY0 + i * L.masterDY, 0.003), inPM(COL_IN.black, 0.6));
+  pAdd(PRIM.box(0.05, 0.03, 0.004), TRS(L.park[0], L.park[1], 0.003), inPM(COL_IN.black, 0.6));
   // yoke collars where the columns leave the panel (below the displays)
   for (const [yx, yy] of L.yokes) {
     pAdd(PRIM.cyl(L.collarR, L.collarR, 0.03, 20), TRS(yx, yy, -0.004, PI / 2), inPM([0.18, 0.18, 0.19], 0.3));
     pAdd(PRIM.cyl(L.collarR * 0.72, L.collarR * 0.72, 0.034, 16), TRS(yx, yy, -0.004, PI / 2), inPM(COL_IN.black, 0.85));
   }
   // amphibian gear selector (wheel-shaped knob)
-  { const [gx, gy] = L.gear; pAdd(PRIM.box(0.05, 0.07, 0.008), TRS(gx, gy + 0.01, 0.004), inPM(COL_IN.black, 0.5));
-    pAdd(PRIM.cyl(0.006, 0.006, 0.05, 8), TRS(gx, gy, 0.004, PI / 2), metal);
-    pAdd(PRIM.cyl(0.02, 0.02, 0.012, 16), TRS(gx, gy, 0.05, PI / 2), inPM([0.92, 0.92, 0.9], 0.4)); }
+  { const [gx, gy] = L.gear; pAdd(PRIM.box(0.026, 0.07, 0.006), TRS(gx, gy, 0.003), inPM(COL_IN.black, 0.5)); }
   // ---- centre pedestal: throttle quadrant, trim wheel slot, fuel selector ----
-  g.add(PRIM.soft(0.22, 0.52, 0.42, 6), TRS(0, -0.27, -1.8), inPM(COL_IN.panel, 0.7));
-  g.add(PRIM.soft(0.21, 0.1, 0.17, 6), TRS(0, 0.0, -1.9), inPM([0.16, 0.165, 0.18], 0.55));
+  g.add(PRIM.soft(0.22, 0.52, 0.42, 6), TRS(0, -0.27, -1.8), inPM([0.2, 0.205, 0.22], 0.7));
+  g.add(PRIM.soft(0.21, 0.1, 0.17, 6), TRS(0, 0.0, -1.9), inPM([0.32, 0.33, 0.35], 0.5));
   for (const x of [-0.05, 0, 0.05]) g.add(PRIM.box(0.008, 0.012, 0.13), TRS(x, 0.05, -1.9), inPM(COL_IN.black, 0.9));
   g.add(PRIM.box(0.006, 0.012, 0.12), TRS(0.065, 0.0, -1.7), inPM(COL_IN.black, 0.9));
   g.add(PRIM.box(0.012, 0.26, 0.05), TRS(-0.112, -0.13, -1.76), inPM(COL_IN.black, 0.9));
@@ -4428,7 +4889,7 @@ function buildInterior(P, mk) {
   }
   for (const z of [-0.66, 0.29, 1.2]) roofBand(g, z, 0.05, PI / 2 - 1.0, PI / 2 + 1.0, 0.018, trim);
   // window reveals (side windows both sides + windshield)
-  for (const s of [-1, 1]) for (const W of WIN.sideW) revealPoly(g, hullSideMap(s), W, trim);
+  for (const s of [-1, 1]) for (const W of WIN.sideW) revealPoly(g, hullSideMap(s), W, inPM([0.5, 0.49, 0.46], 0.6));
   { const W = WIN.shield; revealFrame(g, hullThetaMap, W.z0, W.z1, PI / 2 - W.th, PI / 2 + W.th, 0.05, 1 / 0.75, 12, 16, inPM([0.24, 0.24, 0.25], 0.7)); }
   // ---- overhead: console with reading lights and vents, fuel handles, dome light, sun visors ----
   g.add(PRIM.soft(0.26, 0.04, 2.5, 5), TRS(0, 0.948, -0.3), inPM([0.5, 0.49, 0.46], 0.8));
@@ -4444,9 +4905,9 @@ function buildInterior(P, mk) {
   }
   // ---- small stuff: extinguisher, headset on the empty right seat, checklist ----
   g.add(PRIM.cyl(0.045, 0.045, 0.3, 12), TRS(0.14, -0.49, -1.3, 0, 0, PI / 2 - 0.02), inPM([0.75, 0.08, 0.06], 0.35));
-  for (const s of [-1, 1]) g.add(PRIM.cyl(0.048, 0.048, 0.04, 14), TRS(0.36 + s * 0.09, -0.1, -1.5, PI / 2 + 0.1, 0, 0), inPM(COL_IN.headset, 0.5));
-  g.add(PRIM.box(0.2, 0.02, 0.02), TRS(0.36, -0.09, -1.43), inPM(COL_IN.headset, 0.5));
-  g.add(PRIM.box(0.16, 0.012, 0.23), TRS(0.3, -0.115, -1.62, 0.07, 0.3), inPM([0.85, 0.8, 0.3], 0.7));
+  for (const s of [-1, 1]) g.add(PRIM.cyl(0.048, 0.048, 0.04, 14), TRS(0.42 + s * 0.09, -0.07, -1.38, 0.07, 0, 0), inPM(COL_IN.headset, 0.5));
+  g.add(PRIM.box(0.2, 0.022, 0.024), TRS(0.42, -0.04, -1.38, 0.07), inPM(COL_IN.headset, 0.5));
+  g.add(PRIM.box(0.16, 0.01, 0.23), TRS(0.3, -0.096, -1.6, 0.07, 0.3), inPM([0.85, 0.8, 0.3], 0.7));
   P.interior = g.mesh();
 
   // instrument panel face (textured)
@@ -4465,11 +4926,18 @@ function buildInterior(P, mk) {
   }
   P.yoke = yk.mesh();
   // throttle quadrant levers (origin at pivot)
-  const lever = (knob, kc) => { const l = new Geo(); l.add(PRIM.cyl(0.006, 0.006, 0.16, 8), null, inPM(COL_IN.metal, 0.3)); l.add(knob, TRS(0, 0.165, 0), inPM(kc, 0.4)); return l.mesh(); };
-  P.levPower = lever(PRIM.soft(0.07, 0.026, 0.03, 4), COL_IN.black);
-  P.levProp = lever(PRIM.cyl(0.017, 0.017, 0.03, 14), [0.1, 0.25, 0.75]);
-  P.levCond = lever(PRIM.soft(0.032, 0.032, 0.024, 4), [0.75, 0.1, 0.07]);
-  P.levFlap = lever(PRIM.soft(0.045, 0.018, 0.032, 4), [0.9, 0.9, 0.88]);
+  const lever = (knob, kc) => { const l = new Geo(); l.add(PRIM.cyl(0.008, 0.008, 0.16, 10), null, inPM(COL_IN.metal, 0.25)); l.add(knob, TRS(0, 0.17, 0), inPM(kc, 0.35)); return l.mesh(); };
+  P.levPower = lever(PRIM.soft(0.085, 0.032, 0.036, 4), [0.12, 0.12, 0.13]);
+  P.levProp = lever(PRIM.cyl(0.02, 0.02, 0.034, 16), [0.12, 0.3, 0.85]);
+  P.levCond = lever(PRIM.soft(0.036, 0.036, 0.028, 4), [0.85, 0.12, 0.08]);
+  P.levFlap = lever(PRIM.soft(0.055, 0.02, 0.036, 4), [0.95, 0.95, 0.93]);
+  // live panel parts: toggle switch, rocker, gear handle, parking brake T-handle (panel-local, origin at the panel face)
+  { const t = new Geo(); t.add(PRIM.cyl(0.0035, 0.006, 0.028, 10), TRS(0, 0, 0.004, PI / 2), inPM(COL_IN.metal, 0.18)); t.add(PRIM.sphere(0.0065, 8, 6), TRS(0, 0, 0.032), inPM(COL_IN.metal, 0.18)); P.toggle = t.mesh(); }
+  { const t = new Geo(); t.add(PRIM.soft(0.034, 0.026, 0.014, 4), TRS(0, 0, 0.008), inPM([0.16, 0.16, 0.17], 0.45)); t.add(PRIM.box(0.026, 0.004, 0.002), TRS(0, 0.006, 0.0155), inPM([0.85, 0.85, 0.82], 0.5)); P.rocker = t.mesh(); }
+  { const t = new Geo(); t.add(PRIM.cyl(0.006, 0.006, 0.05, 8), TRS(0, 0, 0.002, PI / 2), metal); t.add(PRIM.cyl(0.021, 0.021, 0.012, 18), TRS(0, 0, 0.05, PI / 2), inPM([0.95, 0.95, 0.93], 0.35));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; t.add(PRIM.box(0.004, 0.004, 0.013), TRS(Math.cos(a) * 0.021, Math.sin(a) * 0.021, 0.056), inPM([0.6, 0.6, 0.6], 0.5)); }
+    P.gearKnob = t.mesh(); }
+  { const t = new Geo(); t.add(PRIM.cyl(0.005, 0.005, 0.04, 8), TRS(0, 0, 0.0, PI / 2), metal); t.add(PRIM.soft(0.05, 0.016, 0.016, 4), TRS(0, 0, 0.042), inPM([0.85, 0.12, 0.08], 0.4)); P.parkKnob = t.mesh(); }
   // trim wheel (rotates about local X)
   const tw = new Geo();
   tw.add(PRIM.cyl(0.11, 0.11, 0.024, 24), TRS(-0.012, 0, 0, 0, 0, PI / 2), inPM([0.05, 0.05, 0.06], 0.6));
@@ -4574,6 +5042,244 @@ function buildLiveryTexture(t) {
 }
 
 // ============================================================================
+// Sailboat model (6 m daysailer, sloop): hull with cockpit, cuddy cabin, fin keel
+// and bulb, transom-hung rudder with tiller, rig with stays and spreaders, and
+// sails rebuilt every frame from the boom angle, camber, twist and luffing.
+// Boat-local coordinates: +X starboard, +Y up, -Z bow, origin on the waterline.
+// ============================================================================
+const BOATM = { parts: {}, mainV: null, jibV: null };
+const BOAT_SEC = [ // z, half beam at the sheer, sheer height, canoe-body bottom
+  [-3.0, 0.03, 0.82, 0.32], [-2.8, 0.26, 0.78, 0.0], [-2.45, 0.53, 0.73, -0.19], [-1.8, 0.83, 0.68, -0.31], [-0.9, 1.02, 0.645, -0.38],
+  [0.0, 1.1, 0.625, -0.4], [0.9, 1.08, 0.62, -0.36], [1.8, 1.0, 0.63, -0.28], [2.5, 0.93, 0.645, -0.2], [3.0, 0.88, 0.66, -0.13],
+];
+const BOAT_COCKPIT = { z0: 0.6, z1: 2.6, sole: 0.25, inner: 0.47 };
+function boatSec(z) {
+  const S = BOAT_SEC, n = S.length;
+  z = clamp(z, S[0][0], S[n - 1][0]);
+  let i = 0; while (i < n - 2 && z > S[i + 1][0]) i++;
+  const z0 = S[i][0], z1 = S[i + 1][0], t = (z - z0) / (z1 - z0), out = [];
+  for (let c = 1; c < 4; c++) {
+    const p0 = S[i][c], p1 = S[i + 1][c];
+    const m0 = i > 0 ? (S[i + 1][c] - S[i - 1][c]) / (S[i + 1][0] - S[i - 1][0]) * (z1 - z0) : p1 - p0;
+    const m1 = i < n - 2 ? (S[i + 2][c] - S[i][c]) / (S[i + 2][0] - S[i][0]) * (z1 - z0) : p1 - p0;
+    const t2 = t * t, t3 = t2 * t;
+    out.push((2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * m1);
+  }
+  return { hb: Math.max(out[0], 0.02), ys: out[1], yb: Math.min(out[2], out[1] - 0.05) };
+}
+const BOAT_E = 0.55;
+function boatHullPt(z, th) { const s = boatSec(z); return [s.hb * Math.cos(th), s.ys - (s.ys - s.yb) * Math.pow(Math.sin(th), BOAT_E), z]; }
+function boatThetaY(z, y) { const s = boatSec(z); const k = clamp((s.ys - y) / (s.ys - s.yb), 0, 1); return Math.asin(Math.pow(k, 1 / BOAT_E)); }
+// open loft (no wrap) through polylines with equal counts; offset along the averaged normals
+function loftOpen(rows, flip = false) {
+  const p = [], idx = [], m = rows[0].length;
+  for (const r of rows) for (const v of r) p.push(v[0], v[1], v[2]);
+  for (let j = 0; j < rows.length - 1; j++) for (let i = 0; i < m - 1; i++) {
+    const a = j * m + i, b = a + 1, c = a + m, d = c + 1;
+    if (flip) idx.push(a, d, c, a, b, d); else idx.push(a, c, d, a, d, b);
+  }
+  return { p, n: computeNormals(p, idx), idx };
+}
+function lineMatrix(a, b, r) {
+  const d = vsub(b, a), len = d.len() || 1e-4, dn = vscale(d, 1 / len), y = new V3(0, 1, 0);
+  const ax = y.cross(dn), s = ax.len(), c = y.dot(dn);
+  let q; if (s < 1e-6) q = c > 0 ? new Quat() : Quat.axis(1, 0, 0, PI); else { ax.mul(1 / s); q = Quat.axis(ax.x, ax.y, ax.z, Math.atan2(s, c)); }
+  const m = M4.fromQT(M4.create(), q, a);
+  m[0] *= r; m[1] *= r; m[2] *= r; m[4] *= len; m[5] *= len; m[6] *= len; m[8] *= r; m[9] *= r; m[10] *= r;
+  return m;
+}
+function buildBoatModel() {
+  const P = BOATM.parts;
+  for (const k in P) deleteMesh(P[k]);
+  const S = BOAT_SPEC, C = BOAT_COCKPIT;
+  const white = PM([0.94, 0.94, 0.92], 0.22), deckC = PM([0.8, 0.81, 0.8], 0.75), teak = PM([0.46, 0.31, 0.18], 0.7);
+  const navy = PM([0.05, 0.1, 0.19], 0.45), coral = PM(LIV.coral, 0.3), teal = PM(LIV.teal, 0.3), steel = PM(LIV.chrome, 0.18), black = PM(LIV.black, 0.6);
+  const g = new Geo();
+  // stations, with sharp steps at the cockpit ends
+  let zs = []; for (let z = -3.0; z <= 3.0 + 1e-6; z += 0.1) zs.push(+z.toFixed(3));
+  zs = zs.filter(z => Math.abs(z - C.z0) > 0.03 && Math.abs(z - C.z1) > 0.03).concat([C.z0 - 0.02, C.z0, C.z1, C.z1 + 0.02]).sort((a, b) => a - b);
+  const NT = 24;
+  // hull skin (white topsides)
+  const hullRows = zs.map(z => { const r = []; for (let k = 0; k <= NT; k++) r.push(boatHullPt(z, k / NT * PI)); return r; });
+  g.add(loftOpen(hullRows), null, white);
+  // painted bands draped just outside the skin: antifouling, boot stripe, sheer stripe
+  const band = (y0, y1, col, off = 0.004) => {
+    const rowsS = [], rowsP = [];
+    for (const z of zs) {
+      const s = boatSec(z); if (s.yb > y0 - 0.01 && y0 < 0.1) continue;
+      const ta = boatThetaY(z, y1), tb = boatThetaY(z, y0);
+      const row = [], rowP = [];
+      for (let k = 0; k <= 4; k++) {
+        const th = lerp(ta, tb, k / 4), p = boatHullPt(z, th);
+        const nx = Math.cos(th), ny = -Math.sin(th) * 0.6, l = Math.hypot(nx, ny) || 1;
+        row.push([p[0] + nx / l * off, p[1] + ny / l * off, z]); rowP.push([-(p[0] + nx / l * off), p[1] + ny / l * off, z]);
+      }
+      rowsS.push(row); rowsP.push(rowP);
+    }
+    if (rowsS.length > 1) { g.add(loftOpen(rowsS), null, col); g.add(loftOpen(rowsP, true), null, col); }
+  };
+  { // antifouling across the bottom
+    const rows = [];
+    for (const z of zs) {
+      const s = boatSec(z); if (s.yb > -0.02) continue;
+      const ta = boatThetaY(z, 0.02), r = [];
+      for (let k = 0; k <= 12; k++) { const th = lerp(ta, PI - ta, k / 12), p = boatHullPt(z, th); r.push([p[0] + Math.cos(th) * 0.003, p[1] - Math.sin(th) * 0.003, z]); }
+      rows.push(r);
+    }
+    g.add(loftOpen(rows), null, navy);
+  }
+  band(0.02, 0.085, coral);
+  { const rowsS = [], rowsP = [];
+    for (const z of zs) {
+      const s = boatSec(z); if (z < -2.9) continue;
+      const ta = boatThetaY(z, s.ys - 0.07), tb = boatThetaY(z, s.ys - 0.13), row = [], rowP = [];
+      for (let k = 0; k <= 2; k++) { const th = lerp(ta, tb, k / 2), p = boatHullPt(z, th); row.push([p[0] + 0.004, p[1], z]); rowP.push([-p[0] - 0.004, p[1], z]); }
+      rowsS.push(row); rowsP.push(rowP);
+    }
+    g.add(loftOpen(rowsS), null, teal); g.add(loftOpen(rowsP, true), null, teal);
+  }
+  // deck with the cockpit well
+  const US = [-1, -0.8, -0.62, -C.inner, -0.3, 0, 0.3, C.inner, 0.62, 0.8, 1];
+  const deckRows = zs.map(z => {
+    const s = boatSec(z), inCk = z >= C.z0 && z <= C.z1;
+    return US.map(u => { const a = Math.abs(u); const y = inCk && a <= C.inner + 1e-6 ? C.sole : s.ys + 0.05 * (1 - u * u); return [u * s.hb, y, z]; });
+  });
+  g.add(loftOpen(deckRows, true), null, null, null, (x, y, z) => (y < 0.5 && z > C.z0 - 0.03 && z < C.z1 + 0.03) ? teak : deckC);
+  // transom
+  { const s = boatSec(3.0), prim = { p: [0, (s.ys + s.yb) / 2, 3.0], n: [0, 0, 1], idx: [] };
+    for (let k = 0; k <= NT; k++) { const p = boatHullPt(3.0, k / NT * PI); prim.p.push(p[0], p[1], 3.0); prim.n.push(0, 0, 1); }
+    for (let k = 0; k < NT; k++) prim.idx.push(0, k + 1, k + 2);
+    g.add(prim, null, white);
+    g.add(PRIM.box(1.4, 0.06, 0.012), TRS(0, s.ys - 0.1, 3.006), teal);
+  }
+  // cockpit benches, toe rails, cleats, winches, traveller
+  for (const sx of [-1, 1]) {
+    g.add(PRIM.soft(0.32, 0.06, C.z1 - C.z0 - 0.2, 4), TRS(sx * 0.58, 0.5, (C.z0 + C.z1) / 2 + 0.05), teak);
+    const rows = []; for (const z of zs) { if (z < -2.85) continue; const s = boatSec(z); rows.push(superRing(sx * (s.hb - 0.015), s.ys + 0.035, z, 0.02, 0.025, 4, 6)); }
+    g.add(PRIM.loft(rows, true, true), null, teak);
+    g.add(PRIM.cyl(0.055, 0.045, 0.12, 14), TRS(sx * 0.82, 0.66, 1.0), steel);
+    g.add(PRIM.cyl(0.06, 0.06, 0.02, 14), TRS(sx * 0.82, 0.78, 1.0), black);
+    g.add(PRIM.box(0.03, 0.04, 0.16), TRS(sx * 0.78, 0.69, 2.75), steel);
+    g.add(PRIM.box(0.04, 0.025, 1.0), TRS(sx * 0.86, 0.665, 0.3), PM([0.25, 0.25, 0.27], 0.4));  // jib track
+  }
+  g.add(PRIM.box(1.3, 0.04, 0.06), TRS(0, 0.62, 2.55), PM([0.3, 0.3, 0.32], 0.35));        // mainsheet traveller
+  // cuddy cabin with portholes and a companionway
+  { const rows = [];
+    for (let z = -1.95; z <= 0.551; z += 0.1) {
+      const s = boatSec(z), w = s.hb * 0.6, rise = clamp((z + 1.95) / 0.42, 0.15, 1);
+      const h = 0.36 * rise;
+      rows.push(superRing(0, s.ys + 0.03 + h / 2, z, w, h / 2 + 0.03, 4, 20));
+    }
+    g.add(PRIM.loft(rows, true, true), null, white);
+    for (const sx of [-1, 1]) for (const z of [-1.25, -0.55, 0.05]) { const s = boatSec(z); g.add(PRIM.soft(0.012, 0.09, 0.32, 6), TRS(sx * (s.hb * 0.6 + 0.012), s.ys + 0.22, z), PM([0.05, 0.08, 0.1], 0.08)); }
+    g.add(PRIM.box(0.5, 0.3, 0.02), TRS(0, 0.84, 0.565), PM([0.12, 0.08, 0.05], 0.6));
+    g.add(PRIM.box(0.56, 0.03, 0.6), TRS(0, 1.06, 0.3), teak);
+  }
+  // fin keel with a lead bulb, rudder stock fitting
+  { const st = [{ y: -0.36, zLE: S.keel.z - 0.45, chord: 0.82 }, { y: -1.2, zLE: S.keel.z - 0.26, chord: 0.56 }];
+    g.add(finLoft(st, 0.12, 0, 1, 16), null, navy);
+    g.add(PRIM.sphere(0.14, 14, 8), TRS(0, -1.24, S.keel.z + 0.05, 0, 0, 0, 0.9, 0.85, 3.6), PM([0.12, 0.13, 0.14], 0.5)); }
+  for (const y of [0.35, 0.05]) g.add(PRIM.box(0.08, 0.05, 0.05), TRS(0, y, 3.02), steel);
+  // outboard motor tilted up on a bracket (port quarter)
+  g.add(PRIM.box(0.06, 0.25, 0.08), TRS(-0.45, 0.45, 3.05), steel);
+  g.add(PRIM.soft(0.24, 0.28, 0.36, 5), TRS(-0.45, 0.72, 3.18, 0.5), PM([0.15, 0.15, 0.17], 0.4));
+  g.add(PRIM.cyl(0.035, 0.035, 0.55, 8), TRS(-0.45, 0.6, 3.25, 1.3), PM([0.15, 0.15, 0.17], 0.4));
+  // pulpit, pushpit, stanchions and lifelines
+  const tube = (a, b, r = 0.012) => { const c = cylBetween(a, b, r, r, 6); g.add(c.prim, c.M, steel); };
+  const sheerPt = (z, side, dy = 0) => { const s = boatSec(z); return new V3(side * (s.hb - 0.05), s.ys + dy, z); };
+  for (const sx of [-1, 1]) {
+    tube(sheerPt(-2.55, sx), sheerPt(-2.55, sx, 0.62)); tube(sheerPt(-2.55, sx, 0.62), new V3(0, 1.36, -2.85));
+    for (const z of [-1.6, -0.6, 0.4, 1.4]) tube(sheerPt(z, sx), sheerPt(z, sx, 0.6), 0.01);
+    tube(sheerPt(2.85, sx), sheerPt(2.85, sx, 0.6)); tube(sheerPt(2.85, sx, 0.6), new V3(sx * 0.3, 1.26, 3.0));
+    const pts = [-2.55, -1.6, -0.6, 0.4, 1.4, 2.85];
+    for (let i = 0; i < pts.length - 1; i++) for (const dy of [0.6, 0.32]) tube(sheerPt(pts[i], sx, dy), sheerPt(pts[i + 1], sx, dy), 0.004);
+  }
+  tube(new V3(-0.3, 1.26, 3.0), new V3(0.3, 1.26, 3.0));
+  // mast, spreaders, standing rigging
+  const mz = S.mastZ, top = S.mastH;
+  g.add(PRIM.cyl(0.05, 0.04, top - 1.0, 10), TRS(0, 1.0, mz, 0, 0, 0, 1, 1, 1.25), PM([0.78, 0.79, 0.8], 0.25));
+  for (const sx of [-1, 1]) {
+    g.add(PRIM.cyl(0.012, 0.01, 0.6, 6), TRS(0, 4.9, mz, 0, 0, -sx * PI / 2), PM([0.78, 0.79, 0.8], 0.25));
+    const chain = new V3(sx * 0.95, 0.66, mz + 0.05), spr = new V3(sx * 0.6, 4.9, mz);
+    tube(chain, spr, 0.004); tube(spr, new V3(0, top - 0.15, mz), 0.004); tube(chain, new V3(0, 4.95, mz), 0.004);
+  }
+  tube(new V3(0, 0.78, -2.95), new V3(0, 7.35, mz - 0.03), 0.005);                 // forestay
+  tube(new V3(0, top - 0.05, mz + 0.03), new V3(0, 0.75, 2.98), 0.004);            // backstay
+  g.add(PRIM.box(0.08, 0.06, 0.12), TRS(0, top + 0.02, mz), PM([0.2, 0.2, 0.22], 0.4));
+  P.hull = g.mesh();
+  // boom (rotates about the mast; origin at the gooseneck)
+  const bm = new Geo();
+  bm.add(PRIM.soft(0.065, 0.1, S.boomL, 4), TRS(0, 0, S.boomL / 2), PM([0.78, 0.79, 0.8], 0.25));
+  bm.add(PRIM.box(0.07, 0.03, 0.12), TRS(0, -0.06, S.boomL - 0.15), PM([0.2, 0.2, 0.22], 0.4));
+  P.boom = bm.mesh();
+  // rudder blade + tiller (rotates about the stock; origin at the stock top)
+  const rd = new Geo();
+  rd.add(finLoft([{ y: 0.42, zLE: -0.06, chord: 0.36 }, { y: -0.88, zLE: 0.0, chord: 0.28 }], 0.12, 0, 1, 14), null, white);
+  rd.add(PRIM.box(0.07, 0.42, 0.08), TRS(0, 0.6, 0.0), white);                                // rudder head
+  rd.add(PRIM.soft(0.05, 0.05, 1.12, 4), TRS(0, 0.84, -0.5, -0.06), teak);
+  rd.add(PRIM.cyl(0.012, 0.012, 0.85, 6), TRS(0, 0.88, -1.02, -PI / 2 - 0.25, 0, 0), black);   // tiller extension
+  P.rudder = rd.mesh();
+  // windex
+  const wx = new Geo();
+  wx.add(PRIM.box(0.012, 0.012, 0.42), TRS(0, 0, -0.1), black);
+  wx.add(PRIM.box(0.004, 0.08, 0.1), TRS(0, 0, 0.1), PM([0.9, 0.2, 0.1], 0.5));
+  P.windex = wx.mesh();
+  // unit line for sheets and vang
+  { const lg = new Geo(); lg.add(PRIM.cyl(1, 1, 1, 6, false), null, PM([0.12, 0.14, 0.24], 0.6)); P.line = lg.mesh(); }
+  // crew: helmsman and a hiking crew member (life jackets), drawn in exterior views
+  const crew = (helm) => {
+    const c = new Geo(), skin = PM(COL_IN.skin, 0.7), vest = PM(helm ? [0.95, 0.42, 0.12] : [0.95, 0.75, 0.1], 0.6), pants = PM([0.1, 0.12, 0.2], 0.8);
+    // local: seated on the side deck at origin, outboard = +X, facing -Z
+    c.add(PRIM.soft(0.28, 0.16, 0.3, 4), TRS(0, 0.08, 0), pants);
+    c.add(PRIM.soft(0.34, 0.5, 0.24, 4), TRS(0.02, 0.4, 0.02, 0, 0, 0), vest);
+    c.add(PRIM.sphere(0.1, 12, 8), TRS(0.02, 0.76, -0.02), skin);
+    c.add(PRIM.sphere(0.104, 12, 8), TRS(0.02, 0.8, 0.0, 0, 0, 0, 1, 0.7, 1), PM(helm ? [0.9, 0.9, 0.88] : [0.12, 0.3, 0.6], 0.6));   // cap
+    for (const s of [-1, 1]) {
+      const t = cylBetween(new V3(-0.12, 0.06, s * 0.09 - 0.05), new V3(-0.45, 0.02, s * 0.09 - 0.3), 0.065, 0.055, 8); c.add(t.prim, t.M, pants);
+      const sh = cylBetween(new V3(-0.45, 0.02, s * 0.09 - 0.3), new V3(-0.55, -0.4, s * 0.09 - 0.35), 0.05, 0.045, 8); c.add(sh.prim, sh.M, pants);
+      const ua = cylBetween(new V3(0.02, 0.58, s * 0.16), new V3(-0.15, 0.36, s * 0.18 - 0.18), 0.045, 0.04, 8); c.add(ua.prim, ua.M, vest);
+      const fa = cylBetween(new V3(-0.15, 0.36, s * 0.18 - 0.18), new V3(-0.25, 0.42, s * 0.12 - 0.42), 0.035, 0.03, 8); c.add(fa.prim, fa.M, skin);
+    }
+    return c.mesh();
+  };
+  P.crewHelm = crew(true); P.crewHike = crew(false);
+  // sails: dynamic meshes
+  const sailMesh = (nu, nv, colFn) => {
+    const nV = (nu + 1) * (nv + 1), idx = [];
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, c, d, a, d, b); }
+    const col = new Float32Array(nV * 4), mat = new Float32Array(nV * 2);
+    for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) { const k = j * (nu + 1) + i, cc = colFn(i / nu, j / nv); col.set([cc[0], cc[1], cc[2], 0], k * 4); mat.set([0.85, 0], k * 2); }
+    const m = makeMesh({ aPos: { data: new Float32Array(nV * 3), size: 3, dynamic: true }, aNormal: { data: new Float32Array(nV * 3), size: 3, dynamic: true }, aColor: { data: col, size: 4 }, aMat: { data: mat, size: 2 } }, new Uint16Array(idx));
+    m.nu = nu; m.nv = nv; m.idx = idx; m.pos = new Float32Array(nV * 3);
+    return m;
+  };
+  const cloth = [0.93, 0.92, 0.88];
+  P.main = sailMesh(10, 16, (u, v) => (u > 0.93 ? [0.82, 0.8, 0.76] : v > 0.86 && v < 0.93 ? LIV.teal : v > 0.79 && v < 0.86 ? LIV.coral : cloth));
+  P.jib = sailMesh(8, 12, (u, v) => (u > 0.9 ? [0.82, 0.8, 0.76] : cloth));
+  P.main.idxArr = new Uint16Array(P.main.idx); P.jib.idxArr = new Uint16Array(P.jib.idx);
+}
+// rebuild a sail's vertices (boat-local) from luff line, chord angle, camber, twist and luff flutter
+function updateSail(mesh, luff0, luff1, chord0, angle, side, camber, twist, luffAmt, t) {
+  const nu = mesh.nu, nv = mesh.nv, pos = mesh.pos;
+  for (let j = 0; j <= nv; j++) {
+    const v = j / nv;
+    const L = [lerp(luff0[0], luff1[0], v), lerp(luff0[1], luff1[1], v), lerp(luff0[2], luff1[2], v)];
+    const c = chord0 * (1 - v) * (1 + 0.14 * Math.sin(PI * v)) + 0.04;
+    const th = angle - side * twist * Math.pow(v, 1.3);
+    const cx = Math.sin(th), cz = Math.cos(th), nx = Math.cos(th), nz = -Math.sin(th);
+    for (let i = 0; i <= nu; i++) {
+      const u = i / nu;
+      let b = Math.pow(u, 0.75) * (1 - u) / 0.302 * camber * c;
+      b += luffAmt * c * 0.06 * Math.sin(t * 15 + u * 9 - v * 5) * (0.25 + u) * (1 - u * 0.5);
+      const k = (j * (nu + 1) + i) * 3;
+      pos[k] = L[0] + cx * u * c - side * nx * b; pos[k + 1] = L[1] + (u * c) * 0.02; pos[k + 2] = L[2] + cz * u * c - side * nz * b;
+    }
+  }
+  updateBuf(mesh, 'aPos', pos);
+  updateBuf(mesh, 'aNormal', new Float32Array(computeNormals(pos, mesh.idx)));
+}
+
+// ============================================================================
 // Environment: time of day, sky colours, volcano activity, wind
 // ============================================================================
 const ENV = {
@@ -4655,6 +5361,7 @@ const STYLES = [
   { id: 'thermal', name: 'Térmica', desc: 'Cámara infrarroja: la lava arde' },
   { id: 'nightvision', name: 'Visión nocturna', desc: 'Intensificador verde para la noche' },
   { id: 'neon', name: 'Neón', desc: 'Synthwave con contornos luminosos' },
+  { id: 'ukiyoe', name: 'Ukiyo-e', desc: 'Grabado japonés: tinta, papel y azul de Prusia', toon: true },
 ];
 const DEFAULTS = {
   preset: 'alto',
@@ -4663,7 +5370,7 @@ const DEFAULTS = {
   terrainRes: 256, vegetation: 1.0, grass: 3, shadows: 2, clouds: 2, particles: 1.0,
   post: true, bloom: 0.8, fxaa: true, msaa: 0, viewDist: 1.0, fov: 65, exposure: 1.0, vignette: 0.22,
   shaderOn: false, style: 'anime', styleMix: 1.0, showFps: false,
-  seaState: 0.35, windSpeed: 5, cloudCover: 0.45, timeScale: 1, eruption: 1.0,
+  seaState: 0.35, windSpeed: 5, turbulence: 1, cloudCover: 0.45, timeScale: 1, eruption: 1.0,
   assist: 2, invertY: false, sensitivity: 1.0, volume: 0.8, hud: true, units: 'kt',
 };
 const PRESETS = {
@@ -4711,8 +5418,8 @@ function styleIndex() { const i = STYLES.findIndex(s => s.id === SETTINGS.style)
 const RENDER = {
   P: {}, comp: {}, noiseTex: null, rippleTex: null, shadowRT: null, dummyShadow: null, reflRT: null, sceneRT: null, ldrRT: null,
   bloomDown: [], bloomUp: [], W: 1, H: 1, panelTex: null, gridKey: '', progKey: '',
-  cam: { pos: new V3(), view: M4.create(), proj: M4.create(), vp: M4.create(), ivp: M4.create(), fov: 65 * DEG, near: 0.5, far: 42000, aspect: 1 },
-  tmpM: M4.create(), tmpM2: M4.create(), planeM: M4.create(), lightVP: M4.create(),
+  eye: [0, 0, 0], cam: { pos: new V3(), view: M4.create(), proj: M4.create(), vp: M4.create(), vpr: M4.create(), ivp: M4.create(), fov: 65 * DEG, near: 0.5, far: 42000, aspect: 1 },
+  tmpM: M4.create(), tmpM2: M4.create(), planeM: M4.create(), boatM: M4.create(), lightVP: M4.create(),
 };
 let NOISE_DATA = null, NOISE_CPU = null;
 
@@ -4760,6 +5467,7 @@ function initRender() {
   RENDER.liveryTex = buildLiveryTexture();
   try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { try { buildLiveryTexture(RENDER.liveryTex); } catch (e) { /* keep first version */ } }); } catch (e) { /* no font API */ }
   SCENE.grassTuft = buildGrassTuft();
+  SCENE.windsockMesh = buildWindsockMesh();
 }
 function buildWorldGPU() {
   for (const m of SCENE.terrain) { if (m.grass) gl.deleteTexture(m.grass.tex); deleteMesh(m); }
@@ -4819,9 +5527,26 @@ function ensureShadow() {
 }
 
 // ---------------- globals ----------------
+const _vr = M4.create(), _rel = M4.create();
+// model matrix relative to the current eye (the subtraction happens in double precision)
+function relM(model) {
+  const e = RENDER.eye; _rel.set(model);
+  _rel[12] = model[12] - e[0]; _rel[13] = model[13] - e[1]; _rel[14] = model[14] - e[2];
+  return _rel;
+}
 function setGlobals(view, proj, camPos, o = {}) {
   const c = RENDER.cam;
   M4.mul(c.vp, proj, view);
+  // camera-relative rendering for vehicles and the cockpit: world coordinates reach ~10 km, where float32 has
+  // only ~1 mm of resolution, which made the panel face and its backing (2 mm apart) fight in depth and flicker.
+  // The eye is recovered from the view matrix itself so mirrored and stereo views stay consistent.
+  const e = RENDER.eye;
+  e[0] = -(view[0] * view[12] + view[1] * view[13] + view[2] * view[14]);
+  e[1] = -(view[4] * view[12] + view[5] * view[13] + view[6] * view[14]);
+  e[2] = -(view[8] * view[12] + view[9] * view[13] + view[10] * view[14]);
+  _vr.set(view); _vr[12] = 0; _vr[13] = 0; _vr[14] = 0;
+  M4.mul(c.vpr, proj, _vr);
+  GU.uVPR = c.vpr; GU.uEyeW = [e[0], e[1], e[2]];
   GU.uViewProj = c.vp; GU.uView = view; GU.uCamPos = [camPos.x, camPos.y, camPos.z]; GU.uTime = SIM.t;
   GU.uClipY = o.clipY === undefined ? -1e9 : o.clipY;
   GU.uSunDir = ENV.sunDir.arr(); GU.uSunCol = ENV.sunCol; GU.uMoonDir = ENV.moonDir.arr(); GU.uMoonCol = ENV.moonCol;
@@ -4830,7 +5555,7 @@ function setGlobals(view, proj, camPos, o = {}) {
   GU.uToon = toonActive() ? 1 : 0; GU.uDirect = o.direct ? 1 : 0; GU.uExposure = ENV.exposure; GU.uNight = ENV.night; GU.uInCloud = o.reflection ? 0 : ENV.inCloud;
   GU.uLava = [LAVA_POS.x, LAVA_POS.y, LAVA_POS.z, ENV.lavaI * (ENV.erupt.level > 0 ? 1 : 0.4)]; GU.uLavaCol = [1.0, 0.33, 0.07];
   const lp = AIR.landingWorld;
-  GU.uLand = [lp.x, lp.y, lp.z, AIR.ac.lights && !AIR.ac.crashed && GAME.state !== 'menu' ? 1 : 0]; GU.uLandDir = AIR.landingDir.arr();
+  GU.uLand = [lp.x, lp.y, lp.z, !isBoat() && (AIR.ac.sw.land || AIR.ac.sw.taxi) && AIR.ac.sw.batt && !AIR.ac.crashed && GAME.state !== 'menu' ? 1 : 0]; GU.uLandDir = AIR.landingDir.arr();
   GU.uCloud = [ENV.cloudCover, ENV.cloudAlt, SETTINGS.clouds >= 2 ? 1 : 0, SETTINGS.clouds >= 1 ? 1 : 0];
   GU.uCloudOff = ENV.cloudOff;
   GU.uShadowMat = RENDER.lightVP; GU.uShadowOn = RENDER.shadowActive ? RENDER.shadowRT.w : 0;
@@ -4844,9 +5569,9 @@ function toonActive() { return SETTINGS.shaderOn && STYLES[styleIndex()].toon; }
 const OBJ_DEF = { lightK: [1, 1], interior: 0, cabin: [0, 0, 0] };
 function drawObj(mesh, model, alpha = 1, emis = null, o = OBJ_DEF) {
   const p = RENDER.P.obj; useProg(p);
-  setU(p, 'uModel', model); setU(p, 'uAlpha', alpha); setU(p, 'uEmis', emis || [0, 0, 0]);
+  setU(p, 'uModel', relM(model)); setU(p, 'uAlpha', alpha); setU(p, 'uEmis', emis || [0, 0, 0]);
   setU(p, 'uLightK', o.lightK || OBJ_DEF.lightK); setU(p, 'uInterior', o.interior || 0); setU(p, 'uCabin', o.cabin || OBJ_DEF.cabin);
-  setU(p, 'uLivery', o.livery ? 1 : 0); setU(p, 'uAO', o.ao ? 1 : 0); setU(p, 'uWinCut', o.interior ? 1 : 0);
+  setU(p, 'uLivery', o.livery ? 1 : 0); setU(p, 'uAO', o.ao ? 1 : 0); setU(p, 'uWinCut', o.interior ? 1 : 0); setU(p, 'uTrans', o.trans ? 1 : 0);
   if (o.interior) { setU(p, 'uWinP', WIN.gpu); setU(p, 'uWinRad', WIN.rad); }
   if (o.livery) setTex(p, 'uLivTex', RENDER.liveryTex);
   drawMesh(mesh);
@@ -4874,8 +5599,8 @@ const _pm = M4.create(), _hm = M4.create(), _rm = M4.create();
 const INSIDE_MODES = { cockpit: 1, passenger: 1 };
 function cabinOpts() {
   const shadowOn = RENDER.shadowActive ? 1 : 0;
-  const night = ENV.night;
-  return { lightK: [shadowOn ? 1 : 0.32, 0.62], interior: 0, ao: 1, cabin: [0.05 * night, 0.036 * night, 0.026 * night] };
+  const night = ENV.night, sw = AIR.ac.sw, k = sw.batt ? (sw.cabin ? 1 : 0.35 * night) : 0;
+  return { lightK: [shadowOn ? 1 : 0.32, 0.62], interior: 0, ao: 1, cabin: [0.16 * k, 0.12 * k, 0.085 * k] };
 }
 const LIVERY_OPTS = { livery: 1 };
 function drawPlane(opts = {}) {
@@ -4888,7 +5613,10 @@ function drawPlane(opts = {}) {
     dm(P.pilotL, null, co);            // the pilot is only ever seen from outside
     drawCabinControls(co, true);
   }
+  // seals and seams sit millimetres above the skin: pull them forward in depth so they never flicker
+  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -4);
   dm(P.fusDetail);
+  gl.disable(gl.POLYGON_OFFSET_FILL);
   dm(P.airframe, null, LIVERY_OPTS);
   dm(P.extras);
   const s = ac.surf;
@@ -4924,23 +5652,33 @@ function drawPropDisc() {
   drawObj(PLANE.parts.disc, _pm, clamp((ac.rpm - 0.45) * 0.45, 0, 0.2));
   setDepth(true, true); setBlend(null);
 }
-// moving cockpit parts: yokes, levers, trim wheel, pedals, compass, panel
+// moving cockpit parts: yokes, levers, trim wheel, pedals, compass, live switches, panel
+const _tm = M4.create(), _tm2 = M4.create();
 function drawCabinControls(co, withPanel) {
-  const ac = AIR.ac, P = PLANE.parts, M = RENDER.planeM;
-  const d = (mesh, local) => drawObj(mesh, M4.mul(_pm, M, local), 1, null, co);
+  const ac = AIR.ac, P = PLANE.parts, M = RENDER.planeM, L = PANEL_LAYOUT;
+  const hl = id => cockpitHighlight(id);
+  const d = (mesh, local, id) => drawObj(mesh, M4.mul(_pm, M, local), 1, id ? hl(id) : null, co);
   const pz = ac.ctl.pitch * 0.05, rr = -ac.ctl.roll * 0.75;
-  for (const x of [-0.36, 0.36]) { const h = yokeHub(x); d(P.yoke, TRS(h.x, h.y, h.z + pz, 0, 0, rr)); }
-  d(P.levPower, TRS(-0.05, 0.05, -1.9, lerp(0.45, -0.55, ac.throttle)));
-  d(P.levProp, TRS(0, 0.05, -1.9, -0.45));
-  d(P.levCond, TRS(0.05, 0.05, -1.9, -0.35));
-  d(P.levFlap, TRS(0.065, 0.0, -1.7, lerp(-0.4, 0.5, ac.flaps / 30)));
-  d(P.trimWheel, TRS(-0.122, -0.13, -1.76, ac.trim * 7));
+  for (const x of [-0.36, 0.36]) { const h = yokeHub(x); d(P.yoke, TRS(h.x, h.y, h.z + pz, 0, 0, rr), 'yoke'); }
+  const lv = LEVERS;
+  d(P.levPower, TRS(lv.power.pivot.x, lv.power.pivot.y, lv.power.pivot.z, lerp(lv.power.a0, lv.power.a1, ac.throttle)), 'power');
+  d(P.levProp, TRS(lv.prop.pivot.x, lv.prop.pivot.y, lv.prop.pivot.z, lerp(lv.prop.a0, lv.prop.a1, ac.propLever)), 'prop');
+  d(P.levCond, TRS(lv.cond.pivot.x, lv.cond.pivot.y, lv.cond.pivot.z, lerp(lv.cond.a0, lv.cond.a1, ac.condLever)), 'cond');
+  d(P.levFlap, TRS(lv.flap.pivot.x, lv.flap.pivot.y, lv.flap.pivot.z, lerp(lv.flap.a0, lv.flap.a1, ac.flaps / 30)), 'flap');
+  d(P.trimWheel, TRS(-0.122, -0.13, -1.76, ac.trim * 7), 'trim');
   const r = ac.surf.r * 0.055;
-  for (const [x, sgn] of [[-0.46, -1], [-0.26, 1], [0.26, -1], [0.46, 1]]) d(P.pedal, TRS(x, -0.52, -2.22 - sgn * r, 0));
+  for (const [x, sgn] of [[-0.46, -1], [-0.26, 1], [0.26, -1], [0.46, 1]]) d(P.pedal, TRS(x, -0.52, -2.22 - sgn * r, 0), x < 0 ? 'pedals' : null);
   d(P.compass, TRS(0, 0.574, -2.165, 0, ac.heading(), 0));
+  // live panel parts (panel-local)
+  const PMx = PANEL_M();
+  const pd = (mesh, lx, ly, local, id) => drawObj(mesh, M4.mul(_pm, M, M4.mul(_tm, PMx, M4.mul(_tm2, TRS(lx, ly, 0), local))), 1, hl(id), co);
+  L.switches.forEach(([n, key], i) => pd(P.toggle, L.switchX0 + i * L.switchDX, L.switchesY, TRS(0, 0, 0, ac.sw[key] ? -0.5 : 0.5), 'sw_' + key));
+  L.master.forEach(([n, key], i) => pd(P.rocker, L.masterX, L.masterY0 + i * L.masterDY, TRS(0, 0, 0, ac.sw[key] ? -0.22 : 0.22), 'sw_' + key));
+  pd(P.gearKnob, L.gear[0], L.gear[1] + (ac.gearSet ? -0.018 : 0.018), TRS(0, 0, 0), 'gear');
+  pd(P.parkKnob, L.park[0], L.park[1], TRS(0, 0, ac.parking ? 0.022 : 0), 'park');
   if (withPanel) {
     const p = RENDER.P.panel; useProg(p);
-    setU(p, 'uModel', M); setTex(p, 'uTex', RENDER.panelTex);
+    setU(p, 'uModel', relM(M)); setTex(p, 'uTex', RENDER.panelTex);
     setU(p, 'uCabin', co.cabin); setU(p, 'uScreen', lerp(2.1, 0.55, ENV.night));
     drawMesh(P.panel);
   }
@@ -4956,7 +5694,7 @@ function drawCabin(mode) {
 }
 function drawPlaneGlass(inside) {
   const p = RENDER.P.glass; useProg(p);
-  setU(p, 'uModel', RENDER.planeM); setU(p, 'uInside', inside ? 1 : 0); setU(p, 'uWinP', WIN.gpu); setU(p, 'uWinRad', WIN.rad);
+  setU(p, 'uModel', relM(RENDER.planeM)); setU(p, 'uInside', inside ? 1 : 0); setU(p, 'uWinP', WIN.gpu); setU(p, 'uWinRad', WIN.rad);
   setBlend('premul'); setDepth(true, false);
   drawMesh(PLANE.parts.glass);
   drawMesh(PLANE.parts.lensGlass);
@@ -4984,6 +5722,8 @@ function drawWater(viewW, viewH) {
   setU(p, 'uWaterDeep', [0.012, 0.075, 0.11]); setU(p, 'uWaterShallow', [0.07, 0.48, 0.47]); setU(p, 'uWaterSSS', [0.05, 0.42, 0.38]);
   setU(p, 'uSea', SEA.state); setU(p, 'uWaveAmp', SEA.ampSum * 0.55);
   setU(p, 'uLavaEntry', [LAVA_ENTRY.x, 0, LAVA_ENTRY.z, ENV.erupt.level > 0 ? 1 : 0]);
+  { const tw = tradeWind(SIM.t), n = nearestIsland(c[0], c[2]).isl, iw = ISL_WIND[n.id] || { R: 900, H: 0.6 };
+    setU(p, 'uGustOff', gustOffset(SIM.t)); setU(p, 'uWindW', [tw.dx, tw.dz, ENV.windSpeed, 0]); setU(p, 'uLeeI', [n.cx, n.cz, iw.R, iw.H]); }
   setBlend('premul'); setDepth(true, true); setCull(false);
   drawMesh(SCENE.water);
   setBlend(null);
@@ -5085,30 +5825,33 @@ function drawWorld(o) {
   drawObj(SCENE.statics, M4.identity(RENDER.tmpM));
   if (SETTINGS.vegetation > 0 && !(o.reflection && SETTINGS.reflections < 2)) drawVegetation();
   if (!o.reflection) drawGrass();
-  if (o.showPlane) drawPlane({ cockpit: o.cockpit });
+  if (o.showPlane && isBoat()) drawBoat({ helmView: CAM.mode === 'cockpit' && !o.reflection });
+  else if (o.showPlane) drawPlane({ cockpit: o.cockpit });
+  if (SCENE.windsocks && !o.reflection) drawWindsocks();
   drawSky(!o.reflection);
   if (!o.reflection) drawWater(o.vw, o.vh);
   drawClouds();
   drawParticles();
   drawLights(o.pixel);
   if (!o.reflection) drawSpray();
-  if (o.showPlane && !o.cockpit) drawPropDisc();
-  if (o.showPlane && !o.cockpit) drawPlaneGlass(false);
+  if (o.showPlane && !o.cockpit && !isBoat()) drawPropDisc();
+  if (o.showPlane && !o.cockpit && !isBoat()) drawPlaneGlass(false);
 }
 function renderShadow() {
   RENDER.shadowActive = false;
   if (!RENDER.shadowRT || ENV.sunDir.y < 0.04 || GAME.state === 'menu') return;
-  const ac = AIR.ac, L = ENV.sunDir;
-  const c = ac.pos, eye = vadd(c, vscale(L, 120));
+  const ac = VEH(), L = ENV.sunDir;
+  const c = isBoat() ? vadd(ac.pos, new V3(0, 3, 0)) : ac.pos, eye = vadd(c, vscale(L, 120));
   const up = Math.abs(L.y) > 0.95 ? new V3(0, 0, 1) : new V3(0, 1, 0);
   const view = M4.lookAt(M4.create(), eye, c, up);
   const proj = M4.ortho(M4.create(), -10.5, 10.5, -10.5, 10.5, 1, 400);
   M4.mul(RENDER.lightVP, proj, view);
   bindRT(RENDER.shadowRT);
-  gl.clear(gl.DEPTH_BUFFER_BIT);
+  gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
   setDepth(true, true); setBlend(null); setCull(false);
   const p = RENDER.P.depth; gl.useProgram(p.p); CUR_PROG = p;
   setU(p, 'uLightVP', RENDER.lightVP);
+  if (isBoat()) { drawBoatDepth(p); RENDER.shadowActive = true; return; }
   const M = RENDER.planeM;
   // draw plane parts through the depth program
   const parts = PLANE.parts;
@@ -5127,7 +5870,7 @@ function renderReflection(view, proj, camPos, pixel) {
   const mir = M4.create(); mir[5] = -1;
   const rv = M4.mul(M4.create(), view, mir);
   bindRT(RENDER.reflRT);
-  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clearColor(0, 0, 0, 0); gl.depthMask(true); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   setGlobals(rv, proj, new V3(camPos.x, -camPos.y, camPos.z), { clipY: -0.2, reflection: true, direct: !CAPS.hdr });
   gl.frontFace(gl.CW);
   drawWorld({ reflection: true, showPlane: GAME.state !== 'menu', vw: RENDER.reflRT.w, vh: RENDER.reflRT.h, pixel: pixel * 2 });
@@ -5135,21 +5878,88 @@ function renderReflection(view, proj, camPos, pixel) {
   RENDER.reflValid = true;
 }
 function updateDynLights() {
-  const ac = AIR.ac, M = RENDER.planeM, D = SCENE.dynLightsData, LL = PLANE.lightsLocal;
+  const D = SCENE.dynLightsData;
   let n = 0;
-  const put = (lp, col, size, inten, blink = 0, phase = 0) => {
+  const put = (M, lp, col, size, inten, blink = 0, phase = 0) => {
+    if (n >= 12) return;
     const w = M4.point(M, lp);
     D.a.set([w.x, w.y, w.z, size], n * 4); D.b.set([col[0], col[1], col[2], inten], n * 4); D.c.set([blink, phase, 0, 0], n * 4); n++;
   };
-  const on = ac.lights || ENV.night > 0.3;
-  if (on) {
-    put(LL.navL, [1, 0.1, 0.06], 0.35, 3); put(LL.navR, [0.15, 1, 0.3], 0.35, 3); put(LL.tail, [1, 1, 1], 0.3, 2.5);
-    put(LL.navL, [1, 1, 1], 0.6, 8, 1.3, 0.0); put(LL.navR, [1, 1, 1], 0.6, 8, 1.3, 0.04);
+  if (isBoat()) {
+    const b = BOAT.b, M = RENDER.boatM;
+    if (b.lights || ENV.night > 0.45) {
+      put(M, new V3(-0.06, 0.86, -2.92), [1, 0.1, 0.06], 0.22, 3); put(M, new V3(0.06, 0.86, -2.92), [0.15, 1, 0.3], 0.22, 3);
+      put(M, new V3(0, 0.8, 3.02), [1, 1, 1], 0.2, 2.5); put(M, new V3(0, BOAT_SPEC.mastH + 0.1, BOAT_SPEC.mastZ), [1, 1, 1], 0.25, 3);
+    }
+  } else {
+    const ac = AIR.ac, M = RENDER.planeM, LL = PLANE.lightsLocal, sw = ac.sw;
+    if (sw.batt) {
+      if (sw.nav) { put(M, LL.navL, [1, 0.1, 0.06], 0.35, 3); put(M, LL.navR, [0.15, 1, 0.3], 0.35, 3); put(M, LL.tail, [1, 1, 1], 0.3, 2.5); }
+      if (sw.strobe) { put(M, LL.navL, [1, 1, 1], 0.6, 8, 1.3, 0.0); put(M, LL.navR, [1, 1, 1], 0.6, 8, 1.3, 0.04); }
+      if (sw.beacon) put(M, LL.beacon, [1, 0.12, 0.05], 0.45, 5, 1.1, 0.5);
+      if (sw.land || sw.taxi) put(M, LL.landing, [1, 0.95, 0.85], 0.9, 6);
+    }
   }
-  put(LL.beacon, [1, 0.12, 0.05], 0.45, 5, 1.1, 0.5);
-  if (ac.lights) put(LL.landing, [1, 0.95, 0.85], 0.9, 6);
   updateBuf(SCENE.dynLights, 'iA', D.a); updateBuf(SCENE.dynLights, 'iB', D.b); updateBuf(SCENE.dynLights, 'iC', D.c);
   return n;
+}
+
+// ---------------- sailboat ----------------
+const SAIL_OPTS = { trans: 1, lightK: [1, 1] };
+function updateBoatSails() {
+  const b = BOAT.b, P = BOATM.parts, S = BOAT_SPEC, mz = S.mastZ;
+  const sideM = b.boom >= 0 ? -1 : 1, sideJ = b.jibAng >= 0 ? -1 : 1;
+  const camM = (0.045 + 0.075 * clamp(b.clMain / 1.3, 0, 1)) * (1 - 0.75 * b.luffMain);
+  const camJ = (0.045 + 0.07 * clamp(b.clJib / 1.3, 0, 1)) * (1 - 0.75 * b.luffJib);
+  updateSail(P.main, [0, S.boomH + 0.05, mz + 0.05], [0, S.mastH - 0.4, mz + 0.05], S.boomL * 0.96, b.boom, sideM, camM, 0.06 + 0.2 * b.mainSheet, b.luffMain, SIM.t);
+  const t0 = [0, 0.8, -2.92], st1 = [0, 7.35, mz - 0.03], f = 0.9;
+  updateSail(P.jib, t0, [0, lerp(t0[1], st1[1], f), lerp(t0[2], st1[2], f)], S.jib.foot, b.jibAng, sideJ, camJ, 0.05 + 0.15 * b.jibSheet, b.luffJib, SIM.t + 1.7);
+}
+function boatLocal() {
+  const b = BOAT.b, S = BOAT_SPEC, mz = S.mastZ, sideW = b.crewPos >= 0 ? 1 : -1;
+  const boomEnd = new V3(Math.sin(b.boom) * (S.boomL - 0.1), S.boomH - 0.06, mz + 0.05 + Math.cos(b.boom) * (S.boomL - 0.1));
+  const clew = new V3(Math.sin(b.jibAng) * S.jib.foot, 0.84, -2.92 + Math.cos(b.jibAng) * S.jib.foot);
+  return { S, mz, sideW, boomEnd, clew };
+}
+function drawBoat(o = {}) {
+  const b = BOAT.b, P = BOATM.parts, M = RENDER.boatM;
+  const { S, mz, sideW, boomEnd, clew } = boatLocal();
+  const dm = (mesh, local, opts) => drawObj(mesh, local ? M4.mul(_pm, M, local) : M, 1, null, opts || OBJ_DEF);
+  dm(P.hull);
+  dm(P.boom, TRS(0, S.boomH, mz + 0.05, 0, b.boom, 0));
+  dm(P.rudder, TRS(0, 0, 2.97, 0, b.rudder, 0));
+  dm(P.windex, TRS(0, S.mastH + 0.1, mz, 0, -b.awa, 0));
+  // running rigging: mainsheet, jib sheet (leeward), vang
+  dm(P.line, lineMatrix(boomEnd, new V3(clamp(boomEnd.x, -0.6, 0.6), 0.66, 2.55), 0.007));
+  const lead = new V3((b.jibAng >= 0 ? 1 : -1) * 0.86, 0.69, 0.35);
+  dm(P.line, lineMatrix(clew, lead, 0.006));
+  dm(P.line, lineMatrix(lead, new V3((b.jibAng >= 0 ? 1 : -1) * 0.82, 0.74, 1.0), 0.006));
+  dm(P.line, lineMatrix(new V3(Math.sin(b.boom) * 0.75, S.boomH - 0.04, mz + 0.05 + Math.cos(b.boom) * 0.75), new V3(0, 0.95, mz + 0.08), 0.01));
+  dm(P.main, null, SAIL_OPTS); dm(P.jib, null, SAIL_OPTS);
+  if (!o.helmView) {
+    // helmsman to windward aft, crew hiking amidships (mirrored with the side)
+    const hike = 0.15 + b.hike * 0.85;
+    dm(P.crewHelm, M4.mul(_tm, TRS(sideW * 0.8, 0.66, 2.05), TRS(0, 0, 0, 0, 0, 0, sideW, 1, 1)));
+    dm(P.crewHike, M4.mul(_tm, TRS(sideW * 0.92, 0.68, 0.95), M4.mul(_tm2, TRS(0, 0, 0, 0, 0, 0, sideW, 1, 1), TRS(0, 0, 0, 0, 0, -hike))));
+  }
+}
+function drawBoatDepth(p) {
+  const b = BOAT.b, P = BOATM.parts, M = RENDER.boatM, S = BOAT_SPEC;
+  const dd = (mesh, local) => { setU(p, 'uModel', local ? M4.mul(_pm, M, local) : M); drawMesh(mesh); };
+  dd(P.hull); dd(P.boom, TRS(0, S.boomH, S.mastZ + 0.05, 0, b.boom, 0)); dd(P.rudder, TRS(0, 0, 2.97, 0, b.rudder, 0));
+  dd(P.main); dd(P.jib);
+  const sideW = b.crewPos >= 0 ? 1 : -1;
+  dd(P.crewHelm, M4.mul(_tm, TRS(sideW * 0.8, 0.66, 2.05), TRS(0, 0, 0, 0, 0, 0, sideW, 1, 1)));
+}
+// windsocks at each airfield: pole is static, the sock swings with the local wind
+function drawWindsocks() {
+  const P = SCENE.windsockMesh; if (!P) return;
+  for (const w of SCENE.windsocks) {
+    const v = windSurface(w.x, w.z, SIM.t), sp = Math.hypot(v.x, v.z);
+    const yaw = Math.atan2(v.x, v.z), droop = (1 - clamp(sp / 9, 0, 1)) * 1.25;
+    const flap = Math.sin(SIM.t * (3 + sp * 0.4) + w.x) * 0.06 * clamp(sp / 5, 0, 1);
+    drawObj(P, TRS(w.x, w.y + 6.2, w.z, droop + flap, yaw + flap * 0.5, 0), 1, null, OBJ_DEF);
+  }
 }
 
 // main entry for a desktop/mobile frame
@@ -5162,19 +5972,20 @@ function renderFrame() {
   ensureShadow();
   const ac = AIR.ac;
   M4.fromQT(RENDER.planeM, ac.q, ac.pos);
+  if (isBoat()) { M4.fromQT(RENDER.boatM, BOAT.b.q, BOAT.b.pos); if (GAME.state !== 'menu') updateBoatSails(); }
   const pixel = 2 * Math.tan(c.fov / 2) / H;
   if (SETTINGS.shadows > 0 && GAME.state !== 'menu') renderShadow(); else RENDER.shadowActive = false;
-  const cockpit = INSIDE_MODES[CAM.mode] && GAME.state !== 'menu';
+  const cockpit = INSIDE_MODES[CAM.mode] && GAME.state !== 'menu' && !isBoat();
   if (RENDER.reflRT) renderReflection(c.view, c.proj, c.pos, pixel); else RENDER.reflValid = false;
   const showPlane = GAME.state !== 'menu';
   const direct = !needPost || !CAPS.hdr;
   if (needPost) bindRT(RENDER.sceneRT); else { bindRT(null); gl.viewport(0, 0, W, H); }
-  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clearColor(0, 0, 0, 1); gl.depthMask(true); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   setGlobals(c.view, c.proj, c.pos, { direct });
   drawWorld({ showPlane, cockpit, vw: W, vh: H, pixel });
   if (cockpit) {
-    gl.clear(gl.DEPTH_BUFFER_BIT);
-    const pn = M4.setNearFar(RENDER.tmpM2, c.proj, 0.03, 40);
+    gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
+    const pn = M4.setNearFar(RENDER.tmpM2, c.proj, 0.06, 14);
     setGlobals(c.view, pn, c.pos, { direct });
     drawCabin(CAM.mode);
   }
@@ -5235,7 +6046,7 @@ function splash(P, strength) {
   emitSpray(P, new V3(0, 2 * strength, 0), n, 0.8, 2.5 * strength, 0.8, 2.2, 6 * strength, 7 * strength);
 }
 function updateFX(dt) {
-  const ac = AIR.ac;
+  const ac = VEH();
   // ---- wake trail ----
   for (const w of FX.wake) w.age += dt;
   while (FX.wake.length && FX.wake[FX.wake.length - 1].age > 45) FX.wake.pop();
@@ -5265,7 +6076,7 @@ function updateFX(dt) {
       }
     }
     // prop wash over water
-    if (ac.onWater && ac.rpm > 0.6 && Math.random() < (ac.rpm - 0.5) * k) {
+    if (!isBoat() && ac.onWater && ac.rpm > 0.6 && Math.random() < (ac.rpm - 0.5) * k) {
       const hub = M4.point(RENDER.planeM, new V3(0, -1.2, -4.5));
       emitSpray(new V3(hub.x, 0.2, hub.z), vscale(ac.fwd(), -6), 2, 0.8, 1.8, 0.6, 1.2, 2, 1.0);
     }
@@ -5296,7 +6107,10 @@ const CAM_MODES = [
   { id: 'chase', name: 'Persecución' }, { id: 'cockpit', name: 'FPV piloto' }, { id: 'passenger', name: 'Pasajero' },
   { id: 'wingcam', name: 'FPV ala' }, { id: 'orbit', name: 'Órbita libre' }, { id: 'flyby', name: 'Pasada' }, { id: 'cinematic', name: 'Cinemática' },
 ];
-const CAM_INSIDE = m => m === 'cockpit' || m === 'passenger';
+const CAM_INSIDE = m => (m === 'cockpit' || m === 'passenger') && GAME.vehicle !== 'boat';
+const BOAT_CAM_NAMES = { cockpit: 'Timonel', passenger: 'Proa', wingcam: 'Tope de palo' };
+const camName = id => (GAME.vehicle === 'boat' && BOAT_CAM_NAMES[id]) || (CAM_MODES.find(m => m.id === id) || CAM_MODES[0]).name;
+const BOAT_VIEW = m => GAME.vehicle === 'boat' && (m === 'cockpit' || m === 'passenger' || m === 'wingcam');
 const PASSENGER_EYE = new V3(-0.42, 0.6, -0.18);
 const WINGCAM = { pos: new V3(7.3, 1.72, -1.25), target: new V3(0.1, 0.62, -1.75) };
 const CAM = {
@@ -5310,7 +6124,9 @@ function setCamMode(m) {
   CAM.yaw = 0; CAM.pitch = 0; CAM.lookYaw = 0; CAM.lookPitch = 0; CAM.fly = null; CAM.fpvFov = 0;
   if (m === 'orbit') { CAM.yaw = 0.6; CAM.pitch = 0.25; }
   if (m === 'passenger') { CAM.lookYaw = 1.2; CAM.lookPitch = -0.12; }
-  if (m === 'cockpit') CAM.lookPitch = -0.06;
+  if (m === 'cockpit') CAM.lookPitch = GAME.vehicle === 'boat' ? -0.12 : -0.06;
+  if (m === 'passenger' && GAME.vehicle === 'boat') { CAM.lookYaw = PI; CAM.lookPitch = 0.12; }
+  if (m === 'wingcam' && GAME.vehicle === 'boat') { CAM.lookYaw = 0; CAM.lookPitch = -1.0; }
   UI.updateQuick && UI.updateQuick();
 }
 function toggleFPV() { setCamMode(CAM.mode === 'cockpit' ? (CAM.prevMode || 'chase') : 'cockpit'); }
@@ -5319,21 +6135,21 @@ function cycleCamera(d = 1) {
   setCamMode(CAM_MODES[(i + d + CAM_MODES.length) % CAM_MODES.length].id);
 }
 function camLook(dx, dy) { // user drag (radians)
-  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam') { CAM.lookYaw = clamp(CAM.lookYaw - dx, -2.8, 2.8); CAM.lookPitch = clamp(CAM.lookPitch - dy, -1.2, 1.2); }
+  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) { CAM.lookYaw = clamp(CAM.lookYaw - dx, -2.8, 2.8); CAM.lookPitch = clamp(CAM.lookPitch - dy, -1.2, 1.2); }
   else { CAM.yaw -= dx; CAM.pitch = clamp(CAM.pitch + dy, -0.6, 1.35); }
   CAM.idle = 0;
 }
 function camZoom(f) {
-  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam') { const base = CAM.fpvFov || (SETTINGS.fov + 10); CAM.fpvFov = clamp(base * (f > 1 ? 1.06 : 0.94), 35, 110); }
+  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) { const base = CAM.fpvFov || (SETTINGS.fov + 10); CAM.fpvFov = clamp(base * (f > 1 ? 1.06 : 0.94), 35, 110); }
   else CAM.dist = clamp(CAM.dist * f, 9, 160);
 }
 function surfaceAt(x, z) { return Math.max(terrainH(x, z), waterH(x, z, SIM.t)); }
 function updateCamera(dt) {
-  const c = RENDER.cam, ac = AIR.ac;
+  const c = RENDER.cam, ac = VEH();
   c.aspect = canvas.width / Math.max(1, canvas.height);
   const menuCam = GAME.state === 'menu';
-  c.fov = (menuCam ? SETTINGS.fov : CAM_INSIDE(CAM.mode) ? (CAM.fpvFov || SETTINGS.fov + 10) : CAM.mode === 'wingcam' ? (CAM.fpvFov || 92) : SETTINGS.fov) * DEG;
-  c.near = !menuCam && CAM.mode === 'wingcam' ? 0.12 : 0.5; c.far = 42000;
+  c.fov = (menuCam ? SETTINGS.fov : CAM_INSIDE(CAM.mode) || BOAT_VIEW(CAM.mode) ? (CAM.fpvFov || SETTINGS.fov + 10) : CAM.mode === 'wingcam' ? (CAM.fpvFov || 92) : SETTINGS.fov) * DEG;
+  c.near = !menuCam && (CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) ? 0.12 : 0.5; c.far = 42000;
   CAM.idle += dt;
   let eye, target, up = new V3(0, 1, 0);
   if (GAME.state === 'menu') {
@@ -5355,12 +6171,29 @@ function updateCamera(dt) {
     // head motion: g-load sinks the head, rolling pushes it sideways, engine and ground add vibration
     const tgt = new V3(clamp(-ac.w.z * 0.03 - ac.beta * 0.05, -0.05, 0.05), clamp(-(ac.gload - 1) * 0.018, -0.06, 0.04), clamp(-(ac.thrust || 0) / 11000 * 0.012, -0.02, 0));
     CAM.head.lerpTo(tgt, 1 - Math.exp(-6 * dt));
-    const vib = (ac.rpm > 0.2 ? 0.0012 * ac.rpm : 0) + (ac.onGround || ac.onWater ? Math.min(0.006, ac.groundSpeed * 0.0002) : 0) + CAM.shake * 0.01;
-    const off = vadd(pass ? PASSENGER_EYE : PLANE.eye, CAM.head).add(new V3((Math.random() - 0.5) * vib, (Math.random() - 0.5) * vib, 0));
+    // smooth vibration (sum of sines) so close-up controls do not jitter from frame to frame
+    const vib = (ac.rpm > 0.2 ? 0.0007 * ac.rpm : 0) + (ac.onGround || ac.onWater ? Math.min(0.004, ac.groundSpeed * 0.00014) : 0) + CAM.shake * 0.008;
+    const tt = SIM.t;
+    const off = vadd(pass ? PASSENGER_EYE : PLANE.eye, CAM.head).add(new V3((Math.sin(tt * 23.1) + Math.sin(tt * 37.7 + 1.3) * 0.6) * vib * 0.5, (Math.sin(tt * 29.3 + 0.7) + Math.sin(tt * 41.9 + 2.1) * 0.6) * vib * 0.5, 0));
     const q = Quat.mul(ac.q, Quat.mul(Quat.axis(0, 1, 0, yaw), Quat.axis(1, 0, 0, CAM.lookPitch)));
     const e = vadd(ac.pos, ac.q.rot(off));
     const m = M4.fromQT(M4.create(), q, e);
     M4.invert(c.view, m);
+    c.pos = e;
+  } else if (BOAT_VIEW(CAM.mode)) {
+    // sailboat: helmsman (sits to windward and moves across when tacking), bow, masthead
+    const b = BOAT.b;
+    CAM.helmSide = CAM.helmSide === undefined ? 1 : CAM.helmSide;
+    CAM.helmSide = damp(CAM.helmSide, b.crewPos >= 0 ? 1 : -1, 1.2, dt);
+    let eyeL, rest = [0, -0.12];
+    if (CAM.mode === 'cockpit') eyeL = new V3(CAM.helmSide * 0.78, 1.32, 2.05);
+    else if (CAM.mode === 'passenger') { eyeL = new V3(0, 1.45, -2.55); rest = [PI, 0.12]; }
+    else { eyeL = new V3(0.15, 8.2, BOAT_SPEC.mastZ + 0.25); rest = [0, -1.0]; }
+    if (CAM.idle > 3 && !CAM.dragging) { CAM.lookYaw = damp(CAM.lookYaw, rest[0], 1.2, dt); CAM.lookPitch = damp(CAM.lookPitch, rest[1], 1.2, dt); }
+    const lean = CAM.mode === 'cockpit' ? -b.phi * 0.55 : 0;   // the helmsman keeps his head more upright than the boat
+    const q = Quat.mul(b.q, Quat.mul(Quat.axis(0, 0, 1, lean), Quat.mul(Quat.axis(0, 1, 0, CAM.lookYaw), Quat.axis(1, 0, 0, CAM.lookPitch))));
+    const e = vadd(b.pos, b.q.rot(eyeL));
+    M4.invert(c.view, M4.fromQT(M4.create(), q, e));
     c.pos = e;
   } else if (CAM.mode === 'wingcam') {
     if (CAM.idle > 3 && !CAM.dragging) { CAM.lookYaw = damp(CAM.lookYaw, 0, 1.2, dt); CAM.lookPitch = damp(CAM.lookPitch, 0, 1.2, dt); }
@@ -5386,8 +6219,8 @@ function updateCamera(dt) {
       const el = Math.asin(clamp(d.y, -0.95, 0.95)) - 0.16 - CAM.pitch;
       const back = new V3(Math.sin(hy) * Math.cos(el), Math.sin(el), Math.cos(hy) * Math.cos(el));
       eye = vsub(ac.pos, vscale(back, CAM.dist));
-      eye.y += 2.5;
-      target = vadd(ac.pos, vscale(f, 6)); target.y += 1.6;
+      eye.y += isBoat() ? 3.5 : 2.5;
+      target = vadd(ac.pos, vscale(f, isBoat() ? 3 : 6)); target.y += isBoat() ? 3.2 : 1.6;
       CAM.upSm.lerpTo(vadd(new V3(0, 1, 0), vscale(ac.up(), 0.35)).norm(), 1 - Math.exp(-3 * dt)).norm();
       up = CAM.upSm;
     } else if (CAM.mode === 'orbit') {
@@ -5473,6 +6306,9 @@ function initAudio() {
   // scrape
   const sc = noise(noiseBuf); const scF = ctx.createBiquadFilter(); scF.type = 'highpass'; scF.frequency.value = 1200; const scG = ctx.createGain(); scG.gain.value = 0; sc.connect(scF).connect(scG).connect(master);
   AUDIO.scrape = { scG };
+  // sail flapping (luffing cloth)
+  const fl = noise(noiseBuf); const flF = ctx.createBiquadFilter(); flF.type = 'bandpass'; flF.frequency.value = 260; flF.Q.value = 0.7; const flG = ctx.createGain(); flG.gain.value = 0; fl.connect(flF).connect(flG).connect(master);
+  AUDIO.flap = { flG, flF };
   AUDIO.on = true;
 }
 function beep(freq, dur = 0.15, vol = 0.12, type = 'sine') {
@@ -5497,6 +6333,8 @@ function updateAudio(dt) {
   const ctx = AUDIO.ctx, t = ctx.currentTime, ac = AIR.ac;
   const k = 0.08;
   AUDIO.master.gain.setTargetAtTime(GAME.state === 'paused' ? 0 : SETTINGS.volume, t, 0.1);
+  if (isBoat()) { updateBoatAudio(dt); return; }
+  if (AUDIO.flap) AUDIO.flap.flG.gain.setTargetAtTime(0, t, 0.05);
   const flying = GAME.state === 'flying' && !ac.crashed;
   const camD = vsub(RENDER.cam.pos, ac.pos).len();
   const near = CAM_INSIDE(CAM.mode) ? 1.1 : 1 / (1 + camD / 45);
@@ -5525,13 +6363,42 @@ function updateAudio(dt) {
   ac.scrape = Math.max(0, ac.scrape - dt * 3);
 }
 
+function updateBoatAudio(dt) {
+  const ctx = AUDIO.ctx, t = ctx.currentTime, b = BOAT.b, k = 0.08;
+  const sailing = GAME.state === 'flying' && !b.crashed;
+  const camD = vsub(RENDER.cam.pos, b.pos).len(), near = 1 / (1 + camD / 30);
+  const onboard = CAM.mode === 'cockpit' || CAM.mode === 'passenger' || CAM.mode === 'wingcam';
+  const nk = onboard ? 1 : near * 1.4;
+  AUDIO.engine.eG.gain.setTargetAtTime(0, t, k);
+  AUDIO.stall.shG.gain.setTargetAtTime(0, t, k);
+  AUDIO.gear.gmG.gain.setTargetAtTime(0, t, k);
+  // wind in the rigging grows with apparent wind; water rush with boat speed
+  const aws = sailing ? b.aws : 0;
+  AUDIO.wind.wF.frequency.setTargetAtTime(300 + aws * 45, t, k);
+  AUDIO.wind.wG.gain.setTargetAtTime(Math.min(0.2, (aws / 14) ** 2 * 0.18) * (onboard ? 1 : 0.6), t, k);
+  const sp = sailing ? Math.max(0, b.u) : 0;
+  AUDIO.water.waG.gain.setTargetAtTime((0.02 + Math.min(sp / 3.2, 1.2) * 0.16) * nk, t, 0.08);
+  AUDIO.water.waF.frequency.setTargetAtTime(350 + sp * 260, t, k);
+  // luffing sails flap at a few Hz
+  const luff = sailing ? Math.max(b.luffMain, b.luffJib * 0.7) * clamp(b.aws / 6, 0, 1.4) : 0;
+  const flut = 0.5 + 0.5 * Math.sin(SIM.t * TAU * (5 + b.aws * 0.4)) * Math.sin(SIM.t * TAU * 1.7 + 1);
+  AUDIO.flap.flG.gain.setTargetAtTime(luff * flut * 0.22 * nk, t, 0.015);
+  AUDIO.flap.flF.frequency.setTargetAtTime(200 + b.aws * 20, t, 0.1);
+  AUDIO.scrape.scG.gain.setTargetAtTime(sailing && b.grounded ? 0.12 : 0, t, 0.05);
+  if (b.gybeT > 1.45 && !AUDIO.gybeBang) { boom(0.35 * nk + 0.1, 0.5); AUDIO.gybeBang = true; }
+  if (b.gybeT < 1.0) AUDIO.gybeBang = false;
+  const dv = vsub(RENDER.cam.pos, CRATER_W).len();
+  const prox = 1 / (1 + (dv / 2200) ** 2);
+  AUDIO.rumble.ruG.gain.setTargetAtTime(prox * (0.12 + 0.55 * ENV.erupt.glow) * (ENV.erupt.level > 0 ? 1 : 0), t, 0.2);
+}
+
 // ============================================================================
 // Input: keyboard, mouse, touch, gamepad (XR controllers are read in the XR module)
 // ============================================================================
 const INPUT = {
   keys: {}, axes: { pitch: 0, roll: 0, yaw: 0 }, kb: { pitch: 0, roll: 0, yaw: 0 },
   touch: { x: 0, y: 0, active: false, rudder: 0, brake: false, thrAbs: null, id: null },
-  gpPrev: [], xr: null, brakeHeld: false, lastUsed: 'kb',
+  gpPrev: [], xr: null, brakeHeld: false, lastUsed: 'kb', mouseYoke: null, mouseRudder: null,
 };
 const KEYMAP = {
   pitchDown: ['KeyW', 'ArrowUp'], pitchUp: ['KeyS', 'ArrowDown'], rollL: ['KeyA', 'ArrowLeft'], rollR: ['KeyD', 'ArrowRight'],
@@ -5559,6 +6426,15 @@ function onKey(e, isDown) {
     case 'KeyU': SETTINGS.hud = !SETTINGS.hud; UI.applyHud(); break;
   }
   if (!playing) { if (e.code === 'Enter' && GAME.state === 'crashed') respawn(); return; }
+  if (isBoat()) {
+    const b = BOAT.b;
+    if (e.code === 'KeyL') { b.lights = !b.lights; UI.toast(b.lights ? 'Luces de navegación encendidas' : 'Luces apagadas'); }
+    if (e.code === 'KeyN') nextTarget();
+    if (e.code === 'KeyK') { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; saveSettings(); UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático de velas' : 'Velas en manual: trima las escotas tú'); }
+    if (e.code === 'Comma') { ENV.time = (ENV.time + 23.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
+    if (e.code === 'Period') { ENV.time = (ENV.time + 0.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
+    return;
+  }
   switch (e.code) {
     case 'KeyG': ac.toggleGear(); beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); break;
     case 'KeyX': case 'BracketRight': ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); break;
@@ -5573,6 +6449,7 @@ function onKey(e, isDown) {
   if (e.code === 'Backquote') ac.throttle = 0;
 }
 function setupInput() {
+  setupCockpitUI();
   addEventListener('keydown', e => onKey(e, true));
   addEventListener('keyup', e => onKey(e, false));
   addEventListener('blur', () => { INPUT.keys = {}; });
@@ -5616,12 +6493,15 @@ function setupTouchControls() {
   stick.addEventListener('pointerup', stickEnd); stick.addEventListener('pointercancel', stickEnd);
   // throttle lever
   const thr = document.getElementById('throttle'), fill = thr.querySelector('.fill');
-  const thrMove = e => { const rc = thr.getBoundingClientRect(); const v = clamp(1 - (e.clientY - rc.top - 10) / (rc.height - 20), 0, 1); AIR.ac.throttle = v; };
+  const thrMove = e => { const rc = thr.getBoundingClientRect(); const v = clamp(1 - (e.clientY - rc.top - 10) / (rc.height - 20), 0, 1); if (isBoat()) BOAT.b.mainSheet = 1 - v; else AIR.ac.throttle = v; };
   let thrId = null;
   thr.addEventListener('pointerdown', e => { thr.setPointerCapture(e.pointerId); thrId = e.pointerId; thrMove(e); });
   thr.addEventListener('pointermove', e => { if (e.pointerId === thrId) thrMove(e); });
   thr.addEventListener('pointerup', e => { if (e.pointerId === thrId) thrId = null; });
-  INPUT.updateThrottleUI = () => { fill.style.height = `calc(${(AIR.ac.throttle * 100).toFixed(0)}% - 12px)`; document.getElementById('tThrLbl').textContent = (AIR.ac.throttle * 100).toFixed(0) + '%'; };
+  INPUT.updateThrottleUI = () => {
+    const v = isBoat() ? 1 - BOAT.b.mainSheet : AIR.ac.throttle;
+    fill.style.height = `calc(${(v * 100).toFixed(0)}% - 12px)`; document.getElementById('tThrLbl').textContent = (isBoat() ? 'MAYOR ' : '') + (v * 100).toFixed(0) + '%';
+  };
   // hold buttons
   const hold = (id, on, off) => {
     const el = document.getElementById(id);
@@ -5631,12 +6511,12 @@ function setupTouchControls() {
   };
   hold('tRudL', () => { T.rudder = -1; }, () => { T.rudder = 0; });
   hold('tRudR', () => { T.rudder = 1; }, () => { T.rudder = 0; });
-  hold('tBrake', () => { T.brake = true; }, () => { T.brake = false; });
-  hold('tGear', () => { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(AIR.ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); });
-  hold('tFlapsUp', () => { AIR.ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); });
-  hold('tFlapsDn', () => { AIR.ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); });
+  hold('tBrake', () => { if (isBoat()) { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático' : 'Velas en manual'); UI.setVehicleUI(); } else T.brake = true; }, () => { T.brake = false; });
+  hold('tGear', () => { if (isBoat()) T.hike = 1; else { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(AIR.ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } }, () => { T.hike = 0; });
+  hold('tFlapsUp', () => { if (isBoat()) T.jib = 1; else { AIR.ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } }, () => { T.jib = 0; });
+  hold('tFlapsDn', () => { if (isBoat()) T.jib = -1; else { AIR.ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } }, () => { T.jib = 0; });
   hold('tCam', () => cycleCamera(1));
-  hold('tLights', () => { AIR.ac.lights = !AIR.ac.lights; UI.toast(AIR.ac.lights ? 'Luces encendidas' : 'Luces apagadas'); });
+  hold('tLights', () => { const v = VEH(); v.lights = !v.lights; UI.toast(v.lights ? 'Luces encendidas' : 'Luces apagadas'); });
   hold('tShader', () => toggleShader());
   hold('tStyle', () => nextStyle(1));
   hold('tMenu', () => UI.pause());
@@ -5656,6 +6536,7 @@ function pollGamepad(dt) {
   const out = { roll: dz(gp.axes[0] || 0), pitch: dz(gp.axes[1] || 0), yaw: (b(5) - b(4)), thr: b(7) - b(6), lookX: dz(gp.axes[2] || 0), lookY: dz(gp.axes[3] || 0), brake: pressed(1) };
   if (Math.abs(out.roll) + Math.abs(out.pitch) + Math.abs(out.thr) > 0.1) INPUT.lastUsed = 'gp';
   const ac = AIR.ac;
+  if (isBoat()) { if (edge(9)) { if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else if (GAME.state === 'crashed') respawn(); } if (edge(8) && GAME.state === 'flying') cycleCamera(1); if (edge(14)) toggleShader(); if (edge(15)) nextStyle(1); out.hike = pressed(0) ? 1 : pressed(2) ? -1 : 0; return out; }
   if (edge(0) && GAME.state === 'flying') { ac.toggleGear(); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); }
   if (edge(2) && GAME.state === 'flying') { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
   if (edge(3) && GAME.state === 'flying') { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
@@ -5697,9 +6578,13 @@ function updateInput(dt) {
     if (x.thr) thrRate = x.thr;
     if (x.brake) brake = true;
   }
+  // dragging the yoke / pedals with the mouse in the cockpit
+  if (INPUT.mouseYoke) { pitch = INPUT.mouseYoke.pitch; roll = INPUT.mouseYoke.roll; }
+  if (INPUT.mouseRudder !== null && INPUT.mouseRudder !== undefined) yaw = INPUT.mouseRudder;
   const sens = SETTINGS.sensitivity;
   const shape = v => Math.sign(v) * Math.min(1, Math.pow(Math.abs(v), 1.35) * sens);
   INPUT.axes = { pitch: shape(pitch), roll: shape(roll), yaw: clamp(yaw, -1, 1) };
+  if (isBoat()) { updateBoatInput(dt, gp); return; }
   if (GAME.state !== 'flying') return;
   ac.throttle = clamp(ac.throttle + thrRate * 0.5 * dt, 0, 1);
   if (down('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
@@ -5708,6 +6593,152 @@ function updateInput(dt) {
   if (brake && ac.parking && ac.throttle > 0.3) ac.parking = false;
   if (ac.parking && ac.throttle > 0.35) { ac.parking = false; }
   INPUT.updateThrottleUI && INPUT.updateThrottleUI();
+}
+
+// sailboat: helm (A/D, arrows), mainsheet (W trim / S ease), jib (E trim / Q ease), hiking (X out / Z in)
+function updateBoatInput(dt, gp) {
+  const B = BOAT.input, K = INPUT.kb, T = INPUT.touch;
+  const rampTo = (cur, target, rate) => cur + clamp(target - cur, -rate * dt, rate * dt);
+  const th = (down('rollR') ? 1 : 0) - (down('rollL') ? 1 : 0);
+  K.helm = rampTo(K.helm || 0, th, th ? 1.6 : 3.0);
+  let helm = K.helm;
+  if (T.active) helm = T.x;
+  if (T.rudder) helm = T.rudder;
+  if (gp && Math.abs(gp.roll) > Math.abs(helm)) helm = gp.roll;
+  if (INPUT.xr && Math.abs(INPUT.xr.roll) > Math.abs(helm)) helm = INPUT.xr.roll;
+  B.helm = clamp(helm, -1, 1);
+  let main = (down('pitchUp') ? 1 : 0) - (down('pitchDown') ? 1 : 0);
+  let jib = (down('yawL') ? 1 : 0) - (down('yawR') ? 1 : 0);
+  let hike = (INPUT.keys.KeyX ? 1 : 0) - (INPUT.keys.KeyZ ? 1 : 0);
+  if (T.jib) jib = T.jib;
+  if (T.hike) hike = 1;
+  if (gp) { if (gp.thr) main = -gp.thr; if (gp.yaw) jib = -gp.yaw; if (gp.hike) hike = gp.hike; }
+  B.main = main; B.jib = jib; B.hike = hike;
+  INPUT.updateThrottleUI && INPUT.updateThrottleUI();
+}
+
+// ============================================================================
+// Clickable cockpit (pilot view): pick controls with the mouse / touch.
+//  - levers (power, propeller, condition, flaps): drag up/down or use the wheel
+//  - trim wheel: drag; yoke: drag to fly; pedals: drag sideways
+//  - switches, master rockers, gear handle, parking brake, MFD map: click
+// ============================================================================
+const CPIT = { hover: null, drag: null, tip: null, last: { x: 0, y: 0 } };
+const HL = [0.05, 0.16, 0.22];
+function cockpitActive() { return GAME.state === 'flying' && !isBoat() && CAM.mode === 'cockpit' && !XR.session; }
+const leverKnob = (pivot, ang) => new V3(pivot.x, pivot.y + 0.17 * Math.cos(ang), pivot.z + 0.17 * Math.sin(ang));
+const LEVERS = {
+  power: { pivot: new V3(-0.05, 0.05, -1.9), a0: 0.45, a1: -0.55 },
+  prop: { pivot: new V3(0, 0.05, -1.9), a0: 0.45, a1: -0.55 },
+  cond: { pivot: new V3(0.05, 0.05, -1.9), a0: 0.45, a1: -0.35 },
+  flap: { pivot: new V3(0.065, 0.0, -1.7), a0: -0.4, a1: 0.5 },
+};
+function cockpitTargets() {
+  const ac = AIR.ac, L = PANEL_LAYOUT, T = [];
+  const lv = (id, key, get, set, label, detents) => {
+    const d = LEVERS[key];
+    T.push({ id, kind: 'lever', p: leverKnob(d.pivot, lerp(d.a0, d.a1, get())), r: 0.04, get, set, label, detents });
+  };
+  lv('power', 'power', () => ac.throttle, v => { ac.throttle = v; }, () => 'Potencia · ' + Math.round(ac.throttle * 100) + ' %');
+  lv('prop', 'prop', () => ac.propLever, v => { ac.propLever = v; }, () => 'Hélice · ' + Math.round(1500 + ac.propLever * 400) + ' RPM');
+  lv('cond', 'cond', () => ac.condLever, v => { const was = ac.engineOn; ac.condLever = v; if (was !== ac.engineOn) UI.toast(ac.engineOn ? 'Combustible abierto: motor en marcha' : 'Corte de combustible: motor parado'); }, () => 'Condición · ' + (ac.condLever < 0.08 ? 'CORTE' : ac.condLever > 0.6 ? 'ALTA' : 'BAJA'));
+  lv('flap', 'flap', () => ac.flapsSet / 3, v => { const n = Math.round(clamp(v, 0, 1) * 3); if (n !== ac.flapsSet) { ac.flapsSet = n; UI.toast('Flaps ' + AC.flapDetents[n] + '°'); } }, () => 'Flaps · ' + AC.flapDetents[ac.flapsSet] + '°', true);
+  T.push({ id: 'trim', kind: 'wheel', p: new V3(-0.135, -0.09, -1.76), r: 0.075, label: () => 'Compensador · ' + (ac.trim >= 0 ? '+' : '') + Math.round(ac.trim * 100) });
+  for (const x of [-0.36, 0.36]) { const h = yokeHub(x); T.push({ id: 'yoke', kind: 'yoke', p: new V3(h.x, h.y + 0.05, h.z + ac.ctl.pitch * 0.05), r: 0.12, label: () => 'Cuernos · arrastra para volar' }); }
+  for (const x of [-0.46, -0.26]) T.push({ id: 'pedals', kind: 'pedals', p: new V3(x, -0.42, -2.2), r: 0.07, label: () => 'Pedales · arrastra a los lados' });
+  L.switches.forEach(([name, key], i) => T.push({ id: 'sw_' + key, kind: 'toggle', key, p: panelPt(L.switchX0 + i * L.switchDX, L.switchesY, 0.02), r: 0.017, label: () => name + ' · ' + (ac.sw[key] ? 'ON' : 'OFF') }));
+  L.master.forEach(([name, key], i) => T.push({ id: 'sw_' + key, kind: 'toggle', key, p: panelPt(L.masterX, L.masterY0 + i * L.masterDY, 0.012), r: 0.022, label: () => name + ' · ' + (ac.sw[key] ? 'ON' : 'OFF') }));
+  T.push({ id: 'gear', kind: 'button', p: panelPt(L.gear[0], L.gear[1] + (ac.gearSet ? -0.018 : 0.018), 0.05), r: 0.032, label: () => 'Tren · ' + (ac.gearSet ? 'ABAJO (pista)' : 'ARRIBA (agua)'),
+    act: () => { ac.toggleGear(); beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } });
+  T.push({ id: 'park', kind: 'button', p: panelPt(L.park[0], L.park[1], 0.04), r: 0.03, label: () => 'Freno de estacionamiento · ' + (ac.parking ? 'PUESTO' : 'QUITADO'),
+    act: () => { ac.parking = !ac.parking; UI.toast(ac.parking ? 'Freno de estacionamiento puesto' : 'Freno de estacionamiento quitado'); } });
+  const m = L.mfd; T.push({ id: 'mfd', kind: 'button', p: panelPt((m[0] + m[2]) / 2 + 0.07, (m[1] + m[3]) / 2, 0.02), r: 0.12, label: () => 'Mapa · ' + (HUD.mapZoom ? 'zoom 4,5 km' : 'archipiélago'), act: () => { HUD.mapZoom = !HUD.mapZoom; } });
+  return T;
+}
+function cockpitRay(cx, cy) {
+  const rect = canvas.getBoundingClientRect(), c = RENDER.cam;
+  const nx = (cx - rect.left) / rect.width * 2 - 1, ny = 1 - (cy - rect.top) / rect.height * 2;
+  const ivp = M4.invert(M4.create(), M4.mul(M4.create(), c.proj, c.view));
+  const far = M4.point(ivp, new V3(nx, ny, 0.2));
+  const iM = M4.invert(M4.create(), RENDER.planeM);
+  const o = M4.point(iM, c.pos), b = M4.point(iM, far);
+  return { o, d: vsub(b, o).norm() };
+}
+function pickCockpit(cx, cy) {
+  if (!cockpitActive()) return null;
+  const { o, d } = cockpitRay(cx, cy);
+  let best = null, bt = 1e9;
+  for (const t of cockpitTargets()) {
+    const oc = vsub(t.p, o), tc = oc.dot(d); if (tc < 0) continue;
+    const d2 = oc.dot(oc) - tc * tc; if (d2 > t.r * t.r) continue;
+    const th = tc - Math.sqrt(t.r * t.r - d2);
+    if (th < bt) { bt = th; best = t; }
+  }
+  return best;
+}
+function cockpitTip(text, x, y) {
+  const el = CPIT.tip || (CPIT.tip = document.getElementById('cptip'));
+  if (!el) return;
+  if (!text) { el.hidden = true; return; }
+  el.hidden = false; el.textContent = text;
+  // keep the label on screen: flip it to the left of / above the pointer near the edges
+  const w = el.offsetWidth || 160, h = el.offsetHeight || 24;
+  const tx = x + 16 + w > innerWidth - 6 ? x - 12 - w : x + 16;
+  const ty = y + 14 + h > innerHeight - 6 ? y - 10 - h : y + 14;
+  el.style.transform = `translate(${Math.round(Math.max(4, tx))}px, ${Math.round(Math.max(4, ty))}px)`;
+}
+function cockpitHighlight(id) { return (CPIT.hover && CPIT.hover.id === id) || (CPIT.drag && CPIT.drag.t.id === id) ? HL : null; }
+function setupCockpitUI() {
+  const opts = { capture: true };
+  canvas.addEventListener('pointerdown', e => {
+    if (!cockpitActive()) return;
+    const t = pickCockpit(e.clientX, e.clientY); if (!t) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    CPIT.drag = { t, id: e.pointerId, x0: e.clientX, y0: e.clientY, ly: e.clientY, acc: t.get ? t.get() : 0 };
+    if (t.kind === 'toggle') { AIR.ac.sw[t.key] = AIR.ac.sw[t.key] ? 0 : 1; beep(1800, 0.03, 0.05, 'square'); if (t.key === 'ign') UI.toast(AIR.ac.sw.ign ? 'Motor: arranque' : 'Motor apagado'); }
+    if (t.kind === 'button') { t.act(); beep(1400, 0.04, 0.05, 'square'); }
+    if (t.kind === 'yoke') INPUT.mouseYoke = { pitch: 0, roll: 0 };
+    if (t.kind === 'pedals') INPUT.mouseRudder = 0;
+    canvas.style.cursor = t.kind === 'lever' || t.kind === 'wheel' ? 'ns-resize' : t.kind === 'yoke' || t.kind === 'pedals' ? 'grabbing' : 'pointer';
+    cockpitTip(t.label(), e.clientX, e.clientY);
+  }, opts);
+  canvas.addEventListener('pointermove', e => {
+    const D = CPIT.drag;
+    if (D && e.pointerId === D.id) {
+      e.stopImmediatePropagation();
+      const dx = e.clientX - D.x0, dy = e.clientY - D.y0, t = D.t;
+      const ddy = e.clientY - D.ly; D.ly = e.clientY;
+      if (t.kind === 'lever') { D.acc = clamp(D.acc - ddy * 0.005, 0, 1); t.set(D.acc); }
+      else if (t.kind === 'wheel') AIR.ac.trim = clamp(AIR.ac.trim - ddy * 0.0025, -0.6, 0.6);
+      else if (t.kind === 'yoke') INPUT.mouseYoke = { pitch: clamp(dy / 160, -1, 1), roll: clamp(dx / 160, -1, 1) };
+      else if (t.kind === 'pedals') INPUT.mouseRudder = clamp(dx / 140, -1, 1);
+      cockpitTip(t.label(), e.clientX, e.clientY);
+      return;
+    }
+    if (e.buttons || e.pointerType !== 'mouse') return;
+    if (!cockpitActive()) { if (CPIT.hover) { CPIT.hover = null; canvas.style.cursor = ''; cockpitTip(null); } return; }
+    const t = pickCockpit(e.clientX, e.clientY);
+    CPIT.hover = t;
+    canvas.style.cursor = t ? (t.kind === 'lever' || t.kind === 'wheel' ? 'ns-resize' : t.kind === 'yoke' || t.kind === 'pedals' ? 'grab' : 'pointer') : '';
+    cockpitTip(t ? t.label() + (t.kind === 'lever' ? ' · arrastra o rueda' : t.kind === 'toggle' || t.kind === 'button' ? ' · clic' : '') : null, e.clientX, e.clientY);
+  }, opts);
+  const end = e => {
+    const D = CPIT.drag; if (!D || e.pointerId !== D.id) return;
+    e.stopImmediatePropagation();
+    if (D.t.kind === 'yoke') INPUT.mouseYoke = null;
+    if (D.t.kind === 'pedals') INPUT.mouseRudder = null;
+    CPIT.drag = null; canvas.style.cursor = CPIT.hover ? 'pointer' : '';
+    if (e.pointerType !== 'mouse') cockpitTip(null);
+  };
+  canvas.addEventListener('pointerup', end, opts); canvas.addEventListener('pointercancel', end, opts);
+  canvas.addEventListener('pointerleave', () => { if (!CPIT.drag) { CPIT.hover = null; cockpitTip(null); } });
+  canvas.addEventListener('wheel', e => {
+    if (!cockpitActive()) return;
+    const t = pickCockpit(e.clientX, e.clientY); if (!t) return;
+    if (t.kind === 'lever') { e.stopImmediatePropagation(); e.preventDefault(); t.set(clamp(t.get() + (e.deltaY < 0 ? 1 : -1) * (t.detents ? 0.34 : 0.05), 0, 1)); cockpitTip(t.label(), e.clientX, e.clientY); }
+    else if (t.kind === 'wheel') { e.stopImmediatePropagation(); e.preventDefault(); AIR.ac.trim = clamp(AIR.ac.trim + (e.deltaY < 0 ? -0.03 : 0.03), -0.6, 0.6); cockpitTip(t.label(), e.clientX, e.clientY); }
+  }, { capture: true, passive: false });
 }
 
 // ============================================================================
@@ -5851,7 +6882,26 @@ function drawPFD(g, W, H, ac, target) {
   // radar altitude
   const agl = ac.agl * FT;
   if (agl < 2500 && !ac.onWater && !ac.onGround) { g.fillStyle = '#55ee88'; g.font = `bold ${fs}px "B612 Mono", monospace`; g.fillText('RA ' + Math.max(0, Math.round(agl / 10) * 10), cx, H * 0.7); }
+  // wind vector (relative to the nose) + speed, like a glass cockpit wind box
+  drawWindBox(g, W * 0.79, H * 0.86, W * 0.19, hh, fs, hdg * DEG);
   g.restore();
+}
+function drawWindBox(g, x, y, w, h, fs, hdgRad) {
+  const wv = WIND_NOW.base, sp = Math.hypot(wv.x, wv.z) * KT;
+  g.fillStyle = 'rgba(10,16,26,0.75)'; g.fillRect(x, y, w, h);
+  const cx = x + h * 0.55, cy = y + h * 0.5, r = h * 0.38;
+  // direction the air moves, rotated into the aircraft frame (up = nose)
+  const to = Math.atan2(wv.x, -wv.z) - hdgRad;
+  g.save(); g.translate(cx, cy); g.rotate(to);
+  g.strokeStyle = '#e8f0f6'; g.fillStyle = '#e8f0f6'; g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(0, r); g.lineTo(0, -r * 0.55); g.stroke();
+  g.beginPath(); g.moveTo(0, -r); g.lineTo(-r * 0.4, -r * 0.4); g.lineTo(r * 0.4, -r * 0.4); g.closePath(); g.fill();
+  g.restore();
+  g.fillStyle = '#e8f0f6'; g.font = `bold ${Math.round(fs * 0.85)}px "B612 Mono", monospace`; g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillText(sp.toFixed(0) + ' KT', x + h * 1.05, y + h * 0.36);
+  const g2 = WIND_NOW.gust; g.fillStyle = g2 > 1.12 ? '#ffbd3a' : WIND_NOW.lee > 0.25 ? '#59e1f2' : '#93a8ba';
+  g.font = `${Math.round(fs * 0.62)}px "B612", sans-serif`;
+  g.fillText(g2 > 1.12 ? 'RACHA' : WIND_NOW.lee > 0.25 ? 'SOTAVENTO' : 'VIENTO', x + h * 1.05, y + h * 0.72);
 }
 
 // ---------------- map ----------------
@@ -5928,15 +6978,16 @@ function drawPanelTexture(ac, target) {
   rr(...L.leftCol);
   g.fillStyle = '#c9d2da'; g.textBaseline = 'middle';
   // master rockers labels
-  ['BATT', 'GEN', 'AVIÓN', 'COMB.'].forEach((t, i) => { g.font = '15px "B612", sans-serif'; g.textAlign = 'left'; g.fillText(t, PX(-0.68), PY(0.165 - i * 0.055)); });
+  L.master.forEach(([t], i) => { g.font = '15px "B612", sans-serif'; g.textAlign = 'left'; g.fillText(t, PX(L.masterX + 0.025), PY(L.masterY0 + i * L.masterDY)); });
   g.font = 'bold 13px "B612", sans-serif'; g.fillStyle = '#ff9a3d'; g.textAlign = 'center'; g.fillText('MASTER', PX(-0.667), PY(0.19));
   // switch labels
   g.fillStyle = '#c9d2da'; g.font = '13px "B612", sans-serif';
-  L.switches.forEach((t, i) => g.fillText(t, PX(L.switchX0 + i * L.switchDX), PY(L.switchesY + 0.034)));
+  L.switches.forEach(([t], i) => g.fillText(t, PX(L.switchX0 + i * L.switchDX), PY(L.switchesY + 0.034)));
   g.fillText('ON', PX(L.switchX0 - 0.03), PY(L.switchesY + 0.012)); g.fillText('OFF', PX(L.switchX0 - 0.03), PY(L.switchesY - 0.016));
   // gear selector, fuel gauge labels, yoke collar holes
   g.font = 'bold 13px "B612", sans-serif'; g.fillText('TREN', PX(L.gear[0]), PY(L.gear[1] + 0.045));
-  g.font = '11px "B612", sans-serif'; g.fillText('ARRIBA', PX(L.gear[0]), PY(L.gear[1] + 0.03)); g.fillText('ABAJO', PX(L.gear[0]), PY(L.gear[1] - 0.042));
+  g.font = '11px "B612", sans-serif'; g.textAlign = 'right'; g.fillText('▲ AGUA', PX(L.gear[0] - 0.02), PY(L.gear[1] + 0.022)); g.fillText('▼ PISTA', PX(L.gear[0] - 0.02), PY(L.gear[1] - 0.022)); g.textAlign = 'center';
+  g.font = 'bold 11px "B612", sans-serif'; g.fillText('FRENO EST.', PX(L.park[0]), PY(L.park[1] + 0.036));
   g.font = 'bold 12px "B612", sans-serif'; g.fillText('COMBUSTIBLE', PX((L.fuel[0][0] + L.fuel[1][0]) / 2), PY(L.fuel[0][1] + 0.05));
   g.fillStyle = '#0d0e10'; for (const [x, y] of L.yokes) { g.beginPath(); g.arc(PX(x), PY(y), PXS(L.collarR + 0.004), 0, TAU); g.fill(); }
   // placards
@@ -5969,6 +7020,9 @@ function drawPanelTexture(ac, target) {
   if (mc.width !== ms) { mc.width = ms; mc.height = ms; }
   drawMap(mc.getContext('2d'), ms, ac, GAME.target);
   g.drawImage(mc, mx + ew + 6 + (mw - ew - 10 - ms) / 2, my + 3);
+  // displays go dark without battery or avionics power
+  const powered = ac.sw.batt && ac.sw.avion;
+  if (!powered) { g.fillStyle = '#030405'; g.fillRect(PX(p0) - 3, PY(p3) - 3, PX(p2) - PX(p0) + 6, PY(p1) - PY(p3) + 6); g.fillRect(mx - 3, my - 3, mw + 6, mh + 6); }
   // ---- standby gauges: airspeed, attitude, altimeter ----
   const [ga, gb, gc] = L.gauges.map(([x, y]) => [PX(x), PY(y)]), R = PXS(L.gaugeR);
   gaugeFace(g, ga[0], ga[1], R, 'KT');
@@ -6010,10 +7064,11 @@ function drawPanelTexture(ac, target) {
   const airborne = !ac.onWater && !ac.onGround;
   const ann = [
     ['TREN ABAJO', ac.gear > 0.98, '#55ee88'], ['TREN ARRIBA', ac.gear < 0.02, '#59e1f2'], ['PÉRDIDA', airborne && ac.stall > 0.5, '#ff4f4f'], ['FRENO EST.', ac.parking, '#ffbd3a'],
-    ['EN AGUA', ac.onWater, '#59e1f2'], ['LUCES', ac.lights, '#55ee88'], ['COMPENS.', Math.abs(ac.trim) > 0.3, '#ffbd3a'], ['GENERADOR', ac.rpm > 0.3, '#55ee88'],
+    ['EN AGUA', ac.onWater, '#59e1f2'], ['LUCES', ac.lights, '#55ee88'], ['COMPENS.', Math.abs(ac.trim) > 0.3, '#ffbd3a'], ['GENERADOR', ac.rpm > 0.3 && ac.sw.gen, '#55ee88'],
   ];
   const cw = aw / 4, ch = ah / 3;
-  ann.forEach(([t, on, col], i) => {
+  ann.forEach(([t, on0, col], i) => {
+    const on = on0 && ac.sw.batt;
     const x = ax + (i % 4) * cw + 5, y = ay + Math.floor(i / 4) * ch + 5;
     g.fillStyle = on ? col : '#1c2026'; g.fillRect(x, y, cw - 10, ch - 10);
     g.fillStyle = on ? '#071015' : '#56606b'; g.font = 'bold 15px "B612", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x + (cw - 10) / 2, y + (ch - 10) / 2);
@@ -6025,12 +7080,13 @@ function drawPanelTexture(ac, target) {
   g.fillStyle = '#e8f0f6'; g.fillRect(ax + 72 + aw * 0.38 * ac.flaps / 30 - 3, fy - 11, 6, 22);
   g.fillStyle = '#e8f0f6'; g.font = 'bold 24px "B612 Mono", monospace'; g.textAlign = 'right'; g.fillText(fmtClock(ENV.time), ax + aw - 10, fy);
   // ---- master rocker lamps, switch status lamps, gear lights ----
-  for (let i = 0; i < 4; i++) { g.fillStyle = ac.rpm > 0.05 || i < 1 ? '#55ee88' : '#2a3038'; g.beginPath(); g.arc(PX(-0.612), PY(0.165 - i * 0.055), 4, 0, TAU); g.fill(); }
-  L.switches.forEach((t, i) => {
-    const on = t === 'NAV' || t === 'ATERR' || t === 'TAXI' || t === 'STROBE' ? ac.lights : true;
-    g.fillStyle = on ? '#55ee88' : '#2a3038'; g.beginPath(); g.arc(PX(L.switchX0 + i * L.switchDX), PY(L.switchesY - 0.034), 4, 0, TAU); g.fill();
+  const bus = ac.sw.batt;
+  L.master.forEach(([t, k], i) => { g.fillStyle = ac.sw[k] && (bus || k === 'batt') ? '#55ee88' : '#2a3038'; g.beginPath(); g.arc(PX(-0.612), PY(L.masterY0 + i * L.masterDY), 4, 0, TAU); g.fill(); });
+  L.switches.forEach(([t, k], i) => {
+    g.fillStyle = ac.sw[k] && bus ? '#55ee88' : '#2a3038'; g.beginPath(); g.arc(PX(L.switchX0 + i * L.switchDX), PY(L.switchesY - 0.034), 4, 0, TAU); g.fill();
   });
-  const gl3 = (x, y, on, col) => { g.fillStyle = on ? col : '#1a1e24'; g.beginPath(); g.arc(PX(x), PY(y), 9, 0, TAU); g.fill(); };
+  g.fillStyle = ac.parking && bus ? '#ffbd3a' : '#2a3038'; g.beginPath(); g.arc(PX(L.park[0] + 0.03), PY(L.park[1]), 5, 0, TAU); g.fill();
+  const gl3 = (x, y, on, col) => { g.fillStyle = on && bus ? col : '#1a1e24'; g.beginPath(); g.arc(PX(x), PY(y), 9, 0, TAU); g.fill(); };
   const gx = L.gear[0] + 0.06;
   for (let i = 0; i < 2; i++) { gl3(gx + i * 0.024, L.gear[1] + 0.025, ac.gear < 0.02, '#4fb3ff'); gl3(gx + i * 0.024, L.gear[1] - 0.01, ac.gear > 0.98, '#55ee88'); }
   gl3(gx + 0.012, L.gear[1] - 0.04, ac.gear > 0.02 && ac.gear < 0.98, '#ffbd3a');
@@ -6046,19 +7102,26 @@ function drawPanelTexture(ac, target) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  // mipmaps + anisotropic filtering keep the small panel text steady instead of shimmering
+  gl.generateMipmap(gl.TEXTURE_2D);
+  if (!RENDER.panelTexMip) {
+    RENDER.panelTexMip = true;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    if (CAPS.aniso) gl.texParameterf(gl.TEXTURE_2D, CAPS.aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(CAPS.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  }
 }
 
 // ---------------- navigation & legs ----------------
 function targetInfo() {
-  const ac = AIR.ac, t = ISLANDS[GAME.target];
+  const ac = VEH(), t = ISLANDS[GAME.target];
   const dx = t.cx - ac.pos.x, dz = t.cz - ac.pos.z, dist = Math.hypot(dx, dz);
   let brg = Math.atan2(dx, -dz) * RAD; if (brg < 0) brg += 360;
   const gs = ac.groundSpeed;
-  return { name: t.name, dist, brg, eta: gs > 5 ? dist / gs : Infinity, full: dist / V_MAX };
+  return { name: t.name, dist, brg, eta: gs > (isBoat() ? 0.4 : 5) ? dist / gs : Infinity, full: dist / (isBoat() ? 3.3 : V_MAX) };
 }
 function nextTarget() {
   GAME.target = (GAME.target + 1) % ISLANDS.length;
-  const near = nearestIsland(AIR.ac.pos.x, AIR.ac.pos.z);
+  const near = nearestIsland(VEH().pos.x, VEH().pos.z);
   if (ISLANDS[GAME.target] === near.isl && near.d < near.isl.ext) GAME.target = (GAME.target + 1) % ISLANDS.length;
   UI.toast('Destino: ' + ISLANDS[GAME.target].name);
 }
@@ -6079,6 +7142,7 @@ function updateLegs(dt) {
   HUD.legShow = Math.max(0, HUD.legShow - dt);
 }
 function updateHUD(dt) {
+  if (isBoat()) return updateBoatHUD(dt);
   HUD.t += dt;
   const ac = AIR.ac;
   updateLegs(dt);
@@ -6146,6 +7210,139 @@ function computeAlerts(ac, gh) {
 }
 
 // ============================================================================
+// Sailboat HUD: wind instrument, speed / VMG / heel / depth, sheet trim bars
+// ============================================================================
+function pointOfSail(twaDeg) {
+  const a = Math.abs(twaDeg);
+  return a < 32 ? 'PROA AL VIENTO' : a < 62 ? 'CEÑIDA' : a < 112 ? 'TRAVÉS' : a < 155 ? 'LARGO' : 'EMPOPADA';
+}
+function drawBoatInstr(g, W, H, b, target) {
+  g.save(); g.clearRect(0, 0, W, H);
+  g.fillStyle = 'rgba(6,12,20,0.88)'; g.fillRect(0, 0, W, H);
+  const fs = Math.round(H * 0.05);
+  // ---- wind dial ----
+  const cx = W * 0.29, cy = H * 0.46, R = H * 0.38;
+  g.fillStyle = '#0b141f'; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.fill();
+  g.lineWidth = R * 0.09;
+  const sector = (a0, a1, col) => { g.strokeStyle = col; g.beginPath(); g.arc(cx, cy, R * 0.93, (a0 - 90) * DEG, (a1 - 90) * DEG); g.stroke(); };
+  sector(20, 60, 'rgba(85,238,136,0.75)'); sector(-60, -20, 'rgba(255,79,79,0.75)');
+  sector(150, 180, 'rgba(89,225,242,0.45)'); sector(-180, -150, 'rgba(89,225,242,0.45)');
+  g.strokeStyle = '#c9d2da'; g.lineWidth = 1.5;
+  for (let a = 0; a < 360; a += 10) {
+    const t = (a - 90) * DEG, l = a % 30 === 0 ? R * 0.14 : R * 0.07;
+    g.beginPath(); g.moveTo(cx + Math.cos(t) * (R * 0.86), cy + Math.sin(t) * (R * 0.86)); g.lineTo(cx + Math.cos(t) * (R * 0.86 - l), cy + Math.sin(t) * (R * 0.86 - l)); g.stroke();
+  }
+  g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.62)}px "B612 Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const a of [30, 60, 90, 120, 150]) for (const s of [-1, 1]) { const t = (s * a - 90) * DEG; g.fillText(a, cx + Math.cos(t) * R * 0.62, cy + Math.sin(t) * R * 0.62); }
+  // boat silhouette
+  g.save(); g.translate(cx, cy); g.rotate(-b.phi * 0.0);
+  g.fillStyle = '#e8f0f6'; g.beginPath(); g.moveTo(0, -R * 0.32); g.bezierCurveTo(R * 0.13, -R * 0.12, R * 0.12, R * 0.18, R * 0.09, R * 0.26); g.lineTo(-R * 0.09, R * 0.26); g.bezierCurveTo(-R * 0.12, R * 0.18, -R * 0.13, -R * 0.12, 0, -R * 0.32); g.fill();
+  g.strokeStyle = '#0b141f'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, -R * 0.06); g.lineTo(Math.sin(b.boom) * R * 0.26, -R * 0.06 + Math.cos(b.boom) * R * 0.26); g.stroke();
+  g.restore();
+  // true and apparent wind pointers
+  const ptr = (ang, col, len, w) => { const t = ang - PI / 2; const ex = cx + Math.cos(t) * R * 0.9, ey = cy + Math.sin(t) * R * 0.9;
+    g.fillStyle = col; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex - Math.cos(t + 0.35) * len, ey - Math.sin(t + 0.35) * len); g.lineTo(ex - Math.cos(t - 0.35) * len, ey - Math.sin(t - 0.35) * len); g.closePath(); g.fill();
+    g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(ex - Math.cos(t) * len * 0.8, ey - Math.sin(t) * len * 0.8); g.lineTo(cx + Math.cos(t) * R * 0.38, cy + Math.sin(t) * R * 0.38); g.stroke(); };
+  ptr(b.twa, '#59e1f2', R * 0.16, 2);
+  ptr(b.awa, '#ffd23a', R * 0.24, 4);
+  g.fillStyle = '#ffd23a'; g.font = `bold ${fs}px "B612 Mono", monospace`; g.fillText((b.aws * KT).toFixed(1), cx, cy + R * 0.48);
+  g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.55)}px "B612", sans-serif`; g.fillText('VIENTO APARENTE KT', cx, cy + R * 0.66);
+  g.fillText(pointOfSail(b.twa * RAD) + ' · ' + (b.twa >= 0 ? 'ESTRIBOR' : 'BABOR'), cx, cy - R * 1.08 + R * 0.02);
+  // rudder angle bar
+  const rx = cx - R * 0.6, ry = H * 0.94, rw = R * 1.2;
+  g.fillStyle = '#26303a'; g.fillRect(rx, ry - 4, rw, 8);
+  g.fillStyle = '#e8f0f6'; g.fillRect(rx + rw / 2 + clamp(b.rudder / BOAT_SPEC.rudder.max, -1, 1) * rw / 2 - 3, ry - 8, 6, 16);
+  g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.5)}px "B612", sans-serif`; g.fillText('TIMÓN', cx, ry - 14);
+  // ---- right column: speed, heading, VMG, true wind, heel, depth ----
+  const x0 = W * 0.6, colW = W * 0.37;
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  const big = (label, val, unit, y, col = '#e8f0f6') => {
+    g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.55)}px "B612", sans-serif`; g.fillText(label, x0, y);
+    g.fillStyle = col; g.font = `bold ${Math.round(fs * 1.35)}px "B612 Mono", monospace`; g.fillText(val, x0, y + fs * 1.35);
+    const vw = g.measureText(val).width;
+    g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.6)}px "B612 Mono", monospace`; g.fillText(unit, x0 + vw + 8, y + fs * 1.35);
+  };
+  const spdKt = Math.max(0, b.u) * KT;
+  big('VELOCIDAD', spdKt.toFixed(1), 'KT', H * 0.09);
+  let vmg = 0; if (target) { const t = ISLANDS[GAME.target]; const dx = t.cx - b.pos.x, dz = t.cz - b.pos.z, dl = Math.hypot(dx, dz) || 1; vmg = (b.vel.x * dx + b.vel.z * dz) / dl * KT; }
+  big('VMG AL DESTINO', (vmg >= 0 ? '' : '−') + Math.abs(vmg).toFixed(1), 'KT', H * 0.31, vmg > 0.3 ? '#55ee88' : '#ffbd3a');
+  g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.55)}px "B612", sans-serif`;
+  const twd = ((b.twd * RAD) % 360 + 360) % 360;
+  g.fillText('RUMBO', x0, H * 0.53); g.fillText('VIENTO REAL', x0 + colW * 0.48, H * 0.53);
+  g.fillStyle = '#e8f0f6'; g.font = `bold ${Math.round(fs * 0.85)}px "B612 Mono", monospace`;
+  g.fillText(String(Math.round(b.heading() * RAD) % 360).padStart(3, '0') + '°', x0, H * 0.53 + fs * 0.95);
+  g.fillText((b.tws * KT).toFixed(0) + 'kt ' + String(Math.round(twd)).padStart(3, '0') + '°', x0 + colW * 0.48, H * 0.53 + fs * 0.95);
+  // heel inclinometer
+  const hy = H * 0.7, hx = x0, hw = colW * 0.95;
+  g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.55)}px "B612", sans-serif`; g.fillText('ESCORA ' + Math.abs(Math.round(b.phi * RAD)) + '°', hx, hy);
+  g.fillStyle = '#26303a'; g.fillRect(hx, hy + 8, hw, 10);
+  g.fillStyle = 'rgba(255,189,58,0.35)'; g.fillRect(hx, hy + 8, hw * (15 / 90), 10); g.fillRect(hx + hw * (75 / 90), hy + 8, hw * (15 / 90), 10);
+  const hp = clamp(b.phi * RAD / 45, -1, 1);
+  g.fillStyle = Math.abs(b.phi) > 30 * DEG ? '#ff4f4f' : '#e8f0f6'; g.fillRect(hx + hw / 2 + hp * hw / 2 - 3, hy + 4, 6, 18);
+  // depth under the keel
+  const dep = b.depth;
+  g.fillStyle = '#93a8ba'; g.fillText('SONDA', hx, H * 0.84);
+  g.fillStyle = dep < 1.5 ? '#ff4f4f' : dep < 4 ? '#ffbd3a' : '#e8f0f6'; g.font = `bold ${Math.round(fs * 0.85)}px "B612 Mono", monospace`;
+  g.fillText(dep > 60 ? '> 60 m' : Math.max(0, dep).toFixed(1) + ' m', hx, H * 0.84 + fs * 0.95);
+  // ---- sheet trim bars ----
+  const sh = (label, val, opt, luff, y) => {
+    const bx = x0 + colW * 0.48, bw = colW * 0.5;
+    g.fillStyle = '#93a8ba'; g.font = `${Math.round(fs * 0.5)}px "B612", sans-serif`; g.fillText(label, bx, y);
+    g.fillStyle = '#26303a'; g.fillRect(bx, y + 6, bw, 9);
+    g.fillStyle = '#55ee88'; g.beginPath(); g.moveTo(bx + bw * opt, y + 6); g.lineTo(bx + bw * opt - 6, y - 2); g.lineTo(bx + bw * opt + 6, y - 2); g.closePath(); g.fill();
+    g.fillStyle = luff > 0.5 ? '#59e1f2' : Math.abs(val - opt) < 0.12 ? '#e8f0f6' : '#ffbd3a'; g.fillRect(bx + bw * val - 3, y + 2, 6, 17);
+  };
+  sh('MAYOR  cazada ← → largada', b.mainSheet, b.optMain, b.luffMain, H * 0.84);
+  sh('FOQUE', b.jibSheet, b.optJib, b.luffJib, H * 0.94);
+  g.restore();
+}
+function computeBoatAlerts(b) {
+  const al = [];
+  if (b.grounded) al.push(['red', 'TOCANDO FONDO']);
+  else if (b.depth < 1.6) al.push(['amber', 'POCA PROFUNDIDAD']);
+  if (Math.abs(b.phi) > 32 * DEG) al.push(['amber', 'ESCORA EXCESIVA · LARGA']);
+  if (Math.abs(b.twa) < 30 * DEG && b.u < 1.2) al.push(['cyan', 'PROA AL VIENTO']);
+  else if (b.luffMain > 0.6 && b.aws > 2) al.push(['cyan', 'LA MAYOR FLAMEA']);
+  if (b.gybeT > 0) al.push(['amber', 'TRASLUCHADA']);
+  else if (b.tackT > 0) al.push(['green', 'VIRADA']);
+  return al;
+}
+function updateBoatHUD(dt) {
+  const b = BOAT.b, E = HUD.el;
+  HUD.t += dt;
+  if (HUD.t < 1 / 15) return;
+  HUD.t = 0;
+  if (!SETTINGS.hud) return;
+  const tinfo = targetInfo();
+  E.navTo.textContent = '→ ' + tinfo.name;
+  E.navBrg.textContent = String(Math.round(tinfo.brg) % 360).padStart(3, '0') + '°';
+  E.navDist.textContent = (tinfo.dist / 1000).toFixed(1) + ' km';
+  E.navEta.textContent = fmtMS(tinfo.eta);
+  E.navFull.textContent = fmtMS(tinfo.full);
+  E.clock.textContent = fmtClock(ENV.time);
+  drawBoatInstr(HUD.pfd, E.pfd.width, E.pfd.height, b, tinfo);
+  drawMap(HUD.map, E.map.width, b, GAME.target);
+  E.sThr.textContent = Math.round((1 - b.mainSheet) * 100) + '%';
+  E.sThrBar.style.width = ((1 - b.mainSheet) * 100).toFixed(0) + '%';
+  E.sRpm.textContent = (Math.max(0, b.u) * KT).toFixed(1) + ' kt';
+  E.sFlaps.textContent = Math.round((1 - b.jibSheet) * 100) + '%';
+  E.sTrim.textContent = Math.abs(Math.round(b.phi * RAD)) + '°';
+  const gv = document.getElementById('sGearV'); if (gv) gv.textContent = (b.tws * KT).toFixed(0) + ' kt';
+  E.sBrk.textContent = SETTINGS.assist >= 2 ? 'AUTO' : SETTINGS.assist >= 1 ? 'FOQUE' : 'MANUAL';
+  E.sLights.textContent = b.lights ? 'ON' : 'OFF';
+  E.sState.textContent = pointOfSail(b.twa * RAD);
+  const al = computeBoatAlerts(b);
+  HUD.alertArr = al;
+  const key = al.map(a => a.join(':')).join('|');
+  if (key !== HUD.alerts) {
+    HUD.alerts = key;
+    E.msg.innerHTML = '';
+    for (const [c, t] of al) { const d = document.createElement('div'); d.className = 'alert ' + c; d.textContent = t; E.msg.appendChild(d); }
+  }
+  E.legtime.hidden = true;
+}
+
+// ============================================================================
 // Menus, settings sheet, help, toasts
 // ============================================================================
 const $ = id => document.getElementById(id);
@@ -6163,7 +7360,19 @@ const UI = {
     if (GAME.state === 'paused') GAME.state = 'flying';
     GAME.lastT = performance.now();
   },
-  toggleHelp() { const h = $('help'); h.hidden = !h.hidden; },
+  toggleHelp() { const h = $('help'); if (h.hidden) buildHelp(); h.hidden = !h.hidden; },
+  // labels that change between the aircraft and the sailboat
+  setVehicleUI() {
+    const boat = isBoat();
+    const L = boat ? ['Escota mayor', 'Velocidad', 'Escota foque', 'Escora', 'Viento real', 'Trimado', 'Luces'] : ['Potencia', 'RPM', 'Flaps', 'Compensador', 'Tren', 'Frenos', 'Luces'];
+    document.querySelectorAll('#sys .l').forEach((el, i) => { if (L[i]) el.textContent = L[i]; });
+    $('sGear').hidden = boat; $('sGearV') && ($('sGearV').hidden = !boat);
+    $('pSwitch').textContent = boat ? 'Cambiar a hidroavión' : 'Cambiar a velero';
+    const tl = { tGear: boat ? 'BANDA' : 'TREN', tFlapsUp: boat ? 'FOQUE −' : 'FLAPS −', tFlapsDn: boat ? 'FOQUE +' : 'FLAPS +', tBrake: boat ? (SETTINGS.assist >= 2 ? 'AUTO ✓' : 'AUTO') : 'FRENO' };
+    for (const k in tl) $(k).textContent = tl[k];
+    $('tRudL').textContent = boat ? '◀ Caña' : '◀ Timón'; $('tRudR').textContent = boat ? 'Caña ▶' : 'Timón ▶';
+    UI.updateQuick();
+  },
   applyHud() {
     const playing = GAME.state === 'flying' || GAME.state === 'paused' || GAME.state === 'crashed';
     $('hud').hidden = !(playing && SETTINGS.hud);
@@ -6174,9 +7383,10 @@ const UI = {
     const st = STYLES[styleIndex()];
     $('qShader').classList.toggle('on', SETTINGS.shaderOn);
     $('qShaderName').textContent = SETTINGS.shaderOn ? st.name : 'OFF · ' + st.name;
-    $('qCamName').textContent = (CAM_MODES.find(m => m.id === CAM.mode) || CAM_MODES[0]).name;
+    $('qCamName').textContent = camName(CAM.mode);
     $('pfd').style.visibility = CAM_INSIDE(CAM.mode) ? 'hidden' : 'visible';
-    { const sy = $('sys'); if (sy) sy.style.visibility = CAM.mode === 'cockpit' ? 'hidden' : 'visible'; }
+    { const sy = $('sys'); if (sy) sy.style.visibility = CAM.mode === 'cockpit' && !isBoat() ? 'hidden' : 'visible'; }
+    if (CAM.mode !== 'cockpit' || isBoat()) { CPIT.hover = null; cockpitTip(null); }
     $('tShader').classList.toggle('on', SETTINGS.shaderOn);
     $('tShader').textContent = SETTINGS.shaderOn ? 'SHADER ON' : 'SHADER OFF';
     $('tStyle').textContent = st.name.toUpperCase() + ' ▸';
@@ -6208,7 +7418,9 @@ function buildMenu() {
     const el = $(id);
     [...el.children].forEach(b => b.addEventListener('click', () => { GAME[key] = b.dataset.v; [...el.children].forEach(c => c.setAttribute('aria-pressed', c === b ? 'true' : 'false')); }));
   };
-  seg('spawnPick', 'spawnKind'); seg('timePick', 'startTime');
+  seg('spawnPick', 'spawnKind'); seg('timePick', 'startTime'); seg('vehPick', 'vehicle');
+  [...$('vehPick').children].forEach(b => b.addEventListener('click', () => { $('spawnWrap').hidden = GAME.vehicle === 'boat'; UI.setVehicleUI(); updateMenuNote(); }));
+  $('pSwitch').addEventListener('click', () => { UI.show('pause', false); switchVehicle(); });
   $('btnFly').addEventListener('click', () => startFlight());
   $('btnSettings').addEventListener('click', () => openSettings('graficos'));
   $('btnHelp').addEventListener('click', () => { buildHelp(); UI.show('help', true); });
@@ -6226,9 +7438,14 @@ function buildMenu() {
   $('qCam').addEventListener('click', () => cycleCamera(1));
   $('qMenu').addEventListener('click', () => UI.pause());
   for (const id of ['btnVR', 'pVR']) $(id).addEventListener('click', () => enterVR());
+  updateMenuNote();
+}
+function updateMenuNote() {
+  const boat = GAME.vehicle === 'boat';
   $('menuNote').innerHTML = GAME.touchUI
-    ? 'Joystick a la izquierda, potencia a la derecha. Gira el móvil en horizontal.'
-    : '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> tren · <kbd>P</kbd> shader · <kbd>H</kbd> ayuda';
+    ? (boat ? 'Joystick: caña del timón · barra derecha: escota de la mayor · FOQUE ± y BANDA abajo.' : 'Joystick a la izquierda, potencia a la derecha. Gira el móvil en horizontal.')
+    : boat ? '<kbd>A</kbd><kbd>D</kbd> timón · <kbd>W</kbd><kbd>S</kbd> cazar / largar mayor · <kbd>E</kbd><kbd>Q</kbd> foque · <kbd>X</kbd><kbd>Z</kbd> sacar banda · <kbd>K</kbd> trimado automático'
+      : '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> tren · <kbd>V</kbd> cabina (clic en los mandos) · <kbd>H</kbd> ayuda';
 }
 
 // ---------------- settings sheet ----------------
@@ -6337,7 +7554,8 @@ function buildSettings(tab) {
     rows.appendChild(row('Hora del día', 'También con <kbd>,</kbd> y <kbd>.</kbd>', t));
     rows.appendChild(row('Velocidad del tiempo', 'Horas de juego por minuto real', select('timeScale', [[0, 'Parado'], [0.1, '0,1 h/min'], [0.5, '0,5 h/min'], [1, '1 h/min'], [4, '4 h/min'], [12, '12 h/min']], () => { ENV.timeScale = SETTINGS.timeScale; })));
     rows.appendChild(row('Estado del mar', 'De calma chicha a mar gruesa', slider('seaState', 0, 1, 0.05, v => ['Calma', 'Rizada', 'Marejadilla', 'Marejada', 'Gruesa'][Math.min(4, Math.floor(v * 4.99))], () => buildWaves(SETTINGS.seaState))));
-    rows.appendChild(row('Viento', 'Alisio del noreste', slider('windSpeed', 0, 15, 0.5, v => (v * KT).toFixed(0) + ' kt', () => { ENV.windSpeed = SETTINGS.windSpeed; })));
+    rows.appendChild(row('Viento', 'Alisio del noreste; cambia por zonas: sotavento de las islas, aceleración en los cabos, brisa marina', slider('windSpeed', 0, 15, 0.5, v => (v * KT).toFixed(0) + ' kt', () => { ENV.windSpeed = SETTINGS.windSpeed; })));
+    rows.appendChild(row('Turbulencia y rachas', 'Remolinos sobre tierra, térmicas y estela de las islas', slider('turbulence', 0, 2, 0.05, v => Math.round(v * 100) + '%')));
     rows.appendChild(row('Nubosidad', null, slider('cloudCover', 0, 1, 0.05, v => Math.round(v * 100) + '%', () => { ENV.cloudCover = SETTINGS.cloudCover; })));
     rows.appendChild(row('Actividad del volcán', null, slider('eruption', 0, 1.5, 0.05, v => v === 0 ? 'Dormido' : v < 0.6 ? 'Baja' : v < 1.1 ? 'Media' : 'Alta', () => { ENV.erupt.level = SETTINGS.eruption; })));
     body.appendChild(rows);
@@ -6354,10 +7572,11 @@ function buildSettings(tab) {
   }
 }
 function buildHelp(target) {
+  if (GAME.vehicle === 'boat') return buildBoatHelp(target);
   const K = [
     ['W / S · ↑ ↓', 'Morro abajo / arriba'], ['A / D · ← →', 'Alabeo'], ['Q / E', 'Timón de dirección'], ['R / F · Shift', 'Potencia + / −'], ['1…0', 'Potencia 10…100%'],
     ['G', 'Tren (abajo = pista, arriba = agua)'], ['X / Z', 'Flaps abajo / arriba'], ['Espacio', 'Frenos'], ['K', 'Freno de estacionamiento'], ['T / Y', 'Compensador'],
-    ['C', 'Cambiar cámara'], ['V', 'Vista FPV piloto'], ['Ratón / dedo', 'Mirar alrededor · rueda: zoom'], ['P', 'Shader ON / OFF'], ['O / I', 'Siguiente / anterior estilo'], ['L', 'Luces'], ['N', 'Cambiar destino'],
+    ['C', 'Cambiar cámara'], ['V', 'Vista FPV piloto'], ['Ratón / dedo', 'Mirar alrededor · rueda: zoom'], ['Clic en cabina', 'En la vista de piloto: arrastra palancas, cuernos y compensador; pulsa interruptores, tren y freno'], ['P', 'Shader ON / OFF'], ['O / I', 'Siguiente / anterior estilo'], ['L', 'Luces'], ['N', 'Cambiar destino'],
     [', / .', 'Hora −/+ 30 min'], ['U', 'Ocultar HUD'], ['Esc', 'Pausa'],
     ['Mando', 'Stick izq: vuelo · Gatillos: potencia · LB/RB: timón · A tren · X/Y flaps · B freno · Cruceta ←→ shader/estilo'],
     ['VR', 'Stick dcho: vuelo · Stick izq: potencia y timón · A tren · B estilo · X/Y flaps · Gatillo: freno'],
@@ -6367,6 +7586,33 @@ function buildHelp(target) {
     'Despegue desde la pista: tren ABAJO, flaps 10°, potencia al máximo y rota a 80 nudos.',
     'Amerizar con el tren abajo hace capotar al avión: escucha la alarma.',
     'Los PAPI junto a la pista marcan la senda: dos blancas y dos rojas es la correcta.',
+    'El viento cambia por zonas: a sotavento de las islas amaina y es racheado, en los cabos acelera, y de día hay brisa marina hacia la costa. Las mangas de viento de cada pista y la caja de viento del PFD te lo indican.',
+    'Con viento cruzado, aterriza con el morro hacia el viento (cangrejeo) y alinea con el pedal justo antes de tocar.',
+  ];
+  const el = target || $('helpBody');
+  if (!target) el.innerHTML = '';
+  const k = document.createElement('div'); k.className = 'keys';
+  for (const [a, b] of K) { const d = document.createElement('div'); d.innerHTML = `<span><kbd>${a}</kbd></span><span>${b}</span>`; k.appendChild(d); }
+  el.appendChild(k);
+  const ul = document.createElement('ul'); ul.className = 'fine'; ul.style.paddingLeft = '18px';
+  for (const t of tips) { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); }
+  el.appendChild(ul);
+}
+
+function buildBoatHelp(target) {
+  const K = [
+    ['A / D · ← →', 'Caña del timón (a babor / estribor)'], ['W / ↑', 'Cazar la mayor'], ['S / ↓', 'Largar la mayor'], ['E / Q', 'Cazar / largar el foque'],
+    ['X / Z', 'Sacar / meter banda (tripulación)'], ['K', 'Trimado automático ON / OFF'], ['L', 'Luces de navegación'], ['N', 'Cambiar destino'],
+    ['C', 'Cambiar cámara (timonel, proa, tope de palo…)'], ['V', 'Vista del timonel'], [', / .', 'Hora −/+ 30 min'], ['Esc', 'Pausa'],
+    ['Mando', 'Stick izq: timón · RT/LT: cazar/largar mayor · RB/LB: foque · A: banda'],
+  ];
+  const tips = [
+    'No se puede navegar directamente contra el viento: ciñe a unos 40–45° del viento real y vira por avante para ganar barlovento.',
+    'Si la vela flamea (aviso FLAMEA) está demasiado largada o vas muy orzado: caza la escota o arriba un poco.',
+    'Con mucha escora el barco orza solo y se frena: larga la mayor o saca banda.',
+    'Con el viento por la popa la botavara puede cruzar de golpe (trasluchada): gira despacio.',
+    'El viento cambia por zonas: detrás de las islas hay calma y rachas; en los cabos acelera. Las manchas más oscuras en el agua son rachas que llegan.',
+    'Vigila la profundidad: la quilla cala 1,3 m y los arrecifes de Palma son someros.',
   ];
   const el = target || $('helpBody');
   if (!target) el.innerHTML = '';
@@ -6455,7 +7701,7 @@ function xrFrame(t, frame) {
   if (SETTINGS.shadows > 0) renderShadow(); else RENDER.shadowActive = false;
   RENDER.reflValid = false;
   gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
-  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clearColor(0, 0, 0, 1); gl.depthMask(true); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   const seat = M4.fromQT(_xc, ac.q, vadd(ac.pos, ac.q.rot(PLANE.eye)));
   for (const view of pose.views) {
     const vp = layer.getViewport(view);
@@ -6470,7 +7716,7 @@ function xrFrame(t, frame) {
     RENDER.cam.near = 0.5; RENDER.cam.far = 42000; RENDER.cam.pos = camPos;
     setGlobals(_xv, _xp, camPos, { direct: true });
     drawWorld({ showPlane: GAME.state !== 'menu', cockpit: true, vw: vp.width, vh: vp.height, pixel });
-    gl.enable(gl.SCISSOR_TEST); gl.scissor(vp.x, vp.y, vp.width, vp.height); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.SCISSOR_TEST);
+    gl.enable(gl.SCISSOR_TEST); gl.scissor(vp.x, vp.y, vp.width, vp.height); gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.SCISSOR_TEST);
     M4.setNearFar(_xp, view.projectionMatrix, 0.03, 40);
     setGlobals(_xv, _xp, camPos, { direct: true });
     drawCabin('cockpit');
@@ -6481,8 +7727,11 @@ function xrFrame(t, frame) {
 // Game state, loop, boot
 // ============================================================================
 const SIM = { t: 0, acc: 0 };
-const GAME = { state: 'loading', spawnIsland: 1, spawnKind: 'runway', startTime: '11', target: 0, touchUI: false, lastT: 0, crashT: 0, dynScale: 1, fps: 60, ft: 16, fpsAcc: 0, fpsN: 0, lastRender: 0 };
+const GAME = { state: 'loading', vehicle: 'plane', spawnIsland: 1, spawnKind: 'runway', startTime: '11', target: 0, touchUI: false, lastT: 0, crashT: 0, dynScale: 1, fps: 60, ft: 16, fpsAcc: 0, fpsN: 0, lastRender: 0 };
 const AIR = { ac: new Aircraft(), landingWorld: new V3(), landingDir: new V3(0, 0, -1), assist: {} };
+const BOAT = { b: new Boat(), input: { helm: 0, main: 0, jib: 0, hike: 0 } };
+const VEH = () => GAME.vehicle === 'boat' ? BOAT.b : AIR.ac;
+const isBoat = () => GAME.vehicle === 'boat';
 let CRATER_W = new V3(), LAVA_POS = new V3(), LAVA_ENTRY = new V3();
 const ENVQ = { t: 0, wind: new V3(), terrainH: (x, z) => terrainH(x, z), terrainN: (x, z) => terrainNormal(x, z), waterH: (x, z) => waterH(x, z, SIM.t) };
 
@@ -6519,27 +7768,72 @@ function spawnAircraft() {
     ac.gearSet = 1; ac.gear = 1; ac.parking = true;
   }
   ac.lights = ENV.night > 0.5;
+  resetSpawnCommon(isl);
+}
+// a starting point in clear wind: round the island, out of its wind shadow, in deep water,
+// with open water ahead on a beam reach heading away from the shore
+function boatSpawnPoint(isl) {
+  const R = (ISL_WIND[isl.id] || { R: 900 }).R;
+  let best = null;
+  for (let k = 0; k < 24; k++) {
+    const a = k / 24 * TAU, cx = Math.cos(a), cz = Math.sin(a);
+    for (let r = 0.9 * R; r < 2.6 * R; r += 0.08 * R) {
+      const x = isl.cx + cx * r, z = isl.cz + cz * r;
+      if (terrainH(x, z) > -5) continue;
+      const w = windSurface(x, z, SIM.t), wl = Math.hypot(w.x, w.z) || 1;
+      const d = new V3(-w.z / wl, 0, w.x / wl);
+      if (d.x * cx + d.z * cz < 0) d.mul(-1);
+      let clear = true;
+      for (let s = 40; s <= 520 && clear; s += 40) if (terrainH(x + d.x * s, z + d.z * s) > -2.5) clear = false;
+      if (!clear) break;
+      const score = wl - 0.0009 * (r - 0.9 * R);
+      if (!best || score > best.score) best = { score, pos: new V3(x, 0, z), d };
+      break;
+    }
+  }
+  return best;
+}
+function spawnBoat() {
+  const isl = ISLANDS[GAME.spawnIsland], b = BOAT.b;
+  let sp = boatSpawnPoint(isl), d;
+  if (sp) d = sp.d;
+  else {
+    sp = spawnWater(isl);
+    const w = windSurface(sp.pos.x, sp.pos.z, SIM.t); const wl = Math.hypot(w.x, w.z) || 1;
+    d = new V3(-w.z / wl, 0, w.x / wl);
+    if (d.x * (sp.pos.x - isl.cx) + d.z * (sp.pos.z - isl.cz) < 0) d.mul(-1);
+  }
+  // start on a beam reach heading away from the island so the boat sails straight off
+  b.reset(new V3(sp.pos.x, 0, sp.pos.z), Math.atan2(d.x, -d.z), 1.5);
+  b.lights = ENV.night > 0.5;
+  BOAT.input = { helm: 0, main: 0, jib: 0, hike: 0 };
+  resetSpawnCommon(isl);
+}
+function resetSpawnCommon(isl) {
   CAM.dirSm = null; CAM.fly = null;
   FX.wake = []; FX.spray = []; FX.lastWake = null;
   HUD.legFrom = isl; HUD.legOut = GAME.spawnKind === 'air'; HUD.legT0 = SIM.t; HUD.lastLeg = null; HUD.prevContact = GAME.spawnKind !== 'air';
   AIR.assist = {};
   SIM.acc = 0;
 }
+function spawnVehicle() { if (isBoat()) spawnBoat(); else spawnAircraft(); }
 function startFlight() {
   initAudio();
   ENV.time = parseFloat(GAME.startTime);
   GAME.target = (GAME.spawnIsland + 1) % ISLANDS.length;
-  spawnAircraft();
+  CAM.dist = isBoat() ? 15 : 24;
+  spawnVehicle();
+  UI.setVehicleUI();
   GAME.state = 'flying';
   UI.show('menu', false); UI.show('crash', false);
   if (CAM_INSIDE(CAM.mode) && !XR.session) CAM.mode = 'chase';
   UI.applyHud(); UI.updateQuick();
-  UI.toast(GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
+  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
   GAME.lastT = performance.now();
 }
 function respawn() {
   UI.show('crash', false);
-  spawnAircraft();
+  spawnVehicle();
   GAME.state = 'flying';
   UI.applyHud();
 }
@@ -6548,30 +7842,52 @@ function toMenu() {
   UI.show('menu', true); UI.show('crash', false); UI.show('pause', false); UI.closeModals();
   UI.applyHud();
 }
+function switchVehicle() {
+  GAME.vehicle = isBoat() ? 'plane' : 'boat';
+  CAM.dist = isBoat() ? 15 : 24;
+  if (CAM.mode === 'flyby' || CAM.mode === 'cinematic') setCamMode('chase');
+  respawn(); UI.resume && UI.resume(); UI.applyHud(); UI.updateQuick(); UI.setVehicleUI && UI.setVehicleUI();
+  UI.toast(isBoat() ? 'Ahora navegas en el velero' : 'De vuelta al hidroavión');
+}
 function onCrash() {
-  const ac = AIR.ac;
+  const ac = VEH();
   GAME.state = 'crashed'; GAME.crashT = SIM.t;
   const wet = waterH(ac.pos.x, ac.pos.z, SIM.t) > terrainH(ac.pos.x, ac.pos.z);
   splash(ac.pos.clone().add(new V3(0, wet ? -1.5 : 0, 0)), 2.4);
   splash(ac.pos.clone(), 1.6);
   boom(0.7, 1.8);
   CAM.shake = 3;
-  $('crashT').textContent = wet ? 'Al agua' : 'Accidente';
+  $('crashT').textContent = isBoat() ? (ac.crashReason.startsWith('Tumbado') ? 'Volcado' : 'Encallado') : wet ? 'Al agua' : 'Accidente';
   $('crashP').textContent = ac.crashReason + '.';
   UI.show('crash', true);
   UI.applyHud();
 }
+// wind sampled once per frame around the active vehicle; turbulence evaluated per physics step
+ENVQ.windAt = p => vadd(WIND_NOW.base, turbAt(p, SIM.t, WIND_NOW.sigma * SETTINGS.turbulence * (isBoat() ? 0.35 : 1), WIND_NOW.base));
+ENVQ.turbAt = p => turbAt(p, SIM.t, WIND_NOW.sigma * SETTINGS.turbulence, WIND_NOW.base);
 function stepGame(dt) {
   updateInput(dt);
-  const ac = AIR.ac;
-  if (GAME.state === 'flying') {
+  const ac = AIR.ac, veh = VEH();
+  if (GAME.state !== 'menu') { const wp = isBoat() ? new V3(veh.pos.x, 3.4, veh.pos.z) : veh.pos; updateWindNow(wp, SIM.t); }
+  if (GAME.state === 'flying' && isBoat()) {
+    const h = 1 / 120, b = BOAT.b;
+    SIM.acc += dt;
+    let n = 0;
+    while (SIM.acc >= h && n < 16) {
+      ENVQ.t = SIM.t; ENVQ.wind = WIND_NOW.base;
+      b.step(h, ENVQ, BOAT.input, SETTINGS.assist);
+      SIM.t += h; SIM.acc -= h; n++;
+      if (b.crashed) { onCrash(); break; }
+    }
+    if (n >= 16) SIM.acc = 0;
+  } else if (GAME.state === 'flying') {
     const h = 1 / 240;
     SIM.acc += dt;
     let n = 0;
     while (SIM.acc >= h && n < 32) {
       const ctl = applyAssist(ac, INPUT.axes, SETTINGS.assist, h, AIR.assist);
       ac.ctl.pitch = ctl.pitch; ac.ctl.roll = ctl.roll; ac.ctl.yaw = ctl.yaw;
-      ENVQ.t = SIM.t; ENVQ.wind = ENV.wind;
+      ENVQ.t = SIM.t; ENVQ.wind = WIND_NOW.base;
       ac.step(h, ENVQ);
       SIM.t += h; SIM.acc -= h; n++;
       if (ac.crashed) { onCrash(); break; }
@@ -6645,6 +7961,7 @@ async function boot() {
   buildStatics();
   prog(0.9, 'Montando el hidroavión…'); await nextFrame();
   buildPlaneModel();
+  buildBoatModel();
   ENV.timeScale = SETTINGS.timeScale; ENV.windSpeed = SETTINGS.windSpeed; ENV.cloudCover = SETTINGS.cloudCover; ENV.erupt.level = SETTINGS.eruption;
   ENV.time = 18.9;
   setupInput(); initHUD(); buildMenu(); UI.updateQuick();
