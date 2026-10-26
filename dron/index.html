@@ -24,11 +24,12 @@
   --txt:#1f1b3a;
   --muted:#5a5680;
   --glass:rgba(255,255,255,.16);
+  --selBg:#1f1b3a; --selFg:#f2f9ff;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --paper:#2a2550; --panel:rgba(36,31,72,.92); --txt:#f6f3ff; --muted:#c3bdf0; --glass:rgba(20,16,50,.28); }
+  :root:not([data-theme="light"]){ --paper:#2a2550; --panel:rgba(36,31,72,.92); --txt:#f6f3ff; --muted:#c3bdf0; --glass:rgba(20,16,50,.28); --selBg:#ffd23f; --selFg:#1f1b3a; }
 }
-:root[data-theme="dark"]{ --paper:#2a2550; --panel:rgba(36,31,72,.92); --txt:#f6f3ff; --muted:#c3bdf0; --glass:rgba(20,16,50,.28); }
+:root[data-theme="dark"]{ --paper:#2a2550; --panel:rgba(36,31,72,.92); --txt:#f6f3ff; --muted:#c3bdf0; --glass:rgba(20,16,50,.28); --selBg:#ffd23f; --selFg:#1f1b3a; }
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(--txt);
@@ -138,9 +139,34 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 .mode span{font-size:13px;color:var(--muted)}
 .mode.sel{background:var(--sun);color:var(--ink)}
 .mode.sel span{color:#4a4470}
+#games{margin:0 0 16px}
+.gamePills{display:flex;gap:8px;flex-wrap:wrap}
+.game{padding:7px 15px;border:3px solid var(--ink);border-radius:999px;background:var(--paper);color:var(--txt);cursor:pointer;font-weight:600;font-size:15px;box-shadow:3px 3px 0 var(--ink)}
+.game:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.game.sel{background:var(--sun);color:var(--ink)}
+.game.hunt.sel{background:var(--tomato);color:#fff}
+#gameDesc{margin:8px 0 0;font-size:14px;line-height:1.4;color:var(--muted);max-width:68ch}
+#recs{margin-top:16px;padding-top:14px;border-top:3px dashed rgba(127,120,170,.45)}
+#recs h3 small{font-weight:400;font-size:13px;color:var(--muted);margin-left:4px}
+.rtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.rtab{padding:4px 12px;border:2px solid var(--ink);border-radius:999px;background:transparent;color:var(--txt);cursor:pointer;font-weight:600;font-size:13px}
+.rtab.sel{background:var(--selBg);color:var(--selFg)}
+.recWrap{border:3px solid var(--ink);border-radius:14px;overflow:hidden;background:var(--paper);box-shadow:3px 3px 0 var(--ink);max-width:520px}
+#recTable{width:100%;border-collapse:collapse;font-size:14px}
+#recTable th{padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--muted);text-align:center;border-bottom:2px solid rgba(127,120,170,.35)}
+#recTable td{padding:6px 10px;text-align:center;font-variant-numeric:tabular-nums}
+#recTable th:first-child,#recTable td:first-child{text-align:left}
+#recTable tbody th{font-weight:inherit;text-align:left;padding:6px 10px;font-size:14px;color:inherit}
+#recTable tbody tr+tr td,#recTable tbody tr+tr th{border-top:1px solid rgba(127,120,170,.22)}
+#recTable td.empty{color:var(--muted);opacity:.55}
+#recTable td.new{background:var(--sun);color:var(--ink);font-weight:700}
+#recTable tr.cur th{font-weight:700}
+#recTable tr.cur th::before{content:'\25B8\00A0';color:var(--tomato)}
+#status .stats i{font-style:normal}
+#result .rm{font-size:14px;color:var(--muted)}
 .tabs{display:flex;gap:6px;margin-bottom:8px}
 .tab{padding:5px 12px;border:2px solid var(--ink);border-radius:999px;background:transparent;cursor:pointer;font-weight:600;font-size:14px}
-.tab.sel{background:var(--ink);color:var(--paper)}
+.tab.sel{background:var(--selBg);color:var(--selFg)}
 .help{font-size:14px;line-height:1.45}
 .help table{border-collapse:collapse;width:100%}
 .help td{padding:3px 0;vertical-align:top}
@@ -155,7 +181,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 .presets{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;font-weight:600}
 .presets span{margin-right:2px}
 .pre{padding:4px 13px;border:2px solid var(--ink);border-radius:999px;background:transparent;cursor:pointer;font-weight:600;font-size:13px}
-.pre.sel{background:var(--ink);color:var(--paper)}
+.pre.sel{background:var(--selBg);color:var(--selFg)}
 .gfxGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 @media (max-width:560px){.gfxGrid{grid-template-columns:1fr}}
 #aaNote{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -181,7 +207,7 @@ h3{margin:0 0 8px;font-size:17px;font-weight:600}
 #vrCams{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:13px;font-weight:600}
 #vrCams span{margin-right:2px}
 .vc{padding:4px 11px;border:2px solid var(--ink);border-radius:999px;background:transparent;cursor:pointer;font-weight:600;font-size:13px}
-.vc.sel{background:var(--ink);color:var(--paper)}
+.vc.sel{background:var(--selBg);color:var(--selFg)}
 #vrInfo{margin:0;font-size:13px;line-height:1.4;color:var(--muted);border-radius:8px;padding:2px 4px;max-width:70ch}
 #vrInfo.pulse{animation:vrp 1.4s ease-out}
 @keyframes vrp{0%{background:rgba(255,210,63,.65);color:var(--txt)}100%{background:transparent}}
@@ -235,7 +261,7 @@ body.vr #hud,body.vr #menu{display:none}
   <div id="status" class="sticker">
     <div class="row"><span id="modeChip" class="chip">Principiante</span><span id="armChip" class="chip off">Desarmado</span><span id="fpsChip" class="chip ok" aria-live="off">– FPS</span></div>
     <div class="bat"><div class="bar"><i id="batFill"></i></div><span id="batTxt" class="num">16,8 V</span></div>
-    <div class="stats"><span>Aros <b id="ringTxt" class="num">0/15</b></span><span>Tiempo <b id="timeTxt" class="num">0:00,0</b></span><span>Récord <b id="bestTxt" class="num">–</b></span><span>Trucos <b id="trickTxt" class="num">0/16</b></span></div>
+    <div class="stats"><span><i id="ringLbl">Aros</i> <b id="ringTxt" class="num">0/15</b></span><span>Tiempo <b id="timeTxt" class="num">0:00,0</b></span><span>Récord <b id="bestTxt" class="num">–</b></span><span>Trucos <b id="trickTxt" class="num">0/16</b></span></div>
     <div id="dmgRow">Daños<div class="bar"><i id="dmgFill"></i></div></div>
   </div>
 
@@ -272,8 +298,15 @@ body.vr #hud,body.vr #menu{display:none}
 
 <div id="menu"><div id="card" class="sticker">
   <h1 id="title">Dron en casa</h1>
-  <p id="sub">Pilota un dron con conductos por una casa de dos plantas. Cruza los 15 aros en orden, o sal por la ventana abierta del salón y busca los 18 trucos de freestyle del barrio: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, un edificio en obras con su grúa, tuberías gigantes, una pista con portería y canasta, y un molino con aspas que giran y en el que puedes entrar por la puerta o las ventanas y salir por el tejado. También puedes jugar con gafas Meta Quest.</p>
+  <p id="sub">Pilota un dron con conductos por una casa de dos plantas y su barrio. Elige juego: cuatro circuitos de aros contra el crono, o la caza: entre los coches que dan vueltas a la manzana hay uno marcado, y tienes que lanzar el dron como una bomba contra él sin chocar con nada más. Mientras vuelas, busca los 18 trucos de freestyle: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, una obra con grúa y tuberías, una pista con portería y canasta, y un molino en el que puedes entrar por la puerta y salir por el tejado. También puedes jugar con gafas Meta Quest.</p>
   <div id="result"></div>
+  <div id="games">
+    <h3>Juego</h3>
+    <div class="gamePills" role="group" aria-label="Juego">
+      <button type="button" class="game" data-g="casa">Casa</button><button type="button" class="game" data-g="barrio">Barrio</button><button type="button" class="game" data-g="obra">Obra y molino</button><button type="button" class="game" data-g="cielo">Cielo</button><button type="button" class="game hunt" data-g="caza">Caza del coche</button>
+    </div>
+    <p id="gameDesc"></p>
+  </div>
   <div class="cols">
     <div>
       <h3>Modo de vuelo</h3>
@@ -290,6 +323,13 @@ body.vr #hud,body.vr #menu{display:none}
       <div class="help" id="help"></div>
     </div>
   </div>
+  <div id="recs">
+    <h3>Récords <small>los 3 mejores tiempos de cada juego en cada modo de vuelo</small></h3>
+    <div class="rtabs" role="group" aria-label="Récords de">
+      <button type="button" class="rtab" data-r="casa">Casa</button><button type="button" class="rtab" data-r="barrio">Barrio</button><button type="button" class="rtab" data-r="obra">Obra y molino</button><button type="button" class="rtab" data-r="cielo">Cielo</button><button type="button" class="rtab" data-r="caza">Caza</button>
+    </div>
+    <div class="recWrap"><table id="recTable"><thead><tr><th scope="col">Modo de vuelo</th><th scope="col">1.º</th><th scope="col">2.º</th><th scope="col">3.º</th></tr></thead><tbody id="recBody"></tbody></table></div>
+  </div>
   <div id="tune">
     <h3>Ajustes del mando</h3>
     <div class="tuneGrid">
@@ -300,7 +340,7 @@ body.vr #hud,body.vr #menu{display:none}
         <label class="sl" data-i="3"><span>Zona muerta del mando <b id="vDead">8 %</b></span><small>Ignora pequeños movimientos del stick en reposo</small><input type="range" id="sDead" min="0" max="25" step="1" aria-label="Zona muerta del mando"></label>
         <label class="sl" data-i="4"><span>Volumen del sonido <b id="vVol">70 %</b></span><small>También dentro de las gafas VR (en pausa, con el stick izquierdo)</small><input type="range" id="sVol" min="0" max="100" step="5" aria-label="Volumen del sonido"></label>
         <label class="sl sl-touch" data-i="11"><span>Tamaño de los sticks táctiles <b id="vTouch">100 %</b></span><small>Al 100 % ocupan todo el hueco libre de la pantalla. Más grandes, más precisos</small><input type="range" id="sTouch" min="50" max="100" step="5" aria-label="Tamaño de los sticks táctiles"></label>
-        <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo, y X para mostrar u ocultar los FPS. Los cambios se guardan solos.</p>
+        <p class="hint">Con el mando, en este menú: cruceta arriba y abajo para elegir un ajuste, izquierda y derecha para cambiarlo, LB y RB para cambiar de juego, y X para mostrar u ocultar los FPS. Los cambios se guardan solos.</p>
       </div>
       <div id="curveBox">
         <h4>Respuesta del gas</h4>
@@ -1197,7 +1237,7 @@ function buildTrain(){
 /* ============ Exterior ============ */
 let cloudGroup = null;
 const GY = -0.3;   // altura del césped
-const FLY = {x1:-62, x2:62, z1:-68, z2:78, y2:90};   // zona de vuelo exterior (colchón invisible en los bordes)
+const FLY = {x1:-76, x2:76, z1:-68, z2:82, y2:90};   // zona de vuelo exterior (colchón invisible en los bordes)
 const inFlyZone=(x1,z1,x2,z2,m)=> x2>FLY.x1-(m||6) && x1<FLY.x2+(m||6) && z2>FLY.z1-(m||6) && z1<FLY.z2+(m||6);   // ¿esta caja queda al alcance del dron?
 function insideHouse(p){ return p.x>-6.15 && p.x<7.15 && p.z>-5.15 && p.z<5.15 && p.y<5.85; }
 // cajas de colisión a lo largo de un segmento (tubos, patas inclinadas, cuerdas)
@@ -1429,10 +1469,41 @@ function car(x,z,rot,color){
   for(const [wx,wz] of [[-0.85,-1.35],[0.85,-1.35],[-0.85,1.35],[0.85,1.35]]){ const p=rotP(wx,wz,rot); CylR(x+p[0],0.03,z+p[1],0.33,0.33,0.24,MAT.black,16,0,rot%2?Math.PI/2:0,Math.PI/2); }
   const p1=rotP(-0.9,-1.7,rot), p2=rotP(0.9,1.7,rot); col(x+Math.min(p1[0],p2[0]),GY,z+Math.min(p1[1],p2[1]),x+Math.max(p1[0],p2[0]),0.3,z+Math.max(p1[1],p2[1]));
 }
+// calzada de la vuelta a la manzana (caza): rectángulo de esquinas redondeadas, x ±68, de la calle trasera (z 52,5) a z -46
+const ROAD = {X:68, Z1:-46, Z2:52.5, R:6, hw:3.5};
+const ROAD_HOLES = (()=>{ const o=ROAD.X+ROAD.hw, i=ROAD.X-ROAD.hw, a=ROAD.Z1-ROAD.hw;
+  return [[-o,a,-i,49],[i,a,o,49],[-o,a,o,ROAD.Z1+ROAD.hw],[-o,a,-o+11,a+11],[o-11,a,o,a+11],[-o,44.5,-o+10.5,49],[o-10.5,44.5,o,49]]; })();
+// rectángulos [x1,z1,x2,z2]: trocea 'outer' con los bordes de los huecos y devuelve las celdas de fuera (inside=false) o de dentro (true)
+function rectCells(outer, holes, inside){
+  const xs=new Set([outer[0],outer[2]]), zs=new Set([outer[1],outer[3]]);
+  for(const h of holes){ for(const x of [h[0],h[2]]) if(x>outer[0]&&x<outer[2]) xs.add(x); for(const z of [h[1],h[3]]) if(z>outer[1]&&z<outer[3]) zs.add(z); }
+  const X=[...xs].sort((a,b)=>a-b), Z=[...zs].sort((a,b)=>a-b), out=[];
+  for(let j=0;j<Z.length-1;j++){ let run=null;
+    for(let i=0;i<X.length-1;i++){ const cx=(X[i]+X[i+1])/2, cz=(Z[j]+Z[j+1])/2, inH=holes.some(h=>cx>h[0]&&cx<h[2]&&cz>h[1]&&cz<h[3]);
+      if(inH===inside){ if(run) run[2]=X[i+1]; else run=[X[i],Z[j],X[i+1],Z[j+1]]; } else if(run){ out.push(run); run=null; } }
+    if(run) out.push(run); }
+  out.sort((a,b)=>a[0]-b[0]||a[2]-b[2]||a[1]-b[1]);
+  const m=[]; for(const r of out){ const p=m[m.length-1]; if(p && p[0]===r[0] && p[2]===r[2] && Math.abs(p[3]-r[1])<1e-9) p[3]=r[3]; else m.push(r.slice()); }
+  return m;
+}
 function buildExterior(){
   const Y=GY, W=320;
   // el césped se corta donde hay calle (z 16..28,8) y ciudad (z>49): nada de capas superpuestas que parpadeen
-  B(-W,Y-0.2,-W,W,Y,16,MAT.grass); B(-W,Y-0.2,28.8,W,Y,49,MAT.grass); col(-W,Y-2,-W,W,Y,W);
+  // y también bajo la vuelta a la manzana de la caza
+  for(const o of [[-W,-W,W,16],[-W,28.8,W,49]]){
+    // los trozos de césped se solapan 6 cm entre sí (mismo material y mismas UV: no se nota) para que no asome ninguna costura
+    const inHole=(x,z)=>ROAD_HOLES.some(h=>x>h[0]&&x<h[2]&&z>h[1]&&z<h[3]), e=0.06;
+    for(const r of rectCells(o, ROAD_HOLES, false)){ const mx=(r[0]+r[2])/2, mz=(r[1]+r[3])/2, ext=(x,z,okIn)=>okIn && !inHole(x,z);
+      const x1=r[0]-(ext(r[0]-0.01,mz,r[0]>o[0])?e:0), x2=r[2]+(ext(r[2]+0.01,mz,r[2]<o[2])?e:0), z1=r[1]-(ext(mx,r[1]-0.01,r[1]>o[1])?e:0), z2=r[3]+(ext(mx,r[3]+0.01,r[3]<o[3])?e:0);
+      B(x1,Y-0.2,z1,x2,Y,z2,MAT.grass); }
+    for(const r of rectCells(o, ROAD_HOLES, true)) B(r[0],Y-0.1,r[1],r[2],Y+0.005,r[3],MAT.asphalt,true);
+  }
+  col(-W,Y-2,-W,W,Y,W);
+  { const dash=MC(0xfff3b0), o=ROAD.X+ROAD.hw, i=ROAD.X-ROAD.hw;
+    for(const [a,b2] of [[-o,-i],[i,o]]) for(const [za,zb] of [[16,17.8],[27,28.8]]) B(a,Y-0.1,za,b2,Y+0.005,zb,MAT.asphalt,true);   // cruces con la calle principal
+    for(const sx of [-1,1]){ const x=sx*ROAD.X; for(let z=ROAD.Z1+ROAD.R+1; z<ROAD.Z2-ROAD.R-2; z+=4){ if(z>14 && z<29.6) continue; B(x-0.09,Y+0.005,z,x+0.09,Y+0.02,z+2,dash); } }
+    for(let x=-ROAD.X+ROAD.R+1; x<ROAD.X-ROAD.R-2; x+=4){ B(x,Y+0.005,ROAD.Z1-0.09,x+2,Y+0.02,ROAD.Z1+0.09,dash); B(x,Y+0.01,ROAD.Z2-0.09,x+2,Y+0.025,ROAD.Z2+0.09,dash); }
+  }
   B(-6.25,Y,-5.25,6.25+EX,-0.01,5.25,MAT.concrete,true);
   // porche con tejadillo y camino
   B(-0.8,Y,5.25,1.1,-0.02,6.3,MAT.sidewalk,true); B(-0.6,Y,6.3,0.9,-0.16,6.6,MAT.sidewalk,true);
@@ -1440,10 +1511,11 @@ function buildExterior(){
   B(-0.95,2.48,5.1,1.25,2.58,6.35,MAT.trim,true); B(-1.02,2.58,5.1,1.32,2.66,6.42,MC(0xb8483a),true);
   B(-0.25,Y,6.6,0.55,Y+0.03,16,MAT.sidewalk,true);
   // aceras, bordillos y calle
-  B(-W,Y,16,W,Y+0.03,17.6,MAT.sidewalk,true); B(-W,Y,17.6,W,Y+0.12,17.8,MC(0xbdb8ad),true);
+  const SWX=[[-W,-ROAD.X-ROAD.hw],[-ROAD.X+ROAD.hw,ROAD.X-ROAD.hw],[ROAD.X+ROAD.hw,W]];   // aceras y bordillos cortados en los cruces
+  for(const [a,b2] of SWX){ B(a,Y,16,b2,Y+0.03,17.6,MAT.sidewalk,true); B(a,Y,17.6,b2,Y+0.12,17.8,MC(0xbdb8ad),true); }
   B(-W,Y-0.1,17.8,W,Y+0.005,27,MAT.asphalt,true);
   for(let x=-300;x<300;x+=4) B(x,Y+0.005,22.3,x+2,Y+0.02,22.5,MC(0xfff3b0));
-  B(-W,Y,27,W,Y+0.12,27.2,MC(0xbdb8ad),true); B(-W,Y,27.2,W,Y+0.03,28.8,MAT.sidewalk,true);
+  for(const [a,b2] of SWX){ B(a,Y,27,b2,Y+0.12,27.2,MC(0xbdb8ad),true); B(a,Y,27.2,b2,Y+0.03,28.8,MAT.sidewalk,true); }
   // entrada de coches y coche
   B(8,Y,2,11,Y+0.03,16,MAT.sidewalk,true); car(9.5,9,0,0x6fb3e8);
   // setos y flores
@@ -2138,30 +2210,78 @@ function segHit(o, t, pad){
   return best;
 }
 
-/* ============ Aros ============ */
-const RINGS = [
-  [-2.65,1.30,0.0,'z'], [-3.2,1.40,-2.5,'z'], [-0.5,1.05,-3.0,'x'], [2.2+EX,1.05,-1.0,'x'], [4.72+EX,1.35,1.5,'z'],
-  [2.78+EX,1.25,1.5,'z'], [0.15,1.30,2.5,'z'], [1.47,2.55,1.7,'z'], [-0.5,3.95,-1.15,'x'], [-2.6,4.2,-1.4,'x'],
-  [-4.5,3.95,0.0,'z'], [-2.6,4.1,1.6,'x'], [-0.5,3.95,3.9,'x'], [2.2+EX,3.95,-0.75,'x'], [3.5+EX,4.2,2.2,'z']
-];
+/* ============ Juegos: cuatro circuitos de aros y la caza de coches ============ */
+// aro: [x, y, z, eje ('x','y','z' o ángulo en radianes alrededor de y), radio]
 const RING_R = 0.45;
-const rings = [];
-let nextRing = 0, raceT = 0, racing = false, raceDone = false, bestTime = store.get('best', null);
+const CIRCUITS = {
+  casa:{start:[-2.4,0.3,2.9], yaw:0, rings:[
+    [-2.65,1.30,0.0,'z'], [-3.2,1.40,-2.5,'z'], [-0.5,1.05,-3.0,'x'], [2.2+EX,1.05,-1.0,'x'], [4.72+EX,1.35,1.5,'z'],
+    [2.78+EX,1.25,1.5,'z'], [0.15,1.30,2.5,'z'], [1.47,2.55,1.7,'z'], [-0.5,3.95,-1.15,'x'], [-2.6,4.2,-1.4,'x'],
+    [-4.5,3.95,0.0,'z'], [-2.6,4.1,1.6,'x'], [-0.5,3.95,3.9,'x'], [2.2+EX,3.95,-0.75,'x'], [3.5+EX,4.2,2.2,'z'] ]},
+  // por la calle del parque: pasarela, arcos, halfpipe, túnel de contenedores, depósito, cartel y, al final, la ventana del salón
+  barrio:{start:[0.15,GY+0.4,12.4], yaw:Math.PI, rings:[
+    [0.15,GY+1.6,18.6,'z',0.9], [-4.6,GY+2.3,20.3,'x',0.8], [-19.0,GY+2.2,22.4,'x',0.9], [-11.8,GY+2.3,24.5,'x',0.8],
+    [7.0,GY+1.15,22.4,'x',0.85], [17.04,GY+1.3,22.0,'z',0.5], [25.6,GY+2.2,22.4,'x',0.9], [21.0,GY+4.5,31.0,'x',0.8],
+    [-0.5,GY+3.9,30.0,'z',0.6], [-1.95,GY+3.2,11.0,'z',0.9], [-1.95,1.47,5.7,'z',0.5] ]},
+  // la valla del jardín, la obra (eslalon entre pilares, marco de la grúa, segunda planta, bajo la pluma) y el molino por dentro
+  obra:{start:[3.0,GY+0.4,-10.5], yaw:0, rings:[
+    [3.0,GY+2.4,-16.2,'z',0.9], [0,GY+1.1,-19.5,'z',0.85], [-12.6,GY+1.8,-29.6,'x',0.8], [-17.0,GY+1.8,-32.0,'z',0.8],
+    [-13.2,GY+1.8,-34.4,'x',0.8], [-7,GY+7.5,-33,'x',0.9], [-14.5,GY+8.6,-33.6,'x',0.8], [-15,GY+18.2,-33,'x',0.9],
+    [21.0,GY+1.0,-12,'x',0.38], [24,GY+10.5,-12,'y',0.55], [21.5,GY+14.0,-12,'x',1.0], [9.0,GY+2.4,-11.5,'x',0.9] ]},
+  // alto: entre los rascacielos, sobre el depósito, el molino y la grúa, y en picado bajo la pasarela
+  cielo:{start:[-8.2,GY+4.6,18.0], yaw:Math.PI, rings:[
+    [-8.2,GY+8.5,31.5,'z',1.4], [-9.5,GY+12.5,52.5,'z',1.6], [-10.9,GY+12,68,'z',1.6], [-10.9,GY+21,74.5,'y',1.8],
+    [10.4,GY+17,69,'z',1.6], [38.9,GY+14,69,'z',1.6], [21,GY+15,31,'x',1.3], [25.8,GY+14.5,-12,'y',1.3],
+    [-10,GY+23.6,-33,'z',1.3], [-8.2,GY+1.3,22.4,'x',0.95] ]}
+};
+const HUNT_START = {start:[0.15,GY+0.4,12.4], yaw:Math.PI};
+const GAMES = ['casa','barrio','obra','cielo','caza'];
+const GAMENAME = {casa:'Casa', barrio:'Barrio', obra:'Obra y molino', cielo:'Cielo', caza:'Caza'};
+const GAMEDESC = {
+  casa:'Circuito de 15 aros por las dos plantas de la casa, en orden. El crono arranca al cruzar el primero.',
+  barrio:'11 aros por la calle del parque: los aros colgantes de la pasarela, los dos arcos, el halfpipe, el túnel de los contenedores, el depósito de agua y el agujero del cartel. Se acaba entrando por la ventana del salón.',
+  obra:'12 aros: salta la valla del jardín, entra en la obra, haz eslalon entre los pilares, cruza el marco de la grúa y la segunda planta, pasa bajo la pluma, entra al molino por la puerta y sal por el agujero del tejado.',
+  cielo:'10 aros altos: despegas de la pasarela, subes entre los rascacielos, pasas sobre el depósito, el molino y la grúa, y acabas en picado bajo la pasarela.',
+  caza:'Hay seis coches dando vueltas a la manzana sin parar, pero solo uno es tu objetivo: el que empieza más lejos de ti, marcado con una columna de luz roja. Tu dron es una bomba: estréllalo contra ese coche. Si chocas con cualquier otra cosa (una pared, el suelo, otro coche) el dron explota y pierdes. Si el objetivo te ve llegar, acelera y da volantazos; desde arriba o por detrás te ve peor. El crono arranca al despegar.'
+};
+let GAME = store.get('game','casa'); if(!GAMES.includes(GAME)) GAME='casa';
+let START_YAW = 0;
+const rings = [], _ringGeo = {}, _lblTex = {};
+let nextRing = 0, raceT = 0, racing = false, raceDone = false, lastRec = null, resultTxt = '', recTab = GAME;
+const raceModes = new Set();   // modos de vuelo usados en la carrera: el tiempo cuenta para el más fácil
+// récords: los 3 mejores tiempos de cada juego en cada modo de vuelo
+const REC = (()=>{ const r=store.get('records',null); return (r && typeof r==='object' && !Array.isArray(r)) ? r : {}; })();
+if(!store.get('recMig',false)){
+  const old=store.get('best',null), m=['beginner','angle','horizon','acro'].includes(flightMode) ? flightMode : 'beginner';
+  if(typeof old==='number' && isFinite(old) && old>0){ const c=REC.casa=(REC.casa && typeof REC.casa==='object') ? REC.casa : {}; const arr=Array.isArray(c[m]) ? c[m] : []; arr.push(old); arr.sort((x,y)=>x-y); c[m]=arr.slice(0,3); store.set('records',REC); }
+  store.set('recMig',true);
+}
+function recList(g,m){ const a=REC[g] && REC[g][m]; return Array.isArray(a) ? a.filter(v=>typeof v==='number' && isFinite(v) && v>0).sort((x,y)=>x-y).slice(0,3) : []; }
+function bestOf(g,m){ const a=recList(g,m); return a.length ? a[0] : null; }
+function addRecord(g,m,t){ const a=recList(g,m); a.push(t); a.sort((x,y)=>x-y); const top=a.slice(0,3); if(!REC[g] || typeof REC[g]!=='object') REC[g]={}; REC[g][m]=top; store.set('records',REC); return top.indexOf(t); }
+function fmtRec(t){ if(t===null||t===undefined) return '–'; t=Math.round(t*100)/100; const m=Math.floor(t/60), s=t-m*60; return m+':'+(s<10?'0':'')+s.toFixed(2).replace('.',','); }
+function recMode(){ for(const m of MODES) if(raceModes.has(m)) return m; return flightMode; }
+const _ps = new V3();
+function gameStart(){ return GAME==='caza' ? HUNT_START : CIRCUITS[GAME]; }
+function applyStart(){ const s=gameStart(), gy=probeVertical(_ps.set(s.start[0],s.start[1],s.start[2]))[0]; START.set(s.start[0], gy+0.0145, s.start[2]); START_YAW=s.yaw||0; }
+function ringGeo(R){ const k=R.toFixed(3); if(!_ringGeo[k]){ const tube=Math.min(0.1,Math.max(0.03,R*0.065)); _ringGeo[k]={t:new THREE.TorusGeometry(R,tube,10,Math.max(48,Math.round(R*40))), d:new THREE.CircleGeometry(R-tube,32)}; } return _ringGeo[k]; }
+function ringLabel(n){ return _lblTex[n] || (_lblTex[n]=labelTex(String(n),'#ffd23f')); }
 function buildRings(){
-  const geo=new THREE.TorusGeometry(RING_R,0.03,10,48);
-  const discGeo=new THREE.CircleGeometry(RING_R-0.03,32);
-  RINGS.forEach((r,i)=>{
-    const g=new THREE.Group(); g.position.set(r[0],r[1],r[2]);
-    if(r[3]==='x') g.rotation.y=Math.PI/2; else if(r[3]==='y') g.rotation.x=Math.PI/2;
+  for(const r of rings) scene.remove(r.g);
+  rings.length=0; nextRing=0;
+  const C=CIRCUITS[GAME];
+  if(C) C.rings.forEach((r,i)=>{
+    const R=r[4]||RING_R, ax=r[3], G=ringGeo(R), g=new THREE.Group(); g.position.set(r[0],r[1],r[2]);
+    if(ax==='x') g.rotation.y=Math.PI/2; else if(ax==='y') g.rotation.x=Math.PI/2; else if(typeof ax==='number') g.rotation.y=ax;
     const mat=new THREE.MeshBasicMaterial({color:0x39e6ff,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false});
-    const t=new THREE.Mesh(geo,mat); g.add(t);
+    g.add(new THREE.Mesh(G.t,mat));
     const dm=new THREE.MeshBasicMaterial({color:0xffd23f,transparent:true,opacity:0.0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
-    const disc=new THREE.Mesh(discGeo,dm); g.add(disc);
-    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex(String(i+1),'#ffd23f'),depthWrite:false,transparent:true}));
-    sp.scale.set(0.18,0.18,1); sp.position.set(0,RING_R+0.16,0); g.add(sp);
+    g.add(new THREE.Mesh(G.d,dm));
+    const sc=0.18*Math.max(1,R/0.45*0.55), sp=new THREE.Sprite(new THREE.SpriteMaterial({map:ringLabel(i+1),depthWrite:false,transparent:true}));
+    sp.scale.set(sc,sc,1); sp.position.set(0,R+sc*0.9,0); g.add(sp);
     scene.add(g);
-    const n=new V3(r[3]==='x'?1:0, r[3]==='y'?1:0, r[3]==='z'?1:0);
-    rings.push({g,mat,dm,sp,pos:new V3(r[0],r[1],r[2]),n});
+    const n = ax==='x' ? new V3(1,0,0) : ax==='y' ? new V3(0,1,0) : typeof ax==='number' ? new V3(Math.sin(ax),0,Math.cos(ax)) : new V3(0,0,1);
+    rings.push({g,mat,dm,sp,pos:new V3(r[0],r[1],r[2]),n,R});
   });
   refreshRings();
 }
@@ -2181,8 +2301,269 @@ function checkRings(prev, cur){
     const t = d0/(d0-d1 || 1e-9);
     _tmp.copy(prev).lerp(cur,t).sub(r.pos);
     const radial = Math.sqrt(Math.max(0,_tmp.lengthSq() - sq(_tmp.dot(r.n))));
-    if(radial < RING_R-0.02) onRing();
+    if(radial < r.R-0.02) onRing();
   }
+}
+
+/* ---------- Caza: seis coches dan vueltas a la manzana; el dron es una bomba ---------- */
+// línea central: rectas y cuartos de círculo (el centro de cada curva queda a la derecha del sentido +s)
+const LOOP = (()=>{
+  const {X,Z1,Z2,R}=ROAD, segs=[]; let L=0;
+  const line=(x0,z0,x1,z1)=>{ const len=Math.hypot(x1-x0,z1-z0); segs.push({k:0,x0,z0,tx:(x1-x0)/len,tz:(z1-z0)/len,s0:L,len}); L+=len; };
+  const arc=(cx,cz,a0)=>{ const len=R*Math.PI/2; segs.push({k:1,cx,cz,a0,s0:L,len}); L+=len; };
+  line(-X+R,Z1, X-R,Z1); arc(X-R,Z1+R,-Math.PI/2);
+  line(X,Z1+R, X,Z2-R); arc(X-R,Z2-R,0);
+  line(X-R,Z2, -X+R,Z2); arc(-X+R,Z2-R,Math.PI/2);
+  line(-X,Z2-R, -X,Z1+R); arc(-X+R,Z1+R,Math.PI);
+  return {segs,L,R};
+})();
+function loopAt(s,o){
+  const L=LOOP.L; s=((s%L)+L)%L;
+  let sg=LOOP.segs[0]; for(const q of LOOP.segs){ if(s>=q.s0) sg=q; else break; }
+  const u=s-sg.s0;
+  if(sg.k===0){ o.x=sg.x0+sg.tx*u; o.z=sg.z0+sg.tz*u; o.tx=sg.tx; o.tz=sg.tz; o.arc=false; }
+  else { const a=sg.a0+u/LOOP.R; o.x=sg.cx+LOOP.R*Math.cos(a); o.z=sg.cz+LOOP.R*Math.sin(a); o.tx=-Math.sin(a); o.tz=Math.cos(a); o.arc=true; }
+  return o;
+}
+// lo listos que son los coches según el modo de vuelo: en Principiante van más despacio y esquivan peor
+// (swap: puede invadir el otro carril para esquivar; blast: a qué distancia de la carrocería estalla la bomba)
+const HUNT_P = {
+  beginner:{cruise:[5,7],  flee:7.5, lat:0.9, range:14, react:0.8,  swap:false, hi:2.6, blast:0.5},
+  angle:   {cruise:[7,9],  flee:12,  lat:2.4, range:22, react:0.45, swap:true,  hi:3.9, blast:0.3},
+  horizon: {cruise:[8,10], flee:15,  lat:3.2, range:27, react:0.35, swap:true,  hi:3.9, blast:0.22},
+  acro:    {cruise:[9,11], flee:18,  lat:3.8, range:30, react:0.28, swap:true,  hi:3.9, blast:0.18}
+};
+const CAR_COLORS = [[0xff6b57,'rojo'],[0xffd23f,'amarillo'],[0x3ddc97,'verde'],[0x3d7dd8,'azul'],[0xb58fe0,'morado'],[0xf4f1ea,'blanco']];
+const HUNT = {cars:[], clock:0, spotToast:-9, burnt:null, alertTex:null};
+const FX = {list:[], tf:null, ts:null, tc:null};
+let boomHide = false; const boomPos = new V3();
+const _lp={}, _lq={}, _eye=new V3(), _hp=new V3();
+function makeCarMesh(color){
+  const saved=parts; parts=[];
+  const b=F(0,0,0,0), c=MC(color,{shininess:80,specular:0x777777}), gl=MC(0x243447,{shininess:100,specular:0xffffff});
+  b(-0.85,0.3,-2.1,0.85,0.95,2.1,c); b(-0.75,0.95,-1.1,0.75,1.5,1.0,c);
+  b(-0.72,0.98,-1.13,0.72,1.45,-1.08,gl); b(-0.72,0.98,0.98,0.72,1.45,1.03,gl); b(-0.77,1.0,-1.0,0.77,1.45,0.9,gl);
+  b(-0.8,0.62,2.1,-0.45,0.78,2.13,MB(0xfff6cc)); b(0.45,0.62,2.1,0.8,0.78,2.13,MB(0xfff6cc)); b(-0.8,0.62,-2.13,-0.5,0.76,-2.1,MB(0xff3b2f)); b(0.5,0.62,-2.13,0.8,0.76,-2.1,MB(0xff3b2f));
+  b(-0.86,0.3,-2.15,0.86,0.45,-2.1,MAT.metal); b(-0.86,0.3,2.1,0.86,0.45,2.15,MAT.metal);
+  for(const [wx,wz] of [[-0.85,-1.35],[0.85,-1.35],[-0.85,1.35],[0.85,1.35]]) CylR(wx,0.33,wz,0.33,0.33,0.24,MAT.black,16,0,0,Math.PI/2);
+  const g=new THREE.Group(), meshes=mergeParts(parts,g); parts=saved;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:HUNT.alertTex,depthWrite:false,transparent:true})); sp.scale.set(0.95,0.95,1); sp.position.set(0,4.15,0); sp.visible=false; g.add(sp);
+  const tg=new THREE.Sprite(new THREE.SpriteMaterial({map:HUNT.targetTex,depthWrite:false,transparent:true})); tg.scale.set(1.3,1.3,1); tg.position.set(0,2.85,0); tg.visible=false; g.add(tg);
+  const beam=new THREE.Mesh(HUNT.beamGeo, HUNT.beamMat); beam.position.set(0,23.5,0); beam.visible=false; g.add(beam);
+  return {g, meshes, mats:meshes.map(m=>m.material), sp, tg, beam};
+}
+function targetTex(){
+  const c=mkCanvas(128,128), g=c.getContext('2d');
+  [[58,'#ff4d3a'],[45,'#ffffff'],[32,'#ff4d3a'],[18,'#ffffff'],[8,'#ff4d3a']].forEach(([r,col])=>{ g.beginPath(); g.arc(64,64,r,0,Math.PI*2); g.fillStyle=col; g.fill(); });
+  g.lineWidth=6; g.strokeStyle='#1f1b3a'; g.beginPath(); g.arc(64,64,58,0,Math.PI*2); g.stroke();
+  return toTex(c,false);
+}
+function buildCars(){
+  HUNT.alertTex=labelTex('!','#ff6b57'); HUNT.burnt=MC(0x2c2826,{shininess:4}); HUNT.targetTex=targetTex();
+  HUNT.beamGeo=new THREE.CylinderGeometry(0.3,0.3,42,12,1,true);
+  HUNT.beamMat=new THREE.MeshBasicMaterial({color:0xff4d3a,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}); HUNT.beamMat.userData.noShadow=true;
+  CAR_COLORS.forEach(([col,name],i)=>{ const m=makeCarMesh(col); scene.add(m.g);
+    HUNT.cars.push(Object.assign(m,{name, dir:i<3?1:-1, s:0, o:1.75, to:1.75, v:0, r:0, x:0, z:0, hx:0, hz:1, alert:0, decT:0, seeT:0, dead:false, smokeT:0, fireT:0, burnT:0, target:false, lead:null, leadGap:1e9})); });
+  resetHunt();
+}
+function resetHunt(){
+  const P=huntP(), L=LOOP.L, b1=rnd(), b2=rnd();
+  HUNT.cars.forEach((c,i)=>{
+    const k=i%3; c.s=(((k/3)+(c.dir>0?b1:b2))%1)*L; c.o=c.to=1.75; c.r=rnd(); c.v=P.cruise[0]+(P.cruise[1]-P.cruise[0])*c.r;
+    c.alert=0; c.decT=0; c.seeT=i*0.025; c.dead=false; c.burnT=0; c.sp.visible=false;
+    c.meshes.forEach((m,j)=>{ m.material=c.mats[j]; });
+    loopAt(c.s,_lp); c.hx=_lp.tx*c.dir; c.hz=_lp.tz*c.dir; placeCar(c,0);
+    c.g.visible = GAME==='caza';
+  });
+  let far=null, fd=-1; for(const c of HUNT.cars){ const dd=(c.x-START.x)**2+(c.z-START.z)**2; if(dd>fd){ fd=dd; far=c; } }
+  HUNT.target=far; for(const c of HUNT.cars){ c.target=c===far; c.tg.visible=c.beam.visible=c.target; }
+  for(const p of FX.list){ p.on=false; p.sp.visible=false; }
+  boomHide=false; HUNT.spotToast=-9;
+}
+function huntP(){ return HUNT_P[flightMode] || HUNT_P.angle; }
+function placeCar(c,dt){
+  loopAt(c.s,_lp); const p=c.o*c.dir, x=_lp.x-_lp.tz*p, z=_lp.z+_lp.tx*p;
+  if(dt>0){ const dx=x-c.x, dz=z-c.z, l=Math.hypot(dx,dz); if(l>1e-4){ const k=Math.min(1,dt*12); c.hx+=(dx/l-c.hx)*k; c.hz+=(dz/l-c.hz)*k; const n=Math.hypot(c.hx,c.hz)||1; c.hx/=n; c.hz/=n; } }
+  c.x=x; c.z=z; c.g.position.set(x,GY,z); c.g.rotation.y=Math.atan2(c.hx,c.hz);
+}
+// ¿ve el conductor el dron? Por el parabrisas y las ventanillas (unos 75° a cada lado), no lo que está muy alto (el techo lo tapa); de cerca lo oye
+function carSees(c,P){
+  const p=drone.pos, dx=p.x-c.x, dz=p.z-c.z, dy=p.y-(GY+1.25), dist=Math.hypot(dx,dy,dz);
+  if(dist>P.range) return false;
+  const hd=Math.hypot(dx,dz)||1e-6, cosH=(dx*c.hx+dz*c.hz)/hd, elev=Math.atan2(dy,hd);
+  if(dist>P.range*0.3 && !(cosH>0.26 && elev<0.7)) return false;
+  _eye.set(c.x,GY+1.25,c.z);
+  return segHit(_eye,p,0)>0.97;
+}
+function oppositeClear(c,ahead){
+  const L=LOOP.L; ahead=ahead||48;
+  for(const o of HUNT.cars){ if(o.dead || o.dir===c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<ahead || g>L-10) return false; }
+  return true;
+}
+// volantazo: hacia el lado de la calzada más lejano del dron (puede invadir el otro carril si viene libre)
+function dodgeTarget(c){
+  const d=drone; loopAt(c.s,_lp);
+  const rx=-_lp.tz*c.dir, rz=_lp.tx*c.dir, ax=d.pos.x-c.x, az=d.pos.z-c.z;
+  const ahead=ax*c.hx+az*c.hz, latD=c.o+(ax*rx+az*rz);
+  const P=huntP();
+  if(ahead<-5) return (P.swap && !_lp.arc && c.leadGap<18 && oppositeClear(c,70)) ? -1.75 : 1.75;   // te deja atrás: adelanta si puede
+  const lo=(P.swap && !_lp.arc && oppositeClear(c)) ? -2.6 : 0.95, hi=P.hi, need=1.45;
+  const tReach=Math.max(0,ahead)/Math.max(c.v,1), side=Math.sign(c.o-latD) || (rnd()<0.5?-1:1);
+  const same=side>0?hi:lo, other=side>0?lo:hi, roomSame=Math.abs(same-latD), roomOther=Math.abs(other-latD);
+  // se aparta por el lado del dron en el que ya está; cruza al otro solo si por el suyo no cabe y le da tiempo
+  if(roomSame<need && roomOther>=need && Math.abs(other-c.o)/P.lat < tReach-0.2) return other;
+  if(tReach>1.8 && roomOther>=need && rnd()<0.3) return other;   // finta de lejos
+  return same;
+}
+function cornerLimit(c,alert){
+  const a=alert?9:6.5; let lim=99;
+  for(let dd=0; dd<=30; dd+=5){ loopAt(c.s+c.dir*dd,_lq); if(!_lq.arc) continue; const r=Math.max(1.5, LOOP.R-c.o*c.dir); lim=Math.min(lim, Math.sqrt(a*r+14*dd)); }
+  return lim;
+}
+function followLimit(c){
+  const L=LOOP.L; let best=1e9, lead=null, bestAny=1e9;
+  for(const o of HUNT.cars){ if(o===c || o.dead || o.dir!==c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<bestAny) bestAny=g;
+    if(Math.abs(o.o-c.o)>1.95) continue;   // va por otro carril: no estorba
+    if(g<best){ best=g; lead=o; } }
+  c.leadGap=bestAny;
+  return lead ? Math.max(0, lead.v+(best-10)*1.3) : 99;
+}
+function onSpotted(c,P){
+  c.decT=Math.min(c.decT,0.12); c.sp.visible=true;
+  const dist=Math.hypot(drone.pos.x-c.x, drone.pos.z-c.z);
+  sfxHorn(clamp(1-dist/45,0.2,1));
+  if(HUNT.clock-HUNT.spotToast>2.5){ HUNT.spotToast=HUNT.clock; toast('¡El coche '+c.name+' te ha visto!',1300); }
+}
+function inCar(c,p,m){
+  const ax=p.x-c.x, az=p.z-c.z, ly=p.y-GY; m=m||0.14;
+  if(ly<-0.1 || ly>1.5+m) return false;
+  const lz=ax*c.hx+az*c.hz, lx=ax*c.hz-az*c.hx;
+  if(Math.abs(lx)<0.86+m && Math.abs(lz)<2.15+m && ly<0.95+m) return true;
+  return Math.abs(lx)<0.77+m && lz>-1.13-m && lz<1.03+m;
+}
+function droneBoom(p){
+  const d=drone; explode(p.x,p.y,p.z); boomHide=true; boomPos.copy(p);
+  d.armed=false; d.crashed=true; d.vel.set(0,0,0); d.w.set(0,0,0);
+  flashA=0.9; shake(0.16); sfxBoom(); vibrate(450,1);
+}
+function huntLive(){ return GAME==='caza' && racing && !raceDone && !boomHide; }
+function huntFail(what){
+  racing=false; raceDone=true; lastRec=null;
+  toast('¡Boom! '+what,3000);
+  resultTxt='¡Boom! '+what+'. Este intento no cuenta para los récords.';
+  $('result').innerHTML='¡Boom! '+what+'. <span class="rm">Este intento no cuenta para los récords.</span>';
+  endRunSoon(2600);
+}
+function carHit(c,p){
+  c.dead=true; c.alert=0; c.sp.visible=false; c.tg.visible=false; c.beam.visible=false; c.burnT=0;
+  for(const m of c.meshes) m.material=HUNT.burnt;
+  droneBoom(p);
+  if(!racing || raceDone){ toast('¡Boom!',1500); return; }
+  if(c.target) finishRun('¡Has cazado el coche '+c.name);
+  else huntFail('Ese no era: has volado el coche '+c.name+' y el objetivo era el '+HUNT.target.name);
+}
+// en la caza cualquier golpe de verdad hace explotar el dron (posarse suave en el suelo no)
+function huntCrash(why){ droneBoom(drone.pos); huntFail(why); }
+function updateHunt(dt, prev){
+  const d=drone, P=huntP(), L=LOOP.L;
+  HUNT.clock+=dt;
+  if(!racing && !raceDone && d.armed){ racing=true; raceT=0; raceModes.clear(); }
+  if(boomHide){ d.pos.copy(boomPos); d.vel.set(0,0,0); d.w.set(0,0,0); }
+  for(const c of HUNT.cars){
+    if(c.dead){
+      c.v=Math.max(0,c.v-dt*7); c.o=approach(c.o,4.4,dt*1.5); c.burnT+=dt;
+      c.smokeT-=dt; if(c.smokeT<=0){ c.smokeT=0.22; fxPuff(false, c.x+(rnd()-0.5)*0.8, GY+1.3, c.z+(rnd()-0.5)*1.4, (rnd()-0.5)*0.4, 1.1+rnd()*0.5, (rnd()-0.5)*0.4, 0.7, 3.2, 3.2); }
+      if(c.burnT<7){ c.fireT-=dt; if(c.fireT<=0){ c.fireT=0.1; fxPuff(true, c.x+(rnd()-0.5)*1.2, GY+1.0, c.z+(rnd()-0.5)*2.4, 0, 1.6, 0, 0.35, 1.3, 0.5); } }
+    } else {
+      c.seeT-=dt;   // solo el objetivo sabe que le persigues: los demás coches siguen a lo suyo (y te pasan por encima)
+      if(c.target && c.seeT<=0){ c.seeT=0.15; if(!raceDone && !boomHide && carSees(c,P)){ if(c.alert<=0) onSpotted(c,P); c.alert=3.5; } }
+      if(c.alert>0){ c.alert-=dt; if(c.alert<=0) c.sp.visible=false; else c.sp.visible = c.alert>1 || (HUNT.clock*6%1)<0.6; }
+      const alert=c.alert>0;
+      if(alert){ c.decT-=dt; if(c.decT<=0){ c.decT=P.react+rnd()*0.35; c.to=dodgeTarget(c); } }
+      else c.to=1.75;
+      if(c.o<0.6 && !oppositeClear(c,30)) c.to=Math.max(c.to,1.75);   // de vuelta a su carril si viene alguien de frente
+      c.o=approach(c.o,c.to,dt*(alert?P.lat:1.2));
+      let vt = alert ? P.flee : P.cruise[0]+(P.cruise[1]-P.cruise[0])*c.r;
+      vt=Math.max(1.5, Math.min(vt, cornerLimit(c,alert), followLimit(c)));
+      c.v = c.v<vt ? Math.min(vt, c.v+dt*(alert?6:3.5)) : Math.max(vt, c.v-dt*9);
+    }
+    loopAt(c.s,_lp); const pl=c.o*c.dir, kk=_lp.arc ? LOOP.R/Math.max(1,LOOP.R-pl) : 1;
+    c.s=(((c.s+c.dir*c.v*dt*kk)%L)+L)%L; placeCar(c,dt);
+  }
+  // ¿ha chocado el dron contra algún coche? (se comprueba a lo largo del movimiento del fotograma)
+  if(!boomHide && racing && !raceDone){
+    for(const c of HUNT.cars){ if(c.dead || Math.abs(d.pos.x-c.x)>7 || Math.abs(d.pos.z-c.z)>7) continue;
+      const m = c.target ? 0.1+P.blast : 0.12;
+      for(let k=1;k<=4;k++){ _hp.copy(prev).lerp(d.pos,k/4); if(inCar(c,_hp,m)){ carHit(c,_hp.clone()); return; } } }
+  }
+}
+// humo y fuego: sprites reutilizables
+function puffTex(rgb, a1){ const c=mkCanvas(64,64), g=c.getContext('2d'), gr=g.createRadialGradient(32,32,2,32,32,31);
+  gr.addColorStop(0,'rgba('+rgb+',1)'); gr.addColorStop(0.45,'rgba('+rgb+','+a1+')'); gr.addColorStop(1,'rgba('+rgb+',0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); return toTex(c,false); }
+function fxPuff(fire, x,y,z, vx,vy,vz, s0,s1,life, core){
+  let p=null; for(const q of FX.list) if(!q.on && q.fire===fire){ p=q; break; }
+  if(!p){ if(FX.list.length>=80) return;
+    if(!FX.tf){ FX.tf=puffTex('255,170,60',0.7); FX.ts=puffTex('58,55,60',0.6); FX.tc=puffTex('255,244,210',0.8); }
+    const m=new THREE.SpriteMaterial({map:fire?FX.tf:FX.ts, transparent:true, depthWrite:false, blending:fire?THREE.AdditiveBlending:THREE.NormalBlending});
+    const sp=new THREE.Sprite(m); scene.add(sp); p={sp,m,fire,on:false,v:new V3()}; FX.list.push(p); }
+  if(fire) p.m.map = core ? FX.tc : FX.tf;
+  p.on=true; p.t=0; p.life=life; p.s0=s0; p.s1=s1; p.v.set(vx,vy,vz); p.sp.position.set(x,y,z); p.sp.scale.set(s0,s0,1); p.sp.visible=true; p.m.opacity=fire?1:0;
+}
+function updateFX(dt){
+  for(const p of FX.list){ if(!p.on) continue;
+    p.t+=dt; const k=p.t/p.life; if(k>=1){ p.on=false; p.sp.visible=false; continue; }
+    p.sp.position.addScaledVector(p.v,dt); p.v.multiplyScalar(Math.max(0,1-dt*(p.fire?2.2:0.5)));
+    const sc=p.s0+(p.s1-p.s0)*(1-(1-k)*(1-k)); p.sp.scale.set(sc,sc,1);
+    p.m.opacity = p.fire ? (1-k)*(1-k) : 0.8*Math.min(1,k/0.12)*(1-k);
+  }
+}
+function explode(x,y,z){
+  for(let i=0;i<4;i++) fxPuff(true, x,y,z, (rnd()-0.5)*1.2, 0.6+rnd(), (rnd()-0.5)*1.2, 0.6, 3.2+rnd()*1.2, 0.35+rnd()*0.15, true);
+  for(let i=0;i<14;i++){ const a=rnd()*Math.PI*2, e=rnd()*1.1, v=2+rnd()*4.5; fxPuff(true, x,y,z, Math.cos(a)*Math.cos(e)*v, Math.sin(e)*v+1.2, Math.sin(a)*Math.cos(e)*v, 0.5, 2.2+rnd()*1.8, 0.5+rnd()*0.45); }
+  for(let i=0;i<14;i++){ const a=rnd()*Math.PI*2, v=0.8+rnd()*2.2; fxPuff(false, x+(rnd()-0.5),y+0.3,z+(rnd()-0.5), Math.cos(a)*v, 1.3+rnd()*1.6, Math.sin(a)*v, 1.0, 4+rnd()*3, 2.6+rnd()*2.2); }
+}
+// lo que muestran el HUD y la marca: el siguiente aro o el coche más cercano
+function nearestCar(){ let best=null, bd=1e18; for(const c of HUNT.cars){ if(c.dead) continue; const dd=(c.x-drone.pos.x)**2+(c.z-drone.pos.z)**2; if(dd<bd){ bd=dd; best=c; } } return best; }
+const _tp=new V3();
+function targetPos(){ if(GAME==='caza'){ const c=HUNT.target; if(raceDone || boomHide || !c || c.dead) return null; return _tp.set(c.x,GY+0.9,c.z); } return nextRing<rings.length ? rings[nextRing].pos : null; }
+function targetLbl(p){ const dd=p.distanceTo(drone.pos); return GAME==='caza' ? 'Coche '+(HUNT.target?HUNT.target.name:'')+'  '+dd.toFixed(0)+' m' : 'Aro '+(nextRing+1)+'  '+dd.toFixed(1).replace('.',',')+' m'; }
+function goalLbl(){ return GAME==='caza' ? 'Objetivo' : 'Aros'; }
+function goalTxt(){ if(GAME==='caza'){ if(raceDone || boomHide) return HUNT.target && HUNT.target.dead ? '¡Cazado!' : '¡Boom!'; const p=targetPos(); return p ? p.distanceTo(drone.pos).toFixed(0)+' m' : '–'; } return Math.min(nextRing,rings.length)+'/'+rings.length; }
+// cambiar de juego (menú de inicio o de pausa)
+function setGame(g){
+  if(!GAMES.includes(g)) return;
+  GAME=g; store.set('game',g);
+  buildRings(); applyStart(); resetFlight();
+  if(!XR.on && state==='pause') state='menu';
+  recTab=g; updateGameUI(); renderRecs();
+  if(XR.on){ vrAfterReset(); XR.hudDirty=true; XR.osdDirty=true; toast('Juego: '+GAMENAME[g],1200); }
+  else if(state!=='play') showMenu();
+}
+function cycleGame(k){ setGame(GAMES[(GAMES.indexOf(GAME)+k+GAMES.length)%GAMES.length]); }
+function updateGameUI(){
+  document.querySelectorAll('.game').forEach(b=>{ const on=b.dataset.g===GAME; b.classList.toggle('sel',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  $('gameDesc').textContent=GAMEDESC[GAME]; $('ringLbl').textContent=goalLbl();
+}
+function renderRecs(){
+  document.querySelectorAll('.rtab').forEach(b=>{ const on=b.dataset.r===recTab; b.classList.toggle('sel',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  $('recBody').innerHTML = MODES.map(m=>{ const a=recList(recTab,m); let tds='';
+    for(let i=0;i<3;i++){ const t=a[i], nw=lastRec && lastRec.g===recTab && lastRec.m===m && lastRec.i===i; tds+='<td class="'+(t===undefined?'empty':'')+(nw?' new':'')+'">'+(t===undefined?'–':fmtRec(t))+'</td>'; }
+    return '<tr'+(m===flightMode?' class="cur"':'')+'><th scope="row">'+MODENAME[m]+'</th>'+tds+'</tr>'; }).join('');
+}
+function recLine(){ const a=recList(GAME,flightMode); return 'Récords '+GAMENAME[GAME]+' ('+MODENAME[flightMode]+'):   '+[0,1,2].map(i=>(i+1)+'.º '+(a[i]!==undefined?fmtRec(a[i]):'–')).join('    '); }
+function finishRun(what){
+  racing=false; raceDone=true;
+  const m=recMode(), t=Math.round(raceT*100)/100, place=addRecord(GAME,m,t), best=bestOf(GAME,m);
+  lastRec = place>=0 ? {g:GAME,m,i:place} : null;
+  const tail = place===0 ? '¡Nuevo récord!' : place===1 ? '¡Segundo mejor tiempo!' : place===2 ? '¡Tercer mejor tiempo!' : 'Récord: '+fmtRec(best);
+  toast(what+' en '+fmtRec(t)+'! '+tail, 2800);
+  resultTxt = what+' en '+fmtRec(t)+'! ('+MODENAME[m]+') '+tail;
+  $('result').innerHTML = what+' en <b>'+fmtRec(t)+'</b>! <span class="rm">('+MODENAME[m]+')</span> '+tail;
+  recTab=GAME; renderRecs();
+  endRunSoon(GAME==='caza' ? 2600 : 1800);
+}
+function endRunSoon(ms){
+  setTimeout(()=>{ if(state==='play' && raceDone){ state='pause'; showMenu(); $('result').style.display='block'; if(XR.on){ XR.hudDirty=true; XR.osdDirty=true; } } }, ms);
 }
 
 /* ============ Trucos de freestyle (huecos que se detectan al cruzarlos) ============ */
@@ -2231,7 +2612,7 @@ function onTrick(t){
 buildHouse(); furnish(); buildExterior(); buildFreestyle(); buildConstruction(); buildCourt(); buildWindmill(); buildStreetDecor();
 mergeParts(parts, scene); parts = [];
 buildSkyline();
-buildSky(); buildTrain(); buildRings();
+buildSky(); buildTrain(); buildRings(); applyStart(); buildCars(); drone.pos.copy(START);
 const droneMesh = buildDroneMesh(); scene.add(droneMesh.g);
 const blob = new THREE.Mesh(new THREE.PlaneGeometry(1,1), new THREE.MeshBasicMaterial({map:blobTex(), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
 blob.rotation.x=-Math.PI/2; scene.add(blob);
@@ -2278,6 +2659,7 @@ window.addEventListener('keydown', e=>{
     case 'KeyM': cycleMode(); break;
     case 'KeyR': if(state==='play') resetFlight(); break;
     case 'KeyF': setFps(!FPS.on, state==='play'); break;
+    case 'KeyG': if(state!=='play') cycleGame(e.shiftKey?-1:1); break;
     case 'KeyP': case 'Escape': togglePause(); break;
     case 'Enter': if(state!=='play') startGame(); break;
   }
@@ -2347,7 +2729,8 @@ function pollPad(dt){
   if(xrPad){ const a=XR.ax; if(Math.abs(a[0])>Math.abs(lx)) lx=a[0]; if(Math.abs(a[1])>Math.abs(ly)) ly=a[1]; if(Math.abs(a[2])>Math.abs(rx)) rx=a[2]; if(Math.abs(a[3])>Math.abs(ry)) ry=a[3]; }
   gp.lx=lx; gp.ly=ly; gp.rx=rx; gp.ry=ry;
   if(xrPad || Math.abs(lx)+Math.abs(ly)+Math.abs(rx)+Math.abs(ry)>0.25) lastSrc='gp';
-  if(XR.on && state==='pause'){ if(Math.abs(lx)>0.6){ XR.volT-=(dt||0); if(XR.volT<=0){ setVol(SET.vol+(lx>0?5:-5)); XR.volT=0.16; } } else XR.volT=0; }
+  if(XR.on && state==='pause'){ if(Math.abs(lx)>0.6){ XR.volT-=(dt||0); if(XR.volT<=0){ setVol(SET.vol+(lx>0?5:-5)); XR.volT=0.16; } } else XR.volT=0;
+    if(Math.abs(rx)>0.7){ if(!XR.gameLatch){ XR.gameLatch=true; cycleGame(rx>0?1:-1); } } else if(Math.abs(rx)<0.35) XR.gameLatch=false; }
   if(p){ const n=Math.min(p.buttons.length,17);
     for(let i=0;i<n;i++){ const now=!!(p.buttons[i] && p.buttons[i].pressed); if(now && !gp.prev[i]) onPadButton(i); gp.prev[i]=now; } }
 }
@@ -2363,6 +2746,7 @@ function onPadButton(i){
       else if(i===4||i===10||i===11) vrAction();
       else if(i===9||i===8){ state='pause'; XR.hudDirty=true; }
     } else if(state==='pause'){
+      if(i===14||i===15){ cycleGame(i===15?1:-1); return; }
       if(i===0||i===9) startGame(); else if(i===3){ cycleMode(); XR.hudDirty=true; } else if(i===2||i===5){ cycleVRCam(); XR.hudDirty=true; } else if(i===4) setFps(!FPS.on);
       else if(i===1){ resetFlight(); startGame(); vrAfterReset(); }
     }
@@ -2372,6 +2756,7 @@ function onPadButton(i){
     if(i===12){ focusSlider(slFocus<=0 ? SL.length-1 : slFocus-1); return; }
     if(i===13){ focusSlider((slFocus+1)%SL.length); return; }
     if(i===14||i===15){ if(slFocus<0) focusSlider(0); const o=SL[slFocus]; setSetting(slFocus, SET[o.k]+(i===15?o.step:-o.step)); sfxBeep(i===15?740:560,0.04); return; }
+    if(i===4||i===5){ cycleGame(i===5?1:-1); sfxBeep(i===5?740:560,0.04); return; }
     if(i===0||i===9) startGame(); else if(i===3) cycleMode(); else if(i===2) setFps(!FPS.on); else if(i===1 && state==='pause'){ resetFlight(); startGame(); }
     return;
   }
@@ -2453,6 +2838,8 @@ const sfxBeep = (f,d)=>tone(f,d,0,'square',0.08);
 const sfxRing = ()=>{ tone(988,0.12,0,'triangle',0.16); tone(1319,0.2,0.09,'triangle',0.16); };
 const sfxHit = v=>noiseHit(Math.min(0.35,0.06*v),0.12,900+v*300);
 const sfxCrash = ()=>{ noiseHit(0.5,0.45,2200); tone(70,0.35,0,'sine',0.3); };
+const sfxBoom = ()=>{ noiseHit(0.95,1.6,520); noiseHit(0.45,0.35,3200); tone(48,1.1,0,'sine',0.5); tone(96,0.45,0,'triangle',0.22); };
+const sfxHorn = v=>{ v=v||1; tone(392,0.3,0,'square',0.07*v); tone(494,0.3,0,'square',0.06*v); tone(392,0.22,0.36,'square',0.07*v); tone(494,0.22,0.36,'square',0.06*v); };
 
 /* ============ Acciones ============ */
 function toggleArm(){
@@ -2472,15 +2859,16 @@ function setMode(m){
   document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('sel', b.dataset.m===m));
   $('modeChip').textContent=MODENAME[m];
   $('stLlbl').textContent = m==='beginner' ? 'Subir y girar' : 'Gas y girar';
+  renderRecs();
 }
 function cycleMode(){ const m=MODES[(MODES.indexOf(flightMode)+1)%MODES.length]; setMode(m); if(state==='play') toast('Modo '+MODENAME[m]); }
 function cycleCam(){ camMode=CAMS[(CAMS.indexOf(camMode)+1)%CAMS.length]; store.set('cam',camMode); $('camLbl').textContent=CAMNAME[camMode]; cam.init=false; if(state==='play') toast('Cámara: '+CAMNAME[camMode],900); }
 function resetFlight(){
   const d=drone;
-  d.pos.copy(START); d.vel.set(0,0,0); d.q.set(0,0,0,1); d.w.set(0,0,0); d.thrust=0; d.spin=0; d.battery=1; d.armed=false; d.crashed=false; d.damage=0;
+  d.pos.copy(START); d.vel.set(0,0,0); d.q.setFromAxisAngle(AX_Y, START_YAW); d.w.set(0,0,0); d.thrust=0; d.spin=0; d.battery=1; d.armed=false; d.crashed=false; d.damage=0;
   d.noise.set(0,0,0); d.vI.set(0,0,0); d.millCool=0; d.fanCool=0; d.hitCool=0; d.landT=0; d.autoArmOK=true; thrHold=true; kbThr=0;
-  nextRing=0; raceT=0; racing=false; raceDone=false; refreshRings();
-  cam.init=false; cam.yaw=0; $('result').style.display='none';
+  nextRing=0; raceT=0; racing=false; raceDone=false; raceModes.clear(); refreshRings(); resetHunt();
+  cam.init=false; cam.yaw=START_YAW; $('result').style.display='none';
   if(state==='play') toast('Listo para despegar',1100);
 }
 function crash(msg){
@@ -2499,23 +2887,22 @@ function handleImpact(v){
 }
 function onRing(){
   const i=nextRing; nextRing++;
-  if(i===0){ racing=true; raceT=0; }
+  if(i===0){ racing=true; raceT=0; raceModes.clear(); raceModes.add(flightMode); }
   sfxRing(); vibrate(30,0.3);
-  if(nextRing>=rings.length){
-    racing=false; raceDone=true;
-    const rec = bestTime===null || raceT<bestTime; if(rec){ bestTime=raceT; store.set('best',bestTime); }
-    toast('¡Circuito completado en '+fmtTime(raceT)+'!',2600);
-    $('result').innerHTML='Circuito completado en <b>'+fmtTime(raceT)+'</b>'+(rec?'. ¡Nuevo récord!':'. Récord: '+fmtTime(bestTime));
-    setTimeout(()=>{ if(state==='play' && raceDone){ state='pause'; showMenu(); $('result').style.display='block'; } },1800);
-  } else if(i>0) toast('Aro '+(i+1)+' de '+rings.length,650);
+  if(nextRing>=rings.length) finishRun('¡Circuito '+GAMENAME[GAME]+' completado');
+  else if(i>0) toast('Aro '+(i+1)+' de '+rings.length,650);
   refreshRings();
 }
 function postPhysics(dt){
   const d=drone;
-  if(d.frameImpact>0) handleImpact(d.frameImpact);
-  if(d.millHit){ d.millHit=false; d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Un aspa del molino golpeó el dron!'); }
+  if(d.frameImpact>0){
+    const ground=d.impactN.y>0.6;
+    if(huntLive() && d.frameImpact>(ground?1.6:0.8)) huntCrash(ground ? 'Te has estrellado contra el suelo' : 'Te has estrellado');
+    else handleImpact(d.frameImpact);
+  }
+  if(d.millHit){ d.millHit=false; if(huntLive()) huntCrash('Un aspa del molino te ha alcanzado'); else { d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Un aspa del molino golpeó el dron!'); } }
   d.millCool-=dt;
-  if(d.fanHit){ d.fanHit=false; d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Las aspas del ventilador golpearon el dron!'); }
+  if(d.fanHit){ d.fanHit=false; if(huntLive()) huntCrash('Te has metido en las aspas del ventilador'); else { d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Las aspas del ventilador golpearon el dron!'); } }
   d.fanCool-=dt; d.hitCool=(d.hitCool||0)-dt;
   if(d.armed){
     d.battery=Math.max(0, d.battery - dt*(0.06+Math.pow(d.thrust/HOVER_T,1.5))/380);
@@ -2553,8 +2940,8 @@ function updateCamera(dt){
   if(XR.on){ updateVR(dt); return; }
   if(state==='menu'){
     const t=performance.now()*0.00013;
-    camera.position.set(START.x+Math.cos(t)*1.25, 0.7+Math.sin(t*1.7)*0.12, START.z+Math.sin(t)*0.95);
-    camera.lookAt(START.x,0.22,START.z); droneMesh.g.visible=true; setFov(60); return;
+    camera.position.set(START.x+Math.cos(t)*1.25, START.y+0.69+Math.sin(t*1.7)*0.12, START.z+Math.sin(t)*0.95);
+    camera.lookAt(START.x,START.y+0.2,START.z); droneMesh.g.visible=true; setFov(60); return;
   }
   if(state==='pause') return;
   const psi=headingOf(d.q);
@@ -2639,6 +3026,7 @@ function animate(dt, now){
   tvT+=dt; if(tvT>0.08){ tvT=0; drawTV(t); }
   rings.forEach((r,i)=>{ if(i===nextRing){ const p=1+0.05*Math.sin(t*6); r.g.scale.set(p,p,p); r.dm.opacity=0.07+0.05*Math.sin(t*6); } else r.g.scale.set(1,1,1); });
   if(cloudGroup) cloudGroup.rotation.y += dt*0.004;
+  if(state==='play' && FX.list.length) updateFX(dt);
 }
 const _lampSort=[];
 function updateLights(){
@@ -2688,8 +3076,8 @@ function updateHUD(dt){
   const b=d.battery, v=volts();
   el.batFill.style.width=(b*100).toFixed(0)+'%'; el.batFill.style.background = b>0.5 ? 'var(--mint)' : b>0.2 ? 'var(--sun)' : 'var(--tomato)';
   el.batTxt.textContent=v.toFixed(1).replace('.',',')+' V';
-  el.ringTxt.textContent=Math.min(nextRing,rings.length)+'/'+rings.length;
-  el.timeTxt.textContent=fmtTime(raceT); el.bestTxt.textContent=fmtTime(bestTime);
+  el.ringTxt.textContent=goalTxt();
+  el.timeTxt.textContent=fmtTime(raceT); el.bestTxt.textContent=fmtTime(bestOf(GAME,flightMode));
   el.dmgFill.style.width=(d.damage*100).toFixed(0)+'%';
   const armTxt = d.armed ? 'Armado' : d.crashed ? 'Estrellado' : 'Desarmado';
   if(el.armChip.textContent!==armTxt){ el.armChip.textContent=armTxt; el.armChip.className='chip '+(d.armed?'on':d.crashed?'bad':'off'); }
@@ -2703,10 +3091,11 @@ function updateHUD(dt){
 }
 function updateMarker(){
   const m=el.marker;
-  if(state!=='play' || nextRing>=rings.length){ m.style.display='none'; return; }
-  const r=rings[nextRing], W=window.innerWidth, H=window.innerHeight;
-  _r.copy(r.pos).sub(camera.position); camera.getWorldDirection(_f); const behind=_r.dot(_f)<0;
-  _tmp.copy(r.pos).project(camera);
+  const tp=targetPos();
+  if(state!=='play' || !tp){ m.style.display='none'; return; }
+  const W=window.innerWidth, H=window.innerHeight;
+  _r.copy(tp).sub(camera.position); camera.getWorldDirection(_f); const behind=_r.dot(_f)<0;
+  _tmp.copy(tp).project(camera);
   let x=_tmp.x, y=_tmp.y; if(behind){ x=-x; y=-y; if(Math.abs(x)<1e-3 && Math.abs(y)<1e-3) y=-1; }
   const on = !behind && Math.abs(x)<0.9 && Math.abs(y)<0.85;
   const dia=m.children[0], arr=m.children[1], lbl=m.children[2];
@@ -2715,7 +3104,7 @@ function updateMarker(){
   else { const s=1/Math.max(Math.abs(x)/0.86, Math.abs(y)/0.72, 1e-6); x*=s; y*=s; sx=(x*0.5+0.5)*W; sy=(-y*0.5+0.5)*H;
     dia.style.display='none'; arr.style.display='block'; arr.style.transform=`rotate(${(Math.atan2(-y,x)-Math.PI).toFixed(3)}rad)`; }
   m.style.display='block'; m.style.transform=`translate(${(sx-hudOff.x).toFixed(1)}px,${(sy-hudOff.y).toFixed(1)}px)`;
-  lbl.textContent='Aro '+(nextRing+1)+'  '+r.pos.distanceTo(drone.pos).toFixed(1).replace('.',',')+' m';
+  lbl.textContent=targetLbl(tp);
 }
 
 /* ============ Menú ============ */
@@ -2732,6 +3121,7 @@ const HELP = {
     <tr><td>A</td><td>Armar o parar motores (en modo manual, con el stick izquierdo abajo)</td></tr>
     <tr><td>B / X / Y</td><td>Reiniciar, cambiar cámara, cambiar modo</td></tr>
     <tr><td>Start</td><td>Pausa</td></tr>
+    <tr><td>LB / RB</td><td>En el menú: cambiar de juego (circuitos o caza)</td></tr>
     <tr><td>Ajustes</td><td>Más abajo puedes suavizar el gas para que la potencia fuerte quede al final del stick</td></tr></table>
     <p>Distribución «modo 2», como una emisora de radiocontrol. Funciona con mandos Xbox, PlayStation y la mayoría de mandos que reconoce el navegador.</p>`,
   kb: `<table>
@@ -2741,6 +3131,7 @@ const HELP = {
     <tr><td>Espacio</td><td>Armar o parar motores</td></tr>
     <tr><td>C / M / R</td><td>Cámara, modo de vuelo, reiniciar</td></tr>
     <tr><td>F</td><td>Mostrar u ocultar los FPS</td></tr>
+    <tr><td>G</td><td>En el menú: cambiar de juego (circuitos o caza)</td></tr>
     <tr><td>P o Esc</td><td>Pausa</td></tr></table>`,
   vr: `<table>
     <tr><td>Stick izquierdo</td><td>Gas o subir y bajar, y girar (modo 2, como una emisora). Al soltarlo vuelve al centro, que es el punto de vuelo estático.</td></tr>
@@ -2751,6 +3142,7 @@ const HELP = {
     <tr><td>Gatillo derecho</td><td>De pie, pasarela o halfpipe: girarte hacia el dron (de pie, además, te acerca a él). Detrás del dron: fijar tu frente actual. FPV 2D: poner la pantalla delante de ti</td></tr>
     <tr><td>Clic del stick izquierdo</td><td>Volumen: 0, 25, 50, 75 o 100 %. En pausa, el stick izquierdo a los lados lo ajusta de 5 en 5</td></tr>
     <tr><td>Gatillo izquierdo</td><td>Pausa</td></tr>
+    <tr><td>En pausa</td><td>Stick derecho a los lados (o la cruceta izquierda y derecha de un mando del PC): cambiar de juego</td></tr>
     <tr><td>Gatillos laterales</td><td>Mantén los dos un segundo para salir de la VR</td></tr>
     <tr><td>Mando del PC</td><td>También vale en VR un mando normal (Xbox, PlayStation…), con los mismos botones que fuera: A armar, B reiniciar, X o RB cámara, Y modo, Start pausa, cruceta arriba y abajo volumen. LB o el clic de un stick hace lo mismo que el gatillo derecho de las gafas.</td></tr></table>
     <p><b>En las gafas</b> (Quest 2, 3 o 3S): abre esta página en el navegador de Meta Quest y pulsa «Jugar en VR». <b>Con el PC</b>: conecta las gafas con Quest Link o Air Link, abre la página en Chrome o Edge y pulsa «Jugar en VR».</p>
@@ -2863,12 +3255,15 @@ function showMenu(){
 function hideMenu(){ $('menu').classList.add('hidden'); }
 function startGame(){
   initAudio(); if(isMobile) enterFs();
+  const fresh = state==='menu' || raceDone;
   if(state==='menu') resetFlight();
   if(raceDone && state==='pause'){ resetFlight(); }
   state='play'; hideMenu(); try{ canvas.focus({preventScroll:true}); }catch(e){}
   cam.init=false; last=performance.now(); acc=0; layoutSticks();
   if(isMobile && window.innerHeight>window.innerWidth){ el.rotHint.style.display='block'; rotHintT=4; }
   if(!drone.armed) toast(flightMode==='beginner' ? (lastSrc==='touch' ? 'Sube el stick izquierdo para despegar' : lastSrc==='gp' ? 'Pulsa A o sube el stick izquierdo' : 'Pulsa Espacio o W para despegar') : (lastSrc==='gp' ? 'Stick izquierdo abajo y pulsa A para armar' : lastSrc==='touch' ? 'Pulsa Armar y sube el stick izquierdo' : 'Pulsa Espacio para armar'), 2400);
+  if(fresh && GAME!=='casa') setTimeout(()=>{ if(state==='play' && !raceDone && (GAME==='caza' || !racing)) toast(GAME==='caza' ? 'Tu objetivo: el coche '+HUNT.target.name+', el de la columna de luz roja. La flecha te lleva hasta él' : 'Circuito '+GAMENAME[GAME]+': cruza los '+rings.length+' aros en orden', 3000); }, 2600);
+  if(fresh && GAME==='caza') setTimeout(()=>{ if(state==='play' && !raceDone) toast('Ojo: si chocas con cualquier otra cosa, el dron explota', 2600); }, 5800);
 }
 function togglePause(){
   if(state==='play'){ state='pause'; $('result').style.display = raceDone ? 'block' : 'none'; showMenu(); }
@@ -3008,11 +3403,13 @@ function pauseLines(){
     'A o gatillo izquierdo: seguir  ·  Y: reiniciar',
     'X: modo ('+MODENAME[flightMode]+')  ·  B: cámara ('+VRCAMNAME[XR.cam]+')',
     'Stick izq. a los lados: volumen  ·  Gatillo dcho.: FPS ('+(FPS.on?'sí':'no')+')',
+    'Stick dcho. a los lados: juego ('+GAMENAME[GAME]+')',
     'Mantén los dos gatillos laterales para salir de la VR'
   ] : [
     'A o Start: seguir  ·  B: reiniciar',
     'Y: modo ('+MODENAME[flightMode]+')  ·  X o RB: cámara ('+VRCAMNAME[XR.cam]+')',
-    'Stick izq. o cruceta: volumen  ·  LB: FPS ('+(FPS.on?'sí':'no')+')',
+    'Stick izq. o cruceta arriba y abajo: volumen  ·  LB: FPS ('+(FPS.on?'sí':'no')+')',
+    'Cruceta a los lados o stick dcho.: juego ('+GAMENAME[GAME]+')',
     'Para salir de la VR, pulsa el botón de Meta de las gafas'
   ];
 }
@@ -3027,7 +3424,7 @@ function drawOSD(){
   if(FPS.on) txt(FPS.val+' FPS', W-40, 96, 'right', 34, FPS.val>=55?'#3ddc97':FPS.val>=30?'#ffd23f':'#ff6b57');
   txt(kmh.toFixed(0)+' km/h', 40, H-48, 'left', 42);
   txt(alt.toFixed(1).replace('.',',')+' m', 290, H-48, 'left', 42);
-  txt('Aros '+Math.min(nextRing,rings.length)+'/'+rings.length+'  ·  Trucos '+tricksFound.size+'/'+TRICKS.length, W-40, H-48, 'right', 34);
+  txt(goalLbl()+' '+goalTxt()+'  ·  Trucos '+tricksFound.size+'/'+TRICKS.length, W-40, H-48, 'right', 34);
   g.strokeStyle='rgba(255,255,255,0.75)'; g.lineWidth=3; g.beginPath();
   g.moveTo(W/2-28,H/2); g.lineTo(W/2-9,H/2); g.moveTo(W/2+9,H/2); g.lineTo(W/2+28,H/2); g.moveTo(W/2,H/2-9); g.lineTo(W/2,H/2-22); g.stroke();
   if(!d.armed) txt(d.crashed ? 'ESTRELLADO' : 'DESARMADO', W/2, H/2+92, 'center', 50, d.crashed ? '#ff6b57' : '#ffd23f');
@@ -3035,9 +3432,10 @@ function drawOSD(){
   else if(!XR.padL && !XR.padR && !gp.pad) txt('Coge los mandos para pilotar', W/2, 128, 'center', 40, '#ffd23f');
   if(state==='pause'){
     g.fillStyle='rgba(12,10,22,0.74)'; g.fillRect(0,0,W,H);
-    txt('Pausa', W/2, 190, 'center', 80, '#ffd23f');
-    pauseLines().forEach((t,i)=>txt(t, W/2, 300+i*64, 'center', 36, i===3 ? '#c3bdf0' : '#ffffff'));
-    txt('Volumen '+SET.vol+' %', W/2, 600, 'center', 38);
+    txt('Pausa · '+GAMENAME[GAME], W/2, 140, 'center', 72, '#ffd23f');
+    txt(raceDone && resultTxt ? resultTxt : recLine(), W/2, 222, 'center', 32, raceDone ? '#3ddc97' : '#ffd23f');
+    pauseLines().forEach((t,i)=>txt(t, W/2, 300+i*58, 'center', 34, i===4 ? '#c3bdf0' : '#ffffff'));
+    txt('Volumen '+SET.vol+' %', W/2, 630, 'center', 36);
   }
   R.otex.needsUpdate=true;
 }
@@ -3128,10 +3526,11 @@ function drawVRHud(){
   rrect(g,6,6,W-12,H-12,34); g.fillStyle='rgba(31,27,58,0.84)'; g.fill(); g.lineWidth=6; g.strokeStyle='#ffd23f'; g.stroke();
   g.textBaseline='middle'; g.textAlign='left';
   if(state==='pause'){
-    g.fillStyle='#ffd23f'; g.font='700 54px '+F; g.fillText('Pausa', 40, 56);
-    g.textAlign='right'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText('Volumen '+SET.vol+' %', W-40, 56); g.textAlign='left';
-    g.font='500 32px '+F;
-    pauseLines().forEach((t,i)=>{ g.fillStyle = i===3 ? '#c3bdf0' : '#ffffff'; g.fillText(t, 40, 120+i*52); });
+    g.fillStyle='#ffd23f'; g.font='700 48px '+F; g.fillText('Pausa · '+GAMENAME[GAME], 40, 50);
+    g.textAlign='right'; g.fillStyle='#ffffff'; g.font='600 32px '+F; g.fillText('Volumen '+SET.vol+' %', W-40, 50); g.textAlign='left';
+    g.fillStyle = raceDone ? '#3ddc97' : '#ffd23f'; g.font='600 28px '+F; g.fillText(raceDone && resultTxt ? resultTxt : recLine(), 40, 98, W-80);
+    g.font='500 28px '+F;
+    pauseLines().forEach((t,i)=>{ g.fillStyle = i===4 ? '#c3bdf0' : '#ffffff'; g.fillText(t, 40, 140+i*38); });
     if(FPS.on){ g.textAlign='center'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText(FPS.val+' FPS', W/2, 56); g.textAlign='left'; }
   } else {
     const st = d.armed ? ['ARMADO','#3ddc97'] : d.crashed ? ['ESTRELLADO','#ff6b57'] : ['DESARMADO','#9a95b8'];
@@ -3146,12 +3545,12 @@ function drawVRHud(){
     g.textAlign='right'; g.fillStyle='#ffffff'; g.font='600 34px '+F; g.fillText(v.toFixed(1).replace('.',',')+' V', W-36, 128);
     g.textAlign='left'; g.font='600 40px '+F;
     const kmh=d.vel.length()*3.6, alt=Math.max(0,d.pos.y-d.groundY-0.014);
-    g.fillText(kmh.toFixed(0)+' km/h    '+alt.toFixed(1).replace('.',',')+' m    Aros '+Math.min(nextRing,rings.length)+'/'+rings.length+'    '+fmtTime(raceT), 32, 160);
+    g.fillText(kmh.toFixed(0)+' km/h    '+alt.toFixed(1).replace('.',',')+' m    '+goalLbl()+' '+goalTxt()+'    '+fmtTime(raceT), 32, 160);
     if(toastT>0 && toastMsg){ g.fillStyle='#ffd23f'; g.font='700 42px '+F; g.fillText(toastMsg, 32, 248); }
     else if(!XR.padL && !XR.padR && !gp.pad){ g.fillStyle='#ffd23f'; g.font='700 40px '+F; g.fillText('Coge los mandos de las gafas para pilotar', 32, 248); }
     else {
       let s='Trucos '+tricksFound.size+'/'+TRICKS.length+'   ·   '+VRCAMNAME[XR.cam];
-      if(nextRing<rings.length) s+='   ·   Aro '+(nextRing+1)+' a '+rings[nextRing].pos.distanceTo(d.pos).toFixed(1).replace('.',',')+' m';
+      { const tp=targetPos(); if(tp) s+='   ·   '+targetLbl(tp); }
       if(d.damage>0.05) s+='   ·   Daños '+(d.damage*100).toFixed(0)+' %';
       g.fillStyle='#c3bdf0'; g.font='500 34px '+F; g.fillText(s, 32, 248);
     }
@@ -3329,6 +3728,9 @@ $('cFps').addEventListener('change', e=>setFps(e.target.checked));
 setFps(FPS.on);
 
 setMode(flightMode); $('camLbl').textContent=CAMNAME[camMode]; setSound(AU.on);
+document.querySelectorAll('.game').forEach(b=>b.addEventListener('click',()=>setGame(b.dataset.g)));
+document.querySelectorAll('.rtab').forEach(b=>b.addEventListener('click',()=>{ recTab=b.dataset.r; renderRecs(); }));
+updateGameUI(); renderRecs();
 selectTab(isXRBrowser ? 'vr' : isTouch ? 'touch' : 'kb'); updatePadInfo(); measureHud(); onResize();
 
 /* ============ Bucle principal ============ */
@@ -3352,13 +3754,15 @@ function tick(now, xrFrame){
     acc+=dt; let n=0; while(acc>=SUB && n<14){ const k=Math.max(1,Math.ceil(d.vel.length()*SUB/0.02)); for(let j=0;j<k;j++) physStep(SUB/k,input); acc-=SUB; n++; } if(n>=14) acc=0;
     d.grounded=d.hadGround;
     postPhysics(dt);
+    if(GAME==='caza') updateHunt(dt, prevPos);
     checkRings(prevPos, d.pos);
     if(d.armed) checkTricks(prevPos, d.pos, dt);
     windT+=dt;
-    if(racing) raceT+=dt;
+    if(racing){ raceT+=dt; raceModes.add(flightMode); }
   }
   if(state!=='play') updateCurveDot();
   animate(dt, now); updateDroneVisual(dt, now); updateCamera(dt); if(!XR.on) viewPos.copy(camera.position);
+  if(boomHide){ droneMesh.g.visible=false; blob.material.opacity=0; }
   updateLights(); if(XR.on) updateVRHud(dt); else updateHUD(dt); updateAudio();
   { const fp = state==='play' ? d.pos : START, sx=Math.round(fp.x*4)/4, sz=Math.round(fp.z*4)/4;
     const kk=Math.max(SUN_K, (fp.y-2.2+5)/10.8);   // si el dron sube por encima del sol de las sombras, lo alejamos

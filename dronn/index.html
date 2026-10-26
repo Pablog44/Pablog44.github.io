@@ -298,12 +298,12 @@ body.vr #hud,body.vr #menu{display:none}
 
 <div id="menu"><div id="card" class="sticker">
   <h1 id="title">Dron en casa</h1>
-  <p id="sub">Pilota un dron con conductos por una casa de dos plantas y su barrio. Elige juego: cuatro circuitos de aros contra el crono, o la caza, en la que lanzas el dron como una bomba contra uno de los coches que dan vueltas a la manzana. Mientras vuelas, busca los 18 trucos de freestyle: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, una obra con grúa y tuberías, una pista con portería y canasta, y un molino en el que puedes entrar por la puerta y salir por el tejado. También puedes jugar con gafas Meta Quest.</p>
+  <p id="sub">Pilota un dron con conductos por una casa de dos plantas y su barrio. Elige juego: cuatro circuitos de aros contra el crono, o la caza: entre los coches que dan vueltas a la manzana hay uno marcado, y tienes que lanzar el dron como una bomba contra él sin chocar con nada más. Mientras vuelas, busca los 18 trucos de freestyle: arcos, aros colgantes, halfpipe, contenedores, un cartel con agujero, un depósito de agua, una obra con grúa y tuberías, una pista con portería y canasta, y un molino en el que puedes entrar por la puerta y salir por el tejado. También puedes jugar con gafas Meta Quest.</p>
   <div id="result"></div>
   <div id="games">
     <h3>Juego</h3>
     <div class="gamePills" role="group" aria-label="Juego">
-      <button type="button" class="game" data-g="casa">Casa</button><button type="button" class="game" data-g="barrio">Barrio</button><button type="button" class="game" data-g="obra">Obra y molino</button><button type="button" class="game" data-g="cielo">Cielo</button><button type="button" class="game hunt" data-g="caza">Caza de coches</button>
+      <button type="button" class="game" data-g="casa">Casa</button><button type="button" class="game" data-g="barrio">Barrio</button><button type="button" class="game" data-g="obra">Obra y molino</button><button type="button" class="game" data-g="cielo">Cielo</button><button type="button" class="game hunt" data-g="caza">Caza del coche</button>
     </div>
     <p id="gameDesc"></p>
   </div>
@@ -2242,7 +2242,7 @@ const GAMEDESC = {
   barrio:'11 aros por la calle del parque: los aros colgantes de la pasarela, los dos arcos, el halfpipe, el túnel de los contenedores, el depósito de agua y el agujero del cartel. Se acaba entrando por la ventana del salón.',
   obra:'12 aros: salta la valla del jardín, entra en la obra, haz eslalon entre los pilares, cruza el marco de la grúa y la segunda planta, pasa bajo la pluma, entra al molino por la puerta y sal por el agujero del tejado.',
   cielo:'10 aros altos: despegas de la pasarela, subes entre los rascacielos, pasas sobre el depósito, el molino y la grúa, y acabas en picado bajo la pasarela.',
-  caza:'Seis coches dan vueltas a la manzana sin parar. Tu dron es una bomba: estréllalo contra uno. Si te ven llegar aceleran y dan volantazos; desde arriba o por detrás te ven peor. El crono arranca al despegar.'
+  caza:'Hay seis coches dando vueltas a la manzana sin parar, pero solo uno es tu objetivo: el que empieza más lejos de ti, marcado con una columna de luz roja. Tu dron es una bomba: estréllalo contra ese coche. Si chocas con cualquier otra cosa (una pared, el suelo, otro coche) el dron explota y pierdes. Si el objetivo te ve llegar, acelera y da volantazos; desde arriba o por detrás te ve peor. El crono arranca al despegar.'
 };
 let GAME = store.get('game','casa'); if(!GAMES.includes(GAME)) GAME='casa';
 let START_YAW = 0;
@@ -2328,10 +2328,10 @@ function loopAt(s,o){
 // lo listos que son los coches según el modo de vuelo: en Principiante van más despacio y esquivan peor
 // (swap: puede invadir el otro carril para esquivar; blast: a qué distancia de la carrocería estalla la bomba)
 const HUNT_P = {
-  beginner:{cruise:[5,7],  flee:8,  lat:1.4, range:16, react:0.65, swap:false, blast:0.45},
-  angle:   {cruise:[7,9],  flee:12, lat:2.4, range:22, react:0.45, swap:true,  blast:0.3},
-  horizon: {cruise:[8,10], flee:15, lat:3.2, range:27, react:0.35, swap:true,  blast:0.22},
-  acro:    {cruise:[9,11], flee:18, lat:3.8, range:30, react:0.28, swap:true,  blast:0.18}
+  beginner:{cruise:[5,7],  flee:7.5, lat:0.9, range:14, react:0.8,  swap:false, hi:2.6, blast:0.5},
+  angle:   {cruise:[7,9],  flee:12,  lat:2.4, range:22, react:0.45, swap:true,  hi:3.9, blast:0.3},
+  horizon: {cruise:[8,10], flee:15,  lat:3.2, range:27, react:0.35, swap:true,  hi:3.9, blast:0.22},
+  acro:    {cruise:[9,11], flee:18,  lat:3.8, range:30, react:0.28, swap:true,  hi:3.9, blast:0.18}
 };
 const CAR_COLORS = [[0xff6b57,'rojo'],[0xffd23f,'amarillo'],[0x3ddc97,'verde'],[0x3d7dd8,'azul'],[0xb58fe0,'morado'],[0xf4f1ea,'blanco']];
 const HUNT = {cars:[], clock:0, spotToast:-9, burnt:null, alertTex:null};
@@ -2347,24 +2347,36 @@ function makeCarMesh(color){
   b(-0.86,0.3,-2.15,0.86,0.45,-2.1,MAT.metal); b(-0.86,0.3,2.1,0.86,0.45,2.15,MAT.metal);
   for(const [wx,wz] of [[-0.85,-1.35],[0.85,-1.35],[-0.85,1.35],[0.85,1.35]]) CylR(wx,0.33,wz,0.33,0.33,0.24,MAT.black,16,0,0,Math.PI/2);
   const g=new THREE.Group(), meshes=mergeParts(parts,g); parts=saved;
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:HUNT.alertTex,depthWrite:false,transparent:true})); sp.scale.set(0.95,0.95,1); sp.position.set(0,2.55,0); sp.visible=false; g.add(sp);
-  return {g, meshes, mats:meshes.map(m=>m.material), sp};
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:HUNT.alertTex,depthWrite:false,transparent:true})); sp.scale.set(0.95,0.95,1); sp.position.set(0,4.15,0); sp.visible=false; g.add(sp);
+  const tg=new THREE.Sprite(new THREE.SpriteMaterial({map:HUNT.targetTex,depthWrite:false,transparent:true})); tg.scale.set(1.3,1.3,1); tg.position.set(0,2.85,0); tg.visible=false; g.add(tg);
+  const beam=new THREE.Mesh(HUNT.beamGeo, HUNT.beamMat); beam.position.set(0,23.5,0); beam.visible=false; g.add(beam);
+  return {g, meshes, mats:meshes.map(m=>m.material), sp, tg, beam};
+}
+function targetTex(){
+  const c=mkCanvas(128,128), g=c.getContext('2d');
+  [[58,'#ff4d3a'],[45,'#ffffff'],[32,'#ff4d3a'],[18,'#ffffff'],[8,'#ff4d3a']].forEach(([r,col])=>{ g.beginPath(); g.arc(64,64,r,0,Math.PI*2); g.fillStyle=col; g.fill(); });
+  g.lineWidth=6; g.strokeStyle='#1f1b3a'; g.beginPath(); g.arc(64,64,58,0,Math.PI*2); g.stroke();
+  return toTex(c,false);
 }
 function buildCars(){
-  HUNT.alertTex=labelTex('!','#ff6b57'); HUNT.burnt=MC(0x2c2826,{shininess:4});
+  HUNT.alertTex=labelTex('!','#ff6b57'); HUNT.burnt=MC(0x2c2826,{shininess:4}); HUNT.targetTex=targetTex();
+  HUNT.beamGeo=new THREE.CylinderGeometry(0.3,0.3,42,12,1,true);
+  HUNT.beamMat=new THREE.MeshBasicMaterial({color:0xff4d3a,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}); HUNT.beamMat.userData.noShadow=true;
   CAR_COLORS.forEach(([col,name],i)=>{ const m=makeCarMesh(col); scene.add(m.g);
-    HUNT.cars.push(Object.assign(m,{name, dir:i<3?1:-1, s:0, o:1.75, to:1.75, v:0, r:0, x:0, z:0, hx:0, hz:1, alert:0, decT:0, seeT:0, dead:false, smokeT:0, fireT:0, burnT:0})); });
+    HUNT.cars.push(Object.assign(m,{name, dir:i<3?1:-1, s:0, o:1.75, to:1.75, v:0, r:0, x:0, z:0, hx:0, hz:1, alert:0, decT:0, seeT:0, dead:false, smokeT:0, fireT:0, burnT:0, target:false, lead:null, leadGap:1e9})); });
   resetHunt();
 }
 function resetHunt(){
-  const P=huntP(), L=LOOP.L;
+  const P=huntP(), L=LOOP.L, b1=rnd(), b2=rnd();
   HUNT.cars.forEach((c,i)=>{
-    const k=i%3; c.s=((k/3)+(c.dir>0?0.04:0.21))*L; c.o=c.to=1.75; c.r=rnd(); c.v=P.cruise[0]+(P.cruise[1]-P.cruise[0])*c.r;
+    const k=i%3; c.s=(((k/3)+(c.dir>0?b1:b2))%1)*L; c.o=c.to=1.75; c.r=rnd(); c.v=P.cruise[0]+(P.cruise[1]-P.cruise[0])*c.r;
     c.alert=0; c.decT=0; c.seeT=i*0.025; c.dead=false; c.burnT=0; c.sp.visible=false;
     c.meshes.forEach((m,j)=>{ m.material=c.mats[j]; });
     loopAt(c.s,_lp); c.hx=_lp.tx*c.dir; c.hz=_lp.tz*c.dir; placeCar(c,0);
     c.g.visible = GAME==='caza';
   });
+  let far=null, fd=-1; for(const c of HUNT.cars){ const dd=(c.x-START.x)**2+(c.z-START.z)**2; if(dd>fd){ fd=dd; far=c; } }
+  HUNT.target=far; for(const c of HUNT.cars){ c.target=c===far; c.tg.visible=c.beam.visible=c.target; }
   for(const p of FX.list){ p.on=false; p.sp.visible=false; }
   boomHide=false; HUNT.spotToast=-9;
 }
@@ -2383,9 +2395,9 @@ function carSees(c,P){
   _eye.set(c.x,GY+1.25,c.z);
   return segHit(_eye,p,0)>0.97;
 }
-function oppositeClear(c){
-  const L=LOOP.L;
-  for(const o of HUNT.cars){ if(o.dead || o.dir===c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<48 || g>L-10) return false; }
+function oppositeClear(c,ahead){
+  const L=LOOP.L; ahead=ahead||48;
+  for(const o of HUNT.cars){ if(o.dead || o.dir===c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<ahead || g>L-10) return false; }
   return true;
 }
 // volantazo: hacia el lado de la calzada más lejano del dron (puede invadir el otro carril si viene libre)
@@ -2393,8 +2405,9 @@ function dodgeTarget(c){
   const d=drone; loopAt(c.s,_lp);
   const rx=-_lp.tz*c.dir, rz=_lp.tx*c.dir, ax=d.pos.x-c.x, az=d.pos.z-c.z;
   const ahead=ax*c.hx+az*c.hz, latD=c.o+(ax*rx+az*rz);
-  if(ahead<-5) return 1.75;
-  const P=huntP(), lo=(P.swap && !_lp.arc && oppositeClear(c)) ? -2.6 : 0.95, hi=3.9, need=1.45;
+  const P=huntP();
+  if(ahead<-5) return (P.swap && !_lp.arc && c.leadGap<18 && oppositeClear(c,70)) ? -1.75 : 1.75;   // te deja atrás: adelanta si puede
+  const lo=(P.swap && !_lp.arc && oppositeClear(c)) ? -2.6 : 0.95, hi=P.hi, need=1.45;
   const tReach=Math.max(0,ahead)/Math.max(c.v,1), side=Math.sign(c.o-latD) || (rnd()<0.5?-1:1);
   const same=side>0?hi:lo, other=side>0?lo:hi, roomSame=Math.abs(same-latD), roomOther=Math.abs(other-latD);
   // se aparta por el lado del dron en el que ya está; cruza al otro solo si por el suyo no cabe y le da tiempo
@@ -2408,15 +2421,18 @@ function cornerLimit(c,alert){
   return lim;
 }
 function followLimit(c){
-  const L=LOOP.L; let best=1e9, lead=null;
-  for(const o of HUNT.cars){ if(o===c || o.dead || o.dir!==c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<best){ best=g; lead=o; } }
+  const L=LOOP.L; let best=1e9, lead=null, bestAny=1e9;
+  for(const o of HUNT.cars){ if(o===c || o.dead || o.dir!==c.dir) continue; const g=(((o.s-c.s)*c.dir)%L+L)%L; if(g<bestAny) bestAny=g;
+    if(Math.abs(o.o-c.o)>1.95) continue;   // va por otro carril: no estorba
+    if(g<best){ best=g; lead=o; } }
+  c.leadGap=bestAny;
   return lead ? Math.max(0, lead.v+(best-10)*1.3) : 99;
 }
 function onSpotted(c,P){
   c.decT=Math.min(c.decT,0.12); c.sp.visible=true;
   const dist=Math.hypot(drone.pos.x-c.x, drone.pos.z-c.z);
   sfxHorn(clamp(1-dist/45,0.2,1));
-  if(HUNT.clock-HUNT.spotToast>2.5){ HUNT.spotToast=HUNT.clock; toast('¡Te ha visto el coche '+c.name+'!',1300); }
+  if(HUNT.clock-HUNT.spotToast>2.5){ HUNT.spotToast=HUNT.clock; toast('¡El coche '+c.name+' te ha visto!',1300); }
 }
 function inCar(c,p,m){
   const ax=p.x-c.x, az=p.z-c.z, ly=p.y-GY; m=m||0.14;
@@ -2425,16 +2441,29 @@ function inCar(c,p,m){
   if(Math.abs(lx)<0.86+m && Math.abs(lz)<2.15+m && ly<0.95+m) return true;
   return Math.abs(lx)<0.77+m && lz>-1.13-m && lz<1.03+m;
 }
-function carHit(c,p){
-  const d=drone;
-  c.dead=true; c.alert=0; c.sp.visible=false; c.burnT=0;
-  for(const m of c.meshes) m.material=HUNT.burnt;
-  explode(p.x,p.y,p.z); boomHide=true; boomPos.copy(p);
+function droneBoom(p){
+  const d=drone; explode(p.x,p.y,p.z); boomHide=true; boomPos.copy(p);
   d.armed=false; d.crashed=true; d.vel.set(0,0,0); d.w.set(0,0,0);
   flashA=0.9; shake(0.16); sfxBoom(); vibrate(450,1);
-  if(racing && !raceDone) finishRun('¡Coche '+c.name+' alcanzado');
-  else toast('¡Boom!',1500);
 }
+function huntLive(){ return GAME==='caza' && racing && !raceDone && !boomHide; }
+function huntFail(what){
+  racing=false; raceDone=true; lastRec=null;
+  toast('¡Boom! '+what,3000);
+  resultTxt='¡Boom! '+what+'. Este intento no cuenta para los récords.';
+  $('result').innerHTML='¡Boom! '+what+'. <span class="rm">Este intento no cuenta para los récords.</span>';
+  endRunSoon(2600);
+}
+function carHit(c,p){
+  c.dead=true; c.alert=0; c.sp.visible=false; c.tg.visible=false; c.beam.visible=false; c.burnT=0;
+  for(const m of c.meshes) m.material=HUNT.burnt;
+  droneBoom(p);
+  if(!racing || raceDone){ toast('¡Boom!',1500); return; }
+  if(c.target) finishRun('¡Has cazado el coche '+c.name);
+  else huntFail('Ese no era: has volado el coche '+c.name+' y el objetivo era el '+HUNT.target.name);
+}
+// en la caza cualquier golpe de verdad hace explotar el dron (posarse suave en el suelo no)
+function huntCrash(why){ droneBoom(drone.pos); huntFail(why); }
 function updateHunt(dt, prev){
   const d=drone, P=huntP(), L=LOOP.L;
   HUNT.clock+=dt;
@@ -2446,12 +2475,13 @@ function updateHunt(dt, prev){
       c.smokeT-=dt; if(c.smokeT<=0){ c.smokeT=0.22; fxPuff(false, c.x+(rnd()-0.5)*0.8, GY+1.3, c.z+(rnd()-0.5)*1.4, (rnd()-0.5)*0.4, 1.1+rnd()*0.5, (rnd()-0.5)*0.4, 0.7, 3.2, 3.2); }
       if(c.burnT<7){ c.fireT-=dt; if(c.fireT<=0){ c.fireT=0.1; fxPuff(true, c.x+(rnd()-0.5)*1.2, GY+1.0, c.z+(rnd()-0.5)*2.4, 0, 1.6, 0, 0.35, 1.3, 0.5); } }
     } else {
-      c.seeT-=dt;
-      if(c.seeT<=0){ c.seeT=0.15; if(!raceDone && !boomHide && carSees(c,P)){ if(c.alert<=0) onSpotted(c,P); c.alert=3.5; } }
+      c.seeT-=dt;   // solo el objetivo sabe que le persigues: los demás coches siguen a lo suyo (y te pasan por encima)
+      if(c.target && c.seeT<=0){ c.seeT=0.15; if(!raceDone && !boomHide && carSees(c,P)){ if(c.alert<=0) onSpotted(c,P); c.alert=3.5; } }
       if(c.alert>0){ c.alert-=dt; if(c.alert<=0) c.sp.visible=false; else c.sp.visible = c.alert>1 || (HUNT.clock*6%1)<0.6; }
       const alert=c.alert>0;
       if(alert){ c.decT-=dt; if(c.decT<=0){ c.decT=P.react+rnd()*0.35; c.to=dodgeTarget(c); } }
       else c.to=1.75;
+      if(c.o<0.6 && !oppositeClear(c,30)) c.to=Math.max(c.to,1.75);   // de vuelta a su carril si viene alguien de frente
       c.o=approach(c.o,c.to,dt*(alert?P.lat:1.2));
       let vt = alert ? P.flee : P.cruise[0]+(P.cruise[1]-P.cruise[0])*c.r;
       vt=Math.max(1.5, Math.min(vt, cornerLimit(c,alert), followLimit(c)));
@@ -2463,7 +2493,8 @@ function updateHunt(dt, prev){
   // ¿ha chocado el dron contra algún coche? (se comprueba a lo largo del movimiento del fotograma)
   if(!boomHide && racing && !raceDone){
     for(const c of HUNT.cars){ if(c.dead || Math.abs(d.pos.x-c.x)>7 || Math.abs(d.pos.z-c.z)>7) continue;
-      for(let k=1;k<=4;k++){ _hp.copy(prev).lerp(d.pos,k/4); if(inCar(c,_hp,0.1+P.blast)){ carHit(c,_hp.clone()); return; } } }
+      const m = c.target ? 0.1+P.blast : 0.12;
+      for(let k=1;k<=4;k++){ _hp.copy(prev).lerp(d.pos,k/4); if(inCar(c,_hp,m)){ carHit(c,_hp.clone()); return; } } }
   }
 }
 // humo y fuego: sprites reutilizables
@@ -2494,10 +2525,10 @@ function explode(x,y,z){
 // lo que muestran el HUD y la marca: el siguiente aro o el coche más cercano
 function nearestCar(){ let best=null, bd=1e18; for(const c of HUNT.cars){ if(c.dead) continue; const dd=(c.x-drone.pos.x)**2+(c.z-drone.pos.z)**2; if(dd<bd){ bd=dd; best=c; } } return best; }
 const _tp=new V3();
-function targetPos(){ if(GAME==='caza'){ if(raceDone || boomHide) return null; const c=nearestCar(); return c ? _tp.set(c.x,GY+0.9,c.z) : null; } return nextRing<rings.length ? rings[nextRing].pos : null; }
-function targetLbl(p){ const dd=p.distanceTo(drone.pos); return GAME==='caza' ? 'Coche '+dd.toFixed(0)+' m' : 'Aro '+(nextRing+1)+'  '+dd.toFixed(1).replace('.',',')+' m'; }
-function goalLbl(){ return GAME==='caza' ? 'Coche' : 'Aros'; }
-function goalTxt(){ if(GAME==='caza'){ if(raceDone || boomHide) return '¡Boom!'; const p=targetPos(); return p ? p.distanceTo(drone.pos).toFixed(0)+' m' : '–'; } return Math.min(nextRing,rings.length)+'/'+rings.length; }
+function targetPos(){ if(GAME==='caza'){ const c=HUNT.target; if(raceDone || boomHide || !c || c.dead) return null; return _tp.set(c.x,GY+0.9,c.z); } return nextRing<rings.length ? rings[nextRing].pos : null; }
+function targetLbl(p){ const dd=p.distanceTo(drone.pos); return GAME==='caza' ? 'Coche '+(HUNT.target?HUNT.target.name:'')+'  '+dd.toFixed(0)+' m' : 'Aro '+(nextRing+1)+'  '+dd.toFixed(1).replace('.',',')+' m'; }
+function goalLbl(){ return GAME==='caza' ? 'Objetivo' : 'Aros'; }
+function goalTxt(){ if(GAME==='caza'){ if(raceDone || boomHide) return HUNT.target && HUNT.target.dead ? '¡Cazado!' : '¡Boom!'; const p=targetPos(); return p ? p.distanceTo(drone.pos).toFixed(0)+' m' : '–'; } return Math.min(nextRing,rings.length)+'/'+rings.length; }
 // cambiar de juego (menú de inicio o de pausa)
 function setGame(g){
   if(!GAMES.includes(g)) return;
@@ -2529,7 +2560,10 @@ function finishRun(what){
   resultTxt = what+' en '+fmtRec(t)+'! ('+MODENAME[m]+') '+tail;
   $('result').innerHTML = what+' en <b>'+fmtRec(t)+'</b>! <span class="rm">('+MODENAME[m]+')</span> '+tail;
   recTab=GAME; renderRecs();
-  setTimeout(()=>{ if(state==='play' && raceDone){ state='pause'; showMenu(); $('result').style.display='block'; if(XR.on){ XR.hudDirty=true; XR.osdDirty=true; } } }, GAME==='caza' ? 2600 : 1800);
+  endRunSoon(GAME==='caza' ? 2600 : 1800);
+}
+function endRunSoon(ms){
+  setTimeout(()=>{ if(state==='play' && raceDone){ state='pause'; showMenu(); $('result').style.display='block'; if(XR.on){ XR.hudDirty=true; XR.osdDirty=true; } } }, ms);
 }
 
 /* ============ Trucos de freestyle (huecos que se detectan al cruzarlos) ============ */
@@ -2578,7 +2612,7 @@ function onTrick(t){
 buildHouse(); furnish(); buildExterior(); buildFreestyle(); buildConstruction(); buildCourt(); buildWindmill(); buildStreetDecor();
 mergeParts(parts, scene); parts = [];
 buildSkyline();
-buildSky(); buildTrain(); buildRings(); buildCars(); applyStart(); drone.pos.copy(START);
+buildSky(); buildTrain(); buildRings(); applyStart(); buildCars(); drone.pos.copy(START);
 const droneMesh = buildDroneMesh(); scene.add(droneMesh.g);
 const blob = new THREE.Mesh(new THREE.PlaneGeometry(1,1), new THREE.MeshBasicMaterial({map:blobTex(), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
 blob.rotation.x=-Math.PI/2; scene.add(blob);
@@ -2861,10 +2895,14 @@ function onRing(){
 }
 function postPhysics(dt){
   const d=drone;
-  if(d.frameImpact>0) handleImpact(d.frameImpact);
-  if(d.millHit){ d.millHit=false; d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Un aspa del molino golpeó el dron!'); }
+  if(d.frameImpact>0){
+    const ground=d.impactN.y>0.6;
+    if(huntLive() && d.frameImpact>(ground?1.6:0.8)) huntCrash(ground ? 'Te has estrellado contra el suelo' : 'Te has estrellado');
+    else handleImpact(d.frameImpact);
+  }
+  if(d.millHit){ d.millHit=false; if(huntLive()) huntCrash('Un aspa del molino te ha alcanzado'); else { d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Un aspa del molino golpeó el dron!'); } }
   d.millCool-=dt;
-  if(d.fanHit){ d.fanHit=false; d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Las aspas del ventilador golpearon el dron!'); }
+  if(d.fanHit){ d.fanHit=false; if(huntLive()) huntCrash('Te has metido en las aspas del ventilador'); else { d.damage=Math.min(1,d.damage+0.35); if(d.armed) crash('¡Las aspas del ventilador golpearon el dron!'); } }
   d.fanCool-=dt; d.hitCool=(d.hitCool||0)-dt;
   if(d.armed){
     d.battery=Math.max(0, d.battery - dt*(0.06+Math.pow(d.thrust/HOVER_T,1.5))/380);
@@ -3224,7 +3262,8 @@ function startGame(){
   cam.init=false; last=performance.now(); acc=0; layoutSticks();
   if(isMobile && window.innerHeight>window.innerWidth){ el.rotHint.style.display='block'; rotHintT=4; }
   if(!drone.armed) toast(flightMode==='beginner' ? (lastSrc==='touch' ? 'Sube el stick izquierdo para despegar' : lastSrc==='gp' ? 'Pulsa A o sube el stick izquierdo' : 'Pulsa Espacio o W para despegar') : (lastSrc==='gp' ? 'Stick izquierdo abajo y pulsa A para armar' : lastSrc==='touch' ? 'Pulsa Armar y sube el stick izquierdo' : 'Pulsa Espacio para armar'), 2400);
-  if(fresh && GAME!=='casa') setTimeout(()=>{ if(state==='play' && !raceDone && (GAME==='caza' || !racing)) toast(GAME==='caza' ? '¡A la caza! Estrella el dron contra un coche: la flecha te lleva al más cercano' : 'Circuito '+GAMENAME[GAME]+': cruza los '+rings.length+' aros en orden', 2800); }, 2600);
+  if(fresh && GAME!=='casa') setTimeout(()=>{ if(state==='play' && !raceDone && (GAME==='caza' || !racing)) toast(GAME==='caza' ? 'Tu objetivo: el coche '+HUNT.target.name+', el de la columna de luz roja. La flecha te lleva hasta él' : 'Circuito '+GAMENAME[GAME]+': cruza los '+rings.length+' aros en orden', 3000); }, 2600);
+  if(fresh && GAME==='caza') setTimeout(()=>{ if(state==='play' && !raceDone) toast('Ojo: si chocas con cualquier otra cosa, el dron explota', 2600); }, 5800);
 }
 function togglePause(){
   if(state==='play'){ state='pause'; $('result').style.display = raceDone ? 'block' : 'none'; showMenu(); }
