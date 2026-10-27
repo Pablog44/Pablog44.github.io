@@ -3842,6 +3842,7 @@ const CAR_TYPES={
   furgo:{name:'Furgoneta de Reparto',len:5.1,wid:2.0,hgt:2.3,maxV:30,acc:6.5,turn:1.5,shape:'van',hp:140},
   churros:{name:'Churromóvil',len:5.1,wid:2.0,hgt:2.4,maxV:31,acc:7,turn:1.5,shape:'van',hp:170,extra:'churros'},
   golf:{name:'Carrito de Golf',len:2.5,wid:1.3,hgt:1.85,maxV:13,acc:6,turn:2.3,shape:'golf',hp:60},
+  rs:{name:'Deportivo clásico RS',len:4.14,wid:1.62,hgt:1.32,maxV:58,acc:16,turn:1.85,shape:'car',cab:0.46,cabZ:-0.06,hp:110,grip:9.2,wr:0.31,glb:true,eye:[0.335,1.08,-0.22]},
   toro:{name:'El Toro GT',len:4.4,wid:1.95,hgt:1.18,maxV:64,acc:17,turn:1.8,shape:'car',cab:0.4,cabZ:-0.1,hp:100,grip:8.5,extra:'spoiler'},
   carroza:{name:'Carroza Imperial',len:6.3,wid:2.0,hgt:1.5,maxV:40,acc:8,turn:1.35,shape:'car',cab:0.62,cabZ:-0.05,hp:240},
   geo:{name:'Furgón del GEO',len:5.3,wid:2.05,hgt:2.5,maxV:46,acc:11,turn:1.55,shape:'van',hp:320,extra:'geo'},
@@ -3898,7 +3899,7 @@ function carCabin(g,add,paint,dark,G,T){
   for(let k=1;k<4;k++)add(chrome,W*0.44,0.008,0.034,0,cl+bh-0.17-bh*0.15+k*bh*0.075,L/2+0.013);
 }
 function buildCarMesh(type,color){
-  const T=CAR_TYPES[type];const g=new THREE.Group();g.rotation.order='YXZ';
+  const T=CAR_TYPES[type];if(T.glb)return glbCarMesh(type,color);const g=new THREE.Group();g.rotation.order='YXZ';
   const L=T.len,W=T.wid,H=T.hgt,cl=type==='golf'?0.22:0.3;
   const paint=new THREE.MeshPhongMaterial({color,shininess:70,specular:0x5a5a5a});
   const tail=new THREE.MeshLambertMaterial({color:0x8a1010,emissive:0xff2010,emissiveIntensity:0.25});
@@ -6743,7 +6744,7 @@ function cabinDims(c){
   const T=c.T,L=T.len,W=T.wid,H=T.hgt,cl=T.shape==='golf'?0.22:0.3;
   if(T.shape==='car'){const G=carGH(T);
     return{kind:'car',W,L,H,cl,fl:cl+0.12,sill:G.sill,sillF:G.sill,top:G.roof,roof:G.roof,zf:G.zf,zr:G.zr,zh:G.zh,zrh:G.zrh,zb:G.zb,rear:G.rear,xb:G.xb,xt:G.xt,xi:W*0.41,seat:cl+0.23,
-      eye:[W*0.22,G.sill+Math.min(0.3,G.gh-0.22),G.ez]};}
+      eye:T.eye||[W*0.22,G.sill+Math.min(0.3,G.gh-0.22),G.ez]};}
   if(T.shape==='van'){const bh=H-cl;
     return{kind:'van',seat:Math.max(cl+0.29,H*0.72-0.6),W,L,H,cl,fl:cl+0.15,sillF:cl+bh*0.53,sill:cl+bh*0.57,top:cl+bh*0.87,roof:H-0.07,zf:L/2-0.02,zr:L/2-1.9,zs0:L/2-0.12,zs1:L/2-1.62,xi:W/2-0.05,eye:[W*0.24,H*0.72,L/2-1.25]};}
   if(T.shape==='monster'){const cb=1.18,cL=L*0.4,cZ=L*0.06;
@@ -6826,7 +6827,8 @@ function icluster(ig,x,y,z,sport,k=1){
   return{needle:nd(-0.0825),tach:nd(0.0825)};
 }
 function ensureCarInterior(c){
-  if(c.interior)return;const D=cabinDims(c),A=imat(),T=c.T,ig=new THREE.Group(),panes=[];
+  if(c.interior)return;if(c.T.glb){c.interior={g:new THREE.Group(),gg:new THREE.Group(),spin:new THREE.Object3D(),panes:[]};return;}   // el modelo GLB ya trae su habitáculo
+  const D=cabinDims(c),A=imat(),T=c.T,ig=new THREE.Group(),panes=[];
   const gg=new THREE.Group();gg.userData.glass=1;gg.visible=false;c.mesh.add(gg);
   const gp=(mat,kind,...q)=>{const m=iquad(gg,mat.clone(),...q);m.userData.pane={kind,broken:false,base:mat};panes.push(m);return m;};   // cada cristal por separado: se puede romper
   ig.userData.int=1;ig.visible=false;c.mesh.add(ig);
@@ -7919,24 +7921,75 @@ async function glbLoad(url){
   const byName={};for(const n of nodes)byName[n.name]=n;
   return{root,byName,json:J};
 }
-// ---------------------------------------------------------------- deportivo clásico amarillo aparcado junto al Toro GT (plaza de al lado)
-const RSCAR={x:-452.6,z:-1043.5,h:Math.PI/2,urls:['modelos/rs500.glb','modelos/rs500.glb.wasm'],state:0,g:null,inner:[],t:0,col:null};
-function rsTick(dt){
-  const R=RSCAR;R.t-=dt;if(R.t>0)return;R.t=0.5;
-  const d=Math.hypot(camPos.x-R.x,camPos.z-R.z);
-  if(R.state===0&&d<380){R.state=1;const tryU=i=>glbLoad(R.urls[i]).then(m=>rsPlace(m)).catch(e=>{if(i+1<R.urls.length)return tryU(i+1);R.state=-1;console.warn('[coche GLB] no se ha podido cargar '+R.urls[0]+': '+e.message);});tryU(0);}
-  if(R.state!==2)return;
-  R.g.visible=d<260;const near=d<30;for(const o of R.inner)o.visible=near;   // el habitáculo solo de cerca (son muchos polígonos)
+// ---------------------------------------------------------------- deportivo clásico amarillo (modelo GLB): se conduce como cualquier coche
+// · las ruedas ruedan (RODADURA_*, eje X) y giran con la dirección (DIRECCION_FL/FR, eje Y); el volante (VOLANTE_GIRO, eje Y de la columna)
+//   y las agujas de velocidad y vueltas (AGUJA_*, eje Y) se mueven; las puertas (PUERTA_IZQUIERDA/DERECHA, eje Y) se abren al subir y bajar,
+//   al acercarte a la del conductor o con la tecla O
+// · el archivo se busca en «modelos»: primero el original, luego la copia ligera
+const GLBC={urls:['modelos/Porsche_RS500_v04_Slick.glb','modelos/rs500.glb','modelos/rs500.glb.wasm'],state:0,model:null,bb:null};
+const RSCAR={x:-452.6,z:-1043.5,h:Math.PI/2,respT:0,started:false,hinted:false};
+function glbCarMesh(type,color){
+  const g=new THREE.Group();g.rotation.order='YXZ';
+  const paint=new THREE.MeshPhongMaterial({color:0xe8b800,shininess:90,specular:0x666666});
+  const tail=new THREE.MeshPhongMaterial({color:0x8a1010,emissive:0xff2010,emissiveIntensity:0.25});
+  g.userData.glb=true;return{g,wheels:[],front:[],paint,tail,siren:null};
 }
-function rsPlace(m){
-  const R=RSCAR,g=new THREE.Group(),root=m.root;g.add(root);
-  root.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(root);root.position.y=-bb.min.y;   // ruedas apoyadas en el suelo
-  const y=groundH(R.x,R.z);g.position.set(R.x,y,R.z);g.rotation.y=R.h;
-  root.traverse(o=>{if(!o.isMesh)return;const n=o.name;o.castShadow=/Pintura|TYRE|Goma_negra/.test(n)&&!/COCKPIT/.test(n);o.receiveShadow=false;
-    if(/COCKPIT|STEER|ARROW|Cuero|Moqueta|Tela|Costura/.test(n))R.inner.push(o);});
-  scene.add(g);R.g=g;R.state=2;
-  const sx=bb.max.x-bb.min.x,sz=bb.max.z-bb.min.z;R.col=addCollider(R.x,R.z,sx/2,sz/2,R.h,y-0.5,y+(bb.max.y-bb.min.y),'prop');
-  R.t=0;rsTick(0);
+function glbCarAttach(c){
+  const M=GLBC.model,root=M.root.clone(true);c.glbAttached=true;root.position.y=-GLBC.bb.min.y;c.mesh.add(root);
+  const N={};root.traverse(o=>{if(o.name)N[o.name]=o;});c.glbN=N;c.glbInner=[];c.doorL=c.doorR=0;c.doorT=0;c.doorsOpen=false;
+  for(const k of['RODADURA_FL','RODADURA_FR','RODADURA_RL','RODADURA_RR'])if(N[k])c.wheels.push(N[k]);
+  for(const k of['DIRECCION_FL','DIRECCION_FR'])if(N[k])c.front.push(N[k]);
+  let pm=null,tm=null;
+  root.traverse(o=>{if(!o.isMesh)return;const mn=o.material.name||'',n=o.name;
+    if(/Pintura/.test(mn)){if(!pm){pm=o.material;const col=c.paint.color.clone(),keep=c.recolored;c.paint.copy(pm);if(keep)c.paint.color.copy(col);}o.material=c.paint;}
+    else if(/Piloto_rojo/.test(mn)){if(!tm){tm=o.material;c.tail.copy(tm);c.tail.emissive.setHex(0xff2010);c.tail.emissiveIntensity=0.25;}o.material=c.tail;}
+    o.castShadow=/Pintura|TYRE/.test(n)&&!/COCKPIT/.test(n);
+    if(/COCKPIT|STEER|ARROW|Cuero|Moqueta|Tela|Costura/.test(n))c.glbInner.push(o);});
+  if(c.dead){c.paint.color.setHex(0x1c1a19);c.paint.shininess=5;c.tail.emissiveIntensity=0;}
+  c.sync();
+}
+function glbRequest(){
+  if(GLBC.state!==0)return;GLBC.state=1;
+  const tryU=i=>glbLoad(GLBC.urls[i]).then(m=>{m.root.updateMatrixWorld(true);GLBC.bb=new THREE.Box3().setFromObject(m.root);GLBC.model=m;GLBC.state=2;})
+    .catch(e=>{if(i+1<GLBC.urls.length)return tryU(i+1);GLBC.state=-1;console.warn('[coche GLB] no está en la carpeta «modelos» ('+GLBC.urls[0]+'): '+e.message);
+      for(const c of CARS.slice())if(c.T.glb&&c!==P.car)c.remove();});
+  tryU(0);
+}
+const DEG=Math.PI/180;
+function rsTick(dt){
+  const R=RSCAR;
+  if(GLBC.state===-1)return;
+  // aparece en su plaza (y vuelve a aparecer si se quema o desaparece)
+  const alive=CARS.some(c=>c.T.glb&&!c.dead);
+  if(!R.started){R.started=true;new Car('rs',R.x,R.z,R.h);}
+  else if(!alive){R.respT+=dt;if(R.respT>25&&Math.hypot(P.x-R.x,P.z-R.z)>40&&!CARS.some(c=>!c.dead&&Math.hypot(c.x-R.x,c.z-R.z)<5)){R.respT=0;new Car('rs',R.x,R.z,R.h);toast('Ha vuelto el deportivo amarillo a su plaza, junto al Toro GT',3);}}
+  else R.respT=0;
+  const kO=KP.has('KeyO');
+  for(const c of CARS){if(!c.T.glb)continue;
+    const d=Math.hypot(c.x-camPos.x,c.z-camPos.z);
+    if(!c.glbAttached){if(d<380||c===P.car)glbRequest();if(GLBC.state===2)glbCarAttach(c);else continue;}
+    const mine=c===P.car,N=c.glbN,near=mine||d<35;for(const o of c.glbInner)o.visible=near;
+    // volante y relojes
+    if(N.VOLANTE_GIRO)N.VOLANTE_GIRO.rotation.y=c.steerV*2.4;
+    const v=Math.abs(c.spd||0),on=!c.dead&&(mine||!!c.driver),gr=Math.min(4,Math.floor(v/11));
+    if(N.AGUJA_VELOCIDAD)N.AGUJA_VELOCIDAD.rotation.y=Math.min(250,v*3.6)*1.1*DEG;
+    if(N.AGUJA_RPM){const t=on?900+clamp(0.11+(v-gr*11)/11*0.55+Math.max(0,c.thr||0)*0.3,0,1)*5600:0;N.AGUJA_RPM.rotation.y=(t?29.7+(t-900)*0.033:0)*DEG;}
+    // puertas: se abren al subir y al bajar, al acercarte a la del conductor y con la O
+    if(c._in!==mine){c._in=mine;c.doorT=1.3;}c.doorT=Math.max(0,c.doorT-dt);
+    const foot=!P.car&&!P.plane&&!P.dead,dp=Math.hypot(P.x-c.x,P.z-c.z);
+    let tl=c.doorT>0,tr=false;
+    if(foot&&dp<4.5&&!c.dead){const s=Math.sin(c.h),k=Math.cos(c.h),lx=(P.x-c.x)*k-(P.z-c.z)*s;   // lado del conductor = +x del coche
+      if(lx>0.5&&dp<2.3)tl=true;
+      if(!R.hinted){R.hinted=true;hint(`Pulsa ${kb('O','','O')} para abrir o cerrar las <b>puertas</b> del deportivo`,5);}}
+    if(kO&&((foot&&dp<4.5)||mine)&&v<1.5)c.doorsOpen=!c.doorsOpen;
+    if(v>3)c.doorsOpen=false;
+    if(c.doorsOpen){tl=true;tr=true;}
+    if(c.dead){tl=tr=false;}
+    c.doorL=clamp(c.doorL+(tl?1:-1)*dt*1.8,0,1);c.doorR=clamp(c.doorR+(tr?1:-1)*dt*1.8,0,1);
+    const e=x=>x*x*(3-2*x);
+    if(N.PUERTA_IZQUIERDA)N.PUERTA_IZQUIERDA.rotation.y=-e(c.doorL)*64*DEG;
+    if(N.PUERTA_DERECHA)N.PUERTA_DERECHA.rotation.y=e(c.doorR)*64*DEG;
+  }
 }
 
 function civSpawner(dt){
