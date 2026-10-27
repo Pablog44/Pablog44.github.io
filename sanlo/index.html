@@ -7599,7 +7599,7 @@ function frameBody(now,xrf){
         if(MONSTER.respT<=0&&Math.hypot(P.x-q.x,P.z-q.z)>40&&!CARS.some(c=>!c.dead&&Math.hypot(c.x-q.x,c.z-q.z)<6)){if(Math.hypot(MONSTER.x-P.x,MONSTER.z-P.z)>60)MONSTER.remove();MONSTER=new Car('monster',q.x,q.z,q.h,0xc8342c);}}
       if(TORO&&TORO.dead){if(TORO.respT===undefined)TORO.respT=20;TORO.respT-=dt;const q=TORO_SPAWN;
         if(TORO.respT<=0&&Math.hypot(P.x-q.x,P.z-q.z)>40&&!CARS.some(c=>!c.dead&&Math.hypot(c.x-q.x,c.z-q.z)<6)){if(Math.hypot(TORO.x-P.x,TORO.z-P.z)>60)TORO.remove();TORO=new Car('toro',q.x,q.z,q.h);toast('Ha llegado un Toro GT nuevo al Mirador de Abantos',3.5);}}
-      updateAircraft(dt);
+      updateAircraft(dt);rsTick(dt);
       for(const n of NPCS.slice())updateNPC(n,dt);
       updateProj(dt);
       if(!G.cine){updatePickups(dt);updateMission(dt);updateSide(dt,I);updateJob(dt,I);updateGarage();civSpawner(dt);malSpawner(dt);trafficSpawner(dt);policeSpawner(dt);cleanupCars();}
@@ -7868,6 +7868,75 @@ function occCorpse(c){   // al sacar a un conductor o acompañante muerto, se qu
   for(const o of[c.occ,c.pas]){if(!o||o.alive)continue;const sd=o.side||1;
     const n=new NPC(o.kind==='poli'?'poli':(o.kind==='geo'?'geo':(o.kind==='mal'?'maton':'civil')),c.x+co*off*sd,c.z-s*off*sd,{weapon:null,mw:null});n.weapon=null;n.mw=null;if(n.gun){n.h.mount.remove(n.gun);n.gun=null;}killNPC(n,'bullet',null);}
   removeOcc(c);
+}
+
+// =====================================================================
+//  MODELOS GLB: lector propio y pequeño (sin GLTFLoader, así funciona sin más archivos) y el deportivo clásico aparcado
+//  · lee glTF 2.0 binario: nodos con su jerarquía, mallas, atributos float o cuantizados (KHR_mesh_quantization),
+//    materiales PBR pasados a Phong (como el resto del juego), texturas PNG/JPG y mapas de normales
+//  · el coche se carga cuando te acercas (unos 14 MB): desde la carpeta «modelos» junto a index.html
+// =====================================================================
+const GLB_CT={5120:Int8Array,5121:Uint8Array,5122:Int16Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array},GLB_NC={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
+async function glbLoad(url){
+  const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status+' '+url);const ab=await r.arrayBuffer(),dv=new DataView(ab);
+  if(dv.getUint32(0,true)!==0x46546C67)throw new Error('no es un GLB');
+  let o=12,J=null,BIN=null;while(o<ab.byteLength){const len=dv.getUint32(o,true),typ=dv.getUint32(o+4,true);
+    if(typ===0x4E4F534A)J=JSON.parse(new TextDecoder().decode(new Uint8Array(ab,o+8,len)));else if(typ===0x004E4942)BIN={buf:ab,off:o+8};o+=8+len;}
+  const view=i=>{const v=J.bufferViews[i];return{off:BIN.off+(v.byteOffset||0),len:v.byteLength,stride:v.byteStride||0};};
+  const acc=i=>{const a=J.accessors[i],T=GLB_CT[a.componentType],n=GLB_NC[a.type],v=view(a.bufferView),off=v.off+(a.byteOffset||0),es=T.BYTES_PER_ELEMENT;
+    if(v.stride&&v.stride!==es*n){const base=v.off,arr=(base%es===0)?new T(BIN.buf,base,v.len/es):new T(BIN.buf.slice(base,base+v.len));
+      return new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(arr,v.stride/es),n,(off-base)/es,!!a.normalized);}
+    const arr=(off%es===0)?new T(BIN.buf,off,a.count*n):new T(BIN.buf.slice(off,off+a.count*n*es));return new THREE.BufferAttribute(arr,n,!!a.normalized);};
+  // texturas
+  const texCache={};
+  const tex=(ti,srgb)=>{if(texCache[ti])return texCache[ti];const t=J.textures[ti],im=J.images[t.source],v=view(im.bufferView);
+    const T=new THREE.Texture();T.flipY=false;T.wrapS=T.wrapT=THREE.RepeatWrapping;T.anisotropy=4;
+    const img=new Image();img.onload=()=>{T.image=img;T.needsUpdate=true;URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(new Blob([new Uint8Array(BIN.buf,v.off,v.len)],{type:im.mimeType||'image/png'}));
+    return texCache[ti]=T;};
+  // materiales PBR -> Phong: el metal oscurece el difuso y tiñe el brillo; la rugosidad decide lo concentrado del brillo
+  const mats=(J.materials||[]).map(m=>{const pb=m.pbrMetallicRoughness||{},f=pb.baseColorFactor||[1,1,1,1],me=pb.metallicFactor??1,ro=pb.roughnessFactor??1,
+      cc=(m.extensions&&m.extensions.KHR_materials_clearcoat&&m.extensions.KHR_materials_clearcoat.clearcoatFactor)||0;
+    const base=new THREE.Color(f[0],f[1],f[2]).convertLinearToSRGB(),blend=m.alphaMode==='BLEND'||f[3]<0.999;
+    const mat=new THREE.MeshPhongMaterial({color:base.clone().multiplyScalar(1-0.65*me),specular:new THREE.Color(0.07,0.07,0.07).lerp(base,me).multiplyScalar(0.4+0.8*(1-ro)).add(new THREE.Color(cc*0.35,cc*0.35,cc*0.35)),
+      shininess:clamp(cc?95:2/Math.max(0.01,ro*ro*ro*ro)-2,6,220),side:m.doubleSided?THREE.DoubleSide:THREE.FrontSide,transparent:blend,opacity:blend?Math.max(0.12,f[3]):1,depthWrite:!blend});
+    if(pb.baseColorTexture)mat.map=tex(pb.baseColorTexture.index);
+    if(m.normalTexture){mat.normalMap=tex(m.normalTexture.index);const s=m.normalTexture.scale??1;mat.normalScale.set(s,-s);}
+    mat.name=m.name||'';return mat;});
+  const defMat=new THREE.MeshPhongMaterial({color:0xcccccc});
+  const meshes=(J.meshes||[]).map(me=>me.primitives.map(p=>{const g=new THREE.BufferGeometry(),A=p.attributes;
+    g.setAttribute('position',acc(A.POSITION));if(A.NORMAL!==undefined)g.setAttribute('normal',acc(A.NORMAL));if(A.TEXCOORD_0!==undefined)g.setAttribute('uv',acc(A.TEXCOORD_0));
+    if(p.indices!==undefined)g.setIndex(acc(p.indices));if(A.NORMAL===undefined)g.computeVertexNormals();
+    g.computeBoundingBox();const pa=g.attributes.position;if(pa.normalized){const k=1/({1:127,2:32767}[pa.array.BYTES_PER_ELEMENT]*(pa.array instanceof Uint8Array||pa.array instanceof Uint16Array?2:1)+ (pa.array instanceof Uint8Array||pa.array instanceof Uint16Array?1:0));
+      g.boundingBox.min.multiplyScalar(k);g.boundingBox.max.multiplyScalar(k);}   // three r128 no desnormaliza al medir: se corrige a mano
+    g.boundingSphere=g.boundingBox.getBoundingSphere(new THREE.Sphere());
+    const m=new THREE.Mesh(g,p.material!==undefined?mats[p.material]:defMat);m.name=me.name||'';return m;}));
+  const nodes=J.nodes.map(n=>{const o=new THREE.Group();o.name=n.name||'';
+    if(n.matrix)o.applyMatrix4(new THREE.Matrix4().fromArray(n.matrix));
+    else{if(n.translation)o.position.fromArray(n.translation);if(n.rotation)o.quaternion.fromArray(n.rotation);if(n.scale)o.scale.fromArray(n.scale);}
+    if(n.mesh!==undefined)for(const m of meshes[n.mesh])o.add(m.clone());return o;});
+  J.nodes.forEach((n,i)=>{for(const c of n.children||[])nodes[i].add(nodes[c]);});
+  const root=new THREE.Group(),sc=J.scenes[J.scene||0];for(const i of sc.nodes)root.add(nodes[i]);
+  const byName={};for(const n of nodes)byName[n.name]=n;
+  return{root,byName,json:J};
+}
+// ---------------------------------------------------------------- deportivo clásico amarillo aparcado junto al Toro GT (plaza de al lado)
+const RSCAR={x:-452.6,z:-1043.5,h:Math.PI/2,urls:['modelos/rs500.glb','modelos/rs500.glb.wasm'],state:0,g:null,inner:[],t:0,col:null};
+function rsTick(dt){
+  const R=RSCAR;R.t-=dt;if(R.t>0)return;R.t=0.5;
+  const d=Math.hypot(camPos.x-R.x,camPos.z-R.z);
+  if(R.state===0&&d<380){R.state=1;const tryU=i=>glbLoad(R.urls[i]).then(m=>rsPlace(m)).catch(e=>{if(i+1<R.urls.length)return tryU(i+1);R.state=-1;console.warn('[coche GLB] no se ha podido cargar '+R.urls[0]+': '+e.message);});tryU(0);}
+  if(R.state!==2)return;
+  R.g.visible=d<260;const near=d<30;for(const o of R.inner)o.visible=near;   // el habitáculo solo de cerca (son muchos polígonos)
+}
+function rsPlace(m){
+  const R=RSCAR,g=new THREE.Group(),root=m.root;g.add(root);
+  root.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(root);root.position.y=-bb.min.y;   // ruedas apoyadas en el suelo
+  const y=groundH(R.x,R.z);g.position.set(R.x,y,R.z);g.rotation.y=R.h;
+  root.traverse(o=>{if(!o.isMesh)return;const n=o.name;o.castShadow=/Pintura|TYRE|Goma_negra/.test(n)&&!/COCKPIT/.test(n);o.receiveShadow=false;
+    if(/COCKPIT|STEER|ARROW|Cuero|Moqueta|Tela|Costura/.test(n))R.inner.push(o);});
+  scene.add(g);R.g=g;R.state=2;
+  const sx=bb.max.x-bb.min.x,sz=bb.max.z-bb.min.z;R.col=addCollider(R.x,R.z,sx/2,sz/2,R.h,y-0.5,y+(bb.max.y-bb.min.y),'prop');
+  R.t=0;rsTick(0);
 }
 
 function civSpawner(dt){
