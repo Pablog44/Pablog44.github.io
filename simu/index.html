@@ -135,6 +135,7 @@ button{font:inherit;color:inherit}
 .btn:hover{border-color:var(--text)}
 .btn.small{padding:8px 12px;font-size:12px}
 .fine{font-size:12px;color:var(--muted);line-height:1.5}
+.gpf{outline:3px solid var(--cyan)!important;outline-offset:3px;box-shadow:0 0 14px rgba(89,225,242,.45)}
 .fine kbd,kbd{font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-strong);border-radius:4px;background:rgba(255,255,255,.04);color:var(--text)}
 
 .modal{background:rgba(3,6,11,.6);display:flex;align-items:flex-start;justify-content:center}
@@ -370,6 +371,7 @@ body.touch #quick{max-width:60vw}
       <button class="btn primary" id="btnFly">Volar</button>
       <button class="btn" id="btnSettings">Ajustes</button>
       <button class="btn" id="btnHelp">Controles</button>
+      <button class="btn" id="btnFull">⛶ Pantalla completa</button>
       <button class="btn" id="btnVR" hidden>Entrar en VR</button>
     </div>
     <div class="fine" id="menuNote"></div>
@@ -384,6 +386,7 @@ body.touch #quick{max-width:60vw}
       <button class="btn" id="pRespawn">Reiniciar en la isla</button>
       <button class="btn" id="pSettings">Ajustes y shaders</button>
       <button class="btn" id="pHelp">Controles</button>
+      <button class="btn" id="pFull">⛶ Pantalla completa</button>
       <button class="btn" id="pVR" hidden>Entrar en VR</button>
       <button class="btn" id="pSwitch">Cambiar a velero</button>
       <button class="btn" id="pMenu">Menú principal</button>
@@ -1237,6 +1240,7 @@ class Aircraft {
     this.flapsSet = 0; this.flaps = 0;
     this.gearSet = AC.fixedGear ? 1 : airborne ? 0 : 1; this.gear = this.gearSet;
     this.hp = 100; this.dead = false; this.hitFlash = 0; this.wheelAng = 0; this.smokeAcc = 0;
+    this.fuel = 0.85; this.oilT = airborne ? 85 : 40; this.gMax = 1; this.gMin = 1; this.canopy = 0; this.canopySet = 0;
     this.gun = { ammo: GUN.mag, reload: 0, cool: 0, side: 0, flash: 0, trigger: false };
     this.brake = 0; this.parking = !airborne;
     this.trim = airborne ? trimFor(speed, this.throttle) : 0;
@@ -6648,6 +6652,7 @@ function onKey(e, isDown) {
     return;
   }
   if (AC.guns && e.code === 'KeyX') { if (ac.gun.ammo < GUN.mag) startReload(ac, 'player'); return; }
+  if (AC.smoke && e.code === 'KeyJ') { toggleCanopy(); return; }
   if (AC.smoke && e.code === 'KeyG') { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo acrobático ON' : 'Humo acrobático OFF'); return; }
   switch (e.code) {
     case 'KeyG': if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } else UI.toast('Tren fijo'); break;
@@ -6748,7 +6753,20 @@ function pollGamepad(dt) {
   const b = i => gp.buttons[i] ? gp.buttons[i].value : 0;
   const pressed = i => gp.buttons[i] && gp.buttons[i].pressed;
   const edge = i => { const p = pressed(i), was = INPUT.gpPrev[i]; INPUT.gpPrev[i] = p; return p && !was; };
-  const out = { roll: dz(gp.axes[0] || 0), pitch: dz(gp.axes[1] || 0), yaw: (b(5) - b(4)), thr: b(7) - b(6), lookX: dz(gp.axes[2] || 0), lookY: dz(gp.axes[3] || 0), brake: pressed(1) };
+  const menuOpen = GAME.state !== 'flying' || !$('settings').hidden || !$('help').hidden;
+  if (menuOpen) {
+    if (!INPUT.wasMenu) { const P = INPUT.navPrev || (INPUT.navPrev = {}); P.a = pressed(0); P.b = pressed(1); P.start = pressed(9); }
+    INPUT.wasMenu = true;
+    gamepadMenu(gp);
+    for (const i of [0, 1, 2, 3, 8, 9, 10, 11, 14, 15]) INPUT.gpPrev[i] = pressed(i);   // no actions leak into the flight on release
+    return null;
+  }
+  INPUT.wasMenu = false;
+  if (INPUT.navEl) { INPUT.navEl.classList.remove('gpf'); INPUT.navEl = null; }
+  // right stick click: change view; left stick click: pilot view
+  if (edge(11)) cycleCamera(1);
+  if (edge(10)) toggleFPV();
+  const out = { roll: dz(gp.axes[0] || 0), pitch: dz(gp.axes[1] || 0), yaw: (b(7) - b(6)), thr: b(5) - b(4), lookX: dz(gp.axes[2] || 0), lookY: dz(gp.axes[3] || 0), brake: pressed(1) };
   if (Math.abs(out.roll) + Math.abs(out.pitch) + Math.abs(out.thr) > 0.1) INPUT.lastUsed = 'gp';
   const ac = AIR.ac;
   if (isBoat()) { if (edge(9)) { if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else if (GAME.state === 'crashed') respawn(); } if (edge(8) && GAME.state === 'flying') cycleCamera(1); if (edge(14)) toggleShader(); if (edge(15)) nextStyle(1); out.hike = pressed(0) ? 1 : pressed(2) ? -1 : 0; return out; }
@@ -6778,7 +6796,7 @@ function updateInput(dt) {
   const gp = pollGamepad(dt);
   let thrRate = (down('thrUp') ? 1 : 0) - (down('thrDown') ? 1 : 0);
   let brake = (AC.guns ? !!INPUT.keys.KeyB : down('brake')) || T.brake;
-  let fire = AC.guns && (!!INPUT.keys.Space || !!T.fire);
+  let fire = AC.guns && (!!INPUT.keys.Space || !!T.fire || !!INPUT.mouseFire);
   if (gp) {
     if (Math.abs(gp.pitch) > Math.abs(pitch)) pitch = gp.pitch * (SETTINGS.invertY ? -1 : 1);
     if (Math.abs(gp.roll) > Math.abs(roll)) roll = gp.roll;
@@ -6844,7 +6862,7 @@ function updateBoatInput(dt, gp) {
 // ============================================================================
 const CPIT = { hover: null, drag: null, tip: null, last: { x: 0, y: 0 } };
 const HL = [0.05, 0.16, 0.22];
-function cockpitActive() { return GAME.state === 'flying' && !isBoat() && AC.type === 'seaplane' && CAM.mode === 'cockpit' && !XR.session; }
+function cockpitActive() { return GAME.state === 'flying' && !isBoat() && CAM.mode === 'cockpit' && !XR.session && (AC.type === 'seaplane' || !!MODELS[AC.model]); }
 const leverKnob = (pivot, ang) => new V3(pivot.x, pivot.y + 0.17 * Math.cos(ang), pivot.z + 0.17 * Math.sin(ang));
 const LEVERS = {
   power: { pivot: new V3(-0.05, 0.05, -1.9), a0: 0.45, a1: -0.55 },
@@ -6853,6 +6871,7 @@ const LEVERS = {
   flap: { pivot: new V3(0.065, 0.0, -1.7), a0: -0.4, a1: 0.5 },
 };
 function cockpitTargets() {
+  if (AC.type !== 'seaplane') return glbCockpitTargets();
   const ac = AIR.ac, L = PANEL_LAYOUT, T = [];
   const lv = (id, key, get, set, label, detents) => {
     const d = LEVERS[key];
@@ -6919,6 +6938,7 @@ function setupCockpitUI() {
     if (t.kind === 'button') { t.act(); beep(1400, 0.04, 0.05, 'square'); }
     if (t.kind === 'yoke') INPUT.mouseYoke = { pitch: 0, roll: 0 };
     if (t.kind === 'pedals') INPUT.mouseRudder = 0;
+    if (t.kind === 'trigger') INPUT.mouseFire = true;
     canvas.style.cursor = t.kind === 'lever' || t.kind === 'wheel' ? 'ns-resize' : t.kind === 'yoke' || t.kind === 'pedals' ? 'grabbing' : 'pointer';
     cockpitTip(t.label(), e.clientX, e.clientY);
   }, opts);
@@ -6947,6 +6967,7 @@ function setupCockpitUI() {
     e.stopImmediatePropagation();
     if (D.t.kind === 'yoke') INPUT.mouseYoke = null;
     if (D.t.kind === 'pedals') INPUT.mouseRudder = null;
+    if (D.t.kind === 'trigger') INPUT.mouseFire = false;
     CPIT.drag = null; canvas.style.cursor = CPIT.hover ? 'pointer' : '';
     if (e.pointerType !== 'mouse') cockpitTip(null);
   };
@@ -7647,6 +7668,103 @@ const UI = {
     $('tStyle').textContent = st.name.toUpperCase() + ' ▸';
   },
 };
+// ---------------- fullscreen ----------------
+function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function updateFullBtn() { for (const id of ['btnFull', 'pFull']) { const b = $(id); if (b) b.textContent = isFullscreen() ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa'; } }
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  const fail = () => UI.toast('El navegador no permite pantalla completa aquí (con el mando, pulsa el botón con el ratón o el dedo)');
+  try {
+    if (isFullscreen()) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) { fail(); return; }
+    const r = req.call(el, { navigationUI: 'hide' });
+    if (r && r.catch) r.catch(fail);
+  } catch (e) { fail(); }
+}
+// ---------------- gamepad navigation of menus and sheets ----------------
+// D-pad or left stick moves the highlight to the nearest control in that direction, A presses it,
+// B goes back, Start flies / resumes. Sliders and selects change with left / right.
+function activeScreen() {
+  for (const id of ['help', 'settings', 'pause', 'crash', 'menu']) { const el = $(id); if (el && !el.hidden) return el; }
+  return null;
+}
+function navTargets(root) {
+  return [...root.querySelectorAll('button, input, select')].filter(b => !b.disabled && b.getClientRects().length && !b.closest('[hidden]'));
+}
+function navFocus(el) {
+  const prev = document.querySelector('.gpf'); if (prev && prev !== el) prev.classList.remove('gpf');
+  if (!el) return;
+  el.classList.add('gpf');
+  try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  INPUT.navEl = el;
+}
+function navMove(root, dx, dy) {
+  const T = navTargets(root); if (!T.length) return;
+  let cur = INPUT.navEl;
+  if (!cur || !T.includes(cur)) { navFocus(T.find(b => b.id === 'btnFly' || b.id === 'pResume' || b.id === 'crashRetry') || T[0]); return; }
+  const r0 = cur.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+  let best = null, bs = 1e9;
+  for (const t of T) {
+    if (t === cur) continue;
+    const r = t.getBoundingClientRect(), vx = r.left + r.width / 2 - cx, vy = r.top + r.height / 2 - cy;
+    const along = vx * dx + vy * dy; if (along < 6) continue;
+    const s = along + Math.abs(vx * dy - vy * dx) * 2.5;
+    if (s < bs) { bs = s; best = t; }
+  }
+  if (best) { navFocus(best); beep(1500, 0.02, 0.03, 'square'); }
+}
+function navAdjust(el, d) {
+  if (el.tagName === 'INPUT' && el.type === 'range') {
+    const st = parseFloat(el.step) || 1, v = clamp(parseFloat(el.value) + d * st, parseFloat(el.min), parseFloat(el.max));
+    el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); return true;
+  }
+  if (el.tagName === 'SELECT') {
+    const i = clamp(el.selectedIndex + d, 0, el.options.length - 1);
+    if (i !== el.selectedIndex) { el.selectedIndex = i; el.dispatchEvent(new Event('change', { bubbles: true })); }
+    return true;
+  }
+  return false;
+}
+function gamepadMenu(gp) {
+  const root = activeScreen(); if (!root) return;
+  const P = INPUT.navPrev || (INPUT.navPrev = {});
+  const pr = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const edgeN = (k, v) => { const was = P[k]; P[k] = v; return v && !was; };
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+  let dx = (pr(15) ? 1 : 0) - (pr(14) ? 1 : 0) + (ax > 0.6 ? 1 : ax < -0.6 ? -1 : 0);
+  let dy = (pr(13) ? 1 : 0) - (pr(12) ? 1 : 0) + (ay > 0.6 ? 1 : ay < -0.6 ? -1 : 0);
+  dx = clamp(dx, -1, 1); dy = clamp(dy, -1, 1);
+  const now = performance.now(), key = dx + ',' + dy;
+  if ((dx || dy) && (key !== P.dir || now > (P.next || 0))) {
+    P.next = now + (key !== P.dir ? 380 : 140); P.dir = key;
+    const el = INPUT.navEl;
+    if (dx && !dy && el && root.contains(el) && navAdjust(el, dx)) { /* slider / select changed */ }
+    else navMove(root, dx, dy);
+  }
+  if (!dx && !dy) P.dir = '';
+  if (edgeN('a', pr(0))) {
+    const el = INPUT.navEl;
+    if (el && root.contains(el) && navTargets(root).includes(el)) { if (el.tagName === 'BUTTON') el.click(); }
+    else navMove(root, 0, 1);
+  }
+  if (edgeN('b', pr(1))) {
+    if (!$('help').hidden) UI.show('help', false);
+    else if (!$('settings').hidden) UI.show('settings', false);
+    else if (GAME.state === 'paused') UI.resume();
+    INPUT.navEl = null;
+  }
+  if (edgeN('start', pr(9))) {
+    if (!$('help').hidden || !$('settings').hidden) UI.closeModals();
+    else if (GAME.state === 'paused') UI.resume();
+    else if (GAME.state === 'crashed') respawn();
+    else if (GAME.state === 'menu') startFlight();
+    INPUT.navEl = null;
+  }
+  // when a sheet opens or closes, the highlight starts again on the new screen
+  if (INPUT.navEl && !root.contains(INPUT.navEl)) { const old = INPUT.navEl; old.classList.remove('gpf'); INPUT.navEl = null; }
+}
 function toggleShader() {
   SETTINGS.shaderOn = !SETTINGS.shaderOn; saveSettings(); UI.updateQuick();
   UI.toast(SETTINGS.shaderOn ? 'Shader ' + STYLES[styleIndex()].name + ' activado' : 'Shader desactivado (realista)');
@@ -7705,6 +7823,9 @@ function buildMenu() {
   $('qCam').addEventListener('click', () => cycleCamera(1));
   $('qMenu').addEventListener('click', () => UI.pause());
   for (const id of ['btnVR', 'pVR']) $(id).addEventListener('click', () => enterVR());
+  for (const id of ['btnFull', 'pFull']) $(id).addEventListener('click', () => toggleFullscreen());
+  document.addEventListener('fullscreenchange', updateFullBtn); document.addEventListener('webkitfullscreenchange', updateFullBtn);
+  updateFullBtn();
   updateMenuNote();
 }
 function updateMenuNote() {
@@ -7847,11 +7968,13 @@ function buildHelp(target) {
     ['G', 'Tren (abajo = pista, arriba = agua)'], ['X / Z', 'Flaps abajo / arriba'], ['Espacio', 'Frenos'], ['K', 'Freno de estacionamiento'], ['T / Y', 'Compensador'],
     ['C', 'Cambiar cámara'], ['V', 'Vista FPV piloto'], ['Ratón / dedo', 'Mirar alrededor · rueda: zoom'], ['Clic en cabina', 'En la vista de piloto: arrastra palancas, cuernos y compensador; pulsa interruptores, tren y freno'], ['P', 'Shader ON / OFF'], ['O / I', 'Siguiente / anterior estilo'], ['L', 'Luces'], ['N', 'Cambiar destino'],
     [', / .', 'Hora −/+ 30 min'], ['U', 'Ocultar HUD'], ['Esc', 'Pausa'],
-    ['Mando', 'Stick izq: vuelo · Gatillos: potencia · LB/RB: timón · A tren · X/Y flaps · B freno · Cruceta ←→ shader/estilo'],
+    ['Mando', 'Stick izq: vuelo · Stick dcho: mirar · pulsar stick dcho: cambiar vista · pulsar stick izq: cabina · RB/LB: potencia + / − · RT/LT: timón derecha / izquierda · A tren (Fokker: disparar) · X/Y flaps (Fokker: Y recargar) · B freno · Cruceta ←→ shader/estilo'],
+    ['Mando en menús', 'Cruceta o stick: moverse · A: pulsar · B: atrás · Start: volar / continuar'],
     ['VR', 'Stick dcho: vuelo · Stick izq: potencia y timón · A tren · B estilo · X/Y flaps · Gatillo: freno'],
   ];
   if (AC.guns) K.unshift(['Espacio', 'Disparar las ametralladoras'], ['X', 'Recargar (300 balas por cinta)'], ['B', 'Frenos']);
-  if (AC.smoke) K.unshift(['G', 'Humo acrobático ON / OFF']);
+  if (AC.smoke) K.unshift(['G', 'Humo acrobático ON / OFF'], ['J', 'Abrir / cerrar la cúpula'], ['Clic en cabina (V)', 'Gases, paso de hélice, mezcla, palanca, pedales y cúpula se mueven con el ratón']);
+  if (AC.guns) K.unshift(['Clic en cabina (V)', 'Gas, mezcla, magnetos, palanca, pedales y gatillos se accionan con el ratón']);
   const tips = AC.guns ? [
     'El Fokker Dr.I es lento pero gira muy cerrado: no tires a tope o entrarás en pérdida.',
     'Apunta con la cruz roja (punto de anticipación), no al avión: las balas tardan en llegar.',
@@ -7885,7 +8008,7 @@ function buildBoatHelp(target) {
     ['A / D · ← →', 'Caña del timón (a babor / estribor)'], ['W / ↑', 'Cazar la mayor'], ['S / ↓', 'Largar la mayor'], ['E / Q', 'Cazar / largar el foque'],
     ['X / Z', 'Sacar / meter banda (tripulación)'], ['K', 'Trimado automático ON / OFF'], ['L', 'Luces de navegación'], ['N', 'Cambiar destino'],
     ['C', 'Cambiar cámara (timonel, proa, tope de palo…)'], ['V', 'Vista del timonel'], [', / .', 'Hora −/+ 30 min'], ['Esc', 'Pausa'],
-    ['Mando', 'Stick izq: timón · RT/LT: cazar/largar mayor · RB/LB: foque · A: banda'],
+    ['Mando', 'Stick izq: timón · RB/LB: cazar/largar mayor · RT/LT: foque · A: banda · pulsar stick dcho: cambiar vista'],
   ];
   const tips = [
     'No se puede navegar directamente contra el viento: ciñe a unos 40–45° del viento real y vira por avante para ganar barlovento.',
@@ -8085,8 +8208,9 @@ const _rz = (a) => M4.fromQT(M4.create(), Quat.axis(0, 0, 1, a), new V3());
 const GLB_VS = `
 in vec3 aPos; in vec3 aNormal; in vec2 aUV;
 uniform mat4 uModel;
+uniform vec2 uUVOff;
 out vec3 vWP; out vec3 vN; out vec2 vUV;
-void main(){ vec4 rp = uModel * vec4(aPos, 1.0); vWP = rp.xyz + uEyeW; vN = mat3(uModel) * aNormal; vUV = aUV; gl_Position = uVPR * rp; }
+void main(){ vec4 rp = uModel * vec4(aPos, 1.0); vWP = rp.xyz + uEyeW; vN = mat3(uModel) * aNormal; vUV = aUV + uUVOff; gl_Position = uVPR * rp; }
 `;
 const GLB_FS = `
 in vec3 vWP; in vec3 vN; in vec2 vUV;
@@ -8123,11 +8247,18 @@ const MODELS = {};
 const GLB_SPECS = {
   acro: {
     url: 'avioneta.glb.txt', fix: M4.create(),
-    anim: ['Helice', 'Helice_Disco', 'Aleron_Derecho', 'Aleron_Izquierdo', 'Timon_Profundidad', 'Timon_Direccion', 'Rueda_Derecha', 'Rueda_Izquierda', 'Palanca_Delantera', 'Palanca_Trasera'],
+    anim: ['Helice', 'Helice_Disco', 'Aleron_Derecho', 'Aleron_Izquierdo', 'Timon_Profundidad', 'Timon_Direccion', 'Rueda_Derecha', 'Rueda_Izquierda', 'Palanca_Delantera', 'Palanca_Trasera',
+      'Tren_Cola', 'Cupula', 'Gases_Delantero', 'Gases_Trasero', 'Paso_Helice_Delantero', 'Paso_Helice_Trasero', 'Mezcla_Delantero',
+      'Pedal_Derecho_Delantero', 'Pedal_Izquierdo_Delantero', 'Pedal_Derecho_Trasero', 'Pedal_Izquierdo_Trasero',
+      'Aguja_Admision', 'Aguja_Altimetro_100ft', 'Aguja_Altimetro_1000ft', 'Aguja_Combustible', 'Aguja_G', 'Aguja_G_Max', 'Aguja_G_Min', 'Aguja_RPM', 'Aguja_Temp_Aceite',
+      'Aguja_Variometro', 'Aguja_Velocidad', 'Avion_Coordinador', 'Bola_Coordinador', 'Brujula_Tarjeta', 'Horizonte_Disco', 'Rosa_Rumbos',
+      'Aguja_Altimetro_100ft_Trasero', 'Aguja_Altimetro_1000ft_Trasero', 'Aguja_G_Trasero', 'Aguja_RPM_Trasero', 'Aguja_Velocidad_Trasero'],
   },
   fokker: {
     url: 'fokker.glb.txt', fix: M4.mul(M4.create(), _ry(PI), M4.translation(M4.create(), 0, -1.45, -0.45)),
-    anim: ['PIVOT_Propeller', 'PIVOT_Aileron_L', 'PIVOT_Aileron_R', 'PIVOT_Elevator', 'PIVOT_Rudder', 'PIVOT_Wheel_L', 'PIVOT_Wheel_R', 'PIVOT_Stick'],
+    anim: ['PIVOT_Propeller', 'PIVOT_Aileron_L', 'PIVOT_Aileron_R', 'PIVOT_Elevator', 'PIVOT_Rudder', 'PIVOT_Wheel_L', 'PIVOT_Wheel_R', 'PIVOT_Stick',
+      'PIVOT_Pedals', 'PIVOT_Gauge_Altitude', 'PIVOT_Gauge_Fuel', 'PIVOT_Gauge_RPM'],
+    extra: m => addFokkerControls(m),
   },
 };
 async function fetchGLB(url) {
@@ -8237,8 +8368,20 @@ async function buildGLBModel(g, spec) {
     model.groups.push({ mesh, anim: G.anim, color: m.color, mr: [m.metal, m.rough, m.tex ? 1 : 0], tex: m.tex, blend: m.blend });
     model.tris += G.i.length / 3;
   }
+  model.info = {};
+  for (const G of groups.values()) {
+    if (!G.anim) continue;
+    const I = model.info[G.anim] || (model.info[G.anim] = { mn: [1e9, 1e9, 1e9], mx: [-1e9, -1e9, -1e9], tip: [0, 0, 0], tipD: -1 });
+    for (let k = 0; k < G.p.length; k += 3) {
+      for (let c = 0; c < 3; c++) { I.mn[c] = Math.min(I.mn[c], G.p[k + c]); I.mx[c] = Math.max(I.mx[c], G.p[k + c]); }
+      const d = G.p[k] * G.p[k] + G.p[k + 1] * G.p[k + 1] + G.p[k + 2] * G.p[k + 2];
+      if (d > I.tipD) { I.tipD = d; I.tip = [G.p[k], G.p[k + 1], G.p[k + 2]]; }
+    }
+  }
+  for (const k in model.info) { const I = model.info[k]; I.center = new V3((I.mn[0] + I.mx[0]) / 2, (I.mn[1] + I.mx[1]) / 2, (I.mn[2] + I.mx[2]) / 2); I.tipV = new V3(...I.tip); }
   model.groups.sort((a, b) => (a.blend ? 1 : 0) - (b.blend ? 1 : 0));
   J.nodes.forEach((n, i) => { if (animSet.has(n.name) && W[i]) model.rest[n.name] = W[i]; });
+  if (spec.extra) spec.extra(model);
   return model;
 }
 async function loadGLBModels(onStep) {
@@ -8250,23 +8393,140 @@ async function loadGLBModels(onStep) {
   }
 }
 // pose of the moving parts (local rotations about each pivot) for an aircraft state
+// gauge needle angle from the scale stored with each needle in the model (degrees clockwise from 12 o'clock)
+const NEEDLE = {
+  Aguja_Admision: [10, 35, 225, 495], Aguja_Altimetro_100ft: [0, 1000, 0, 360], Aguja_Altimetro_1000ft: [0, 10000, 0, 360],
+  Aguja_Combustible: [0, 1, 300, 420], Aguja_G: [-5, 10, 160, 490], Aguja_RPM: [0, 3500, 225, 495], Aguja_Temp_Aceite: [40, 140, 225, 495],
+  Aguja_Variometro: [-2000, 2000, 100, 440], Aguja_Velocidad: [0, 240, 0, 330],
+};
+const needleRot = (k, v) => { const n = NEEDLE[k], t = clamp((v - n[0]) / (n[1] - n[0]), 0, 1); return _rz(-(n[2] + t * (n[3] - n[2])) * DEG); };
+// what the instruments read for an aircraft state
+function instr(ac) {
+  const ft = Math.max(0, ac.pos.y - (AC.aglOff || 0) * 0) * FT;
+  const yawRate = -ac.w.y * RAD;   // deg/s, + = turning right
+  return {
+    ft, kt: clamp(ac.ias * KT, 0, 240), fpm: clamp(ac.vs * FT * 60, -2000, 2000), g: ac.gload,
+    rpm: ac.engineOn || ac.rpm > 0.02 ? (AC.type === 'fokker' ? 1350 : 2700) * ac.rpm : 0,
+    map: ac.engineOn ? 12 + 17 * ac.throttle * ac.rpm + 2 * (1 - ac.rpm) : 29.9, oil: ac.oilT || 40, fuel: ac.fuel ?? 0.85,
+    turn: yawRate, ball: clamp(-ac.beta * RAD * 2.5, -20, 20), hdg: ac.heading(), bank: ac.bankAng(), pitch: ac.pitchAng() * RAD,
+  };
+}
 function planePose(type, ac) {
-  const s = ac.surf, P = {};
+  const s = ac.surf, P = {}, I = instr(ac);
   if (type === 'acro') {
     P.Helice = _rz(-ac.propAngle);
     P.Aleron_Derecho = _rx(-0.4 * s.a); P.Aleron_Izquierdo = _rx(0.4 * s.a);
     P.Timon_Profundidad = _rx(-0.45 * s.e); P.Timon_Direccion = _ry(0.45 * s.r);
+    P.Tren_Cola = _ry(0.45 * s.r);
     P.Rueda_Derecha = _rx(-(ac.wheelAng || 0)); P.Rueda_Izquierda = P.Rueda_Derecha;
-    P.Palanca_Delantera = M4.mul(M4.create(), _rx(0.3 * ac.ctl.pitch), _rz(-0.3 * ac.ctl.roll)); P.Palanca_Trasera = P.Palanca_Delantera;
+    P.Palanca_Delantera = M4.mul(M4.create(), _rx(0.31 * ac.ctl.pitch), _rz(-0.31 * ac.ctl.roll)); P.Palanca_Trasera = P.Palanca_Delantera;
+    P.Cupula = _rz(-1.3 * (ac.canopy || 0));
+    P.Gases_Delantero = _rx(-35 * DEG * ac.throttle); P.Gases_Trasero = P.Gases_Delantero;
+    P.Paso_Helice_Delantero = _rx(-35 * DEG * ac.propLever); P.Paso_Helice_Trasero = P.Paso_Helice_Delantero;
+    P.Mezcla_Delantero = _rx(-35 * DEG * ac.condLever);
+    P.Pedal_Derecho_Delantero = _rx(15 * DEG * s.r); P.Pedal_Izquierdo_Delantero = _rx(-15 * DEG * s.r);
+    P.Pedal_Derecho_Trasero = P.Pedal_Derecho_Delantero; P.Pedal_Izquierdo_Trasero = P.Pedal_Izquierdo_Delantero;
+    P.Aguja_Admision = needleRot('Aguja_Admision', I.map);
+    P.Aguja_Altimetro_100ft = needleRot('Aguja_Altimetro_100ft', I.ft % 1000); P.Aguja_Altimetro_1000ft = needleRot('Aguja_Altimetro_1000ft', I.ft % 10000);
+    P.Aguja_Combustible = needleRot('Aguja_Combustible', I.fuel);
+    P.Aguja_G = needleRot('Aguja_G', I.g); P.Aguja_G_Max = needleRot('Aguja_G', ac.gMax ?? 1); P.Aguja_G_Min = needleRot('Aguja_G', ac.gMin ?? 1);
+    P.Aguja_RPM = needleRot('Aguja_RPM', I.rpm); P.Aguja_Temp_Aceite = needleRot('Aguja_Temp_Aceite', I.oil);
+    P.Aguja_Variometro = needleRot('Aguja_Variometro', I.fpm); P.Aguja_Velocidad = needleRot('Aguja_Velocidad', I.kt);
+    P.Avion_Coordinador = _rz(-clamp(20 * I.turn / 3, -45, 45) * DEG); P.Bola_Coordinador = _rz(-I.ball * DEG);
+    P.Brujula_Tarjeta = _ry(I.hdg); P.Rosa_Rumbos = _rz(I.hdg);
+    P.Horizonte_Disco = _rz(I.bank);
+    P.uv = { Horizonte_Disco: [0, -clamp(I.pitch, -80, 80) / 180] };
+    P.Aguja_Altimetro_100ft_Trasero = P.Aguja_Altimetro_100ft; P.Aguja_Altimetro_1000ft_Trasero = P.Aguja_Altimetro_1000ft;
+    P.Aguja_G_Trasero = P.Aguja_G; P.Aguja_RPM_Trasero = P.Aguja_RPM; P.Aguja_Velocidad_Trasero = P.Aguja_Velocidad;
     P.hide = { Helice_Disco: ac.rpm < 0.5 };
   } else if (type === 'fokker') {
     P.PIVOT_Propeller = _rz(ac.propAngle);
     P.PIVOT_Aileron_L = _rx(0.35 * s.a); P.PIVOT_Aileron_R = _rx(-0.35 * s.a);
     P.PIVOT_Elevator = _rx(0.45 * s.e); P.PIVOT_Rudder = _ry(0.45 * s.r);
     P.PIVOT_Wheel_L = _rx(ac.wheelAng || 0); P.PIVOT_Wheel_R = P.PIVOT_Wheel_L;
-    P.PIVOT_Stick = M4.mul(M4.create(), _rx(-0.3 * ac.ctl.pitch), _rz(0.3 * ac.ctl.roll));
+    const stick = M4.mul(M4.create(), _rx(-0.3 * ac.ctl.pitch), _rz(0.3 * ac.ctl.roll));
+    P.PIVOT_Stick = stick;
+    P.PIVOT_Pedals = _ry(12 * DEG * s.r);
+    // gauges: pose rotates from the needle's rest angle (0 on every scale)
+    P.PIVOT_Gauge_RPM = _rz(clamp(I.rpm / 1400, 0, 1) * 219 * DEG);
+    P.PIVOT_Gauge_Altitude = _rz(clamp(ac.pos.y / 6000, 0, 1) * 270 * DEG);
+    P.PIVOT_Gauge_Fuel = _rz((clamp(I.fuel, 0, 1) - 1) * 108 * DEG);
+    // added controls: throttle and mixture (forward = open), magneto key, gun triggers riding on the stick
+    P.X_Gas = _rx(lerp(-0.5, 0.42, ac.throttle));
+    P.X_Mezcla = _rx(lerp(-0.5, 0.35, ac.condLever));
+    P.X_Magneto = _rz(ac.sw.ign ? 0.7 : -0.7);
+    const trig = _rx(ac.gun && ac.gun.trigger ? 0.45 : 0);
+    for (const k of ['X_Gatillo_L', 'X_Gatillo_R']) { const o = FOKKER_TRIG[k]; P[k] = M4.mul(M4.create(), M4.mul(M4.create(), M4.translation(M4.create(), -o.x, -o.y, -o.z), M4.mul(M4.create(), stick, M4.translation(M4.create(), o.x, o.y, o.z))), trig); }
   }
+  const t = CPIT.drag ? CPIT.drag.t : CPIT.hover;
+  if (t && t.nodes && ac === AIR.ac) { P.hl = {}; for (const n of t.nodes) P.hl[n] = 1; }
   return P;
+}
+// ---------------- controls added to the Fokker (built here, parented to the model's pivots) ----------------
+const FOKKER_PIV = { gas: [0.245, 1.53, -0.47], magneto: [0, 1.632, -0.252], stick: [0, 1.205, -0.55] };
+const FOKKER_TRIG = { X_Gatillo_L: { x: 0.035, y: 0.44, z: 0.03 }, X_Gatillo_R: { x: -0.035, y: 0.44, z: 0.03 } };
+function addFokkerControls(model) {
+  const grp = (anim, rest, build, color, mr) => {
+    const g = new Geo(), add0 = g.add.bind(g); g.add = (prim, M) => add0(prim, M, [1, 1, 1, 0], [0.5, 0]); build(g);
+    const mesh = makeMesh({ aPos: { data: new Float32Array(g.p), size: 3 }, aNormal: { data: new Float32Array(g.n), size: 3 }, aUV: { data: new Float32Array(g.vc * 2), size: 2 } }, new Uint32Array(g.i));
+    model.groups.unshift({ mesh, anim, color, mr, tex: null, blend: false });
+    if (anim) {
+      model.rest[anim] = rest;
+      const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]; let tip = [0, 0, 0], td = -1;
+      for (let k = 0; k < g.p.length; k += 3) { for (let c = 0; c < 3; c++) { mn[c] = Math.min(mn[c], g.p[k + c]); mx[c] = Math.max(mx[c], g.p[k + c]); } const d = g.p[k] ** 2 + g.p[k + 1] ** 2 + g.p[k + 2] ** 2; if (d > td) { td = d; tip = [g.p[k], g.p[k + 1], g.p[k + 2]]; } }
+      model.info[anim] = { center: new V3((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2), tipV: new V3(...tip) };
+    }
+  };
+  const wood = [0.42, 0.25, 0.12, 1], brass = [0.78, 0.6, 0.3, 1], black = [0.03, 0.03, 0.03, 1], red = [0.6, 0.06, 0.04, 1], steel = [0.55, 0.56, 0.58, 1];
+  const [gx, gy, gz] = FOKKER_PIV.gas;
+  // quadrant on the left cockpit wall (pilot's left is +X in the model)
+  grp(null, null, g => { g.add(PRIM.box(0.022, 0.07, 0.2), TRS(gx + 0.026, gy - 0.02, gz)); g.add(PRIM.box(0.012, 0.012, 0.21), TRS(gx + 0.012, gy + 0.012, gz)); }, wood, [0, 0.5, 0]);
+  grp(null, null, g => { g.add(PRIM.cyl(0.012, 0.012, 0.075, 12), TRS(gx - 0.05, gy, gz, 0, 0, PI / 2)); }, brass, [1, 0.35, 0]);
+  grp('X_Gas', M4.translation(M4.create(), gx, gy, gz), g => { g.add(PRIM.cyl(0.006, 0.005, 0.17, 8), TRS(0, 0, 0)); g.add(PRIM.sphere(0.017, 12, 8), TRS(0, 0.175, 0, 0, 0, 0, 1, 1.25, 1)); }, wood, [0, 0.45, 0]);
+  grp('X_Mezcla', M4.translation(M4.create(), gx - 0.04, gy, gz), g => { g.add(PRIM.cyl(0.005, 0.004, 0.13, 8), TRS(0, 0, 0)); g.add(PRIM.box(0.03, 0.018, 0.018), TRS(0, 0.135, 0)); }, steel, [1, 0.35, 0]);
+  // magneto switch under the altimeter: brass boss with a black key
+  const [mx_, my, mz] = FOKKER_PIV.magneto;
+  grp(null, null, g => { g.add(PRIM.cyl(0.02, 0.02, 0.008, 18), TRS(mx_, my, mz + 0.004, -PI / 2)); }, brass, [1, 0.3, 0]);
+  grp('X_Magneto', M4.translation(M4.create(), mx_, my, mz), g => { g.add(PRIM.box(0.03, 0.009, 0.016), TRS(0, 0, -0.008)); g.add(PRIM.box(0.004, 0.012, 0.004), TRS(0.012, 0, -0.017)); }, black, [0, 0.4, 0]);
+  // twin gun triggers on the stick grip
+  for (const k of ['X_Gatillo_L', 'X_Gatillo_R']) {
+    const o = FOKKER_TRIG[k], [sx, sy, sz] = FOKKER_PIV.stick;
+    grp(k, M4.translation(M4.create(), sx + o.x, sy + o.y, sz + o.z), g => { g.add(PRIM.box(0.012, 0.05, 0.008), TRS(0, -0.025, 0.006)); g.add(PRIM.box(0.014, 0.012, 0.03), TRS(0, 0.0, -0.008)); }, k.endsWith('L') ? red : steel, [k.endsWith('L') ? 0 : 1, 0.35, 0]);
+  }
+}
+// ---------------- clickable cockpit for the GLB aircraft ----------------
+function glbPoint(name, which) {
+  const m = MODELS[AC.model]; if (!m || !m.info[name]) return null;
+  const pose = planePose(AC.type, AIR.ac), L = pose[name];
+  let M = M4.mul(M4.create(), m.fix, m.rest[name]); if (L) M = M4.mul(M4.create(), M, L);
+  return M4.point(M, which === 'tip' ? m.info[name].tipV : m.info[name].center);
+}
+function glbCockpitTargets() {
+  const ac = AIR.ac, T = [];
+  const add = (o) => { const p = glbPoint(o.nodes[0], o.at || 'tip'); if (p) T.push(Object.assign({ p }, o)); };
+  const lever = (id, node, nodes, get, set, label) => add({ id, kind: 'lever', nodes, r: AC.type === 'fokker' ? 0.022 : 0.04, get, set, label });
+  if (AC.type === 'acro') {
+    lever('power', 'Gases_Delantero', ['Gases_Delantero', 'Gases_Trasero'], () => ac.throttle, v => { ac.throttle = v; }, () => 'Gases · ' + Math.round(ac.throttle * 100) + ' %');
+    lever('prop', 'Paso_Helice_Delantero', ['Paso_Helice_Delantero', 'Paso_Helice_Trasero'], () => ac.propLever, v => { ac.propLever = v; }, () => 'Paso de hélice · ' + (ac.propLever > 0.6 ? 'FINO' : 'GRUESO') + ' · ' + Math.round(1800 + ac.propLever * 900) + ' RPM');
+    lever('cond', 'Mezcla_Delantero', ['Mezcla_Delantero'], () => ac.condLever, v => { const was = ac.engineOn; ac.condLever = v; if (was !== ac.engineOn) UI.toast(ac.engineOn ? 'Mezcla rica: motor en marcha' : 'Corte de mezcla: motor parado'); }, () => 'Mezcla · ' + (ac.condLever < 0.08 ? 'CORTE' : ac.condLever > 0.6 ? 'RICA' : 'POBRE'));
+    add({ id: 'yoke', kind: 'yoke', nodes: ['Palanca_Delantera', 'Palanca_Trasera'], r: 0.07, label: () => 'Palanca · arrastra para volar' });
+    add({ id: 'pedals', kind: 'pedals', nodes: ['Pedal_Derecho_Delantero', 'Pedal_Izquierdo_Delantero'], at: 'center', r: 0.07, label: () => 'Pedales · arrastra a los lados' });
+    add({ id: 'pedals', kind: 'pedals', nodes: ['Pedal_Izquierdo_Delantero', 'Pedal_Derecho_Delantero'], at: 'center', r: 0.07, label: () => 'Pedales · arrastra a los lados' });
+    add({ id: 'canopy', kind: 'button', nodes: ['Cupula'], at: 'center', r: 0.32, label: () => 'Cúpula · ' + (ac.canopySet ? 'ABIERTA' : 'CERRADA') + ' (J)', act: () => toggleCanopy() });
+  } else if (AC.type === 'fokker') {
+    lever('power', 'X_Gas', ['X_Gas'], () => ac.throttle, v => { ac.throttle = v; }, () => 'Gas · ' + Math.round(ac.throttle * 100) + ' %');
+    lever('cond', 'X_Mezcla', ['X_Mezcla'], () => ac.condLever, v => { const was = ac.engineOn; ac.condLever = v; if (was !== ac.engineOn) UI.toast(ac.engineOn ? 'Mezcla abierta: motor en marcha' : 'Corte de mezcla: motor parado'); }, () => 'Mezcla (aire/gasolina) · ' + (ac.condLever < 0.08 ? 'CORTE' : Math.round(ac.condLever * 100) + ' %'));
+    add({ id: 'sw_ign', kind: 'toggle', key: 'ign', nodes: ['X_Magneto'], at: 'center', r: 0.03, label: () => 'Magnetos · ' + (ac.sw.ign ? 'ON' : 'OFF') });
+    add({ id: 'yoke', kind: 'yoke', nodes: ['PIVOT_Stick'], at: 'center', r: 0.05, label: () => 'Palanca · arrastra para volar' });
+    add({ id: 'trigger', kind: 'trigger', nodes: ['X_Gatillo_L', 'X_Gatillo_R'], at: 'center', r: 0.035, label: () => 'Gatillos · mantén pulsado para disparar' });
+    add({ id: 'pedals', kind: 'pedals', nodes: ['PIVOT_Pedals'], at: 'center', r: 0.12, label: () => 'Pedales · arrastra a los lados' });
+  }
+  return T;
+}
+function toggleCanopy() {
+  const ac = AIR.ac; if (!AC.smoke) return;
+  ac.canopySet = ac.canopySet ? 0 : 1;
+  UI.toast(ac.canopySet ? 'Cúpula abierta' : 'Cúpula cerrada');
 }
 const _gm = M4.create(), _gm2 = M4.create();
 function glbMatrix(model, world, G, pose) {
@@ -8286,6 +8546,9 @@ function drawGLB(model, world, pose, hit) {
     if (G.anim && pose && pose.hide && pose.hide[G.anim]) continue;
     if (G.blend && !blend) { blend = true; setBlend('premul'); setDepth(true, false); }
     setU(p, 'uModel', relM(glbMatrix(model, world, G, pose)));
+    setU(p, 'uUVOff', (G.anim && pose && pose.uv && pose.uv[G.anim]) || [0, 0]);
+    const hl = G.anim && pose && pose.hl && pose.hl[G.anim];
+    setU(p, 'uHit', hl ? [0, 0, 0.25] : (hit || [0, 0, 0]));
     setU(p, 'uColor', G.color); setU(p, 'uMR', G.mr);
     setTex(p, 'uBase', G.tex || RENDER.whiteTex);
     drawMesh(G.mesh);
@@ -8306,6 +8569,13 @@ function planeHit(ac) {
 }
 function drawGLBPlane(ac, M) { drawGLB(MODELS[AC.model], M, planePose(AC.type, ac), planeHit(ac)); }
 function updatePlaneAnim(ac, dt) {
+  if (GAME.state === 'flying') {
+    ac.fuel = Math.max(0.03, (ac.fuel ?? 0.85) - (ac.engineOn ? (0.15 + 0.85 * ac.throttle) * ac.rpm : 0) * dt / 2400);
+    const oilT = ac.engineOn ? 62 + 38 * ac.rpm * (0.6 + 0.4 * ac.throttle) : 40;
+    ac.oilT = (ac.oilT ?? 40) + (oilT - (ac.oilT ?? 40)) * (1 - Math.exp(-dt / 25));
+    ac.gMax = Math.max(ac.gMax ?? 1, ac.gload); ac.gMin = Math.min(ac.gMin ?? 1, ac.gload);
+  }
+  ac.canopy = (ac.canopy || 0) + clamp((ac.canopySet || 0) - (ac.canopy || 0), -dt * 0.8, dt * 0.8);
   if (ac.onGround) ac.wheelAng = ((ac.wheelAng || 0) + ac.groundSpeed / 0.33 * dt) % TAU;
   ac.hitFlash = Math.max(0, (ac.hitFlash || 0) - dt * 6);
 }
