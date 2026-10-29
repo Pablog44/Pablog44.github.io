@@ -135,6 +135,12 @@ button{font:inherit;color:inherit}
 .btn:hover{border-color:var(--text)}
 .btn.small{padding:8px 12px;font-size:12px}
 .fine{font-size:12px;color:var(--muted);line-height:1.5}
+.bindb{min-width:132px;max-width:230px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bindb.alt{min-width:110px;opacity:.85}
+.bindpair{display:flex;gap:6px;flex-wrap:nowrap;justify-content:flex-end;align-items:center}
+@media (max-width:640px){.bindpair{flex-wrap:wrap}.bindb{min-width:96px;max-width:160px}}
+.bindx{padding:4px 9px;min-width:0}
+.bindb.capturing{border-color:var(--amber);color:var(--amber);animation:blink .8s steps(2) infinite}
 .gpf{outline:3px solid var(--cyan)!important;outline-offset:3px;box-shadow:0 0 14px rgba(89,225,242,.45)}
 .fine kbd,kbd{font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-strong);border-radius:4px;background:rgba(255,255,255,.04);color:var(--text)}
 
@@ -348,6 +354,13 @@ body.touch #quick{max-width:60vw}
         <button data-v="acro" aria-pressed="false">Avioneta acrobática</button>
         <button data-v="fokker" aria-pressed="false">Fokker · Barón Rojo</button>
         <button data-v="boat" aria-pressed="false">Velero</button>
+      </div>
+    </div>
+    <div id="modeWrap" hidden>
+      <div class="sect-t">Modo con el Fokker</div>
+      <div class="seg" id="modePick">
+        <button data-v="duel" aria-pressed="true">Duelo contra el Barón Rojo</button>
+        <button data-v="free" aria-pressed="false">Vuelo libre, sin combate</button>
       </div>
     </div>
     <div id="spawnWrap">
@@ -1339,7 +1352,8 @@ class Aircraft {
         const wl = env.turbAt(vadd(this.pos, vscale(rgt, -6.5))), wr = env.turbAt(vadd(this.pos, vscale(rgt, 6.5)));
         gustRoll = -AC.CLa * (wr.dot(upv) - wl.dot(upv)) / (8 * Vd);
       }
-      const Cl = AC.Clb * beta + AC.Clp * (p * AC.b / (2 * Vd)) + AC.Clr * (r * AC.b / (2 * Vd)) + AC.Clda * this.surf.a * (1 - 0.6 * st) + drop + gustRoll;
+      const yr = this.isAI ? 1 : SETTINGS.yawRoll;
+      const Cl = AC.Clb * beta * yr + AC.Clp * (p * AC.b / (2 * Vd)) + AC.Clr * (r * AC.b / (2 * Vd)) * yr + AC.Clda * this.surf.a * (1 - 0.6 * st) + drop + gustRoll;
       const Cn = AC.Cnb * beta + AC.Cnr * (r * AC.b / (2 * Vd)) + AC.Cnp * (p * AC.b / (2 * Vd)) + AC.Cnda * this.surf.a;
       const Lroll = qd * S * AC.b * Cl;
       const Nyaw = qd * S * AC.b * Cn + qt * S * AC.b * AC.Cndr * this.surf.r;
@@ -5566,7 +5580,7 @@ const DEFAULTS = {
   post: true, bloom: 0.8, fxaa: true, msaa: 0, viewDist: 1.0, fov: 65, exposure: 1.0, vignette: 0.22,
   shaderOn: false, style: 'anime', styleMix: 1.0, showFps: false,
   seaState: 0.35, windSpeed: 5, turbulence: 1, cloudCover: 0.45, timeScale: 1, eruption: 1.0,
-  assist: 2, invertY: false, sensitivity: 1.0, volume: 0.8, hud: true, units: 'kt',
+  assist: 2, invertY: false, sensitivity: 1.0, yawRoll: 1.0, gpMap: null, gpMap2: null, kbMap: null, volume: 0.8, hud: true, units: 'kt',
 };
 const PRESETS = {
   muybajo: { grass: 0, renderScale: 0.55, waterWaves: 4, waterDetail: 0, waterGrid: 0, reflections: 0, foam: true, wake: false, terrainRes: 128, vegetation: 0.25, shadows: 0, clouds: 1, particles: 0.3, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 30 },
@@ -6620,7 +6634,101 @@ const KEYMAP = {
   pitchDown: ['KeyW', 'ArrowUp'], pitchUp: ['KeyS', 'ArrowDown'], rollL: ['KeyA', 'ArrowLeft'], rollR: ['KeyD', 'ArrowRight'],
   yawL: ['KeyQ'], yawR: ['KeyE'], thrUp: ['KeyR', 'ShiftLeft', 'ShiftRight', 'Equal', 'NumpadAdd'], thrDown: ['KeyF', 'Minus', 'NumpadSubtract'],
   brake: ['Space', 'KeyB'], trimDn: ['KeyT'], trimUp: ['KeyY'],
+  fire: ['Space'], reload: ['KeyX'], gear: ['KeyG'], flapsDn: ['KeyX', 'BracketRight'], flapsUp: ['KeyZ', 'BracketLeft'],
+  camera: ['KeyC'], fpv: ['KeyV'], lights: ['KeyL'], parking: ['KeyK'], canopy: ['KeyJ'], target: ['KeyN'],
 };
+const KEYMAP_DEFAULT = JSON.parse(JSON.stringify(KEYMAP));
+function applyKeymap() { for (const k in KEYMAP_DEFAULT) KEYMAP[k] = (SETTINGS.kbMap && SETTINGS.kbMap[k]) ? SETTINGS.kbMap[k].slice() : KEYMAP_DEFAULT[k].slice(); }
+// ---------------- remappable gamepad / joystick ----------------
+const GP_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'];
+const GP_DEFAULT = {
+  pitch: { t: 'axis', i: 1 }, roll: { t: 'axis', i: 0 }, yaw: { t: 'btn2', pos: 7, neg: 6 }, thr: { t: 'btn2', pos: 5, neg: 4 },
+  lookX: { t: 'axis', i: 2 }, lookY: { t: 'axis', i: 3 },
+  fire: { t: 'btn', i: 0 }, reload: { t: 'btn', i: 3 }, gear: { t: 'btn', i: 0 }, flapsDn: { t: 'btn', i: 2 }, flapsUp: { t: 'btn', i: 3 },
+  brake: { t: 'btn', i: 1 }, camera: { t: 'btn', i: 11 }, fpv: { t: 'btn', i: 10 }, pause: { t: 'btn', i: 9 }, trimDn: { t: 'btn', i: 12 }, trimUp: { t: 'btn', i: 13 },
+};
+// [action, label, kind, what to do while assigning]
+const GP_ACTIONS = [
+  ['pitch', 'Morro arriba / abajo', 'axis', 'tira hacia ti (morro arriba)'], ['roll', 'Alabeo', 'axis', 'inclina a la derecha'],
+  ['yaw', 'Timón de dirección', 'axis', 'mueve el timón a la derecha'], ['thr', 'Potencia', 'axis', 'da más potencia (botón o palanca de gases)'],
+  ['lookX', 'Mirar izquierda / derecha', 'axis', 'mira a la derecha'], ['lookY', 'Mirar arriba / abajo', 'axis', 'mira hacia abajo'],
+  ['fire', 'Disparar (Fokker)', 'btn'], ['reload', 'Recargar (Fokker)', 'btn'], ['gear', 'Tren / humo', 'btn'],
+  ['flapsDn', 'Flaps abajo', 'btn'], ['flapsUp', 'Flaps arriba', 'btn'], ['brake', 'Frenos', 'btn'],
+  ['camera', 'Cambiar vista', 'btn'], ['fpv', 'Vista de cabina', 'btn'], ['pause', 'Pausa', 'btn'], ['trimDn', 'Compensador morro abajo', 'btn'], ['trimUp', 'Compensador morro arriba', 'btn'],
+];
+const KB_ACTIONS = [
+  ['pitchUp', 'Morro arriba (tirar)'], ['pitchDown', 'Morro abajo (empujar)'], ['rollL', 'Alabeo izquierda'], ['rollR', 'Alabeo derecha'],
+  ['yawL', 'Timón izquierda'], ['yawR', 'Timón derecha'], ['thrUp', 'Más potencia'], ['thrDown', 'Menos potencia'],
+  ['fire', 'Disparar (Fokker)'], ['reload', 'Recargar (Fokker)'], ['brake', 'Frenos'], ['gear', 'Tren / humo'], ['flapsDn', 'Flaps abajo'], ['flapsUp', 'Flaps arriba'],
+  ['trimDn', 'Compensador morro abajo'], ['trimUp', 'Compensador morro arriba'], ['camera', 'Cambiar vista'], ['fpv', 'Vista de cabina'],
+  ['lights', 'Luces'], ['parking', 'Freno de estacionamiento'], ['canopy', 'Cúpula (acrobática)'], ['target', 'Cambiar destino'],
+];
+const gpBind = k => (SETTINGS.gpMap && SETTINGS.gpMap[k]) || GP_DEFAULT[k];
+const gpBind2 = k => (SETTINGS.gpMap2 && SETTINGS.gpMap2[k]) || null;
+const gpBtnName = i => GP_NAMES[i] || ('Botón ' + (i + 1));
+function padShort(id) { return String(id || '').replace(/[(].*?[)]/g, '').replace(/STANDARD GAMEPAD|Vendor:.*|Product:.*/gi, '').trim().slice(0, 18) || 'Mando'; }
+function gpBindLabel(b) {
+  if (!b) return '＋ Añadir';
+  const nm = i => (b.pad && !b.std) ? 'Botón ' + (i + 1) : gpBtnName(i);
+  let s = b.t === 'axis' ? 'Eje ' + b.i + (b.inv ? ' (inv.)' : '') : b.t === 'btn2' ? nm(b.pos) + ' / ' + nm(b.neg) : nm(b.i);
+  const n = INPUT.pads ? INPUT.pads.length : 0;
+  if (b.pad && (n > 1 || (INPUT.gpName && b.pad !== INPUT.gpName))) s += ' · ' + padShort(b.pad) + (b.pi !== undefined && n > 1 ? ' #' + (b.pi + 1) : '');
+  return s;
+}
+function keyLabel(code) {
+  const M = { Space: 'Espacio', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ShiftLeft: 'Shift', ShiftRight: 'Shift dcho', ControlLeft: 'Ctrl', ControlRight: 'Ctrl dcho', AltLeft: 'Alt', Equal: '=', Minus: '-', BracketLeft: '[', BracketRight: ']', NumpadAdd: 'Num +', NumpadSubtract: 'Num -', Enter: 'Intro', Tab: 'Tab', Backspace: 'Retroceso' };
+  return M[code] || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+}
+function startCapture(dev, key, btn, slot) {
+  if (INPUT.capture && INPUT.capture.btn) INPUT.capture.btn.classList.remove('capturing');
+  const A = GP_ACTIONS.find(a => a[0] === key);
+  INPUT.capture = { dev, key, btn, slot: slot || 1, step: 0, t0: performance.now(), kind: A ? A[2] : 'btn', hint: A && A[3] };
+  btn.classList.add('capturing');
+  btn.textContent = dev === 'kb' ? 'Pulsa una tecla… (Esc cancela)' : INPUT.capture.kind === 'axis' ? 'Mueve el eje: ' + INPUT.capture.hint + ' · o pulsa un botón' : 'Pulsa el botón…';
+}
+function endCapture() { INPUT.capture = null; INPUT.gpAct = {}; if (!$('settings').hidden) buildSettings('controles'); }
+function captureKey(e) {
+  const C = INPUT.capture; if (!C || C.dev !== 'kb') return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (e.type !== 'keydown') return;
+  if (e.code === 'Escape') { endCapture(); return; }
+  const m = Object.assign({}, SETTINGS.kbMap || {});
+  // a key does one thing: take it away from any other action
+  const taken = [];
+  for (const k in KEYMAP) if (k !== C.key && KEYMAP[k].includes(e.code)) { m[k] = KEYMAP[k].filter(c => c !== e.code); taken.push(k); }
+  m[C.key] = C.slot === 2 ? [...new Set([...(KEYMAP[C.key] || []).filter(c => c !== e.code), e.code])] : [e.code];
+  SETTINGS.kbMap = m; applyKeymap(); saveSettings();
+  if (taken.length) UI.toast(keyLabel(e.code) + ' se ha quitado de: ' + taken.map(k => (KB_ACTIONS.find(a => a[0] === k) || [k, k])[1]).join(', '));
+  endCapture();
+}
+function captureGamepad(pads, prim) {
+  const C = INPUT.capture;
+  const P = b => !!(b && b.pressed);
+  if (!C.base) { C.base = {}; C.prevB = {}; }
+  if (performance.now() - C.t0 > 12000) { UI.toast('Asignación cancelada'); endCapture(); return; }
+  const done = (bnd, gp) => {
+    bnd.pad = gp.id; bnd.std = gp.mapping === 'standard'; bnd.pi = pads.filter(q => q.id === gp.id).indexOf(gp);
+    const mk = C.slot === 2 ? 'gpMap2' : 'gpMap';
+    SETTINGS[mk] = Object.assign({}, SETTINGS[mk] || {}, { [C.key]: bnd }); saveSettings();
+    const N = INPUT.navPrev || (INPUT.navPrev = {}); N.a = P(prim.buttons[0]); N.b = P(prim.buttons[1]); N.start = P(prim.buttons[9]);
+    UI.toast('Asignado: ' + gpBindLabel(bnd)); beep(1200, 0.05, 0.06, 'square'); endCapture();
+  };
+  for (const gp of pads) {
+    const key = gp.index;
+    if (!C.base[key]) { C.base[key] = Array.from(gp.axes); C.prevB[key] = gp.buttons.map(P); continue; }   // a pad plugged in mid-capture starts its baseline now
+    if (C.step === 0) for (let i = 0; i < gp.axes.length; i++) {
+      const d = (gp.axes[i] || 0) - (C.base[key][i] || 0);
+      if (Math.abs(d) > 0.7) { done({ t: 'axis', i, inv: d < 0 }, gp); return; }
+    }
+    for (let i = 0; i < gp.buttons.length; i++) {
+      const p = P(gp.buttons[i]), was = C.prevB[key][i]; C.prevB[key][i] = p;
+      if (!p || was) continue;
+      if (C.kind === 'btn') { done({ t: 'btn', i }, gp); return; }
+      if (C.step === 0) { C.pos = i; C.padIx = key; C.step = 1; C.btn.textContent = gpBtnName(i) + ' ✓ · ahora el botón del sentido contrario'; return; }
+      if (key === C.padIx && i !== C.pos) { done({ t: 'btn2', pos: C.pos, neg: i }, gp); return; }
+    }
+  }
+}
 const down = name => KEYMAP[name].some(k => INPUT.keys[k]);
 function onKey(e, isDown) {
   const tag = (e.target && e.target.tagName) || '';
@@ -6631,44 +6739,49 @@ function onKey(e, isDown) {
   if (!isDown || e.repeat) return;
   const ac = AIR.ac;
   const playing = GAME.state === 'flying';
-  switch (e.code) {
-    case 'Escape': if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else UI.closeModals(); break;
-    case 'KeyP': toggleShader(); break;
-    case 'KeyO': nextStyle(1); break;
-    case 'KeyI': nextStyle(-1); break;
-    case 'KeyC': if (playing) cycleCamera(e.shiftKey ? -1 : 1); break;
-    case 'KeyV': if (playing) toggleFPV(); break;
-    case 'KeyH': UI.toggleHelp(); break;
-    case 'KeyU': SETTINGS.hud = !SETTINGS.hud; UI.applyHud(); break;
+  const is = k => !!KEYMAP[k] && KEYMAP[k].includes(e.code);
+  const bound = e.code !== 'Escape' && Object.values(KEYMAP).some(a => a.includes(e.code));
+  if (!bound) switch (e.code) {
+    case 'Escape': if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else UI.closeModals(); return;
+    case 'KeyP': toggleShader(); return;
+    case 'KeyO': nextStyle(1); return;
+    case 'KeyI': nextStyle(-1); return;
+    case 'KeyH': UI.toggleHelp(); return;
+    case 'KeyU': SETTINGS.hud = !SETTINGS.hud; UI.applyHud(); return;
   }
+  if (playing && is('camera')) { cycleCamera(e.shiftKey ? -1 : 1); return; }
+  if (playing && is('fpv')) { toggleFPV(); return; }
   if (!playing) { if (e.code === 'Enter' && GAME.state === 'crashed') respawn(); return; }
   if (isBoat()) {
     const b = BOAT.b;
-    if (e.code === 'KeyL') { b.lights = !b.lights; UI.toast(b.lights ? 'Luces de navegación encendidas' : 'Luces apagadas'); }
-    if (e.code === 'KeyN') nextTarget();
-    if (e.code === 'KeyK') { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; saveSettings(); UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático de velas' : 'Velas en manual: trima las escotas tú'); }
+    if (is('lights')) { b.lights = !b.lights; UI.toast(b.lights ? 'Luces de navegación encendidas' : 'Luces apagadas'); }
+    if (is('target')) nextTarget();
+    if (is('parking')) { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; saveSettings(); UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático de velas' : 'Velas en manual: trima las escotas tú'); }
     if (e.code === 'Comma') { ENV.time = (ENV.time + 23.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
     if (e.code === 'Period') { ENV.time = (ENV.time + 0.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
     return;
   }
-  if (AC.guns && e.code === 'KeyX') { if (ac.gun.ammo < GUN.mag) startReload(ac, 'player'); return; }
-  if (AC.smoke && e.code === 'KeyJ') { toggleCanopy(); return; }
-  if (AC.smoke && e.code === 'KeyG') { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo acrobático ON' : 'Humo acrobático OFF'); return; }
-  switch (e.code) {
-    case 'KeyG': if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } else UI.toast('Tren fijo'); break;
-    case 'KeyX': case 'BracketRight': ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); break;
-    case 'KeyZ': case 'BracketLeft': ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); break;
-    case 'KeyL': ac.lights = !ac.lights; UI.toast(ac.lights ? 'Luces encendidas' : 'Luces apagadas'); break;
-    case 'KeyN': nextTarget(); break;
-    case 'KeyK': ac.parking = !ac.parking; UI.toast(ac.parking ? 'Freno de estacionamiento puesto' : 'Freno de estacionamiento quitado'); break;
-    case 'Comma': ENV.time = (ENV.time + 23.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); break;
-    case 'Period': ENV.time = (ENV.time + 0.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); break;
+  if (AC.guns && is('reload')) { if (ac.gun.ammo < GUN.mag) startReload(ac, 'player'); return; }
+  if (AC.guns && is('fire')) return;   // held: read every frame in updateInput
+  if (AC.smoke && is('canopy')) { toggleCanopy(); return; }
+  if (is('gear')) {
+    if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo acrobático ON' : 'Humo acrobático OFF'); }
+    else if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } else UI.toast('Tren fijo');
   }
+  if (is('flapsDn') && !(AC.guns && is('reload'))) { if (AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); } else UI.toast('Este avión no tiene flaps'); }
+  if (is('flapsUp')) { if (AC.flapDetents.length > 1) { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); } else UI.toast('Este avión no tiene flaps'); }
+  if (is('lights')) { ac.lights = !ac.lights; UI.toast(ac.lights ? 'Luces encendidas' : 'Luces apagadas'); }
+  if (is('target')) nextTarget();
+  if (is('parking')) { ac.parking = !ac.parking; UI.toast(ac.parking ? 'Freno de estacionamiento puesto' : 'Freno de estacionamiento quitado'); }
+  if (bound) return;
+  if (e.code === 'Comma') { ENV.time = (ENV.time + 23.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
+  if (e.code === 'Period') { ENV.time = (ENV.time + 0.5) % 24; UI.toast('Hora ' + fmtClock(ENV.time)); }
   if (/^Digit[0-9]$/.test(e.code)) { const n = +e.code.slice(5); ac.throttle = n === 0 ? 1 : n / 10; }
   if (e.code === 'Backquote') ac.throttle = 0;
 }
 function setupInput() {
   setupCockpitUI();
+  addEventListener('keydown', captureKey, true); addEventListener('keyup', captureKey, true);
   addEventListener('keydown', e => onKey(e, true));
   addEventListener('keyup', e => onKey(e, false));
   addEventListener('blur', () => { INPUT.keys = {}; });
@@ -6746,40 +6859,65 @@ function pollGamepad(dt) {
   let pads = [];
   try { pads = navigator.getGamepads ? (navigator.getGamepads() || []) : []; }
   catch (e) { INPUT.noGamepad = true; return null; }  // blocked by the page's permissions policy
-  let gp = null; for (const p of pads) if (p && p.connected && p.mapping === 'standard') { gp = p; break; }
-  if (!gp) for (const p of pads) if (p && p.connected) { gp = p; break; }
+  const all = []; for (const p of pads) if (p && p.connected) all.push(p);
+  let gp = all.find(p => p.mapping === 'standard') || all[0];
+  const sig = all.map(p => p.index + p.id).join('|');
+  if (INPUT.padSig !== sig) { INPUT.padSig = sig; INPUT.pads = all; INPUT.gpName = gp ? gp.id : ''; if (all.length > 1 && INPUT.padSigN < all.length) UI.toast(all.length + ' mandos conectados: puedes usarlos a la vez'); INPUT.padSigN = all.length; if (!$('settings').hidden && UI.tab === 'controles') buildSettings('controles'); }
+  INPUT.pads = all;
   if (!gp) return null;
+  if (INPUT.capture && INPUT.capture.dev === 'gp') { captureGamepad(all, gp); return null; }
   const dz = v => Math.abs(v) < 0.12 ? 0 : (v - Math.sign(v) * 0.12) / 0.88;
   const b = i => gp.buttons[i] ? gp.buttons[i].value : 0;
-  const pressed = i => gp.buttons[i] && gp.buttons[i].pressed;
+  const pressed = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
   const edge = i => { const p = pressed(i), was = INPUT.gpPrev[i]; INPUT.gpPrev[i] = p; return p && !was; };
+  // which physical device a binding reads from: the one it was assigned on (same model + order), else the main pad
+  const padOf = bd => { if (!bd.pad) return gp; const same = all.filter(p => p.id === bd.pad); return same[bd.pi || 0] || same[0] || gp; };
+  const bv = (q, i) => q.buttons[i] ? q.buttons[i].value : 0, bp = (q, i) => !!(q.buttons[i] && q.buttons[i].pressed);
+  const val1 = bd => { if (!bd) return 0; const q = padOf(bd); if (bd.t === 'axis') { const v = dz(q.axes[bd.i] || 0); return bd.inv ? -v : v; } if (bd.t === 'btn2') return bv(q, bd.pos) - bv(q, bd.neg); return bv(q, bd.i); };
+  const on1 = bd => { if (!bd) return false; const q = padOf(bd); return bd.t === 'btn' ? bp(q, bd.i) : bd.t === 'btn2' ? bp(q, bd.pos) : val1(bd) > 0.5; };
+  // both slots of an action add up: whichever is pushed further wins
+  const valK = k => { const a = val1(gpBind(k)), c = val1(gpBind2(k)); return Math.abs(c) > Math.abs(a) ? c : a; };
+  const val = bd => val1(bd);
+  const act = k => on1(gpBind(k)) || on1(gpBind2(k));
+  INPUT.gpAct = INPUT.gpAct || {}; INPUT.thrLever = INPUT.thrLever || {};
+  const edgeA = k => { const p = act(k), was = INPUT.gpAct[k]; INPUT.gpAct[k] = p; return p && !was; };
   const menuOpen = GAME.state !== 'flying' || !$('settings').hidden || !$('help').hidden;
   if (menuOpen) {
     if (!INPUT.wasMenu) { const P = INPUT.navPrev || (INPUT.navPrev = {}); P.a = pressed(0); P.b = pressed(1); P.start = pressed(9); }
     INPUT.wasMenu = true;
     gamepadMenu(gp);
-    for (const i of [0, 1, 2, 3, 8, 9, 10, 11, 14, 15]) INPUT.gpPrev[i] = pressed(i);   // no actions leak into the flight on release
+    for (let i = 0; i < gp.buttons.length; i++) INPUT.gpPrev[i] = pressed(i);   // no actions leak into the flight on release
+    for (const a of GP_ACTIONS) INPUT.gpAct[a[0]] = act(a[0]);
+    for (const s of [1, 2]) { const tb = s === 1 ? gpBind('thr') : gpBind2('thr'); if (tb && tb.t === 'axis') INPUT.thrLever[s] = clamp((val(tb) + 1) / 2, 0, 1); }
     return null;
   }
   INPUT.wasMenu = false;
   if (INPUT.navEl) { INPUT.navEl.classList.remove('gpf'); INPUT.navEl = null; }
-  // right stick click: change view; left stick click: pilot view
-  if (edge(11)) cycleCamera(1);
-  if (edge(10)) toggleFPV();
-  const out = { roll: dz(gp.axes[0] || 0), pitch: dz(gp.axes[1] || 0), yaw: (b(7) - b(6)), thr: b(5) - b(4), lookX: dz(gp.axes[2] || 0), lookY: dz(gp.axes[3] || 0), brake: pressed(1) };
+  if (edgeA('camera')) cycleCamera(1);
+  if (edgeA('fpv')) toggleFPV();
+  // throttle: a lever (axis) sets the power directly, but only while it moves, so keys / buttons still work too
+  let thrRate = 0, thrAbs = null; INPUT.thrLever = INPUT.thrLever || {};
+  for (const [slot, tb] of [[1, gpBind('thr')], [2, gpBind2('thr')]]) {
+    if (!tb) continue;
+    if (tb.t === 'axis') { const v = clamp((val(tb) + 1) / 2, 0, 1), last = INPUT.thrLever[slot]; if (last === undefined || Math.abs(v - last) > 0.015) { thrAbs = v; INPUT.thrLever[slot] = v; } }
+    else { const v = val(tb); if (Math.abs(v) > Math.abs(thrRate)) thrRate = v; }
+  }
+  const out = { roll: valK('roll'), pitch: valK('pitch'), yaw: valK('yaw'), thr: thrRate, thrAbs,
+    lookX: valK('lookX'), lookY: valK('lookY'), brake: act('brake') };
   if (Math.abs(out.roll) + Math.abs(out.pitch) + Math.abs(out.thr) > 0.1) INPUT.lastUsed = 'gp';
   const ac = AIR.ac;
-  if (isBoat()) { if (edge(9)) { if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else if (GAME.state === 'crashed') respawn(); } if (edge(8) && GAME.state === 'flying') cycleCamera(1); if (edge(14)) toggleShader(); if (edge(15)) nextStyle(1); out.hike = pressed(0) ? 1 : pressed(2) ? -1 : 0; return out; }
-  if (AC.guns) { out.fire = pressed(0); if (edge(3) && GAME.state === 'flying') startReload(ac, 'player'); }
-  else if (edge(0) && GAME.state === 'flying') { if (AC.smoke) COMBAT.smokeOn = !COMBAT.smokeOn; else if (ac.toggleGear()) UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); }
-  if (edge(2) && GAME.state === 'flying') { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
-  if (edge(3) && GAME.state === 'flying') { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
+  const pause = edgeA('pause');
+  if (pause) { if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else if (GAME.state === 'crashed') respawn(); }
   if (edge(8) && GAME.state === 'flying') cycleCamera(1);
-  if (edge(9)) { if (GAME.state === 'flying') UI.pause(); else if (GAME.state === 'paused') UI.resume(); else if (GAME.state === 'crashed') respawn(); }
   if (edge(14)) toggleShader();
   if (edge(15)) nextStyle(1);
-  if (pressed(12)) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
-  if (pressed(13)) ac.trim = clamp(ac.trim + 0.15 * dt, -0.6, 0.6);
+  if (isBoat()) { out.hike = act('gear') ? 1 : act('flapsDn') ? -1 : 0; return out; }
+  if (AC.guns) { out.fire = act('fire'); if (edgeA('reload') && GAME.state === 'flying') startReload(ac, 'player'); }
+  else if (edgeA('gear') && GAME.state === 'flying') { if (AC.smoke) COMBAT.smokeOn = !COMBAT.smokeOn; else if (ac.toggleGear()) UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); else UI.toast('Tren fijo'); }
+  if (!AC.guns && edgeA('flapsDn') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
+  if (!AC.guns && edgeA('flapsUp') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
+  if (act('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
+  if (act('trimUp')) ac.trim = clamp(ac.trim + 0.15 * dt, -0.6, 0.6);
   return out;
 }
 function updateInput(dt) {
@@ -6795,8 +6933,8 @@ function updateInput(dt) {
   if (T.rudder) yaw = T.rudder;
   const gp = pollGamepad(dt);
   let thrRate = (down('thrUp') ? 1 : 0) - (down('thrDown') ? 1 : 0);
-  let brake = (AC.guns ? !!INPUT.keys.KeyB : down('brake')) || T.brake;
-  let fire = AC.guns && (!!INPUT.keys.Space || !!T.fire || !!INPUT.mouseFire);
+  let brake = KEYMAP.brake.some(k => INPUT.keys[k] && !(AC.guns && KEYMAP.fire.includes(k))) || T.brake;
+  let fire = AC.guns && (down('fire') || !!T.fire || !!INPUT.mouseFire);
   if (gp) {
     if (Math.abs(gp.pitch) > Math.abs(pitch)) pitch = gp.pitch * (SETTINGS.invertY ? -1 : 1);
     if (Math.abs(gp.roll) > Math.abs(roll)) roll = gp.roll;
@@ -6823,6 +6961,7 @@ function updateInput(dt) {
   if (isBoat()) { updateBoatInput(dt, gp); return; }
   if (GAME.state !== 'flying') return;
   ac.throttle = clamp(ac.throttle + thrRate * 0.5 * dt, 0, 1);
+  if (gp && gp.thrAbs !== null && gp.thrAbs !== undefined) ac.throttle = gp.thrAbs;
   if (down('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
   if (down('trimUp')) ac.trim = clamp(ac.trim + 0.15 * dt, -0.6, 0.6);
   ac.brake = brake ? 1 : 0;
@@ -7803,6 +7942,14 @@ function buildMenu() {
     water.hidden = GAME.vehicle !== 'boat' && GAME.plane !== 'seaplane';
     if (water.hidden && GAME.spawnKind === 'water') $('spawnPick').querySelector('[data-v="runway"]').click();
     if (!isBoat()) applyPlaneType(GAME.plane);
+    $('modeWrap').hidden = isBoat() || GAME.plane !== 'fokker';
+    UI.setVehicleUI(); updateMenuNote();
+  }));
+  const mp = $('modePick');
+  [...mp.children].forEach(b => b.addEventListener('click', () => {
+    GAME.combat = b.dataset.v === 'duel';
+    [...mp.children].forEach(c => c.setAttribute('aria-pressed', c === b ? 'true' : 'false'));
+    if (!isBoat()) applyPlaneType(GAME.plane);
     UI.setVehicleUI(); updateMenuNote();
   }));
   $('pSwitch').addEventListener('click', () => { UI.show('pause', false); switchVehicle(); });
@@ -7833,13 +7980,14 @@ function updateMenuNote() {
   $('menuNote').innerHTML = GAME.touchUI
     ? (boat ? 'Joystick: caña del timón · barra derecha: escota de la mayor · FOQUE ± y BANDA abajo.' : 'Joystick a la izquierda, potencia a la derecha. Gira el móvil en horizontal.')
     : boat ? '<kbd>A</kbd><kbd>D</kbd> timón · <kbd>W</kbd><kbd>S</kbd> cazar / largar mayor · <kbd>E</kbd><kbd>Q</kbd> foque · <kbd>X</kbd><kbd>Z</kbd> sacar banda · <kbd>K</kbd> trimado automático'
+      : GAME.plane === 'fokker' && !GAME.combat ? 'Vuelo libre con el Fokker: sin Barón Rojo ni ametralladoras · <kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>V</kbd> cabina'
       : GAME.plane === 'fokker' ? '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>Espacio</kbd> ametralladoras · <kbd>X</kbd> recargar · <kbd>B</kbd> frenos · <kbd>V</kbd> cabina'
       : GAME.plane === 'acro' ? '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>Q</kbd><kbd>E</kbd> timón · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> humo · <kbd>V</kbd> cabina'
       : '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> tren · <kbd>V</kbd> cabina (clic en los mandos) · <kbd>H</kbd> ayuda';
 }
 
 // ---------------- settings sheet ----------------
-const TABS = [['graficos', 'Gráficos'], ['shaders', 'Shaders'], ['mundo', 'Mundo'], ['vuelo', 'Vuelo y controles'], ['sonido', 'Sonido']];
+const TABS = [['graficos', 'Gráficos'], ['shaders', 'Shaders'], ['mundo', 'Mundo'], ['vuelo', 'Vuelo'], ['controles', 'Controles'], ['sonido', 'Sonido']];
 function openSettings(tab) { buildSettings(tab || UI.tab || 'graficos'); UI.show('settings', true); }
 function row(label, hint, ctl) {
   const r = document.createElement('div'); r.className = 'row';
@@ -7953,9 +8101,42 @@ function buildSettings(tab) {
     rows.appendChild(row('Asistencia de vuelo', 'Coordinación, compensador automático y nivelador', select('assist', [[0, 'Ninguna (realista)'], [1, 'Media'], [2, 'Completa']])));
     rows.appendChild(row('Invertir eje vertical', 'Para joystick táctil y mando', toggle('invertY')));
     rows.appendChild(row('Sensibilidad', null, slider('sensitivity', 0.5, 1.8, 0.05, v => v.toFixed(2))));
+    rows.appendChild(row('Alabeo inducido por el timón', 'Realista (100 %): al pisar el timón el avión derrapa y se inclina solo por el efecto diedro. A 0 % el timón solo gira el morro', slider('yawRoll', 0, 1, 0.05, v => Math.round(v * 100) + '%')));
     rows.appendChild(row('HUD', 'También con la tecla U', toggle('hud', () => UI.applyHud())));
     body.appendChild(rows);
     buildHelp(body);
+  } else if (tab === 'controles') {
+    const top = document.createElement('p'); top.className = 'fine';
+    const pl = INPUT.pads || [];
+    top.textContent = 'Pulsa un botón de la lista y después la tecla, el botón o el eje que quieras usar. En un joystick o volante, mueve el eje en el sentido que se indica. Para los ejes también puedes usar dos botones (uno para cada sentido). Cada acción tiene dos huecos, y puedes usar a la vez el teclado y varios mandos (por ejemplo un joystick, una palanca de gases y unos pedales): cada hueco recuerda en qué mando lo asignaste. '
+      + (pl.length ? 'Mandos conectados: ' + pl.map((q, i) => (i + 1) + ') ' + padShort(q.id)).join(' · ') + '.' : 'Ningún mando detectado: pulsa cualquier botón del mando.');
+    body.appendChild(top);
+    const sect = t => { const h = document.createElement('div'); h.className = 'sect-t'; h.style.marginTop = '10px'; h.textContent = t; body.appendChild(h); };
+    const bindBtn = (dev, key, label, slot) => { const bt = document.createElement('button'); bt.className = 'btn small bindb' + (slot === 2 ? ' alt' : ''); bt.textContent = label; bt.addEventListener('click', () => startCapture(dev, key, bt, slot)); return bt; };
+    const clr = fn => { const x = document.createElement('button'); x.className = 'btn small bindx'; x.textContent = '✕'; x.title = 'Quitar'; x.addEventListener('click', () => { fn(); saveSettings(); buildSettings('controles'); }); return x; };
+    const pair = (...els) => { const w = document.createElement('div'); w.className = 'bindpair'; els.filter(Boolean).forEach(e => w.appendChild(e)); return w; };
+    sect('Mando / joystick');
+    const r1 = document.createElement('div'); r1.className = 'rows';
+    for (const [k, l, kind] of GP_ACTIONS) {
+      const b2 = gpBind2(k);
+      r1.appendChild(row(l, kind === 'axis' ? 'Eje o pareja de botones' : null, pair(bindBtn('gp', k, gpBindLabel(gpBind(k)), 1), bindBtn('gp', k, gpBindLabel(b2), 2),
+        b2 ? clr(() => { const m = Object.assign({}, SETTINGS.gpMap2); delete m[k]; SETTINGS.gpMap2 = m; }) : null)));
+    }
+    body.appendChild(r1);
+    sect('Teclado');
+    const r2 = document.createElement('div'); r2.className = 'rows';
+    for (const [k, l] of KB_ACTIONS) r2.appendChild(row(l, null, pair(bindBtn('kb', k, (KEYMAP[k] || []).map(keyLabel).join(' · ') || '—', 1), bindBtn('kb', k, '＋ Tecla', 2),
+      (KEYMAP[k] || []).length ? clr(() => { SETTINGS.kbMap = Object.assign({}, SETTINGS.kbMap || {}, { [k]: [] }); applyKeymap(); }) : null)));
+    body.appendChild(r2);
+    const rs = document.createElement('div'); rs.className = 'cta'; rs.style.marginTop = '12px';
+    const b1 = document.createElement('button'); b1.className = 'btn'; b1.textContent = 'Restablecer mando';
+    b1.addEventListener('click', () => { SETTINGS.gpMap = null; SETTINGS.gpMap2 = null; saveSettings(); buildSettings('controles'); UI.toast('Mando por defecto'); });
+    const b2 = document.createElement('button'); b2.className = 'btn'; b2.textContent = 'Restablecer teclado';
+    b2.addEventListener('click', () => { SETTINGS.kbMap = null; applyKeymap(); saveSettings(); buildSettings('controles'); UI.toast('Teclado por defecto'); });
+    rs.appendChild(b1); rs.appendChild(b2); body.appendChild(rs);
+    rows.appendChild(row('Invertir eje vertical', 'Para joystick táctil y mando', toggle('invertY')));
+    rows.appendChild(row('Sensibilidad', null, slider('sensitivity', 0.5, 1.8, 0.05, v => v.toFixed(2))));
+    body.appendChild(rows);
   } else if (tab === 'sonido') {
     rows.appendChild(row('Volumen', null, slider('volume', 0, 1, 0.05, v => Math.round(v * 100) + '%', () => { if (AUDIO.master) AUDIO.master.gain.value = SETTINGS.volume; })));
     body.appendChild(rows);
@@ -8189,6 +8370,7 @@ function applyPlaneType(type) {
   const T = PLANE_TYPES[type] || PLANE_TYPES.seaplane;
   Object.assign(AC, T);
   if (T.type === 'seaplane') AC.lightsLocal = PLANE.lightsLocal;
+  if (T.type === 'fokker' && typeof GAME !== 'undefined' && GAME.combat === false) AC.guns = false;
   if (T.type !== 'seaplane') {
     // top speed calibration: thrust = drag in level flight at vmax with the fixed gear
     const q = 0.5 * RHO * AC.vmax * AC.vmax, W = AC.mass * G, CL = W / (q * AC.S);
@@ -8946,7 +9128,7 @@ function updateCombatHUD() {
 // Game state, loop, boot
 // ============================================================================
 const SIM = { t: 0, acc: 0 };
-const GAME = { state: 'loading', vehicle: 'plane', plane: 'seaplane', spawnIsland: 1, spawnKind: 'runway', startTime: '11', target: 0, touchUI: false, lastT: 0, crashT: 0, dynScale: 1, fps: 60, ft: 16, fpsAcc: 0, fpsN: 0, lastRender: 0 };
+const GAME = { state: 'loading', vehicle: 'plane', plane: 'seaplane', combat: true, spawnIsland: 1, spawnKind: 'runway', startTime: '11', target: 0, touchUI: false, lastT: 0, crashT: 0, dynScale: 1, fps: 60, ft: 16, fpsAcc: 0, fpsN: 0, lastRender: 0 };
 const AIR = { ac: new Aircraft(), landingWorld: new V3(), landingDir: new V3(0, 0, -1), assist: {} };
 const BOAT = { b: new Boat(), input: { helm: 0, main: 0, jib: 0, hike: 0 } };
 const VEH = () => GAME.vehicle === 'boat' ? BOAT.b : AIR.ac;
@@ -9064,7 +9246,7 @@ function startFlight() {
   UI.show('menu', false); UI.show('crash', false);
   if (CAM_INSIDE(CAM.mode) && !XR.session) CAM.mode = 'chase';
   UI.applyHud(); UI.updateQuick();
-  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo' : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
+  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo' : AC.type === 'fokker' ? 'Fokker Dr.I · vuelo libre: potencia a tope, levanta la cola y despega a unos 50 nudos' : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
   GAME.lastT = performance.now();
 }
 function respawn() {
@@ -9184,6 +9366,7 @@ async function boot() {
   GAME.touchUI = matchMedia('(pointer: coarse)').matches;
   document.body.classList.toggle('touch', GAME.touchUI);
   if (!loadSettings()) { applyPreset(detectPreset()); saveSettings(); }
+  applyKeymap();
   SETTINGS.shaderOn = !!SETTINGS.shaderOn;
   prog(0.05, 'Levantando islas…'); await nextFrame();
   for (let i = 0; i < ISLANDS.length; i++) { buildIslandData(ISLANDS[i]); prog(0.08 + i * 0.12, 'Levantando ' + ISLANDS[i].name + '…'); await nextFrame(); }
