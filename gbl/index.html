@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hangar de Modelos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+[hidden]{display:none!important} body{margin:0}
+/* Layout: app a pantalla completa — catálogo a la izquierda, escena 3D al centro, mandos flotando sobre la escena. */
+:root {
+  --bg: #e7eae7;
+  --panel: #f5f6f4;
+  --panel-2: #eceeeb;
+  --fg: #19201d;
+  --muted: #5a6560;
+  --line: #cdd3cf;
+  --accent: #a85f00;
+  --accent-fg: #ffffff;
+  --stage-a: #e3e7e4;
+  --stage-b: #c3cac6;
+  --grid-1: #8e9893;
+  --grid-2: #b7bfba;
+  --glass: rgba(245, 246, 244, .86);
+  --danger: #b3261e;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121614; --panel: #1a1f1d; --panel-2: #222826; --fg: #e4e9e6; --muted: #93a09a; --line: #2d3532;
+  --accent: #f2a93b; --accent-fg: #1a1205; --stage-a: #252c29; --stage-b: #0d100f; --grid-1: #4b5550; --grid-2: #2e3633;
+  --glass: rgba(26, 31, 29, .86); --danger: #ff8a80; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121614; --panel: #1a1f1d; --panel-2: #222826; --fg: #e4e9e6; --muted: #93a09a; --line: #2d3532;
+  --accent: #f2a93b; --accent-fg: #1a1205; --stage-a: #252c29; --stage-b: #0d100f; --grid-1: #4b5550; --grid-2: #2e3633;
+  --glass: rgba(26, 31, 29, .86); --danger: #ff8a80; color-scheme: dark; }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+
+/* ---- Catálogo ---- */
+.side { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--line);
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); }
+.brand { padding: 18px 18px 12px; display: flex; flex-direction: column; gap: 2px; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-stretch: 72%; font-weight: 800; font-size: 26px; letter-spacing: .01em; line-height: 1; text-transform: uppercase; }
+.brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.tally { margin: 0 18px 10px; display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tally b { color: var(--fg); font-weight: 500; }
+.list { flex: 1; overflow-y: auto; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 2px; }
+.group-h { font-family: var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: var(--muted); padding: 12px 8px 4px; font-weight: 600; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; text-align: left; border: 1px solid transparent; background: none; border-radius: var(--r); padding: 8px 10px; }
+.item:hover { background: var(--panel-2); }
+.item[aria-current="true"] { background: var(--panel-2); border-color: var(--line); box-shadow: inset 3px 0 0 var(--accent); }
+.item .t { font-weight: 600; min-width: 0; }
+.item .v { grid-column: 1; color: var(--muted); font-size: 12px; min-width: 0; }
+.item .s { grid-column: 2; grid-row: 1; font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.item .a { grid-column: 2; grid-row: 2; font-family: var(--f-mono); font-size: 11px; color: var(--accent); }
+.side-foot { border-top: 1px solid var(--line); padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 6px 10px; font-size: 13px; line-height: 1.2; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; }
+
+/* ---- Escena ---- */
+.stage { position: relative; min-width: 0; min-height: 0; background: radial-gradient(120% 90% at 50% 35%, var(--stage-a), var(--stage-b)); overflow: hidden; }
+#lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hud { position: absolute; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.card { background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.title-hud { top: calc(14px + env(safe-area-inset-top, 0px)); left: 16px; max-width: min(460px, calc(100% - 32px)); }
+.title-hud h2 { margin: 0; font-family: var(--f-display); font-stretch: 78%; font-weight: 800; font-size: clamp(24px, 3.4vw, 40px); line-height: .95; text-transform: uppercase; text-wrap: balance; }
+.title-hud .sub { margin-top: 6px; color: var(--muted); font-size: 13px; }
+.specs { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.specs b { color: var(--fg); font-weight: 500; }
+.cam-hud { top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); width: 248px; }
+.cam-hud .card { display: flex; flex-direction: column; gap: 10px; }
+.lbl { font-family: var(--f-display); font-stretch: 85%; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg .btn { border: 0; border-radius: 0; }
+.seg .btn + .btn { border-left: 1px solid var(--line); }
+.views { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.views .btn { padding: 6px 4px; font-size: 12px; }
+select.btn { width: 100%; justify-content: flex-start; }
+.range { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.range output { font-family: var(--f-mono); font-size: 11px; min-width: 3.5ch; text-align: right; color: var(--fg); }
+input[type=range] { accent-color: var(--accent); width: 100%; min-width: 0; }
+.toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.toggles .btn { font-size: 12px; }
+.collapse-cam { display: none; }
+
+/* ---- Dock de animaciones ---- */
+.anim-hud { left: 16px; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); align-items: flex-start; }
+.anim { width: min(720px, 100%); display: flex; flex-direction: column; gap: 8px; }
+.anim-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.anim-top .lbl { margin-right: 4px; }
+.timeline { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.timeline output { font-family: var(--f-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.clips { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.clip { flex: none; display: inline-flex; align-items: baseline; gap: 8px; }
+.clip small { font-family: var(--f-mono); font-size: 10.5px; opacity: .75; }
+.clip.focus { box-shadow: 0 0 0 1px var(--fg) inset; }
+.noanim { color: var(--muted); font-size: 12.5px; }
+
+/* ---- Carga ---- */
+.loader { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.loader .card { pointer-events: auto; width: min(320px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.loader .msg { font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.loader .err { color: var(--danger); font-size: 13px; }
+.drop { position: absolute; inset: 10px; border: 2px dashed var(--accent); border-radius: 12px; display: grid; place-items: center; background: var(--glass); font-family: var(--f-display); font-stretch: 80%; font-size: 26px; text-transform: uppercase; font-weight: 800; pointer-events: none; }
+.fly-help { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.menu-btn { display: none; }
+
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .side { position: fixed; z-index: 20; inset: 0 auto 0 0; width: min(320px, 88vw); transform: translateX(-102%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,.25);
+    padding-top: env(safe-area-inset-top, 0px); }
+  .side.open { transform: none; }
+  .menu-btn { display: inline-flex; }
+  .title-hud { right: 16px; max-width: none; }
+  .title-hud .card { display: flex; flex-direction: column; }
+  .title-hud .specs { display: none; }
+  .cam-hud { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); width: auto; align-items: flex-end; }
+  .cam-hud .card { width: min(260px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; }
+  .cam-hud.closed .card { display: none; }
+  .collapse-cam { display: inline-flex; }
+  .anim-hud { right: auto; left: max(16px, env(safe-area-inset-left, 0px)); width: calc(100% - 120px); }
+  .fly-help { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.scrim { display: none; }
+@media (max-width: 820px) { .scrim.on { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(0,0,0,.35); } }
+</style>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="application/json" id="catalogo">[{"id":"porsche-rs500-v04-street","titulo":"Porsche RS500","version":"Street · v04","tipo":"coche","archivo":"models/Porsche_RS500_v04_Street.txt","bytesOriginal":34448672,"bytesTxt":5748281,"animaciones":3},{"id":"porsche-rs500-v04-slick","titulo":"Porsche RS500","version":"Slick · v04","tipo":"coche","archivo":"models/Porsche_RS500_v04_Slick.txt","bytesOriginal":34447628,"bytesTxt":5661597,"animaciones":3},{"id":"fokker-dr1-redbaron-rev05","titulo":"Fokker Dr.I Barón Rojo","version":"Revisión 5","tipo":"avion","archivo":"models/Fokker_DR1_RedBaron_Rev05.txt","bytesOriginal":39362452,"bytesTxt":3105713,"animaciones":1},{"id":"avioneta-acrobatica","titulo":"Avioneta acrobática","version":"","tipo":"avion","archivo":"models/avioneta_acrobatica.txt","bytesOriginal":1563708,"bytesTxt":435161,"animaciones":0},{"id":"speedster-aletas-ultima-guardada","titulo":"Speedster con aletas","version":"Última revisión guardada","tipo":"coche","archivo":"models/Speedster_Aletas_Ultima_Guardada.txt","bytesOriginal":26579468,"bytesTxt":1609505,"animaciones":1},{"id":"lotus25","titulo":"Lotus 25","version":"Maestro actualizado","tipo":"coche","archivo":"models/Lotus25.txt","bytesOriginal":11970676,"bytesTxt":1390481,"animaciones":0},{"id":"lotus25-4x4","titulo":"Lotus 25 4x4","version":"Largo · ajuste de muelles","tipo":"coche","archivo":"models/Lotus25_4x4.txt","bytesOriginal":18979668,"bytesTxt":1834641,"animaciones":0},{"id":"lotus25-4x4-compact","titulo":"Lotus 25 4x4","version":"Compacto · ajuste de muelles","tipo":"coche","archivo":"models/Lotus25_4x4_Compact.txt","bytesOriginal":19048344,"bytesTxt":1850961,"animaciones":0},{"id":"kart-4x4","titulo":"Kart 4x4","version":"Revisión de transmisión","tipo":"coche","archivo":"models/Kart_4x4.txt","bytesOriginal":8905176,"bytesTxt":822549,"animaciones":0},{"id":"triciclo-maleta-v05","titulo":"Triciclo maleta","version":"v05","tipo":"vehiculo","archivo":"models/Triciclo_Maleta_v05.txt","bytesOriginal":8071188,"bytesTxt":502969,"animaciones":1},{"id":"veloce-33","titulo":"Velero Veloce 33","version":"Última entrega","tipo":"barco","archivo":"models/Veloce_33.txt","bytesOriginal":9627636,"bytesTxt":1654013,"animaciones":1},{"id":"santa-barbara-44-v3","titulo":"Santa Bárbara 44","version":"v3","tipo":"barco","archivo":"models/Santa_Barbara_44_v3.txt","bytesOriginal":6815020,"bytesTxt":360425,"animaciones":1},{"id":"la-viuda-negra","titulo":"La Viuda Negra","version":"Barco pirata","tipo":"barco","archivo":"models/La_Viuda_Negra.txt","bytesOriginal":11412592,"bytesTxt":1039265,"animaciones":0},{"id":"casa-aurea","titulo":"Casa Áurea","version":"Última entrega","tipo":"casa","archivo":"models/Casa_Aurea.txt","bytesOriginal":9875064,"bytesTxt":660333,"animaciones":37}]</script>
+
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side" aria-label="Catálogo de modelos">
+    <div class="brand">
+      <h1>Hangar de Modelos</h1>
+      <p>Visor GLB con animaciones y cámaras</p>
+    </div>
+    <div class="tally" id="tally"></div>
+    <nav class="list" id="lista"></nav>
+    <div class="side-foot">
+      <label class="btn primary" for="archivo">Añadir modelo (.glb o .txt)</label>
+      <input type="file" id="archivo" accept=".glb,.txt,model/gltf-binary,text/plain" multiple hidden>
+      <p class="hint">También puedes arrastrar archivos sobre la escena. Los que añadas se ven solo en este navegador.</p>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="stage" id="stage">
+    <canvas id="lienzo" aria-label="Escena 3D. Arrastra para girar, rueda o pellizco para acercar."></canvas>
+
+    <div class="hud title-hud">
+      <div class="card">
+        <div class="row" style="align-items:center; gap:10px">
+          <button class="btn menu-btn" id="menuBtn" aria-controls="side">Modelos</button>
+          <h2 id="mTitulo">Cargando…</h2>
+        </div>
+        <div class="sub" id="mVersion"></div>
+        <div class="specs" id="mSpecs"></div>
+      </div>
+    </div>
+
+    <div class="hud cam-hud" id="camHud">
+      <button class="btn collapse-cam" id="camToggle" aria-expanded="false">Cámara</button>
+      <div class="card">
+        <div class="lbl">Modo</div>
+        <div class="seg" role="group" aria-label="Modo de cámara">
+          <button class="btn" id="mOrbita" aria-pressed="true">Órbita</button>
+          <button class="btn" id="mVuelo" aria-pressed="false">Vuelo libre</button>
+        </div>
+        <div class="seg" role="group" aria-label="Proyección">
+          <button class="btn" id="pPersp" aria-pressed="true">Perspectiva</button>
+          <button class="btn" id="pOrto" aria-pressed="false">Ortográfica</button>
+        </div>
+        <div class="lbl">Vistas</div>
+        <div class="views" id="vistas">
+          <button class="btn" data-v="frente">Frente</button>
+          <button class="btn" data-v="atras">Atrás</button>
+          <button class="btn" data-v="tres4">3/4</button>
+          <button class="btn" data-v="izq">Izquierda</button>
+          <button class="btn" data-v="der">Derecha</button>
+          <button class="btn" data-v="arriba">Arriba</button>
+        </div>
+        <div id="camModeloBox" hidden>
+          <div class="lbl" style="margin-bottom:4px">Cámaras del modelo</div>
+          <select class="btn" id="camModelo"></select>
+        </div>
+        <div class="range"><span>Lente</span><input type="range" id="fov" min="15" max="90" value="40"><output id="fovOut">40°</output></div>
+        <div class="toggles">
+          <button class="btn" id="tGiro" aria-pressed="false">Giro auto</button>
+          <button class="btn" id="tRejilla" aria-pressed="true">Rejilla</button>
+          <button class="btn" id="tSombras" aria-pressed="true">Sombras</button>
+          <button class="btn" id="tAlambre" aria-pressed="false">Alambre</button>
+        </div>
+        <button class="btn" id="encuadrar" title="Tecla F">Encuadrar modelo</button>
+      </div>
+    </div>
+
+    <div class="hud anim-hud">
+      <div class="card anim" id="animCard">
+        <div class="anim-top">
+          <span class="lbl">Animaciones</span>
+          <button class="btn" id="aPlay" aria-pressed="false">Pausar</button>
+          <button class="btn" id="aTodas">Todas</button>
+          <button class="btn" id="aParar">Parar</button>
+          <button class="btn" id="aBucle" aria-pressed="true">Bucle</button>
+          <label class="range" style="grid-template-columns:auto 90px auto"><span>Velocidad</span><input type="range" id="vel" min="0.1" max="3" step="0.1" value="1"><output id="velOut">1,0×</output></label>
+        </div>
+        <div class="timeline"><input type="range" id="tiempo" min="0" max="1000" value="0" aria-label="Línea de tiempo"><output id="tiempoOut">0,00 / 0,00 s</output></div>
+        <div class="clips" id="clips"></div>
+      </div>
+    </div>
+
+    <div class="fly-help" id="flyHelp" hidden>Vuelo libre · arrastra para mirar · W A S D para moverte · Q/E bajar y subir · Mayús rápido</div>
+    <div class="loader" id="loader"><div class="card"><div class="msg" id="lMsg">Preparando…</div><div class="bar"><i id="lBar"></i></div><div class="err" id="lErr" hidden></div></div></div>
+    <div class="drop" id="drop" hidden>Suelta para ver el modelo</div>
+  </main>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const $ = (id) => document.getElementById(id);
+const CATALOGO = JSON.parse($('catalogo').textContent);
+const locales = [];
+const TIPOS = { coche: 'Coches', vehiculo: 'Coches', avion: 'Aviones', barco: 'Barcos', casa: 'Arquitectura', propio: 'Añadidos por ti' };
+const fmtMB = (b) => (b / 1048576).toLocaleString('es-ES', { maximumFractionDigits: b < 1048576 * 10 ? 1 : 0, minimumFractionDigits: b < 1048576 * 10 ? 1 : 0 }) + ' MB';
+const fmtN = (n) => n.toLocaleString('es-ES');
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- Decodificador .txt → GLB ----------
+   Formato AGZ1: "AGZ1:" + base64( gzip( GLB con filtros delta ) ).
+   También acepta base64 de un .glb normal, con o sin gzip. */
+function b64ToBytes(s) {
+  s = s.replace(/[^A-Za-z0-9+/=_-]/g, '');
+  if (Uint8Array.fromBase64) { try { return Uint8Array.fromBase64(s); } catch {} }
+  const bin = atob(s); const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+async function gunzip(u) {
+  const st = new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(st).arrayBuffer();
+}
+function unfilter(buf) {
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('El archivo no es un GLB válido.');
+  const jl = dv.getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)));
+  const binStart = 20 + jl + 8;
+  if (binStart > buf.byteLength) return buf;
+  const bin = new Uint8Array(buf, binStart);
+  for (const bv of json.bufferViews || []) {
+    const f = bv.extras && bv.extras.f; if (!f) continue;
+    const o = bv.byteOffset || 0, L = bv.byteLength, tmp = bin.slice(o, o + L);
+    if (f === 'v') {
+      const s = bv.byteStride, n = L / s;
+      for (let k = 0; k < s; k++) { let acc = 0; const base = k * n; for (let i = 0; i < n; i++) { acc = (acc + tmp[base + i]) & 255; bin[o + i * s + k] = acc; } }
+    } else {
+      const w = +f[1], n = L / w, out = new DataView(buf, binStart + o, L); let acc = 0;
+      if (w === 2) for (let i = 0; i < n; i++) { acc = (acc + (tmp[i] | (tmp[n + i] << 8))) & 0xffff; out.setUint16(i * 2, acc, true); }
+      else for (let i = 0; i < n; i++) { const v = (tmp[i] | (tmp[n + i] << 8) | (tmp[2 * n + i] << 16) | (tmp[3 * n + i] << 24)) >>> 0; acc = (acc + v) >>> 0; out.setUint32(i * 4, acc, true); }
+    }
+  }
+  return buf;
+}
+async function textoAGLB(txt) {
+  txt = txt.trim();
+  if (txt.startsWith('AGZ1:')) txt = txt.slice(5);
+  const bytes = b64ToBytes(txt);
+  const buf = (bytes[0] === 0x1f && bytes[1] === 0x8b) ? await gunzip(bytes) : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return unfilter(buf);
+}
+
+/* ---------- Escena ---------- */
+const canvas = $('lienzo'), stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); scene.add(hemi);
+const sol = new THREE.DirectionalLight(0xffffff, 1.6);
+sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048); sol.shadow.bias = -0.0005; sol.shadow.normalBias = 0.02;
+scene.add(sol, sol.target);
+const suelo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.22 }));
+suelo.rotation.x = -Math.PI / 2; suelo.receiveShadow = true; scene.add(suelo);
+let rejilla = null;
+
+const persp = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
+const orto = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 1000);
+let camara = persp;            // cámara de usuario activa
+let camModelo = null;          // cámara incluida en el GLB (si se elige)
+let controls = crearControles(persp);
+function crearControles(cam, target) {
+  const c = new OrbitControls(cam, canvas);
+  c.enableDamping = true; c.dampingFactor = 0.08; c.screenSpacePanning = true;
+  if (target) c.target.copy(target);
+  c.autoRotate = $('tGiro')?.getAttribute('aria-pressed') === 'true'; c.autoRotateSpeed = 1.2;
+  return c;
+}
+
+let modelo = null, mixer = null, clips = [], acciones = new Map(), activos = new Set(), foco = null;
+let radio = 1, centro = new THREE.Vector3(), cajaModelo = new THREE.Box3();
+let pausado = false, velocidad = 1, bucle = true;
+let modoVuelo = false;
+
+function colores() {
+  const cs = getComputedStyle(document.documentElement);
+  return { g1: new THREE.Color(cs.getPropertyValue('--grid-1').trim()), g2: new THREE.Color(cs.getPropertyValue('--grid-2').trim()) };
+}
+function hacerRejilla() {
+  if (rejilla) { scene.remove(rejilla); rejilla.geometry.dispose(); rejilla.material.dispose(); }
+  const { g1, g2 } = colores();
+  const size = Math.pow(10, Math.ceil(Math.log10(radio * 6)));
+  rejilla = new THREE.GridHelper(size, 40, g1, g2);
+  rejilla.material.transparent = true; rejilla.material.opacity = 0.55; rejilla.material.depthWrite = false;
+  rejilla.position.set(centro.x, cajaModelo.min.y + radio * 0.001, centro.z);
+  rejilla.visible = $('tRejilla').getAttribute('aria-pressed') === 'true';
+  scene.add(rejilla);
+}
+new MutationObserver(hacerRejilla).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', hacerRejilla);
+
+function tamano() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  persp.aspect = w / h; persp.updateProjectionMatrix();
+  ajustarOrto();
+  if (camModelo && camModelo.isPerspectiveCamera) { camModelo.aspect = w / h; camModelo.updateProjectionMatrix(); }
+}
+function ajustarOrto() {
+  const w = stage.clientWidth || 1, h = stage.clientHeight || 1;
+  const dist = orto.position.distanceTo(controls.target) || radio * 3;
+  const halfH = dist * Math.tan(THREE.MathUtils.degToRad(persp.fov / 2));
+  orto.left = -halfH * w / h; orto.right = halfH * w / h; orto.top = halfH; orto.bottom = -halfH;
+  orto.updateProjectionMatrix();
+}
+new ResizeObserver(tamano).observe(stage);
+
+/* ---------- Catálogo ---------- */
+function pintarLista(actual) {
+  const lista = $('lista'); lista.innerHTML = '';
+  const todos = [...CATALOGO, ...locales];
+  const orden = ['propio', 'coche', 'avion', 'barco', 'casa'];
+  const grupos = {};
+  for (const m of todos) { const g = m.tipo === 'vehiculo' ? 'coche' : m.tipo; (grupos[g] ||= []).push(m); }
+  for (const g of orden) {
+    if (!grupos[g]) continue;
+    const h = document.createElement('div'); h.className = 'group-h'; h.textContent = TIPOS[g]; lista.append(h);
+    for (const m of grupos[g]) {
+      const b = document.createElement('button'); b.className = 'item'; b.dataset.id = m.id;
+      b.setAttribute('aria-current', m.id === actual ? 'true' : 'false');
+      b.innerHTML = `<span class="t"></span><span class="s"></span><span class="v"></span><span class="a"></span>`;
+      b.querySelector('.t').textContent = m.titulo;
+      b.querySelector('.v').textContent = m.version || '—';
+      b.querySelector('.s').textContent = fmtMB(m.bytesTxt);
+      b.querySelector('.a').textContent = m.animaciones ? `${m.animaciones} anim.` : '';
+      b.addEventListener('click', () => { abrirMenu(false); if (location.hash.slice(1) === m.id) cargar(m); else location.hash = m.id; });
+      lista.append(b);
+    }
+  }
+  const orig = CATALOGO.reduce((a, m) => a + m.bytesOriginal, 0), txt = CATALOGO.reduce((a, m) => a + m.bytesTxt, 0);
+  $('tally').innerHTML = `<span>${CATALOGO.length} modelos</span><span>·</span><span><b>${fmtMB(txt)}</b> en texto</span><span>(antes ${fmtMB(orig)})</span>`;
+}
+
+/* ---------- Carga ---------- */
+let cargaId = 0;
+function estado(msg, frac) { $('loader').hidden = false; $('lErr').hidden = true; $('lMsg').textContent = msg; if (frac != null) $('lBar').style.width = (frac * 100).toFixed(1) + '%'; }
+function error(msg) { $('loader').hidden = false; $('lErr').hidden = false; $('lErr').textContent = msg; }
+
+async function descargarTexto(url, total, id) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`No se pudo descargar ${url} (error ${res.status}).`);
+  if (!res.body || !res.body.getReader) return await res.text();
+  const reader = res.body.getReader(); const partes = []; let rec = 0;
+  for (;;) {
+    const { done, value } = await reader.read(); if (done) break;
+    partes.push(value); rec += value.length;
+    if (id === cargaId) estado(`Descargando ${fmtMB(rec)} de ${fmtMB(total)}`, Math.min(rec / total, 1) * 0.8);
+  }
+  return new TextDecoder().decode(await new Blob(partes).arrayBuffer());
+}
+
+async function cargar(m) {
+  const id = ++cargaId;
+  document.querySelectorAll('.item').forEach((b) => b.setAttribute('aria-current', b.dataset.id === m.id ? 'true' : 'false'));
+  $('mTitulo').textContent = m.titulo; $('mVersion').textContent = m.version || ''; $('mSpecs').innerHTML = '';
+  try {
+    let glb;
+    if (m.buffer) { estado('Leyendo archivo…', 0.5); glb = m.buffer; }
+    else {
+      estado(`Descargando 0 de ${fmtMB(m.bytesTxt)}`, 0);
+      const txt = await descargarTexto(m.archivo, m.bytesTxt, id);
+      if (id !== cargaId) return;
+      estado('Descomprimiendo…', 0.85);
+      glb = await textoAGLB(txt);
+    }
+    if (id !== cargaId) return;
+    estado('Montando la escena…', 0.93);
+    const gltf = await new GLTFLoader().parseAsync(glb, '');
+    if (id !== cargaId) { liberar(gltf.scene); return; }
+    montar(gltf, m);
+    $('loader').hidden = true;
+    store.set('hangar-ultimo', m.id);
+  } catch (e) {
+    console.error(e);
+    if (id === cargaId) error(e.message || String(e));
+  }
+}
+
+function liberar(obj) {
+  obj.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mt) => {
+      for (const k in mt) if (mt[k] && mt[k].isTexture) mt[k].dispose();
+      mt.dispose();
+    });
+  });
+}
+
+function montar(gltf, m) {
+  if (modelo) { scene.remove(modelo); liberar(modelo); }
+  if (mixer) { mixer.stopAllAction(); mixer.uncacheRoot(mixer.getRoot()); }
+  modelo = gltf.scene; scene.add(modelo);
+
+  let tris = 0, mallas = 0; const mats = new Set();
+  modelo.traverse((o) => {
+    if (o.isMesh) {
+      mallas++; o.castShadow = true;
+      const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((mt) => mats.add(mt));
+    }
+  });
+  aplicarAlambre(); aplicarSombras();
+
+  cajaModelo.setFromObject(modelo);
+  if (cajaModelo.isEmpty()) cajaModelo.set(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
+  cajaModelo.getCenter(centro);
+  radio = cajaModelo.getBoundingSphere(new THREE.Sphere()).radius || 1;
+  const size = cajaModelo.getSize(new THREE.Vector3());
+
+  for (const c of [persp, orto]) { c.near = radio / 200; c.far = radio * 200; c.updateProjectionMatrix(); }
+  suelo.scale.set(radio * 8, radio * 8, 1); suelo.position.set(centro.x, cajaModelo.min.y, centro.z);
+  sol.position.set(centro.x + radio * 1.2, centro.y + radio * 2.4, centro.z + radio * 1.0);
+  sol.target.position.copy(centro);
+  const sc = sol.shadow.camera; sc.left = -radio * 1.5; sc.right = radio * 1.5; sc.top = radio * 1.5; sc.bottom = -radio * 1.5; sc.near = radio * 0.1; sc.far = radio * 6; sc.updateProjectionMatrix();
+  hacerRejilla();
+
+  // Cámaras incluidas en el archivo
+  const cams = gltf.cameras || [];
+  const sel = $('camModelo'); sel.innerHTML = '<option value="-1">Ninguna (usar la mía)</option>';
+  cams.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = c.name || `Cámara ${i + 1}`; sel.append(o); });
+  $('camModeloBox').hidden = cams.length === 0;
+  sel.onchange = () => usarCamModelo(+sel.value >= 0 ? cams[+sel.value] : null);
+  usarCamModelo(null);
+
+  // Animaciones
+  mixer = new THREE.AnimationMixer(modelo); mixer.timeScale = pausado ? 0 : velocidad;
+  clips = gltf.animations || []; acciones = new Map(); activos = new Set(); foco = null;
+  clips.forEach((c) => { const a = mixer.clipAction(c); a.clampWhenFinished = true; a.setLoop(bucle ? THREE.LoopRepeat : THREE.LoopOnce); acciones.set(c, a); });
+  pintarClips();
+  if (clips.length) alternarClip(clips[0], true);
+
+  const orig = m.bytesOriginal, txt = m.bytesTxt;
+  const ahorro = orig ? Math.round((1 - txt / orig) * 100) : 0;
+  $('mSpecs').innerHTML = [
+    ['Triángulos', fmtN(Math.round(tris))], ['Mallas', fmtN(mallas)], ['Materiales', fmtN(mats.size)],
+    ['Medidas', `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m`],
+    ...(orig ? [['Archivo', `${fmtMB(txt)} (−${ahorro}% vs ${fmtMB(orig)})`]] : [['Archivo', fmtMB(txt)]]),
+  ].map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
+
+  salirVuelo();
+  irAVista('tres4', true);
+}
+
+/* ---------- Cámaras ---------- */
+const VISTAS = { frente: [0, 0.15, 1], atras: [0, 0.15, -1], izq: [-1, 0.15, 0], der: [1, 0.15, 0], arriba: [0, 1, 0.001], tres4: [1, 0.55, 1.15] };
+let tween = null;
+function distanciaEncuadre() {
+  const fov = THREE.MathUtils.degToRad(persp.fov);
+  const fovH = 2 * Math.atan(Math.tan(fov / 2) * persp.aspect);
+  return (radio / Math.sin(Math.min(fov, fovH) / 2)) * 1.05;
+}
+function irAVista(nombre, instant) {
+  if (camModelo) { $('camModelo').value = '-1'; usarCamModelo(null); }
+  if (modoVuelo) salirVuelo();
+  const d = new THREE.Vector3(...VISTAS[nombre]).normalize();
+  const dest = centro.clone().addScaledVector(d, distanciaEncuadre());
+  moverCamara(dest, centro.clone(), instant);
+}
+function moverCamara(pos, target, instant) {
+  const cam = camara;
+  if (instant || reduceMotion) { cam.position.copy(pos); controls.target.copy(target); orto.zoom = 1; orto.updateProjectionMatrix(); controls.update(); ajustarOrto(); return; }
+  tween = { t: 0, p0: cam.position.clone(), p1: pos, q0: controls.target.clone(), q1: target, z0: orto.zoom };
+}
+function pasoTween(dt) {
+  if (!tween) return;
+  tween.t = Math.min(1, tween.t + dt / 0.6);
+  const k = 1 - Math.pow(1 - tween.t, 3);
+  camara.position.lerpVectors(tween.p0, tween.p1, k);
+  controls.target.lerpVectors(tween.q0, tween.q1, k);
+  if (camara === orto) { orto.zoom = THREE.MathUtils.lerp(tween.z0, 1, k); orto.updateProjectionMatrix(); }
+  ajustarOrto();
+  if (tween.t >= 1) tween = null;
+}
+function setProyeccion(ortografica) {
+  const target = controls.target.clone();
+  const from = camara;
+  const to = ortografica ? orto : persp;
+  $('pPersp').setAttribute('aria-pressed', String(!ortografica));
+  $('pOrto').setAttribute('aria-pressed', String(ortografica));
+  if (from === to) return;
+  to.position.copy(from.position); to.quaternion.copy(from.quaternion);
+  if (ortografica) orto.zoom = 1;
+  controls.dispose(); camara = to; controls = crearControles(to, target); controls.enabled = !modoVuelo && !camModelo;
+  ajustarOrto(); controls.update();
+}
+function usarCamModelo(cam) {
+  camModelo = cam;
+  controls.enabled = !cam && !modoVuelo;
+  if (cam && cam.isPerspectiveCamera) { cam.aspect = stage.clientWidth / stage.clientHeight; cam.updateProjectionMatrix(); }
+}
+function camaraRender() { return camModelo || camara; }
+
+// Vuelo libre
+const teclas = new Set(); let yaw = 0, pitch = 0, arrastrando = null;
+function entrarVuelo() {
+  if (camModelo) { $('camModelo').value = '-1'; usarCamModelo(null); }
+  modoVuelo = true; tween = null; controls.enabled = false; controls.autoRotate = false;
+  const e = new THREE.Euler().setFromQuaternion(camara.quaternion, 'YXZ'); yaw = e.y; pitch = e.x;
+  $('mVuelo').setAttribute('aria-pressed', 'true'); $('mOrbita').setAttribute('aria-pressed', 'false');
+  $('flyHelp').hidden = false; canvas.focus?.();
+}
+function salirVuelo() {
+  if (!modoVuelo) return;
+  modoVuelo = false;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camara.quaternion);
+  const dist = Math.max(camara.position.distanceTo(centro), radio * 0.5);
+  controls.target.copy(camara.position).addScaledVector(fwd, dist);
+  controls.enabled = !camModelo; controls.autoRotate = $('tGiro').getAttribute('aria-pressed') === 'true';
+  $('mVuelo').setAttribute('aria-pressed', 'false'); $('mOrbita').setAttribute('aria-pressed', 'true');
+  $('flyHelp').hidden = true; teclas.clear();
+}
+canvas.addEventListener('pointerdown', (e) => { if (!modoVuelo) return; arrastrando = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', (e) => {
+  if (!modoVuelo || !arrastrando) return;
+  yaw -= (e.clientX - arrastrando.x) * 0.004; pitch -= (e.clientY - arrastrando.y) * 0.004;
+  pitch = Math.max(-1.55, Math.min(1.55, pitch)); arrastrando = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('pointerup', () => { arrastrando = null; });
+canvas.addEventListener('wheel', (e) => { if (!modoVuelo) return; e.preventDefault(); const f = new THREE.Vector3(0, 0, -1).applyQuaternion(camara.quaternion); camara.position.addScaledVector(f, -Math.sign(e.deltaY) * radio * 0.08); }, { passive: false });
+addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('input, select, textarea')) return;
+  const k = e.key.toLowerCase();
+  if (modoVuelo && 'wasdqe'.includes(k) && k.length === 1) { teclas.add(k); e.preventDefault(); }
+  if (e.key === 'Shift') teclas.add('shift');
+  if (k === 'f' && !modoVuelo) irAVista('tres4');
+  if (k === 'escape' && modoVuelo) salirVuelo();
+  if (k === ' ' && clips.length && !e.target.closest('button')) { e.preventDefault(); setPausa(!pausado); }
+});
+addEventListener('keyup', (e) => { teclas.delete(e.key.toLowerCase()); if (e.key === 'Shift') teclas.delete('shift'); });
+function pasoVuelo(dt) {
+  if (!modoVuelo) return;
+  camara.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+  const v = radio * (teclas.has('shift') ? 2.4 : 0.8) * dt;
+  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(camara.quaternion);
+  const r = new THREE.Vector3(1, 0, 0).applyQuaternion(camara.quaternion);
+  if (teclas.has('w')) camara.position.addScaledVector(f, v);
+  if (teclas.has('s')) camara.position.addScaledVector(f, -v);
+  if (teclas.has('d')) camara.position.addScaledVector(r, v);
+  if (teclas.has('a')) camara.position.addScaledVector(r, -v);
+  if (teclas.has('e')) camara.position.y += v;
+  if (teclas.has('q')) camara.position.y -= v;
+}
+
+/* ---------- Animaciones ---------- */
+function pintarClips() {
+  const box = $('clips'); box.innerHTML = '';
+  const hay = clips.length > 0;
+  ['aPlay', 'aTodas', 'aParar', 'aBucle', 'vel', 'tiempo'].forEach((id) => { $(id).disabled = !hay; });
+  if (!hay) { box.innerHTML = '<span class="noanim">Este modelo no trae animaciones. Puedes girarlo y cambiar de cámara igualmente.</span>'; actualizarTiempo(); return; }
+  clips.forEach((c, i) => {
+    const b = document.createElement('button'); b.className = 'btn clip'; b.dataset.i = i;
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = '<span></span><small></small>';
+    b.querySelector('span').textContent = (c.name || `Animación ${i + 1}`).replace(/_/g, ' ');
+    b.querySelector('small').textContent = c.duration.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' s';
+    b.addEventListener('click', () => alternarClip(c));
+    box.append(b);
+  });
+}
+function refrescarClips() {
+  document.querySelectorAll('#clips .clip').forEach((b) => {
+    const c = clips[+b.dataset.i];
+    b.setAttribute('aria-pressed', String(activos.has(c)));
+    b.classList.toggle('focus', c === foco);
+  });
+}
+function alternarClip(c, forzar) {
+  const a = acciones.get(c);
+  if (activos.has(c) && !forzar) { a.stop(); activos.delete(c); if (foco === c) foco = [...activos].pop() || null; }
+  else { a.reset().play(); activos.add(c); foco = c; }
+  refrescarClips();
+}
+function todas() { clips.forEach((c) => { const a = acciones.get(c); a.reset().play(); activos.add(c); }); foco = clips[0]; refrescarClips(); }
+function parar() { mixer && mixer.stopAllAction(); activos.clear(); foco = null; refrescarClips(); actualizarTiempo(); }
+function setPausa(p) { pausado = p; if (mixer) mixer.timeScale = p ? 0 : velocidad; $('aPlay').textContent = p ? 'Reproducir' : 'Pausar'; $('aPlay').setAttribute('aria-pressed', String(p)); }
+let arrastrandoTiempo = false;
+function actualizarTiempo() {
+  if (!foco) { $('tiempoOut').textContent = '—'; if (!arrastrandoTiempo) $('tiempo').value = 0; return; }
+  const a = acciones.get(foco), d = foco.duration || 1;
+  const t = bucle ? (a.time % d) : Math.min(a.time, d);
+  if (!arrastrandoTiempo) $('tiempo').value = Math.round((t / d) * 1000);
+  $('tiempoOut').textContent = `${t.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${d.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
+}
+$('tiempo').addEventListener('pointerdown', () => { arrastrandoTiempo = true; });
+addEventListener('pointerup', () => { arrastrandoTiempo = false; });
+$('tiempo').addEventListener('input', () => {
+  if (!clips.length) return;
+  if (!foco) alternarClip(clips[0], true);
+  setPausa(true);
+  const a = acciones.get(foco); a.paused = false; a.enabled = true;
+  a.time = ($('tiempo').value / 1000) * foco.duration;
+  mixer.update(0); actualizarTiempo();
+});
+$('aPlay').addEventListener('click', () => setPausa(!pausado));
+$('aTodas').addEventListener('click', todas);
+$('aParar').addEventListener('click', parar);
+$('aBucle').addEventListener('click', () => {
+  bucle = !bucle; $('aBucle').setAttribute('aria-pressed', String(bucle));
+  acciones.forEach((a) => a.setLoop(bucle ? THREE.LoopRepeat : THREE.LoopOnce));
+});
+$('vel').addEventListener('input', () => {
+  velocidad = +$('vel').value; $('velOut').textContent = velocidad.toLocaleString('es-ES', { minimumFractionDigits: 1 }) + '×';
+  if (mixer && !pausado) mixer.timeScale = velocidad;
+});
+
+/* ---------- Mandos de cámara y vista ---------- */
+$('vistas').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) irAVista(b.dataset.v); });
+$('mOrbita').addEventListener('click', salirVuelo);
+$('mVuelo').addEventListener('click', () => (modoVuelo ? salirVuelo() : entrarVuelo()));
+$('pPersp').addEventListener('click', () => setProyeccion(false));
+$('pOrto').addEventListener('click', () => setProyeccion(true));
+$('encuadrar').addEventListener('click', () => irAVista('tres4'));
+$('fov').addEventListener('input', () => {
+  const v = +$('fov').value; $('fovOut').textContent = v + '°';
+  const dir = camara.position.clone().sub(controls.target); const d0 = dir.length();
+  const k = Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(v / 2));
+  persp.fov = v; persp.updateProjectionMatrix();
+  if (camara === persp && !modoVuelo) camara.position.copy(controls.target).addScaledVector(dir.normalize(), d0 * k);
+  ajustarOrto();
+});
+function toggle(id, fn) { $(id).addEventListener('click', () => { const on = $(id).getAttribute('aria-pressed') !== 'true'; $(id).setAttribute('aria-pressed', String(on)); fn(on); }); }
+toggle('tGiro', (on) => { controls.autoRotate = on && !modoVuelo; });
+toggle('tRejilla', (on) => { if (rejilla) rejilla.visible = on; });
+toggle('tSombras', aplicarSombras);
+toggle('tAlambre', aplicarAlambre);
+function aplicarSombras() { const on = $('tSombras').getAttribute('aria-pressed') === 'true'; sol.castShadow = on; suelo.visible = on; }
+function aplicarAlambre() {
+  const on = $('tAlambre').getAttribute('aria-pressed') === 'true';
+  modelo && modelo.traverse((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.wireframe = on; }); });
+}
+$('camToggle').addEventListener('click', () => { const h = $('camHud'); const open = h.classList.toggle('closed') === false; $('camToggle').setAttribute('aria-expanded', String(open)); });
+if (matchMedia('(max-width: 820px)').matches) $('camHud').classList.add('closed');
+function abrirMenu(on) { $('side').classList.toggle('open', on); $('scrim').classList.toggle('on', on); }
+$('menuBtn').addEventListener('click', () => abrirMenu(!$('side').classList.contains('open')));
+$('scrim').addEventListener('click', () => abrirMenu(false));
+
+/* ---------- Añadir modelos propios ---------- */
+async function anadirArchivos(files) {
+  let ultimo = null;
+  for (const f of files) {
+    const nombre = f.name.replace(/\.(glb|txt)$/i, '');
+    let buffer;
+    try {
+      buffer = /\.txt$/i.test(f.name) ? await textoAGLB(await f.text()) : unfilter(await f.arrayBuffer());
+    } catch (e) { error(`No se pudo leer ${f.name}: ${e.message}`); continue; }
+    const id = 'propio-' + (locales.length + 1);
+    const m = { id, titulo: nombre.replace(/[_-]+/g, ' '), version: 'Añadido desde tu equipo', tipo: 'propio', bytesTxt: f.size, bytesOriginal: 0, animaciones: 0, buffer };
+    locales.push(m); ultimo = m;
+  }
+  if (ultimo) { pintarLista(ultimo.id); abrirMenu(false); history.replaceState(null, '', '#' + ultimo.id); cargar(ultimo); }
+}
+$('archivo').addEventListener('change', (e) => { anadirArchivos([...e.target.files]); e.target.value = ''; });
+let dragN = 0;
+stage.addEventListener('dragenter', (e) => { e.preventDefault(); dragN++; $('drop').hidden = false; });
+stage.addEventListener('dragover', (e) => e.preventDefault());
+stage.addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; $('drop').hidden = true; } });
+stage.addEventListener('drop', (e) => { e.preventDefault(); dragN = 0; $('drop').hidden = true; anadirArchivos([...e.dataTransfer.files]); });
+
+/* ---------- Bucle ---------- */
+const reloj = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(reloj.getDelta(), 0.1);
+  if (mixer) mixer.update(dt);
+  pasoTween(dt); pasoVuelo(dt);
+  if (controls.enabled) controls.update();
+  if (camara === orto) ajustarOrto();
+  if (clips.length) actualizarTiempo();
+  renderer.render(scene, camaraRender());
+});
+
+/* ---------- Arranque ---------- */
+function desdeHash() {
+  const id = location.hash.slice(1);
+  const m = [...CATALOGO, ...locales].find((x) => x.id === id);
+  if (m) cargar(m);
+  return !!m;
+}
+addEventListener('hashchange', desdeHash);
+pintarLista(location.hash.slice(1));
+tamano();
+if (!desdeHash()) {
+  const ult = store.get('hangar-ultimo');
+  const m = CATALOGO.find((x) => x.id === ult) || CATALOGO.find((x) => x.id === 'fokker-dr1-redbaron-rev05') || CATALOGO[0];
+  pintarLista(m.id); cargar(m);
+}
+</script>
+
+</body>
+</html>
