@@ -433,7 +433,7 @@ body.touch #quick{max-width:60vw}
 </div>
 
 <div id="loading"><div class="t">Tres Islas</div><div class="bar"><i id="loadBar"></i></div><div class="s" id="loadTxt">Preparando el océano…</div></div>
-<div id="nogl" hidden><div><h2 style="font-family:var(--display);font-size:34px;margin:0 0 8px">WebGL2 no disponible</h2><p class="fine">Este simulador necesita WebGL2. Prueba con una versión reciente de Chrome, Edge, Firefox o Safari.</p></div></div>
+<div id="nogl" hidden><div><h2 style="font-family:var(--display);font-size:34px;margin:0 0 8px">WebGL2 no disponible</h2><p class="fine">Este simulador necesita WebGL2. Si en otro navegador funciona, Chrome lo ha bloqueado para esta web tras un fallo de la tarjeta gráfica: cierra Chrome del todo y vuelve a abrirlo, y comprueba en Configuración → Sistema que «Usar aceleración gráfica» está activado.</p><p><button class="btn" onclick="location.reload()">Recargar</button></p></div></div>
 
 <script>
 'use strict';
@@ -1812,7 +1812,7 @@ const ATTR = { aPos: 0, aNormal: 1, aColor: 2, aMat: 3, aUV: 4, aMask: 5, iA: 6,
 
 function glInit(cv) {
   canvas = cv;
-  gl = cv.getContext('webgl2', { antialias: false, depth: true, stencil: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false, xrCompatible: true });
+  gl = cv.getContext('webgl2', { antialias: false, depth: true, stencil: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
   if (!gl) return false;
   const cbf = gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float');
   CAPS.floatLinear = !!gl.getExtension('OES_texture_float_linear');
@@ -7776,12 +7776,13 @@ const UI = {
   closeModals() { for (const id of ['settings', 'help']) $(id).hidden = true; },
   pause() {
     if (GAME.state !== 'flying') return;
-    GAME.state = 'paused'; UI.show('pause', true); $('pResume').focus();
+    GAME.state = 'paused'; UI.show('pause', true); $('pResume').focus(); UI.applyHud();
   },
   resume() {
     UI.closeModals(); UI.show('pause', false);
     if (GAME.state === 'paused') GAME.state = 'flying';
     GAME.lastT = performance.now();
+    UI.applyHud();
   },
   toggleHelp() { const h = $('help'); if (h.hidden) buildHelp(); h.hidden = !h.hidden; },
   // labels that change between the aircraft and the sailboat
@@ -8502,7 +8503,11 @@ const GLB_SPECS = {
   },
 };
 async function fetchGLB(url) {
-  const r = await fetch(url);
+  // never let a stalled download freeze the loading screen: give up after 40 s and fly without that model
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const to = setTimeout(() => ac && ac.abort(), 40000);
+  let r;
+  try { r = await fetch(url, ac ? { signal: ac.signal } : undefined); } finally { clearTimeout(to); }
   if (!r.ok) throw new Error(url + ': HTTP ' + r.status);
   let buf;
   if (url.endsWith('.txt')) { // GLB shipped as base64 text (the artifact host serves only standard web types)
@@ -9418,9 +9423,11 @@ function loop(now) {
 }
 const REPORTED = {};
 function reportOnce(k, e) { if (REPORTED[k]) return; REPORTED[k] = true; console.error('[' + k + ']', e); }
-const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+const nextFrame = () => new Promise(r => { let done = false; const go = () => { if (!done) { done = true; r(); } }; requestAnimationFrame(go); setTimeout(go, 120); });
 async function boot() {
   const cv = $('gl');
+  cv.addEventListener('webglcontextlost', e => { e.preventDefault(); GAME.ctxLost = true; const l = $('loading'); l.hidden = false; $('loadTxt').innerHTML = 'La tarjeta gráfica se ha reiniciado (Chrome ha perdido el contexto WebGL). <button class="btn small" onclick="location.reload()">Recargar</button>'; });
+  setTimeout(() => { if (!$('loading').hidden && !GAME.ctxLost) { const t = $('loadTxt'); t.innerHTML = t.textContent + '<br><small>Está tardando mucho. Si se queda aquí: cierra otras pestañas pesadas, recarga con Ctrl+Mayús+R o reinicia Chrome. <button class="btn small" onclick="location.reload()">Recargar</button></small>'; } }, 30000);
   const prog = (p, txt) => { $('loadBar').style.width = (p * 100).toFixed(0) + '%'; $('loadTxt').textContent = txt; };
   if (!glInit(cv)) { $('loading').hidden = true; $('nogl').hidden = false; return; }
   GAME.touchUI = matchMedia('(pointer: coarse)').matches;
@@ -9455,7 +9462,7 @@ async function boot() {
   setupInput(); initHUD(); buildMenu(); UI.updateQuick();
   addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && !GAME.touchUI) { GAME.touchUI = true; document.body.classList.add('touch'); UI.applyHud(); } }, true);
   document.addEventListener('visibilitychange', () => { if (document.hidden && GAME.state === 'flying') UI.pause(); });
-  checkXR();
+  setTimeout(checkXR, 2500);   // asking for VR support can start the headset software in Chrome: do it after the game is up
   resize(); addEventListener('resize', resize);
   prog(1, 'Listo'); await nextFrame();
   // warm up programs (compile composite for the current style)
