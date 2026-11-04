@@ -149,6 +149,8 @@ body.tg-tap.tshow #touch .zone{opacity:1;transition:opacity .12s}
 #hudMini:hover,#hudMini:focus-within{opacity:1}
 #hudMini button{font:600 12px/1 var(--sans,system-ui);padding:8px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(8,14,24,.55);color:#fff;backdrop-filter:blur(6px);cursor:pointer}
 .hudpre{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#ringHud{position:absolute;left:50%;top:calc(max(8px,env(safe-area-inset-top)) + 104px);transform:translateX(-50%);padding:6px 14px;font:600 13px/1.35 var(--mono);text-align:center;color:#9ff0b4}
+#ringHud small{font-weight:400;color:var(--dim,#9ab)}
 .gpf{outline:3px solid var(--cyan)!important;outline-offset:3px;box-shadow:0 0 14px rgba(89,225,242,.45)}
 .fine kbd,kbd{font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-strong);border-radius:4px;background:rgba(255,255,255,.04);color:var(--text)}
 
@@ -295,6 +297,7 @@ body.touch #quick{max-width:60vw}
     <div class="state" id="sState">EN AGUA</div>
   </div>
   <div id="msg"></div>
+  <div id="ringHud" class="hud-panel" hidden></div>
   <div id="cptip" hidden></div>
   <div id="toast" class="hud-panel"></div>
   <div id="combat" class="hud-panel" hidden>
@@ -350,7 +353,7 @@ body.touch #quick{max-width:60vw}
     <div class="brand">
       <div class="eyebrow">Simulador de vuelo en el archipiélago</div>
       <h1>Tres<span>Islas</span></h1>
-      <p>Elige el hidroavión, la avioneta acrobática o el Fokker Dr.I del Barón Rojo. Con el Fokker aparece otro Fokker pilotado por la IA para batirte en duelo con las ametralladoras.</p>
+      <p>Elige el hidroavión, la avioneta acrobática o el Fokker Dr.I del Barón Rojo. Con el Fokker aparece otro Fokker pilotado por la IA para batirte en duelo con las ametralladoras. En Isla Faro te espera un circuito de aros contra el crono.</p>
     </div>
     <div>
       <div class="sect-t">Isla de salida</div>
@@ -1154,6 +1157,7 @@ const SEA = {
   uWB: new Float32Array(NWMAX * 4),   // omega, phase, Q, lambda
   cpuCount: NWMAX,
   ampSum: 1,
+  minLam: 7.5,
 };
 function buildWaves(state) {
   SEA.state = state;
@@ -1189,7 +1193,7 @@ function seaDisp(x, z, t, sf, out) {
   const ws = SEA.waves, n = Math.min(SEA_VERTEX_WAVES, ws.length);
   for (let i = 0; i < n; i++) {
     const w = ws[i];
-    if (w.lam < 7.5) continue;
+    if (w.lam < SEA.minLam) continue;
     const f = w.k * (w.dx * x + w.dz * z) - w.omega * t + w.phase;
     const c = Math.cos(f), s = Math.sin(f), A = w.A * sf;
     dx += w.Q * A * w.dx * c; dz += w.Q * A * w.dz * c; dy += A * s;
@@ -1872,7 +1876,7 @@ function makeProgram(name, vs, fs, defines = {}, opts = {}) {
     const nm = info.name.replace(/\[0\]$/, '');
     const e = { loc: gl.getUniformLocation(p, info.name), type: info.type, size: info.size };
     if (info.type === gl.SAMPLER_2D || info.type === gl.SAMPLER_2D_SHADOW) {
-      e.unit = nm === 'uNoise' ? 0 : nm === 'uShadow' ? 1 : unit++;
+      e.unit = nm === 'uNoise' ? 0 : nm === 'uShadow' ? 1 : nm === 'uWShadow' ? 15 : unit++;
       gl.uniform1i(e.loc, e.unit);
     }
     u[nm] = e;
@@ -2148,7 +2152,26 @@ float cloudShadow(vec3 p){
   vec2 q = p.xz + uSunDir.xz * ((uCloud.y - p.y) / uSunDir.y);
   return 1.0 - 0.6 * cloudDensity(q);
 }
-float planeShadow(vec3 p){
+uniform sampler2DShadow uWShadow;
+uniform mat4 uWSM0;
+uniform mat4 uWSM1;
+uniform vec4 uWSInfo;   // on, texel (of one cascade), bias near, bias far
+float worldShadow(vec3 p){
+  if (uWSInfo.x < 0.5) return 1.0;
+  vec3 c = (uWSM0 * vec4(p, 1.0)).xyz * 0.5 + 0.5; float ci = 0.0, b = uWSInfo.z;
+  if (c.x < 0.03 || c.y < 0.03 || c.x > 0.97 || c.y > 0.97) {
+    c = (uWSM1 * vec4(p, 1.0)).xyz * 0.5 + 0.5; ci = 1.0; b = uWSInfo.w;
+    if (c.x < 0.0 || c.y < 0.0 || c.x > 1.0 || c.y > 1.0 || c.z > 1.0) return 1.0;
+  }
+  vec2 uv = vec2((c.x + ci) * 0.5, c.y), px = vec2(uWSInfo.y * 0.5, uWSInfo.y);
+  float s = texture(uWShadow, vec3(uv + vec2(-0.7, -0.7) * px, c.z - b)) + texture(uWShadow, vec3(uv + vec2(0.7, -0.7) * px, c.z - b))
+          + texture(uWShadow, vec3(uv + vec2(-0.7, 0.7) * px, c.z - b)) + texture(uWShadow, vec3(uv + vec2(0.7, 0.7) * px, c.z - b));
+  float edge = ci > 0.5 ? smoothstep(0.82, 0.98, max(abs(c.x - 0.5), abs(c.y - 0.5)) * 2.0) : 0.0;
+  return mix(s * 0.25, 1.0, edge);
+}
+float planeShadow0(vec3 p);
+float planeShadow(vec3 p){ return planeShadow0(p) * worldShadow(p); }
+float planeShadow0(vec3 p){
   if (uShadowOn < 0.5) return 1.0;
   vec4 s = uShadowMat * vec4(p, 1.0);
   vec3 c = s.xyz * 0.5 + 0.5;
@@ -2317,6 +2340,14 @@ float islH(sampler2D t, vec4 isl, vec2 xz){
 float seabed(vec2 xz){ return max(max(islH(uDepth0, uIsl0, xz), islH(uDepth1, uIsl1, xz)), islH(uDepth2, uIsl2, xz)); }
 uniform vec4 uWA[12];
 uniform vec4 uWB[12];
+uniform float uMinLam;
+uniform float uGridM;
+#ifdef FFT
+uniform sampler2D uFD0; uniform sampler2D uFD1;
+uniform sampler2D uFS0; uniform sampler2D uFS1; uniform sampler2D uFS2;
+uniform vec4 uFL;    // 1 / cascade lengths, 1 / texel size of cascade 0
+uniform vec4 uFAmp;  // slope gain, displacement gain, foam gain
+#endif
 `;
 const WATER_VS = SEABED_GLSL + `
 in vec3 aPos;
@@ -2331,12 +2362,22 @@ void main(){
   vec3 p = vec3(xz.x, 0.0, xz.y);
   for (int i = 0; i < NWV; i++) {
     vec4 a = uWA[i]; vec4 b = uWB[i];
+    if (b.w < uMinLam) continue;
     float fade = 1.0 - smoothstep(b.w * uFade.x, b.w * uFade.y, dist);
     float A = a.w * fade * sf;
     float f = a.z * dot(a.xy, xz) - b.x * uTime + b.y;
     float c = cos(f), s = sin(f);
     p.x += b.z * A * a.x * c; p.z += b.z * A * a.y * c; p.y += A * s;
   }
+#ifdef FFT
+  float fd = (1.0 - smoothstep(250.0, 1200.0, dist)) * sf * uFAmp.y;
+  if (fd > 0.0) {
+    float lod0 = log2(max((0.2 + uGridM * dist) * uFL.w * 0.5, 1.0));
+    vec3 d0 = textureLod(uFD0, xz * uFL.x, lod0).xyz;
+    vec3 d1 = textureLod(uFD1, xz * uFL.y, lod0 + log2(uFL.y / uFL.x)).xyz * (1.0 - smoothstep(25.0, 110.0, dist));
+    p += (d0 + d1) * fd;
+  }
+#endif
   vWP = p; vXZ = xz; vH = p.y; vSF = sf;
   gl_Position = uViewProj * vec4(p, 1.0);
 }
@@ -2465,10 +2506,13 @@ Wk wakeEval(vec2 p){
 void main(){
   vec3 toCam = uCamPos - vWP; float dist = length(toCam); vec3 V = toCam / max(dist, 0.001);
   vec3 tx = vec3(1.0, 0.0, 0.0), tz = vec3(0.0, 0.0, 1.0);
+  float fp = max(length(dFdx(vXZ)), length(dFdy(vXZ))), gVar = 0.0;
   for (int i = 0; i < NWF; i++) {
     vec4 a = uWA[i]; vec4 b = uWB[i];
-    float fade = 1.0 - smoothstep(b.w * 50.0, b.w * 240.0, dist);
-    float WA = a.z * a.w * vSF * fade;
+    if (b.w < uMinLam) continue;
+    float fade = (1.0 - smoothstep(b.w * 50.0, b.w * 240.0, dist)) * (1.0 - smoothstep(b.w * 0.16, b.w * 0.42, fp));
+    float ak = a.z * a.w * vSF; gVar += (1.0 - fade) * ak * ak * 0.5;
+    float WA = ak * fade;
     float f = a.z * dot(a.xy, vXZ) - b.x * uTime + b.y;
     float c = cos(f), s = sin(f);
     tx += vec3(-b.z * a.x * a.x * WA * s, a.x * WA * c, -b.z * a.x * a.y * WA * s);
@@ -2481,7 +2525,25 @@ void main(){
 #else
   Wk wk; wk.g = vec2(0.0); wk.foam = 0.0; wk.aer = 0.0; wk.slick = 0.0;
 #endif
-#ifdef DETAIL
+  float fftVar = -1.0, fftFoam = 0.0;
+#ifdef FFT
+  {
+    float fk1 = 1.0 - smoothstep(500.0, 2600.0, dist), fk2 = 1.0 - smoothstep(45.0, 320.0, dist);
+    vec4 s0 = texture(uFS0, vXZ * uFL.x), s1 = texture(uFS1, vXZ * uFL.y), s2 = texture(uFS2, vXZ * uFL.z);
+    float wrf = 0.3 + 0.7 * clamp(windRough(vXZ), 0.0, 1.7);
+    float k0 = vSF * wrf * (1.0 - 0.5 * wk.slick) * uFAmp.x, k1 = k0 * fk1, k2 = k0 * fk2;
+    vec2 slf = s0.xy * k0 + s1.xy * k1 + s2.xy * k2;
+    // LEAN: the mips hold mean slope and mean squared slope, so their difference is the slope variance
+    // of everything finer than a pixel; detail faded out with distance still roughens the surface
+    vec2 vr = max(s0.zw - s0.xy * s0.xy, 0.0) * k0 * k0 + max(s1.zw - s1.xy * s1.xy, 0.0) * k1 * k1 + max(s2.zw - s2.xy * s2.xy, 0.0) * k2 * k2
+            + (1.0 - fk1) * s1.zw * k0 * k0 + (1.0 - fk2) * s2.zw * k0 * k0;
+    fftVar = vr.x + vr.y;
+    N = normalize(N + vec3(-slf.x, 0.0, -slf.y));
+    float tb = min(texture(uFD0, vXZ * uFL.x).w, texture(uFD1, vXZ * uFL.y).w + 0.25);
+    fftFoam = (1.0 - smoothstep(0.2, 0.8, tb)) * vSF * uFAmp.z * (1.0 - 0.6 * wk.slick);
+  }
+#endif
+#if defined(DETAIL) && !defined(FFT)
   float dfade = exp(-dist * 0.0022);
   vec2 r1 = texture(uRipple, vXZ * 0.031 + uTime * vec2(0.013, 0.008)).rg * 2.0 - 1.0;
   vec2 r2 = texture(uRipple, vXZ * 0.083 + uTime * vec2(-0.011, 0.017)).rg * 2.0 - 1.0;
@@ -2507,6 +2569,8 @@ void main(){
   }
 #endif
   float rough = clamp(0.045 + dist * 0.000028 + uSea * 0.05, 0.04, 0.35);
+  if (fftVar >= 0.0) rough = clamp(sqrt(0.0016 + fftVar + gVar + dist * dist * 1.2e-10), 0.035, 0.45);
+  else rough = clamp(sqrt(rough * rough + gVar), 0.04, 0.45);
   float a2 = rough * rough;
   vec3 H = normalize(uSunDir + V);
   float nh = max(dot(N, H), 0.0);
@@ -2549,6 +2613,9 @@ void main(){
   float bands = sin(depth * 4.0 - uTime * 1.7 + fn * 7.0) * 0.5 + 0.5;
   foam += shore * smoothstep(0.55, 0.95, bands * 0.7 + fn2 * 0.6) * 0.9;
   foam += (1.0 - smoothstep(0.0, 0.35, depth)) * 0.6 * fn2;
+  // whitecaps where the FFT surface folds (Jacobian < 1), textured with lace that ages into holes
+  float lace = texture(uNoise, vXZ * 0.31 + vec2(fn, fn2) * 0.2).a;
+  foam += fftFoam * smoothstep(0.62 - 0.45 * fftFoam, 0.9 - 0.45 * fftFoam, lace * 0.55 + fn2 * 0.45 + fftFoam * 0.3);
 #endif
   // bubbles under the wake make the water milky turquoise
   body = mix(body, uWaterShallow * (ambL * 1.2 + uSunCol * sunUp * 0.22), clamp(wk.aer, 0.0, 1.0) * 0.22);
@@ -2652,6 +2719,8 @@ void main(){
   float dist = length(uCamPos - vWP);
   // detail normal
   vec2 dn = (vec2(texture(uNoise, xz * 0.05 + 0.13).g, texture(uNoise, xz * 0.05 + 0.57).b) - 0.5) * 0.5 * exp(-dist * 0.0012);
+  dn += (vec2(texture(uNoise, xz * 0.23 + 0.31).r, texture(uNoise, xz * 0.23 + 0.77).g) - 0.5) * 0.42 * exp(-dist * 0.006);
+  dn += (vec2(texture(uNoise, xz * 1.1 + 0.11).b, texture(uNoise, xz * 1.1 + 0.43).r) - 0.5) * 0.3 * exp(-dist * 0.025);
   N = normalize(N + vec3(dn.x, 0.0, dn.y));
   float slope = 1.0 - N.y;
   bool volc = uKind < 0.5;
@@ -2662,6 +2731,13 @@ void main(){
   vec3 jungle = mix(vec3(0.07, 0.25, 0.06), vec3(0.12, 0.33, 0.08), n2);
   vec3 rock = mix(vec3(0.44, 0.40, 0.35), vec3(0.30, 0.28, 0.26), n2) * (0.85 + 0.3 * n3);
   if (uKind > 1.5) rock = mix(vec3(0.55, 0.53, 0.50), vec3(0.40, 0.39, 0.37), n2);
+  {
+    float strata = sin(h * 0.9 + n2 * 5.0 + n1 * 9.0) * 0.5 + 0.5;
+    rock *= 0.82 + 0.3 * strata * (1.0 - smoothstep(300.0, 1500.0, dist));
+    float macro = texture(uNoise, xz * 0.0011 + 0.7).g;
+    grass *= 0.86 + 0.28 * macro; jungle *= 0.9 + 0.2 * macro;
+    grass = mix(grass, grass * vec3(1.12, 1.0, 0.7), smoothstep(0.55, 0.8, texture(uNoise, xz * 0.0023 + 0.2).r) * 0.6);   // dry patches
+  }
   vec3 ash = mix(vec3(0.075, 0.068, 0.066), vec3(0.17, 0.14, 0.125), n2) * (0.8 + 0.4 * n3);
   vec2 cd = xz - uCrater.xz; ash *= 0.72 + 0.56 * texture(uNoise, normalize(cd + 0.001) * 2.3 + length(cd) * 0.00035).b;
   float beachH = 2.2 + n1 * 3.5;
@@ -2939,8 +3015,22 @@ void main(){
   if (vWP.y < uClipY) discard;
   vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(uCamPos - vWP);
+  vec3 base = vCol;
+  float vd = length(uCamPos - vWP);
+  if (vLeaf > 0.5) {
+    vec3 q = vWP * 1.35;
+    float n1 = texture(uNoise, q.xz + q.y * 0.37).r, n2 = texture(uNoise, q.zy * 0.71 + q.x * 0.21).g, n3 = texture(uNoise, q.xy * 2.3 + 0.5).b;
+    float clump = n1 * 0.55 + n2 * 0.45, fine = n3;
+    float k = 1.0 - smoothstep(60.0, 260.0, vd);
+    base *= 0.78 * mix(0.85, 0.38 + 0.95 * clump * (0.75 + 0.5 * fine), k);
+    base *= vec3(0.92 + 0.16 * n2, 1.0, 0.85 + 0.2 * n1);   // hue drift between leaf clusters
+    N = normalize(N + (vec3(n1, n2, n3) - 0.5) * 0.9 * k);
+  } else {
+    float b = texture(uNoise, vec2(vWP.y * 2.6, atan(vN.z, vN.x) * 0.6) + vWP.xz * 0.05).r;   // bark grooves
+    base *= 0.8 + 0.35 * b * (1.0 - smoothstep(40.0, 150.0, vd));
+  }
   float sh = planeShadow(vWP) * cloudShadow(vWP);
-  vec3 c = lighting(vCol, N, V, vWP, 0.8, 0.12 * vLeaf, sh);
+  vec3 c = lighting(base, N, V, vWP, 0.8, 0.12 * vLeaf, sh);
   // leaf translucency
   float tr = pow(max(dot(-V, uSunDir), 0.0), 3.0) * vLeaf * 0.6;
   c += vCol * vec3(0.9, 1.1, 0.5) * uSunCol * tr * sh;
@@ -4104,6 +4194,7 @@ function placeVegetation(density) {
   return types;
 }
 function buildVegMeshes(density) {
+  return buildVegMeshes2(density);
   for (const k in SCENE.veg) deleteMesh(SCENE.veg[k].mesh);
   SCENE.veg = {};
   const models = { palm: palmModel(), broad: broadleafModel(), bush: bushModel(), rock: rockModel(), dead: deadTreeModel() };
@@ -5585,7 +5676,7 @@ const DEFAULTS = {
   preset: 'alto',
   renderScale: 1.0, dynRes: true, targetFps: 60, fpsCap: 0,
   waterWaves: 10, waterDetail: 2, waterGrid: 2, reflections: 1, foam: true, wake: true,
-  terrainRes: 256, vegetation: 1.0, grass: 3, shadows: 2, clouds: 2, particles: 1.0,
+  terrainRes: 256, vegetation: 1.0, vegNear: 600, vegFar: 12000, grass: 3, shadows: 2, worldShadows: 1, clouds: 2, particles: 1.0, rings: true,
   post: true, bloom: 0.8, fxaa: true, msaa: 0, viewDist: 1.0, fov: 65, exposure: 1.0, vignette: 0.22,
   shaderOn: false, style: 'anime', styleMix: 1.0, showFps: false,
   seaState: 0.35, windSpeed: 5, turbulence: 1, cloudCover: 0.45, timeScale: 1, eruption: 1.0,
@@ -5593,13 +5684,14 @@ const DEFAULTS = {
   assist: 2, invertY: false, sensitivity: 1.0, yawRoll: 1.0, gpMap: null, gpMap2: null, kbMap: null, volume: 0.8, hud: true, units: 'kt',
 };
 const PRESETS = {
-  muybajo: { grass: 0, renderScale: 0.55, waterWaves: 4, waterDetail: 0, waterGrid: 0, reflections: 0, foam: true, wake: false, terrainRes: 128, vegetation: 0.25, shadows: 0, clouds: 1, particles: 0.3, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 30 },
-  bajo: { grass: 1, renderScale: 0.7, waterWaves: 6, waterDetail: 1, waterGrid: 0, reflections: 0, foam: true, wake: true, terrainRes: 160, vegetation: 0.45, shadows: 1, clouds: 1, particles: 0.5, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 45 },
-  medio: { grass: 2, renderScale: 0.85, waterWaves: 8, waterDetail: 1, waterGrid: 1, reflections: 0, foam: true, wake: true, terrainRes: 192, vegetation: 0.75, shadows: 1, clouds: 2, particles: 0.8, post: true, bloom: 0.7, fxaa: true, msaa: 0, targetFps: 60 },
-  alto: { grass: 3, renderScale: 1.0, waterWaves: 10, waterDetail: 2, waterGrid: 2, reflections: 1, foam: true, wake: true, terrainRes: 256, vegetation: 1.0, shadows: 2, clouds: 2, particles: 1.0, post: true, bloom: 0.8, fxaa: true, msaa: 0, targetFps: 60 },
-  ultra: { grass: 4, renderScale: 1.25, waterWaves: 12, waterDetail: 2, waterGrid: 3, reflections: 2, foam: true, wake: true, terrainRes: 384, vegetation: 1.4, shadows: 2, clouds: 2, particles: 1.4, post: true, bloom: 0.9, fxaa: false, msaa: 4, targetFps: 60 },
+  muybajo: { vegNear: 120, vegFar: 2500, worldShadows: 0, grass: 0, renderScale: 0.55, waterWaves: 4, waterDetail: 0, waterGrid: 0, reflections: 0, foam: true, wake: false, terrainRes: 128, vegetation: 0.25, shadows: 0, clouds: 1, particles: 0.3, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 30 },
+  bajo: { vegNear: 200, vegFar: 4000, worldShadows: 0, grass: 1, renderScale: 0.7, waterWaves: 6, waterDetail: 1, waterGrid: 0, reflections: 0, foam: true, wake: true, terrainRes: 160, vegetation: 0.45, shadows: 1, clouds: 1, particles: 0.5, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 45 },
+  medio: { vegNear: 350, vegFar: 7000, worldShadows: 0, grass: 2, renderScale: 0.85, waterWaves: 8, waterDetail: 1, waterGrid: 1, reflections: 0, foam: true, wake: true, terrainRes: 192, vegetation: 0.75, shadows: 1, clouds: 2, particles: 0.8, post: true, bloom: 0.7, fxaa: true, msaa: 0, targetFps: 60 },
+  alto: { vegNear: 600, vegFar: 12000, worldShadows: 1, grass: 3, renderScale: 1.0, waterWaves: 10, waterDetail: 2, waterGrid: 2, reflections: 1, foam: true, wake: true, terrainRes: 256, vegetation: 1.0, shadows: 2, clouds: 2, particles: 1.0, post: true, bloom: 0.8, fxaa: true, msaa: 0, targetFps: 60 },
+  ultra: { vegNear: 1000, vegFar: 20000, worldShadows: 2, grass: 4, renderScale: 1.25, waterWaves: 12, waterDetail: 3, waterGrid: 4, reflections: 2, foam: true, wake: true, terrainRes: 512, vegetation: 2.0, shadows: 2, clouds: 2, particles: 1.4, post: true, bloom: 0.9, fxaa: false, msaa: 4, targetFps: 60 },
+  extremo: { vegNear: 1800, vegFar: 32000, worldShadows: 3, grass: 4, renderScale: 1.5, waterWaves: 12, waterDetail: 4, waterGrid: 5, reflections: 2, foam: true, wake: true, terrainRes: 512, vegetation: 3.0, shadows: 3, clouds: 2, particles: 1.5, post: true, bloom: 0.9, fxaa: false, msaa: 4, targetFps: 60, viewDist: 2.5 },
 };
-const PRESET_NAMES = { muybajo: 'Muy bajo', bajo: 'Bajo', medio: 'Medio', alto: 'Alto', ultra: 'Ultra' };
+const PRESET_NAMES = { muybajo: 'Muy bajo', bajo: 'Bajo', medio: 'Medio', alto: 'Alto', ultra: 'Ultra', extremo: 'Extremo (PC potente)' };
 const SETTINGS = Object.assign({}, DEFAULTS);
 const STORE_KEY = 'tresislas.settings.v1';
 function loadSettings() {
@@ -5695,12 +5787,18 @@ function buildWorldGPU() {
   if (!SCENE.depthTex.length) SCENE.depthTex = ISLANDS.map(isl => buildDepthTex(isl));
 }
 function rebuildPrograms() {
-  const key = [SETTINGS.waterWaves, SETTINGS.waterDetail, SETTINGS.foam, SETTINGS.wake, SETTINGS.reflections > 0].join('|');
+  // ultra water: the FFT sea (128² or 256² per cascade) replaces the short Gerstner waves
+  const wantFFT = SETTINGS.waterDetail >= 3;
+  OCN.on = wantFFT && oceanInit(SETTINGS.waterDetail >= 4 ? 256 : 128);
+  if (!wantFFT && OCN.ready) oceanFree();
+  SEA.minLam = OCN.on ? 20 : 7.5;
+  const key = [SETTINGS.waterWaves, SETTINGS.waterDetail, SETTINGS.foam, SETTINGS.wake, SETTINGS.reflections > 0, OCN.on].join('|');
   if (key !== RENDER.progKey) {
     RENDER.progKey = key;
     if (RENDER.P.water) gl.deleteProgram(RENDER.P.water.p);
     const d = { NWV: clamp(SETTINGS.waterWaves | 0, 2, 12), NWF: SETTINGS.waterDetail >= 1 ? 12 : Math.max(6, SETTINGS.waterWaves | 0) };
     if (SETTINGS.waterDetail >= 1) d.DETAIL = 1;
+    if (OCN.on) d.FFT = 1;
     if (SETTINGS.foam) d.FOAM = 1;
     if (SETTINGS.wake) d.WAKE = 1;
     if (SETTINGS.reflections > 0) d.REFL = 1;
@@ -5711,9 +5809,12 @@ function rebuildPrograms() {
   if (gk !== RENDER.gridKey) {
     RENDER.gridKey = gk;
     deleteMesh(SCENE.water);
-    const G = [[56, 112], [84, 160], [112, 224], [150, 300]][clamp(gk, 0, 3)];
+    const G = [[56, 112], [84, 160], [112, 224], [150, 300], [220, 480], [320, 720]][clamp(gk, 0, 5)];
     SCENE.water = buildWaterGrid(G[0], G[1]);
-    RENDER.waterFade = [[2.2, 4.5], [3, 6], [4, 8], [5, 10]][clamp(gk, 0, 3)];
+    let lo = 0.001, hi = 1; for (let it = 0; it < 60; it++) { const a = (lo + hi) / 2; if ((Math.exp(a * G[0]) - 1) / (Math.exp(a) - 1) > 32000 / 0.55) hi = a; else lo = a; }
+    const m = Math.max((lo + hi) / 2, TAU / G[1]);
+    RENDER.gridM = m;
+    RENDER.waterFade = [1 / (5 * m), 1 / (2.4 * m)];
   }
 }
 function compositeProg(styleNum) {
@@ -5740,7 +5841,7 @@ function ensureTargets(W, H, needPost) {
   }
 }
 function ensureShadow() {
-  const size = SETTINGS.shadows >= 2 ? 2048 : SETTINGS.shadows === 1 ? 1024 : 0;
+  const size = SETTINGS.shadows >= 3 ? 4096 : SETTINGS.shadows >= 2 ? 2048 : SETTINGS.shadows === 1 ? 1024 : 0;
   if ((RENDER.shadowRT ? RENDER.shadowRT.w : 0) === size) return;
   deleteRT(RENDER.shadowRT); RENDER.shadowRT = null;
   if (size) RENDER.shadowRT = makeRT(size, size, { color: false, depth: 'tex', compare: true });
@@ -5782,6 +5883,10 @@ function setGlobals(view, proj, camPos, o = {}) {
   newPass();
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RENDER.noiseTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, RENDER.shadowActive ? RENDER.shadowRT.depth : RENDER.dummyShadow);
+  const ws = WSH.active && !o.noWorldShadow;
+  GU.uWSM0 = WSH.vp[0]; GU.uWSM1 = WSH.vp[1];
+  GU.uWSInfo = [ws ? 1 : 0, 1 / Math.max(WSH.size, 1), 0.3 / 9500, 1.6 / 9500];
+  gl.activeTexture(gl.TEXTURE15); gl.bindTexture(gl.TEXTURE_2D, ws ? WSH.rt.depth : (RENDER.dummyWShadow || (RENDER.dummyWShadow = makeDepthTex(1, 1, true))));
 }
 function toonActive() { return SETTINGS.shaderOn && STYLES[styleIndex()].toon; }
 
@@ -5808,6 +5913,7 @@ function drawTerrain() {
   setCull(false);
 }
 function drawVegetation() {
+  return drawVegetation2();
   const p = RENDER.P.veg; useProg(p);
   for (const k in SCENE.veg) drawMesh(SCENE.veg[k].mesh);
 }
@@ -5933,8 +6039,15 @@ function drawSky(sunDisk) {
 function drawWater(viewW, viewH) {
   const p = RENDER.P.water; useProg(p);
   const c = GU.uCamPos;
-  setU(p, 'uGridC', [c[0], c[2]]); setU(p, 'uFade', RENDER.waterFade);
+  setU(p, 'uGridC', [c[0], c[2]]); setU(p, 'uFade', RENDER.waterFade); setU(p, 'uGridM', RENDER.gridM || 0.07);
   setU(p, 'uWA', SEA.uWA); setU(p, 'uWB', SEA.uWB);
+  setU(p, 'uMinLam', OCN.on ? SEA.minLam : 0);
+  if (OCN.on && OCN.ready) {
+    setTex(p, 'uFD0', oceanTex('disp', 0)); setTex(p, 'uFD1', oceanTex('disp', 1));
+    setTex(p, 'uFS0', oceanTex('slope', 0)); setTex(p, 'uFS1', oceanTex('slope', 1)); setTex(p, 'uFS2', oceanTex('slope', 2));
+    setU(p, 'uFL', [1 / OCN.L[0], 1 / OCN.L[1], 1 / OCN.L[2], OCN.N / OCN.L[0]]);
+    setU(p, 'uFAmp', [0.85, 0.8, SETTINGS.foam ? 1 : 0, 0]);
+  }
   ISLANDS.forEach((isl, i) => { setTex(p, 'uDepth' + i, SCENE.depthTex[i]); setU(p, 'uIsl' + i, [isl.cx, isl.cz, (HM - 1) / (2 * isl.ext * HM), 0]); });
   setTex(p, 'uRipple', RENDER.rippleTex);
   const reflOn = RENDER.reflRT && RENDER.reflValid ? 1 : 0;
@@ -6045,6 +6158,7 @@ function drawWorld(o) {
   setDepth(true, true); setBlend(null); setCull(false);
   drawTerrain();
   drawObj(SCENE.statics, M4.identity(RENDER.tmpM));
+  setCull(false); drawRings(o);
   if (SETTINGS.vegetation > 0 && !(o.reflection && SETTINGS.reflections < 2)) drawVegetation();
   if (!o.reflection) drawGrass();
   if (o.showPlane && isBoat()) drawBoat({ helmView: CAM.mode === 'cockpit' && !o.reflection });
@@ -6197,11 +6311,13 @@ function renderFrame() {
   const needPost = (SETTINGS.post || styleOn);
   ensureTargets(W, H, needPost);
   ensureShadow();
+  oceanUpdate();
   const ac = AIR.ac;
   M4.fromQT(RENDER.planeM, ac.q, ac.pos);
   if (isBoat()) { M4.fromQT(RENDER.boatM, BOAT.b.q, BOAT.b.pos); if (GAME.state !== 'menu') updateBoatSails(); }
   const pixel = 2 * Math.tan(c.fov / 2) / H;
   if (SETTINGS.shadows > 0 && GAME.state !== 'menu') renderShadow(); else RENDER.shadowActive = false;
+  ensureWorldShadow(); renderWorldShadow();
   const cockpit = INSIDE_MODES[CAM.mode] && GAME.state !== 'menu' && !isBoat();
   if (RENDER.reflRT) renderReflection(c.view, c.proj, c.pos, pixel); else RENDER.reflValid = false;
   const showPlane = GAME.state !== 'menu';
@@ -7560,6 +7676,7 @@ function updateHUD(dt) {
   const gh = terrainH(ac.pos.x, ac.pos.z);
   ac.agl = ac.pos.y - Math.max(gh, 0) - AC.aglOff;
   updateCombatHUD();
+  updateRingsHUD();
   const tinfo = targetInfo();
   if (HUD.t < 1 / 15) return;
   HUD.t = 0;
@@ -8008,7 +8125,7 @@ function updateMenuNote() {
     : boat ? '<kbd>A</kbd><kbd>D</kbd> timón · <kbd>W</kbd><kbd>S</kbd> cazar / largar mayor · <kbd>E</kbd><kbd>Q</kbd> foque · <kbd>X</kbd><kbd>Z</kbd> sacar banda · <kbd>K</kbd> trimado automático'
       : GAME.plane === 'fokker' && !GAME.combat ? 'Vuelo libre con el Fokker: sin Barón Rojo, pero puedes disparar (<kbd>Espacio</kbd>, <kbd>X</kbd> recarga) · <kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>V</kbd> cabina'
       : GAME.plane === 'fokker' ? '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>Espacio</kbd> ametralladoras · <kbd>X</kbd> recargar · <kbd>B</kbd> frenos · <kbd>V</kbd> cabina'
-      : GAME.plane === 'acro' ? '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>Q</kbd><kbd>E</kbd> timón · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> humo · <kbd>V</kbd> cabina'
+      : GAME.plane === 'acro' ? 'Circuito de aros en Isla Faro: cruza el aro verde · <kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>Q</kbd><kbd>E</kbd> timón · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> humo · <kbd>V</kbd> cabina'
       : '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> tren · <kbd>V</kbd> cabina (clic en los mandos) · <kbd>H</kbd> ayuda';
 }
 
@@ -8046,7 +8163,7 @@ function select(key, opts, onchange) {
   s.addEventListener('change', () => { const v = s.value; SETTINGS[key] = isNaN(+v) ? v : +v; markCustom(key); onchange && onchange(); saveSettings(); });
   return s;
 }
-const GFX_KEYS = ['renderScale', 'waterWaves', 'waterDetail', 'waterGrid', 'reflections', 'foam', 'wake', 'terrainRes', 'vegetation', 'grass', 'shadows', 'clouds', 'particles', 'post', 'bloom', 'fxaa', 'msaa', 'targetFps'];
+const GFX_KEYS = ['renderScale', 'waterWaves', 'waterDetail', 'waterGrid', 'reflections', 'foam', 'wake', 'terrainRes', 'vegetation', 'vegNear', 'vegFar', 'grass', 'shadows', 'worldShadows', 'clouds', 'particles', 'post', 'bloom', 'fxaa', 'msaa', 'targetFps'];
 function markCustom(key) { if (GFX_KEYS.includes(key) && SETTINGS.preset !== 'custom') { SETTINGS.preset = 'custom'; const p = document.querySelector('.presets'); if (p) [...p.children].forEach(b => b.setAttribute('aria-pressed', 'false')); } }
 function buildSettings(tab) {
   UI.tab = tab;
@@ -8074,22 +8191,25 @@ function buildSettings(tab) {
     rows.appendChild(row('FPS objetivo', null, select('targetFps', [[30, '30'], [45, '45'], [60, '60'], [90, '90'], [120, '120']])));
     rows.appendChild(row('Límite de FPS', 'Ahorra batería en móvil', select('fpsCap', [[0, 'Sin límite'], [30, '30'], [60, '60']])));
     rows.appendChild(row('Olas en la malla', 'Ondas Gerstner que desplazan el agua', slider('waterWaves', 2, 12, 1, v => v, soft)));
-    rows.appendChild(row('Detalle del agua', 'Ondas finas por píxel y rizado', select('waterDetail', [[0, 'Bajo'], [1, 'Medio'], [2, 'Alto']], soft)));
-    rows.appendChild(row('Densidad de la malla de agua', null, select('waterGrid', [[0, 'Baja'], [1, 'Media'], [2, 'Alta'], [3, 'Ultra']], soft)));
+    rows.appendChild(row('Detalle del agua', 'Ultra y Extremo simulan el oleaje con FFT (espectro JONSWAP, espuma por plegado, rugosidad LEAN): para PC con buena gráfica', select('waterDetail', [[0, 'Bajo'], [1, 'Medio'], [2, 'Alto'], [3, 'Ultra · FFT'], [4, 'Extremo · FFT 256']], soft)));
+    rows.appendChild(row('Densidad de la malla de agua', null, select('waterGrid', [[0, 'Baja'], [1, 'Media'], [2, 'Alta'], [3, 'Ultra'], [4, 'Extrema (PC potente)'], [5, 'Máxima (gráfica muy potente)']], soft)));
     rows.appendChild(row('Reflejos planos', 'Islas, avión y nubes reflejados en el agua', select('reflections', [[0, 'No'], [1, 'Media resolución'], [2, 'Alta + vegetación']], soft)));
     rows.appendChild(row('Espuma', 'Crestas y orilla', toggle('foam', soft)));
     rows.appendChild(row('Estela del avión', null, toggle('wake', soft)));
-    rows.appendChild(row('Resolución del terreno', null, select('terrainRes', [[128, '128'], [160, '160'], [192, '192'], [256, '256'], [384, '384']], regen)));
-    rows.appendChild(row('Vegetación', 'Palmeras, árboles, rocas', slider('vegetation', 0, 1.5, 0.05, v => Math.round(v * 100) + '%', () => { clearTimeout(UI.vegT); UI.vegT = setTimeout(() => buildVegMeshes(SETTINGS.vegetation), 250); })));
+    rows.appendChild(row('Resolución del terreno', null, select('terrainRes', [[128, '128'], [160, '160'], [192, '192'], [256, '256'], [384, '384'], [512, '512 (máxima)']], regen)));
+    rows.appendChild(row('Vegetación', 'Palmeras, árboles, rocas', slider('vegetation', 0, 4, 0.05, v => Math.round(v * 100) + '%', () => { clearTimeout(UI.vegT); UI.vegT = setTimeout(() => buildVegMeshes(SETTINGS.vegetation), 250); })));
     rows.appendChild(row('Césped', 'Hierba con viento y flores vista de cerca', select('grass', [[0, 'No'], [1, 'Bajo'], [2, 'Medio'], [3, 'Alto'], [4, 'Ultra']])));
-    rows.appendChild(row('Sombras', 'Sombra del avión', select('shadows', [[0, 'No'], [1, '1024'], [2, '2048']], soft)));
+    rows.appendChild(row('Árboles con todo detalle hasta', 'Más cerca se ven los modelos completos; más lejos, versiones sencillas', slider('vegNear', 100, 3000, 50, v => v + ' m')));
+    rows.appendChild(row('Distancia de árboles', 'Hasta dónde se dibuja la vegetación (los arbustos y rocas, a la mitad)', slider('vegFar', 1000, 40000, 500, v => (v / 1000).toFixed(1) + ' km')));
+    rows.appendChild(row('Sombra del avión', null, select('shadows', [[0, 'No'], [1, '1024'], [2, '2048'], [3, '4096']], soft)));
+    rows.appendChild(row('Sombras del mundo', 'Islas, árboles, edificios y aros proyectan sombra (dos cascadas)', select('worldShadows', [[0, 'No'], [1, 'Media · 2048, hasta 1 km'], [2, 'Alta · 2048, hasta 2 km'], [3, 'Ultra · 4096, hasta 3,6 km']])));
     rows.appendChild(row('Nubes', null, select('clouds', [[0, 'No'], [1, 'Simples'], [2, 'Con sombras']], soft)));
     rows.appendChild(row('Partículas', 'Erupción, humo, espray', slider('particles', 0, 1.5, 0.05, v => Math.round(v * 100) + '%')));
     rows.appendChild(row('Postprocesado', 'Necesario para bloom y antialiasing', toggle('post', soft)));
     rows.appendChild(row('Bloom', 'Resplandor de lava, sol y luces', slider('bloom', 0, 1.5, 0.05, v => v.toFixed(2), soft)));
     rows.appendChild(row('FXAA', null, toggle('fxaa')));
     rows.appendChild(row('MSAA', 'Antialiasing por muestras (pesado)', select('msaa', [[0, 'No'], [2, '2x'], [4, '4x']], soft)));
-    rows.appendChild(row('Distancia de visión', null, slider('viewDist', 0.4, 2, 0.05, v => v.toFixed(2) + '×')));
+    rows.appendChild(row('Distancia de visión', null, slider('viewDist', 0.4, 4, 0.05, v => v.toFixed(2) + '×')));
     rows.appendChild(row('Campo de visión', null, slider('fov', 45, 95, 1, v => v + '°')));
     rows.appendChild(row('Brillo', null, slider('exposure', 0.5, 2, 0.05, v => v.toFixed(2))));
     rows.appendChild(row('Viñeta', null, slider('vignette', 0, 0.8, 0.02, v => v.toFixed(2))));
@@ -8127,6 +8247,7 @@ function buildSettings(tab) {
     rows.appendChild(row('Estado del mar', 'De calma chicha a mar gruesa', slider('seaState', 0, 1, 0.05, v => ['Calma', 'Rizada', 'Marejadilla', 'Marejada', 'Gruesa'][Math.min(4, Math.floor(v * 4.99))], () => buildWaves(SETTINGS.seaState))));
     rows.appendChild(row('Viento', 'Alisio del noreste; cambia por zonas: sotavento de las islas, aceleración en los cabos, brisa marina', slider('windSpeed', 0, 15, 0.5, v => (v * KT).toFixed(0) + ' kt', () => { ENV.windSpeed = SETTINGS.windSpeed; })));
     rows.appendChild(row('Turbulencia y rachas', 'Remolinos sobre tierra, térmicas y estela de las islas', slider('turbulence', 0, 2, 0.05, v => Math.round(v * 100) + '%')));
+    rows.appendChild(row('Circuito de aros', 'Postes con aros alrededor de Isla Faro: atraviésalos en orden contra el crono; si tocas uno, te estrellas', toggle('rings')));
     rows.appendChild(row('Nubosidad', null, slider('cloudCover', 0, 1, 0.05, v => Math.round(v * 100) + '%', () => { ENV.cloudCover = SETTINGS.cloudCover; })));
     rows.appendChild(row('Actividad del volcán', null, slider('eruption', 0, 1.5, 0.05, v => v === 0 ? 'Dormido' : v < 0.6 ? 'Baja' : v < 1.1 ? 'Media' : 'Alta', () => { ENV.erupt.level = SETTINGS.eruption; })));
     body.appendChild(rows);
@@ -8511,7 +8632,10 @@ async function fetchGLB(url) {
   if (!r.ok) throw new Error(url + ': HTTP ' + r.status);
   let buf;
   if (url.endsWith('.txt')) { // GLB shipped as base64 text (the artifact host serves only standard web types)
-    const b64 = (await r.text()).replace(/\s+/g, ''), bin = atob(b64), u8 = new Uint8Array(bin.length);
+    let b64 = (await r.text()).replace(/[^A-Za-z0-9+/=]/g, '');
+    const k = b64.indexOf('Z2xURg'); if (k > 0) b64 = b64.slice(k);   // tolerate stray characters before the data (a copy-paste slip)
+    b64 = b64.slice(0, b64.length - (b64.replace(/=+$/, '').length % 4 === 1 ? 1 : 0));
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     buf = u8.buffer;
   } else buf = await r.arrayBuffer();
@@ -9190,6 +9314,629 @@ function updateCombatHUD() {
 }
 
 // ============================================================================
+// FFT ocean detail. Port of the Tessendorf FFT simulation in Ultra-Water
+// (https://github.com/Humpalumps/Ultra-Water, Copyright (c) 2026 Humpalumps, MIT License):
+// JONSWAP spectrum with cos-2s spreading, capillary-gravity dispersion, Stockham radix-2 IFFT,
+// Jacobian foam with dt-based recovery and slope moments (sx, sz, sx², sz²) for LEAN roughness.
+// Here it adds the short and medium waves on top of the long Gerstner swell (which the flight
+// and float physics follow), so the sea gets a continuous, non-repeating spectrum.
+// ============================================================================
+const OCN = { on: false, ok: null, N: 256, L: [85, 12, 2.1], t: 0, parity: 0, key: '', last: -1 };
+const OCN_LOOP = 300, OCN_G = 9.81, OCN_ST = 7.4e-5;
+const OCN_COMMON = `
+#define PI 3.14159265359
+#define G 9.81
+#define ST 7.4e-5
+vec2 cmul(vec2 a, vec2 b){ return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
+float omega(float k){ return sqrt(G * k + ST * k * k * k); }
+`;
+const OCN_VS = `in vec2 aPos; void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+const OCN_EVOLVE = OCN_COMMON + `
+uniform highp sampler2D uH0; uniform vec4 uLength; uniform float uT;
+layout(location = 0) out vec4 out0; layout(location = 1) out vec4 out1;
+vec2 pack2(vec2 a, vec2 b){ return vec2(a.x - b.y, a.y + b.x); }
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy); int c = p.y / N;
+  vec2 k = vec2(ivec2(p.x, p.y - c * N) - N / 2) * (2.0 * PI / uLength[c]);
+  float kl = length(k); float ik = kl > 1e-6 ? 1.0 / kl : 0.0;
+  const float W0 = 2.0 * PI / 300.0;
+  float ph = 2.0 * PI * fract(floor(omega(kl) / W0) * (uT / 300.0));
+  vec2 e = vec2(cos(ph), sin(ph));
+  vec4 h0 = texelFetch(uH0, p, 0);
+  vec2 h = cmul(h0.xy, e) + cmul(h0.zw, vec2(e.x, -e.y));
+  vec2 ih = vec2(-h.y, h.x);
+  vec2 dx = ih * k.x * ik, dz = ih * k.y * ik;
+  vec2 dxdx = -h * k.x * k.x * ik, dzdz = -h * k.y * k.y * ik, dxdz = -h * k.x * k.y * ik;
+  vec2 dydx = ih * k.x, dydz = ih * k.y;
+  out0 = vec4(pack2(dx, dz), pack2(h, dxdz));
+  out1 = vec4(pack2(dydx, dydz), pack2(dxdx, dzdz));
+}`;
+const OCN_FFT = OCN_COMMON + `
+uniform highp sampler2D uIn0; uniform highp sampler2D uIn1; uniform int uSub; uniform int uVertical;
+layout(location = 0) out vec4 out0; layout(location = 1) out vec4 out1;
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  int i = uVertical == 1 ? p.y % N : p.x;
+  int hs = uSub >> 1;
+  int e = (i / uSub) * hs + (i & (hs - 1));
+  ivec2 pe, po;
+  if (uVertical == 1) { int base = p.y - i; pe = ivec2(p.x, base + e); po = ivec2(p.x, base + e + N / 2); }
+  else { pe = ivec2(e, p.y); po = ivec2(e + N / 2, p.y); }
+  float a = 2.0 * PI * float(i & (uSub - 1)) / float(uSub);
+  vec2 tw = vec2(cos(a), sin(a));
+  vec4 e0 = texelFetch(uIn0, pe, 0), o0 = texelFetch(uIn0, po, 0);
+  vec4 e1 = texelFetch(uIn1, pe, 0), o1 = texelFetch(uIn1, po, 0);
+  out0 = vec4(e0.xy + cmul(tw, o0.xy), e0.zw + cmul(tw, o0.zw));
+  out1 = vec4(e1.xy + cmul(tw, o1.xy), e1.zw + cmul(tw, o1.zw));
+}`;
+const OCN_ASSEMBLE = OCN_COMMON + `
+uniform highp sampler2D uIn0; uniform highp sampler2D uIn1; uniform highp sampler2D uPrev;
+uniform int uCascade; uniform float uLambda; uniform float uDt; uniform float uFoamRec;
+layout(location = 0) out vec4 outDisp; layout(location = 1) out vec4 outSlope;
+void main(){
+  ivec2 id = ivec2(gl_FragCoord.xy); ivec2 p = id + ivec2(0, uCascade * N);
+  float s = ((id.x + id.y) & 1) == 0 ? 1.0 : -1.0;
+  vec4 a = texelFetch(uIn0, p, 0) * s; vec4 b = texelFetch(uIn1, p, 0) * s;
+  float dxx = uLambda * b.z, dzz = uLambda * b.w, dxz = uLambda * a.w;
+  float jac = (1.0 + dxx) * (1.0 + dzz) - dxz * dxz;
+  vec2 slope = b.xy / max(vec2(1.0 + dxx, 1.0 + dzz), vec2(0.2));
+  float prev = texelFetch(uPrev, id, 0).w;
+  float turb = min(jac, prev + uDt * uFoamRec / max(jac, 0.5));
+  outDisp = vec4(uLambda * a.x, a.z, uLambda * a.y, turb);
+  outSlope = vec4(slope, slope * slope);
+}`;
+function ocnTarget(w, h, mips) {
+  const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  const tex = [0, 1].map(i => {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    const lv = mips ? Math.log2(w) + 1 : 1;
+    gl.texStorage2D(gl.TEXTURE_2D, lv, gl.RGBA16F, w, h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mips ? gl.LINEAR_MIPMAP_LINEAR : gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mips ? gl.LINEAR : gl.NEAREST);
+    const wr = mips ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wr); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wr);
+    if (mips && CAPS.aniso) gl.texParameterf(gl.TEXTURE_2D, CAPS.aniso.TEXTURE_MAX_ANISOTROPY_EXT, 8);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0);
+    return t;
+  });
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);   // turbulence starts at 1? set below
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { fb, tex, w, h, ok };
+}
+function oceanInit(N) {
+  if (OCN.ok === false) return false;
+  if (OCN.ready && OCN.N === N) return true;
+  try {
+    if (!CAPS.hdr) throw new Error('sin render a coma flotante');
+    oceanFree();
+    OCN.N = N; const C = OCN.L.length;
+    const d = { N };
+    OCN.P = {
+      evolve: makeProgram('ocnEvolve', OCN_VS, OCN_EVOLVE, d, { raw: true }),
+      fft: makeProgram('ocnFFT', OCN_VS, OCN_FFT, d, { raw: true }),
+      assemble: makeProgram('ocnAssemble', OCN_VS, OCN_ASSEMBLE, d, { raw: true }),
+    };
+    OCN.h0 = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, OCN.h0);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, N, N * C);
+    OCN.ping = ocnTarget(N, N * C, false); OCN.pong = ocnTarget(N, N * C, false);
+    OCN.out = OCN.L.map(() => [ocnTarget(N, N, true), ocnTarget(N, N, true)]);
+    if (![OCN.ping, OCN.pong, ...OCN.out.flat()].every(t => t.ok)) throw new Error('FBO incompleto');
+    // turbulence (foam) channel starts at 1 = no foam
+    for (const pr of OCN.out) for (const t of pr) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 1]); gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gaussian noise is fixed (seeded) so changing the wind only reshapes the same sea
+    const rnd = mulberry32(1337), n = N * N * C;
+    OCN.gauss = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { const u1 = (rnd() + 1e-7), u2 = rnd(), r = Math.sqrt(-2 * Math.log(u1)); OCN.gauss[i * 2] = r * Math.cos(TAU * u2); OCN.gauss[i * 2 + 1] = r * Math.sin(TAU * u2); }
+    OCN.ready = true; OCN.key = ''; OCN.ok = true;
+    return true;
+  } catch (e) { console.warn('Océano FFT desactivado:', e); OCN.ok = false; oceanFree(); return false; }
+}
+function oceanFree() {
+  if (OCN.P) for (const k in OCN.P) gl.deleteProgram(OCN.P[k].p);
+  const del = t => { if (t) { gl.deleteFramebuffer(t.fb); t.tex.forEach(x => gl.deleteTexture(x)); } };
+  del(OCN.ping); del(OCN.pong); if (OCN.out) OCN.out.flat().forEach(del);
+  if (OCN.h0) gl.deleteTexture(OCN.h0);
+  OCN.P = OCN.ping = OCN.pong = OCN.out = OCN.h0 = null; OCN.ready = false;
+}
+// JONSWAP + directional spreading on the CPU (only when the wind or sea state changes)
+function oceanSpectrum(U, dirRad, scale) {
+  const N = OCN.N, C = OCN.L.length, data = new Float32Array(N * N * C * 4);
+  const fetch = 120000;
+  const alpha = 0.076 * Math.pow(OCN_G * fetch / (U * U), -0.22), wp = 22 * Math.pow(U * fetch / (OCN_G * OCN_G), -0.33);
+  const cuts = OCN.L.slice(1).map(L => TAU / L * 6);
+  const kHP = TAU / 24;   // the long swell (> ~24 m) comes from the Gerstner waves the physics use
+  const omega = k => Math.sqrt(OCN_G * k + OCN_ST * k * k * k);
+  const norm = s => s < 5 ? -0.000564 * s ** 4 + 0.00776 * s ** 3 - 0.044 * s * s + 0.192 * s + 0.163 : -4.8e-8 * s ** 4 + 1.07e-5 * s ** 3 - 9.53e-4 * s * s + 5.9e-2 * s + 0.393;
+  const S = (kl, theta, c) => {
+    const lo = c === 0 ? 1e-4 : cuts[c - 1], hi = c === C - 1 ? 1e4 : cuts[c];
+    if (kl < lo || kl > hi || kl < 1e-6) return 0;
+    const w = omega(kl), dwdk = (OCN_G + 3 * OCN_ST * kl * kl) / (2 * w);
+    const sg = w <= wp ? 0.07 : 0.09, r = Math.exp(-(w - wp) * (w - wp) / (2 * sg * sg * wp * wp));
+    const q = wp / w;
+    const js = scale * alpha * OCN_G * OCN_G / w ** 5 * Math.exp(-1.25 * q ** 4) * Math.pow(3.3, r);
+    const x = w / wp; let s = x > 1 ? 9.77 * Math.pow(x, -2.5) : 6.97 * Math.pow(x, 5); s += 16 * Math.tanh(Math.min(x, 20)) * 0.0625;
+    const t = theta - dirRad;
+    const dir = 0.15 * (2 / PI * Math.cos(t) ** 2) + 0.85 * norm(s) * Math.pow(Math.abs(Math.cos(0.5 * t)), 2 * s);
+    const fade = c === C - 1 ? 0.08 : 0.04;
+    const hp = 1 - Math.exp(-((kl / kHP) ** 4));
+    return js * dir * Math.exp(-fade * fade * kl * kl) * dwdk / kl * hp;
+  };
+  for (let c = 0; c < C; c++) {
+    const dk = TAU / OCN.L[c];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const kx = (x - N / 2) * dk, kz = (y - N / 2) * dk, kl = Math.hypot(kx, kz);
+      const a = Math.sqrt(2 * S(kl, Math.atan2(kz, kx), c) * dk * dk);
+      const mx = (N - x) % N, my = (N - y) % N;
+      const kx2 = (mx - N / 2) * dk, kz2 = (my - N / 2) * dk, kl2 = Math.hypot(kx2, kz2);
+      const b = Math.sqrt(2 * S(kl2, Math.atan2(kz2, kx2), c) * dk * dk);
+      const gi = ((c * N + y) * N + x) * 2, gj = ((c * N + my) * N + mx) * 2, o = ((c * N + y) * N + x) * 4;
+      data[o] = OCN.gauss[gi] * a; data[o + 1] = OCN.gauss[gi + 1] * a;
+      data[o + 2] = OCN.gauss[gj] * b; data[o + 3] = -OCN.gauss[gj + 1] * b;
+    }
+  }
+  gl.bindTexture(gl.TEXTURE_2D, OCN.h0);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N * C, gl.RGBA, gl.FLOAT, data);
+}
+function oceanParams() {
+  const st = SEA.state;
+  return { U: Math.round((3 + 7 * st + 0.2 * clamp(ENV.windSpeed, 0, 15)) * 2) / 2, dir: Math.atan2(WIND_DIR.z, WIND_DIR.x), scale: 0.3 + 0.7 * st, chop: 0.55 + 0.4 * st };
+}
+function oceanUpdate() {
+  if (!OCN.on || !OCN.ready) return;
+  const N = OCN.N, C = OCN.L.length, P = OCN.P;
+  const pr = oceanParams(), key = pr.U + '|' + pr.dir.toFixed(2) + '|' + pr.scale.toFixed(2);
+  if (key !== OCN.key) { OCN.key = key; oceanSpectrum(pr.U, pr.dir, pr.scale); }
+  const t = SIM.t; let dt = OCN.last < 0 ? 0 : t - OCN.last; OCN.last = t;
+  if (dt === 0 && OCN.done) return;  // paused: nothing moves
+  dt = clamp(dt, 0, 0.1); OCN.done = true;
+  setDepth(false, false); setBlend(null); setCull(false);
+  const tri = fullscreenTri();
+  const run = (prog, tgt, w, h, setup) => { gl.bindFramebuffer(gl.FRAMEBUFFER, tgt.fb); gl.viewport(0, 0, w, h); useProg(prog); setup(prog); drawMesh(tri); };
+  run(P.evolve, OCN.ping, N, N * C, p => { setTex(p, 'uH0', OCN.h0); setU(p, 'uLength', [...OCN.L, 1]); setU(p, 'uT', t % OCN_LOOP); });
+  let src = OCN.ping, dst = OCN.pong;
+  const LOG = Math.log2(N);
+  for (let dir = 0; dir < 2; dir++) for (let s = 1; s <= LOG; s++) {
+    run(P.fft, dst, N, N * C, p => { setU(p, 'uVertical', dir); setU(p, 'uSub', 1 << s); setTex(p, 'uIn0', src.tex[0]); setTex(p, 'uIn1', src.tex[1]); });
+    [src, dst] = [dst, src];
+  }
+  const next = OCN.parity ^ 1;
+  for (let c = 0; c < C; c++) {
+    run(P.assemble, OCN.out[c][next], N, N, p => {
+      setTex(p, 'uIn0', src.tex[0]); setTex(p, 'uIn1', src.tex[1]); setTex(p, 'uPrev', OCN.out[c][OCN.parity].tex[0]);
+      setU(p, 'uCascade', c); setU(p, 'uLambda', pr.chop); setU(p, 'uDt', dt); setU(p, 'uFoamRec', 0.7);
+    });
+    for (const tx of OCN.out[c][next].tex) { gl.bindTexture(gl.TEXTURE_2D, tx); gl.generateMipmap(gl.TEXTURE_2D); }
+  }
+  OCN.parity = next;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+// textures the water shader reads: [slope c0..c2], [displacement c0..c2]
+function oceanTex(kind, c) { return OCN.out[c][OCN.parity].tex[kind === 'disp' ? 0 : 1]; }
+
+// ============================================================================
+// Vegetation 2: richer tree models, two levels of detail and distance culling per 160 m cell
+// ============================================================================
+const VEG2 = { cell: 160, types: {}, camX: 1e9, camZ: 1e9, key: '', stats: { hi: 0, lo: 0 } };
+const vrand = s => { let a = s | 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+// noisy blob for canopies and rocks: sphere pushed in and out by a few low-frequency waves
+function blobPrim(r, seg, rings, amp, seed, squash = 1) {
+  const s = PRIM.sphere(r, seg, rings), R = vrand(seed), ph = [R() * 6, R() * 6, R() * 6, R() * 6];
+  for (let k = 0; k < s.p.length; k += 3) {
+    const x = s.p[k] / r, y = s.p[k + 1] / r, z = s.p[k + 2] / r;
+    const f = 1 + amp * (0.55 * Math.sin(x * 3.1 + ph[0]) * Math.cos(z * 2.7 + y * 1.9 + ph[1]) + 0.3 * Math.sin(y * 5.3 + x * 4.1 + ph[2]) + 0.15 * Math.cos(z * 7.7 + ph[3]));
+    s.p[k] *= f; s.p[k + 1] *= f * squash; s.p[k + 2] *= f;
+  }
+  s.n = computeNormals(s.p, s.idx);
+  return s;
+}
+// leaf colour: darker and bluer underneath and inside the crown, sunlit tips lighter
+const leafCol = (base, var1) => (lx, ly, lz, x, y, z) => {
+  const t = clamp((ly + 1) / 2, 0, 1), k = 0.72 + 0.4 * t + var1 * Math.sin(x * 1.7 + z * 2.3) * 0.08;
+  return [base[0] * k, base[1] * k * (0.96 + 0.06 * t), base[2] * k * (1.1 - 0.15 * t), 1];
+};
+function palmTree(lod) {
+  const g = new Geo(), H = 9.5, hi = lod === 0;
+  const segs = hi ? 12 : 3, bend = y => 0.032 * y * y / H * 1.7;
+  for (let i = 0; i < segs; i++) {
+    const y0 = i / segs * H, y1 = (i + 1) / segs * H, r0 = lerp(0.26, 0.15, i / segs), r1 = lerp(0.26, 0.15, (i + 1) / segs);
+    const x0 = bend(y0), x1 = bend(y1), len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(x1 - x0, y1 - y0);
+    const band = i % 2 ? C(0.40, 0.32, 0.23, 0) : C(0.47, 0.38, 0.28, 0);   // leaf-scar rings
+    g.add(PRIM.cyl(r0 * 1.06, r1, len, hi ? 9 : 4, false), TRS(x0, y0, 0, 0, 0, -ang), band, [0.9, 0]);
+  }
+  const top = new V3(bend(H), H, 0);
+  const fronds = hi ? 15 : 7;
+  for (let f = 0; f < fronds; f++) {
+    const layer = f % 3, ang = f / fronds * TAU + layer * 0.35;
+    const dir = new V3(Math.cos(ang), 0, Math.sin(ang)), side = new V3(-dir.z, 0, dir.x);
+    const L = (hi ? 4.4 : 4.6) + layer * 0.55, lift = 1.4 - layer * 0.45 + (f % 2) * 0.3, droop = 2.0 + layer * 0.9;
+    const K = hi ? 14 : 3, p = [], idx = [];
+    for (let k = 0; k <= K; k++) {
+      const t = k / K;
+      const c = vadd(top, vscale(dir, t * L)); c.y += Math.sin(t * PI * 0.6) * lift - t * t * droop;
+      // leaflets: a keeled, saw-toothed blade (wide and narrow alternately) that tapers to the tip
+      const w = Math.sin(Math.min(t * 1.25, 1) * PI) * (hi ? (k % 2 ? 1.05 : 0.45) : 0.8);
+      const keel = 0.22 * w;
+      p.push(c.x + side.x * w, c.y - keel, c.z + side.z * w, c.x, c.y + 0.05, c.z, c.x - side.x * w, c.y - keel, c.z - side.z * w);
+    }
+    for (let k = 0; k < K; k++) { const a = k * 3; idx.push(a, a + 1, a + 4, a, a + 4, a + 3, a + 1, a + 2, a + 5, a + 1, a + 5, a + 4); }
+    const n = computeNormals(p, idx);
+    for (let q = 0; q < n.length; q += 3) if (n[q + 1] < 0) { n[q] *= -1; n[q + 1] *= -1; n[q + 2] *= -1; }
+    const sh = 0.82 + layer * 0.09, dry = f === 3 || f === 11;   // a couple of old, yellowing fronds
+    const col = dry ? [0.42, 0.40, 0.14] : [0.18, 0.40, 0.09];
+    g.add({ p, n, idx }, null, null, null, (lx, ly, lz) => { const d = Math.hypot(lx - top.x, lz) / L; return [col[0] * sh * (0.85 + 0.3 * d), col[1] * sh * (0.9 + 0.2 * d), col[2] * sh, 1]; });
+  }
+  if (hi) for (let k = 0; k < 6; k++) g.add(PRIM.sphere(0.17, 7, 5), TRS(top.x + Math.cos(k * 1.1) * 0.32, H - 0.35 - (k % 2) * 0.18, Math.sin(k * 1.1) * 0.32), C(0.36, 0.27, 0.09, 0), [0.6, 0]);
+  return g;
+}
+function broadTree(lod, seed = 3, kind = 'broad') {
+  const g = new Geo(), hi = lod === 0, R = vrand(seed);
+  const flower = kind === 'flower';
+  const bark = C(0.30, 0.23, 0.17, 0);
+  const trunkH = flower ? 3.4 : 4.4;
+  g.add(PRIM.cyl(0.36, 0.24, trunkH, hi ? 8 : 4, false), TRS(0, 0, 0), bark, [0.9, 0]);
+  const blobs = [];
+  if (hi) {
+    // forked crown: three limbs, each carrying a cluster of leaf masses
+    for (let b = 0; b < 3; b++) {
+      const a = b / 3 * TAU + R() * 0.6, lean = 0.55 + R() * 0.25, len = 2.6 + R() * 0.8;
+      const ex = Math.sin(lean) * Math.cos(a) * len, ez = Math.sin(lean) * Math.sin(a) * len, ey = trunkH + Math.cos(lean) * len;
+      g.add(PRIM.cyl(0.18, 0.08, len, 6, false), TRS(0, trunkH - 0.2, 0, Math.sin(a) * lean, 0, -Math.cos(a) * lean), bark, [0.9, 0]);
+      const n = flower ? 4 : 5 + (R() * 3 | 0);
+      for (let k = 0; k < n; k++) blobs.push([ex + (R() - 0.5) * 2.6, ey + (R() - 0.3) * 1.6, ez + (R() - 0.5) * 2.6, (flower ? 1.6 : 1.15) + R() * 0.8]);
+    }
+    blobs.push([0, trunkH + (flower ? 2.3 : 3.6), 0, flower ? 2.4 : 2.3]);
+  } else blobs.push([0, trunkH + 2.0, 0, flower ? 3.4 : 3.0], [0.6, trunkH + 3.2, -0.4, flower ? 2.4 : 2.2]);
+  const base = flower ? [0.6, 0.12, 0.04] : (seed % 2 ? [0.12, 0.30, 0.07] : [0.16, 0.33, 0.06]);
+  blobs.forEach((b, i) => {
+    const s = blobPrim(b[3], hi ? 12 : 6, hi ? 9 : 4, hi ? 0.34 : 0.14, seed * 31 + i, flower ? 0.55 : 0.8);
+    const mix = flower && i % 3 === 2 ? [0.22, 0.38, 0.1] : base;   // the flame tree keeps some green
+    g.add(s, TRS(b[0], b[1], b[2]), null, null, leafCol(mix, 1));
+  });
+  return g;
+}
+function pineTree(lod) {
+  const g = new Geo(), hi = lod === 0;
+  g.add(PRIM.cyl(0.26, 0.1, 11, hi ? 7 : 4, false), TRS(0, 0, 0), C(0.29, 0.21, 0.15, 0), [0.9, 0]);
+  const tiers = hi ? 6 : 2;
+  for (let t = 0; t < tiers; t++) {
+    const y = 2.4 + t * (hi ? 1.55 : 4.2), r = (hi ? 2.6 : 2.4) * (1 - t / (tiers + 0.6)), h = hi ? 2.6 : 5.2;
+    const c = PRIM.cyl(r, 0.02, h, hi ? 11 : 6, false);
+    if (hi) for (let k = 0; k < c.p.length; k += 3) if (c.p[k + 1] < 0.01) { const a = Math.atan2(c.p[k + 2], c.p[k]); const f = 1 + 0.18 * Math.sin(a * 5 + t); c.p[k] *= f; c.p[k + 2] *= f; c.p[k + 1] -= 0.35 * Math.abs(Math.sin(a * 5 + t)); }
+    c.n = computeNormals(c.p, c.idx);
+    g.add(c, TRS(0, y, 0, 0, t * 0.7, 0), null, null, leafCol([0.10, 0.26, 0.12], 1));
+  }
+  return g;
+}
+function bushPlant(lod, seed = 5) {
+  const g = new Geo(), hi = lod === 0, R = vrand(seed);
+  const n = hi ? 5 : 1;
+  for (let i = 0; i < n; i++) {
+    const r = hi ? 0.7 + R() * 0.6 : 1.3, x = hi ? (R() - 0.5) * 1.8 : 0, z = hi ? (R() - 0.5) * 1.8 : 0;
+    g.add(blobPrim(r, hi ? 8 : 5, hi ? 6 : 3, 0.22, seed + i, 0.75), TRS(x, r * 0.55, z), null, null, leafCol([0.16 + 0.04 * (i % 2), 0.35, 0.10], 1));
+  }
+  if (hi) for (let k = 0; k < 9; k++) { const a = R() * TAU, rr = 0.6 + R() * 0.7; g.add(PRIM.sphere(0.09, 4, 3), TRS(Math.cos(a) * rr, 0.9 + R() * 0.5, Math.sin(a) * rr), k % 2 ? C(0.95, 0.35, 0.55, 0) : C(1.0, 0.85, 0.3, 0), [0.6, 0]); }
+  return g;
+}
+function rockStone(lod, seed = 9) {
+  const g = new Geo(), hi = lod === 0;
+  const s = blobPrim(1, hi ? 10 : 5, hi ? 7 : 3, 0.32, seed, 0.62);
+  g.add(s, TRS(0, 0.3, 0), null, [0.85, 0], (lx, ly) => { const t = clamp(ly + 0.3, 0, 1); return [0.40 + 0.08 * t - 0.06 * Math.sin(lx * 9), 0.39 + 0.12 * t, 0.36 + 0.02 * t, 0]; });
+  return g;
+}
+function deadTree2(lod) {
+  const g = new Geo(), hi = lod === 0, col = C(0.17, 0.14, 0.12, 0);
+  g.add(PRIM.cyl(0.26, 0.09, 6.4, hi ? 6 : 4, false), TRS(0, 0, 0), col, [0.9, 0]);
+  if (hi) [[3.2, 0.9, 0, 2.6], [4.2, -0.8, 1.2, 2.2], [5.0, 0.6, 2.4, 1.8], [5.6, -0.5, 4.0, 1.3], [2.4, -1.0, 3.1, 1.6]].forEach(b => g.add(PRIM.cyl(0.1, 0.02, b[3], 4, false), TRS(0, b[0], 0, b[1] * 0.6, b[2], b[1]), col, [0.9, 0]));
+  return g;
+}
+const VEG2_MODELS = {
+  palm: l => palmTree(l), broad: l => broadTree(l, 3), broad2: l => broadTree(l, 11), flower: l => broadTree(l, 7, 'flower'),
+  pine: l => pineTree(l), bush: l => bushPlant(l, 5), bush2: l => bushPlant(l, 17), rock: l => rockStone(l, 9), rock2: l => rockStone(l, 23), dead: l => deadTree2(l),
+};
+function vegMesh(g, n) {
+  return makeMesh({
+    aPos: { data: new Float32Array(g.p), size: 3 }, aNormal: { data: new Float32Array(g.n), size: 3 }, aColor: { data: new Float32Array(g.c), size: 4 },
+    iA: { data: new Float32Array(Math.max(n, 1) * 4), size: 4, divisor: 1, dynamic: true }, iB: { data: new Float32Array(Math.max(n, 1) * 4), size: 4, divisor: 1, dynamic: true },
+  }, g.vc > 65535 ? new Uint32Array(g.i) : new Uint16Array(g.i));
+}
+function placeVegetation2(density) {
+  const T = {}; for (const k in VEG2_MODELS) T[k] = [];
+  const rnd = mulberry32(2024);
+  const counts = {
+    brasa: { palm: 220, broad: 160, broad2: 120, flower: 20, pine: 0, bush: 160, bush2: 120, rock: 220, rock2: 180, dead: 260 },
+    palma: { palm: 950, broad: 650, broad2: 520, flower: 120, pine: 0, bush: 420, bush2: 330, rock: 40, rock2: 40, dead: 0 },
+    faro: { palm: 120, broad: 120, broad2: 90, flower: 0, pine: 260, bush: 380, bush2: 300, rock: 240, rock2: 220, dead: 0 },
+  };
+  const m = [0, 0, 0, 0];
+  for (const isl of ISLANDS) {
+    const cnt = counts[isl.id], r = isl.rwy;
+    const tryPlace = (type, n, accept) => {
+      let placed = 0, tries = 0; n = Math.round(n * density);
+      while (placed < n && tries < n * 30) {
+        tries++;
+        const lx = (rnd() * 2 - 1) * isl.ext * 0.98, lz = (rnd() * 2 - 1) * isl.ext * 0.98;
+        const h = hmSample(isl, lx, lz); if (h === null) continue;
+        const e = 4, hx = (hmSample(isl, lx + e, lz) ?? h) - (hmSample(isl, lx - e, lz) ?? h), hz = (hmSample(isl, lx, lz + e) ?? h) - (hmSample(isl, lx, lz - e) ?? h);
+        const slope = Math.hypot(hx, hz) / (2 * e);
+        maskBilinear(isl, lx, lz, m);
+        const uv = rwyUV(r, lx, lz);
+        if (rectDist(uv.u, uv.v, 0, 0, r.len / 2 + 160, r.wid / 2 + 55) < 1) continue;
+        if (m[3] > 0.05 || m[0] > 0.02) continue;
+        if (ringClear && !ringClear(isl.cx + lx, isl.cz + lz)) continue;
+        // clustering: woods are denser where a low-frequency noise is high
+        const clump = 0.5 + 0.5 * Math.sin((isl.cx + lx) * 0.0061 + Math.cos((isl.cz + lz) * 0.0047) * 2.1) * Math.cos((isl.cz + lz) * 0.0053);
+        if (type !== 'rock' && type !== 'rock2' && rnd() > 0.35 + 0.75 * clump) continue;
+        if (!accept(h, slope, m, rnd)) continue;
+        const rock = type === 'rock' || type === 'rock2';
+        const scale = type === 'palm' ? 0.75 + rnd() * 0.55 : rock ? 0.6 + rnd() * 2.6 : type === 'pine' ? 0.7 + rnd() * 0.8 : 0.7 + rnd() * 0.7;
+        T[type].push([isl.cx + lx, h - (rock ? 0.3 : 0.05), isl.cz + lz, rnd() * TAU, scale, rnd(), rock || type === 'dead' ? 0 : 0.6 + rnd() * 0.8]);
+        placed++;
+      }
+    };
+    const trop = isl.kind === 'tropical';
+    tryPlace('palm', cnt.palm, (h, s, mm, R) => h > 1.0 && h < (trop ? 40 : 20) && s < 0.45 && (h < 10 || R() < 0.35));
+    for (const b of ['broad', 'broad2']) tryPlace(b, cnt[b], (h, s, mm, R) => h > 5 && s < 0.6 && (mm[1] > 0.25 || R() < 0.15) && mm[2] < 0.35);
+    tryPlace('flower', cnt.flower, (h, s, mm, R) => h > 3 && h < 60 && s < 0.35 && mm[2] < 0.2);
+    tryPlace('pine', cnt.pine, (h, s, mm, R) => h > 25 && s < 0.7 && mm[2] < 0.4);
+    for (const b of ['bush', 'bush2']) tryPlace(b, cnt[b], (h, s, mm, R) => h > 2.5 && s < 0.8 && mm[2] < 0.5);
+    for (const b of ['rock', 'rock2']) tryPlace(b, cnt[b], (h, s, mm, R) => h > -1.5 && (s > 0.25 || mm[2] > 0.3 || R() < 0.25));
+    tryPlace('dead', cnt.dead, (h, s, mm, R) => h > 8 && h < 260 && mm[2] > 0.25 && s < 0.7);
+  }
+  return T;
+}
+let ringClear = null;   // set by the ring course so no tree grows inside a gate
+function buildVegMeshes2(density) {
+  for (const k in VEG2.types) { deleteMesh(VEG2.types[k].hi); deleteMesh(VEG2.types[k].lo); }
+  VEG2.types = {}; VEG2.camX = 1e9; VEG2.key = '';
+  SCENE.veg = {};
+  if (density <= 0) return;
+  const inst = placeVegetation2(density), C0 = VEG2.cell;
+  for (const type in VEG2_MODELS) {
+    const list = inst[type]; if (!list.length) continue;
+    // sort the instances by cell so each cell is one contiguous run
+    const key = v => (Math.floor(v[0] / C0) + 1000) * 4096 + Math.floor(v[2] / C0) + 1000;
+    list.sort((a, b) => key(a) - key(b));
+    const A = new Float32Array(list.length * 4), B = new Float32Array(list.length * 4), cells = [];
+    let cur = null;
+    list.forEach((v, i) => {
+      A.set([v[0], v[1], v[2], v[3]], i * 4); B.set([v[4], v[5], v[6], 0], i * 4);
+      const k = key(v);
+      if (!cur || cur.k !== k) { cur = { k, x: (Math.floor(v[0] / C0) + 0.5) * C0, z: (Math.floor(v[2] / C0) + 0.5) * C0, s: i, n: 0 }; cells.push(cur); }
+      cur.n++;
+    });
+    const hiG = VEG2_MODELS[type](0), loG = VEG2_MODELS[type](1);
+    VEG2.types[type] = { A, B, cells, n: list.length, hi: vegMesh(hiG, list.length), lo: vegMesh(loG, list.length), hiA: new Float32Array(list.length * 4), hiB: new Float32Array(list.length * 4), loA: new Float32Array(list.length * 4), loB: new Float32Array(list.length * 4), triHi: hiG.i.length / 3, triLo: loG.i.length / 3 };
+  }
+}
+// choose which cells draw the detailed model, the simple one or nothing (re-run when the camera moves 30 m)
+function vegUpdate(cam) {
+  const near = SETTINGS.vegNear, far = SETTINGS.vegFar, key = near + '|' + far;
+  if (Math.hypot(cam.x - VEG2.camX, cam.z - VEG2.camZ) < 30 && key === VEG2.key) return;
+  VEG2.camX = cam.x; VEG2.camZ = cam.z; VEG2.key = key;
+  const half = VEG2.cell * 0.71, hgt = Math.max(0, cam.y - 300) * 0.5;   // from high up the near ring widens a little
+  let nh = 0, nl = 0;
+  for (const type in VEG2.types) {
+    const T = VEG2.types[type]; let h = 0, l = 0;
+    const big = type === 'palm' || type === 'broad' || type === 'broad2' || type === 'flower' || type === 'pine';
+    const farT = big ? far : far * 0.45;   // bushes and rocks vanish sooner than trees
+    for (const c of T.cells) {
+      const d = Math.max(0, Math.hypot(c.x - cam.x, c.z - cam.z) - half);
+      if (d < near + hgt) { T.hiA.set(T.A.subarray(c.s * 4, (c.s + c.n) * 4), h * 4); T.hiB.set(T.B.subarray(c.s * 4, (c.s + c.n) * 4), h * 4); h += c.n; }
+      else if (d < farT) { T.loA.set(T.A.subarray(c.s * 4, (c.s + c.n) * 4), l * 4); T.loB.set(T.B.subarray(c.s * 4, (c.s + c.n) * 4), l * 4); l += c.n; }
+    }
+    if (h) { updateBuf(T.hi, 'iA', T.hiA, h * 4); updateBuf(T.hi, 'iB', T.hiB, h * 4); }
+    if (l) { updateBuf(T.lo, 'iA', T.loA, l * 4); updateBuf(T.lo, 'iB', T.loB, l * 4); }
+    T.hi.instances = h; T.lo.instances = l; nh += h; nl += l;
+  }
+  VEG2.stats = { hi: nh, lo: nl };
+}
+function drawVegetation2() {
+  const p = RENDER.P.veg; useProg(p);
+  vegUpdate(RENDER.cam.pos);
+  for (const k in VEG2.types) { const T = VEG2.types[k]; if (T.hi.instances) drawMesh(T.hi); if (T.lo.instances) drawMesh(T.lo); }
+}
+
+// ============================================================================
+// World shadows: two cascades (near and far) of the sun's view of terrain, buildings, trees and the ring
+// course, kept in one depth atlas. Texel-snapped so they don't shimmer; the far one refreshes every 3rd frame.
+// ============================================================================
+const WSH = { rt: null, size: 0, vp: [M4.create(), M4.create()], frame: 0, active: false, valid: [false, false], prog: null };
+const WSH_RANGE = [null, [140, 1100], [220, 2000], [320, 3600]];
+const VEG_DEPTH_VS = `
+in vec3 aPos; in vec4 iA; in vec4 iB;
+uniform mat4 uLightVP; uniform float uTime;
+void main(){
+  float s = iB.x; float ca = cos(iA.w), sa = sin(iA.w);
+  vec3 p = aPos * s;
+  float hh = max(aPos.y, 0.0);
+  float sw = sin(uTime * 1.25 + iA.x * 0.05 + iA.z * 0.07) * 0.6 + sin(uTime * 2.9 + iA.x * 0.11) * 0.25;
+  p.x += sw * iB.z * hh * hh * 0.0035 * s; p.z += sw * iB.z * hh * hh * 0.002 * s;
+  vec3 wp = vec3(p.x * ca - p.z * sa, p.y, p.x * sa + p.z * ca) + iA.xyz;
+  gl_Position = uLightVP * vec4(wp, 1.0);
+}`;
+function ensureWorldShadow() {
+  const lv = clamp(SETTINGS.worldShadows | 0, 0, 3), size = lv === 0 ? 0 : lv === 3 ? 4096 : 2048;
+  if (WSH.size === size) return;
+  deleteRT(WSH.rt); WSH.rt = null; WSH.size = size; WSH.valid = [false, false];
+  if (size) WSH.rt = makeRT(size * 2, size, { color: false, depth: 'tex', compare: true });
+  if (!WSH.prog) WSH.prog = makeProgram('vegDepth', VEG_DEPTH_VS, DEPTH_FS, {}, { raw: true });
+  if (!RENDER.dummyWShadow) RENDER.dummyWShadow = makeDepthTex(1, 1, true);
+}
+function snapCenter(c, L, texel) {
+  const up = Math.abs(L.y) > 0.95 ? new V3(0, 0, 1) : new V3(0, 1, 0);
+  const r = up.cross(L).norm(), u = L.cross(r).norm();
+  const a = Math.round(c.dot(r) / texel) * texel, b = Math.round(c.dot(u) / texel) * texel, d = c.dot(L);
+  return vadd(vadd(vscale(r, a), vscale(u, b)), vscale(L, d));
+}
+function renderWorldShadow() {
+  WSH.active = false;
+  const lv = SETTINGS.worldShadows | 0;
+  if (!WSH.rt || lv <= 0 || ENV.sunDir.y < 0.05) return;
+  const L = ENV.sunDir, cam = RENDER.cam, rng = WSH_RANGE[lv], S = WSH.size;
+  WSH.frame++;
+  // look a little ahead of the camera so more of the map covers what is on screen
+  const f = new V3(-cam.view[2], 0, -cam.view[10]); if (f.len() > 1e-3) f.norm();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, WSH.rt.fb);
+  gl.activeTexture(gl.TEXTURE15); gl.bindTexture(gl.TEXTURE_2D, RENDER.dummyWShadow);
+  setDepth(true, true); setBlend(null); setCull(false);
+  gl.enable(gl.SCISSOR_TEST); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.6, 3.0);
+  for (let i = 0; i < 2; i++) {
+    if (i === 1 && WSH.valid[1] && WSH.frame % 3 !== 0) continue;
+    const half = rng[i], texel = 2 * half / S;
+    let c = vadd(cam.pos, vscale(f, half * 0.55)); c.y = Math.max(0, Math.min(cam.pos.y, 400));
+    c = snapCenter(c, L, texel);
+    const eye = vadd(c, vscale(L, 4500)), up = Math.abs(L.y) > 0.95 ? new V3(0, 0, 1) : new V3(0, 1, 0);
+    const view = M4.lookAt(M4.create(), eye, c, up), proj = M4.ortho(M4.create(), -half, half, -half, half, 10, 9500);
+    M4.mul(WSH.vp[i], proj, view);
+    gl.viewport(i * S, 0, S, S); gl.scissor(i * S, 0, S, S);
+    gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
+    const p = RENDER.P.depth; gl.useProgram(p.p); CUR_PROG = p;
+    setU(p, 'uLightVP', WSH.vp[i]); setU(p, 'uModel', M4.identity(RENDER.tmpM));
+    for (const m of SCENE.terrain) drawMesh(m);
+    if (SCENE.statics) drawMesh(SCENE.statics);
+    if (RINGS.mesh) drawMesh(RINGS.mesh);
+    const pv = WSH.prog; gl.useProgram(pv.p); CUR_PROG = pv;
+    setU(pv, 'uLightVP', WSH.vp[i]); setU(pv, 'uTime', SIM.t);
+    for (const k in VEG2.types) { const T = VEG2.types[k]; if (T.hi.instances) drawMesh(T.hi); if (i === 1 && T.lo.instances) drawMesh(T.lo); }
+    WSH.valid[i] = true;
+  }
+  gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SCISSOR_TEST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  WSH.active = true;
+}
+
+// ============================================================================
+// Ring course on Isla Faro: tall striped poles carrying big rings. Fly through them in order against the
+// clock; touching a ring or a pole is a crash.
+// ============================================================================
+const RINGS = { gates: [], mesh: null, unit: null, next: 0, t0: null, last: null, best: null, R: 14, r: 0.9, poleR: 1.0, lapT: 0 };
+try { RINGS.best = parseFloat(localStorage.getItem('tresislas.rings.best')) || null; } catch (e) { RINGS.best = null; }
+function torusPrim(R, r, seg = 48, sides = 10) {
+  const p = [], n = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = i / seg * TAU, ca = Math.cos(a), sa = Math.sin(a);
+    for (let j = 0; j <= sides; j++) {
+      const b = j / sides * TAU, cb = Math.cos(b), sb = Math.sin(b);
+      // ring in the local XY plane (normal along Z)
+      p.push((R + r * cb) * ca, (R + r * cb) * sa, r * sb); n.push(cb * ca, cb * sa, sb);
+    }
+  }
+  for (let i = 0; i < seg; i++) for (let j = 0; j < sides; j++) { const a = i * (sides + 1) + j, b = a + sides + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  return { p, n, idx };
+}
+function ringFrame(g) { // model matrix: ring normal along the gate direction
+  const yaw = Math.atan2(g.n.x, g.n.z);
+  return TRS(g.c.x, g.c.y, g.c.z, 0, yaw, 0);
+}
+function buildRings() {
+  const isl = ISLANDS.find(i => i.id === 'faro'); if (!isl) return;
+  const N = 12, gates = [], r = isl.rwy;
+  for (let i = 0; i < N; i++) {
+    const th = i / N * TAU;
+    let rad = 820 + 140 * Math.sin(3 * th + 0.4);
+    let lx, lz;
+    for (let k = 0; k < 8; k++) {   // keep poles off the runway, its approaches and the lighthouse
+      lx = Math.cos(th) * rad; lz = Math.sin(th) * rad;
+      const uv = rwyUV(r, lx, lz);
+      const lh = SCENE.lighthouse ? Math.hypot(isl.cx + lx - SCENE.lighthouse.x, isl.cz + lz - SCENE.lighthouse.z) : 1e9;
+      if (rectDist(uv.u, uv.v, 0, 0, r.len / 2 + 400, r.wid / 2 + 90) >= 1 && lh > 90) break;
+      rad += 110;
+    }
+    const gx = isl.cx + lx, gz = isl.cz + lz, ground = Math.max(terrainH(gx, gz), -12);
+    const clear = 45 + 45 * (0.5 + 0.5 * Math.sin(2 * th + 1.0)) + (i % 4 === 2 ? 40 : 0);
+    gates.push({ c: new V3(gx, Math.max(ground, 0) + clear + RINGS.R, gz), ground });
+  }
+  // each gate faces along the course (counter-clockwise seen from above)
+  gates.forEach((g, i) => { const a = gates[(i + N - 1) % N].c, b = gates[(i + 1) % N].c; g.n = new V3(b.x - a.x, 0, b.z - a.z).norm(); });
+  RINGS.gates = gates;
+  const geo = new Geo(), tor = torusPrim(RINGS.R, RINGS.r, 56, 10);
+  gates.forEach((g, i) => {
+    geo.add(tor, ringFrame(g), null, [0.45, 0.2], (lx, ly) => { const a = Math.atan2(ly, lx); return Math.floor((a / TAU + 1) * 16) % 2 ? C(0.98, 0.42, 0.06) : C(0.97, 0.96, 0.92); });
+    const top = g.c.y - RINGS.R - RINGS.r * 0.5, bot = g.ground - 6, h = top - bot;
+    // red and white bands, 6 m each
+    const nb = Math.max(1, Math.ceil(h / 6));
+    for (let k = 0; k < nb; k++) { const y0 = bot + k * h / nb, rr = RINGS.poleR * (1.15 - 0.15 * k / nb); geo.add(PRIM.cyl(rr, rr * 0.99, h / nb, 14, k === nb - 1), TRS(g.c.x, y0, g.c.z), k % 2 ? C(0.96, 0.96, 0.93) : C(0.9, 0.12, 0.08), [0.55, 0.1]); }
+    geo.add(PRIM.cyl(4.5, 3.6, 2.5, 16, true), TRS(g.c.x, Math.max(g.ground, -2) - 1.5, g.c.z), C(0.55, 0.55, 0.53), [0.85, 0]);   // footing
+    // number plate on the pole
+    geo.add(PRIM.box(3.4, 3.4, 0.25), TRS(g.c.x, top - 6, g.c.z, 0, Math.atan2(g.n.x, g.n.z)), C(0.08, 0.1, 0.12), [0.6, 0]);
+  });
+  deleteMesh(RINGS.mesh); RINGS.mesh = geo.mesh();
+  const u = new Geo(); u.add(torusPrim(RINGS.R, RINGS.r * 1.15, 56, 10), null, C(0.3, 1.0, 0.45)); deleteMesh(RINGS.unit); RINGS.unit = u.mesh();
+  ringClear = (x, z) => !RINGS.gates.some(g => Math.hypot(g.c.x - x, g.c.z - z) < 28);
+}
+function ringsReset() { RINGS.next = 0; RINGS.t0 = null; RINGS.prevPos = null; }
+function ringsActive() { return SETTINGS.rings !== false && RINGS.gates.length && !isBoat() && GAME.state === 'flying'; }
+// called every physics substep: crossings and contact with rings and poles
+function ringStep(ac) {
+  if (!ringsActive() || ac.crashed) return;
+  const P = ac.pos, prev = RINGS.prevPos || P.clone();
+  RINGS.prevPos = P.clone();
+  const near = RINGS.gates.filter(g => Math.abs(g.c.x - P.x) < 60 && Math.abs(g.c.z - P.z) < 60);
+  if (!near.length) return;
+  const right = ac.q.rot(new V3(1, 0, 0)), fwd = ac.fwd(), up = ac.q.rot(new V3(0, 1, 0)), hs = AC.b * 0.48;
+  const pts = [P, vadd(P, vscale(right, hs)), vadd(P, vscale(right, -hs)), vadd(P, vscale(right, hs * 0.5)), vadd(P, vscale(right, -hs * 0.5)), vadd(P, vscale(fwd, 3.2)), vadd(vsub(P, vscale(fwd, 4.5)), vscale(up, 0.8))];
+  const tube = RINGS.r + 0.12, pr = RINGS.poleR + 0.25;
+  for (const g of near) {
+    for (const q of pts) {
+      const d = vsub(q, g.c), u = d.dot(g.n), rho = vsub(d, vscale(g.n, u)).len();
+      if (Math.hypot(rho - RINGS.R, u) < tube) { ac.crash('Has chocado con el aro ' + (RINGS.gates.indexOf(g) + 1)); return; }
+      if (Math.hypot(q.x - g.c.x, q.z - g.c.z) < pr && q.y < g.c.y - RINGS.R + 0.3 && q.y > g.ground - 8) { ac.crash('Has chocado con el poste del aro ' + (RINGS.gates.indexOf(g) + 1)); return; }
+    }
+  }
+  // gate crossing: the centre goes through the ring plane, inside the ring, in the course direction
+  const g = RINGS.gates[RINGS.next];
+  if (!g) return;
+  const u0 = vsub(prev, g.c).dot(g.n), u1 = vsub(P, g.c).dot(g.n);
+  if (u0 < 0 && u1 >= 0) {
+    const t = u0 / (u0 - u1), x = vadd(prev, vscale(vsub(P, prev), t)), rho = vsub(x, g.c).len();
+    if (rho < RINGS.R - RINGS.r) ringPassed();
+  }
+}
+function ringPassed() {
+  const N = RINGS.gates.length, i = RINGS.next;
+  if (i === 0) { RINGS.t0 = SIM.t; UI.toast('¡Aro 1! Crono en marcha · sigue el aro verde'); }
+  else UI.toast('Aro ' + (i + 1) + ' de ' + N + ' · ' + fmtRace(SIM.t - RINGS.t0));
+  beep(880 + i * 40, 0.08, 0.08, 'square');
+  RINGS.next = i + 1;
+  if (RINGS.next >= N) {
+    const t = SIM.t - RINGS.t0, rec = !RINGS.best || t < RINGS.best;
+    if (rec) { RINGS.best = t; try { localStorage.setItem('tresislas.rings.best', String(t)); } catch (e) { /* private mode */ } }
+    UI.toast((rec ? '¡Nuevo récord! ' : 'Circuito completado: ') + fmtRace(t) + (rec ? '' : ' · récord ' + fmtRace(RINGS.best)));
+    beep(1320, 0.25, 0.1, 'square');
+    RINGS.last = t; RINGS.next = 0; RINGS.t0 = null;
+  }
+}
+function fmtRace(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function drawRings(o) {
+  if (!RINGS.mesh || SETTINGS.rings === false) return;
+  drawObj(RINGS.mesh, M4.identity(RENDER.tmpM));
+  if (o && o.reflection) return;
+  const g = RINGS.gates[RINGS.next];
+  if (g && GAME.state !== 'menu' && !isBoat()) {
+    const pulse = 0.6 + 0.4 * Math.sin(SIM.t * 5);
+    setBlend('add'); setDepth(true, false);
+    drawObj(RINGS.unit, ringFrame(g), 1, [0.3 * pulse * 3, 1.0 * pulse * 3, 0.45 * pulse * 3]);
+    setBlend(null); setDepth(true, true);
+  }
+}
+// small panel with the course state
+function updateRingsHUD() {
+  const el = document.getElementById('ringHud'); if (!el) return;
+  const on = ringsActive() && SETTINGS.hud;
+  const isl = ISLANDS.find(i => i.id === 'faro');
+  const close = on && isl && Math.hypot(AIR.ac.pos.x - isl.cx, AIR.ac.pos.z - isl.cz) < 4500;
+  el.hidden = !close;
+  if (!close) return;
+  const g = RINGS.gates[RINGS.next], d = g ? vsub(g.c, AIR.ac.pos).len() : 0;
+  el.innerHTML = '<b>Aros</b> ' + RINGS.next + ' / ' + RINGS.gates.length + (RINGS.t0 !== null ? ' · ' + fmtRace(SIM.t - RINGS.t0) : '')
+    + '<br><small>siguiente a ' + (d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km') + (RINGS.best ? ' · récord ' + fmtRace(RINGS.best) : '') + '</small>';
+}
+
+// ============================================================================
 // Game state, loop, boot
 // ============================================================================
 const SIM = { t: 0, acc: 0 };
@@ -9298,7 +10045,7 @@ function resetSpawnCommon(isl) {
   AIR.assist = {};
   SIM.acc = 0;
 }
-function spawnVehicle() { if (isBoat()) spawnBoat(); else spawnAircraft(); }
+function spawnVehicle() { ringsReset(); if (isBoat()) spawnBoat(); else spawnAircraft(); }
 function startFlight() {
   initAudio();
   ENV.time = parseFloat(GAME.startTime);
@@ -9375,6 +10122,7 @@ function stepGame(dt) {
       ENVQ.t = SIM.t; ENVQ.wind = WIND_NOW.base;
       ac.step(h, ENVQ);
       stepEnemy(h);
+      ringStep(ac);
       SIM.t += h; SIM.acc -= h; n++;
       if (ac.crashed) { onCrash(); break; }
     }
@@ -9448,9 +10196,10 @@ async function boot() {
   prog(0.6, 'Modelando el terreno…'); await nextFrame();
   buildWorldGPU();
   prog(0.72, 'Plantando palmeras…'); await nextFrame();
-  buildVegMeshes(SETTINGS.vegetation);
   prog(0.82, 'Iluminando pistas…'); await nextFrame();
   buildStatics();
+  buildRings();
+  buildVegMeshes(SETTINGS.vegetation);
   prog(0.9, 'Montando el hidroavión…'); await nextFrame();
   buildPlaneModel();
   buildBoatModel();
