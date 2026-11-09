@@ -5962,6 +5962,7 @@ const VEH = [
 ];
 const vehicles = [];
 function vehHome(v) {
+  if (v.type === 'mosca') v.moscaViz = null;
   const h = v.home; v.x = h.x; v.z = h.z; v.yaw = v.tyaw = h.yaw; v.y = groundAt(v.x, v.z); v.speed = 0; v.steer = 0; v.pitch = v.kind === 'plane' ? 0.16 : 0; v.roll = 0; v.tpitch = 0;
   v.hp = v.def.hp; v.dead = false; v.falling = false; v.air = false; v.idleT = 0; v.fireT = 0; v.mgT = 0; v.bombs = v.def.bombs || 0; v.bombT = 0; v.regenT = 0; v.thr = 1; v.kick = 0; v.smokeT = 0;
   if (v.claim) v.claim.goVeh = null;
@@ -6478,6 +6479,7 @@ function updateVehicles(dt) {
       input.bomb = false;
     } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); }
     if (v.kind === 'plane') updatePlane(v, dt, ctl); else updateGround(v, dt, ctl);
+    if (mosca && v.type === 'mosca') moscaTick(v, dt, ctl);
     const c = v.crew; c.x = v.x; c.y = v.y + 0.5; c.z = v.z; c.speed = Math.abs(v.speed);
     if (v.driver) { const d = v.driver; d.x = v.x; d.z = v.z; d.y = v.y + (v.kind === 'plane' ? 0 : 0.5); d.speed = Math.abs(v.speed); d.vx = d.vz = 0; d.swim = false; }
   }
@@ -6493,13 +6495,149 @@ function updateVehicles(dt) {
     }
   }
 }
+/* CM-249 republicano: el modelo usa el mismo shader de los demás glTF del juego. */
+let mosca = null;
+const MOSCA_SCALE = 9 / 9.6, MOSCA_H = 1.92;
+const _moscaPlane = M4.create(), _moscaEye = M4.create(), _moscaLocal = M4.create();
+async function loadMosca() {
+  if (!SK.ready) return;
+  try {
+    const url = new URL('mosca_cm249.glb', location.href);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const g = glbParse(await res.arrayBuffer()), J = g.j, cache = new Map();
+    const rig = J.nodes[J.scenes[J.scene || 0].nodes[0]].extras.FPV_Rig;
+    const names = new Map(J.nodes.map((n, i) => [n.name, i])), nodes = [], opaque = [], glass = [];
+    const visit = (i, parent) => {
+      const nd = J.nodes[i];
+      const node = { i, parent, t: nd.translation || [0, 0, 0], q: nd.rotation || [0, 0, 0, 1],
+        s: nd.scale || [1, 1, 1], world: M4.create(), parts: [], panes: [] };
+      nodes.push(node);
+      for (const child of nd.children || []) visit(child, node);
+    };
+    for (const root of J.scenes[J.scene || 0].nodes) visit(root, null);
+    for (const node of nodes) {
+      const mesh = J.meshes[J.nodes[node.i].mesh];
+      if (!mesh) continue;
+      for (const pr of mesh.primitives) {
+        const mat = J.materials[pr.material];
+        if (mat.alphaMode !== 'BLEND') node.parts.push(await skPart(g, pr, cache));
+        else {
+          const p = glbAcc(g, pr.attributes.POSITION), n = glbAcc(g, pr.attributes.NORMAL);
+          const col = mat.pbrMetallicRoughness.baseColorFactor;
+          const vertices = new Float32Array(p.length * 3);
+          for (let i = 0; i < p.length / 3; i++) {
+            vertices.set(p.subarray(i * 3, i * 3 + 3), i * 9);
+            vertices.set(n.subarray(i * 3, i * 3 + 3), i * 9 + 3);
+            vertices.set([enc(col[0]), enc(col[1]), enc(col[2])], i * 9 + 6);
+          }
+          node.panes.push(makeMesh(vertices, glbAcc(g, pr.indices, true)));
+        }
+      }
+      if (node.parts.length) opaque.push(node);
+      if (node.panes.length) glass.push(node);
+    }
+    const controls = new Map();
+    for (const source of ['pitch', 'roll', 'yaw', 'throttle']) {
+      const c = rig.controls[source];
+      for (const binding of c.targets || [c]) {
+        const id = names.get(binding.node);
+        if (!controls.has(id)) controls.set(id, []);
+        controls.get(id).push({ source, axis: binding.axis, angle: binding.degrees_per_unit * Math.PI / 180 });
+      }
+    }
+    const gear = new Map();
+    const retract = J.animations.find(a => a.name === 'Gear_Retract');
+    let gearTime = 0;
+    for (const { sampler, target } of retract.channels) {
+      const s = retract.samplers[sampler], t = glbAcc(g, s.input), path = target.path;
+      const track = { t, v: glbAcc(g, s.output), w: path === 'rotation' ? 4 : 3 };
+      gearTime = Math.max(gearTime, t[t.length - 1]);
+      if (!gear.has(target.node)) gear.set(target.node, {});
+      gear.get(target.node)[path] = track;
+    }
+    const instruments = new Map(Object.entries(rig.instruments).map(([name, binding]) => [names.get(name), binding]));
+    const cameraNode = J.nodes[names.get('FPV_Camera')];
+    const camera = J.cameras[cameraNode.camera].perspective;
+    mosca = { nodes, opaque, glass, controls, gear, gearTime, instruments, prop: names.get('Propeller'),
+      eye: J.nodes[names.get('Pilot_View')].translation, rotation: cameraNode.rotation, fov: camera.yfov };
+  } catch (e) { console.warn('[Mosca CM-249] se usa el modelo provisional:', e.message); }
+}
+function moscaTick(v, dt, ctl) {
+  const s = v.moscaViz || (v.moscaViz = { pitch: 0, roll: 0, yaw: 0, prop: 0, gear: v.air ? 1 : 0 });
+  const pilot = v.driver?.isPlayer, gain = Math.min(1, dt * 12);
+  s.pitch = lerp(s.pitch, pilot ? clamp(flyIn.pitch + flyIn.pm * 18, -1, 1) : clamp(ctl.aimPitch - v.pitch, -1, 1), gain);
+  s.roll = lerp(s.roll, pilot ? clamp(flyIn.roll + flyIn.rm * 18, -1, 1) : clamp(-v.roll, -1, 1), gain);
+  s.yaw = lerp(s.yaw, pilot ? flyIn.yaw : ctl.r, gain);
+  const rpm = v.driver || v.aiOn || v.air ? lerp(550, 2450, v.thr || 0) : 0;
+  s.prop = (s.prop + rpm * Math.PI / 30 * dt) % (Math.PI * 2);
+  const retract = v.air && (v.y - Math.max(groundAt(v.x, v.z), waterY) > 16 || (v.vyv || 0) > 0);
+  s.gear = clamp(s.gear + (retract ? dt : -dt) / 3, 0, 1);
+  s.rpm = rpm;
+}
+function moscaLift(v) {
+  return MOSCA_H - (v.air ? 0 : 1.1 * Math.tan(clamp(v.pitch + (v.gp || 0), -.25, .25)));
+}
+function moscaPilot() {
+  return mosca && P?.alive && P.veh?.type === 'mosca' && P.team === REP &&
+    (game.state === 'play' || game.state === 'pause') ? P.veh : null;
+}
+function moscaCamera(v) {
+  M4.identity(_moscaPlane);
+  M4.translate(_moscaPlane, v.x, v.y, v.z);
+  M4.rotY(_moscaPlane, v.yaw); M4.rotX(_moscaPlane, v.pitch + (!v.air ? v.gp || 0 : 0)); M4.rotZ(_moscaPlane, v.roll);
+  const eye = mosca.eye;
+  M4.copy(_moscaEye, _moscaPlane);
+  M4.translate(_moscaEye, eye[0] * MOSCA_SCALE, moscaLift(v) + eye[1] * MOSCA_SCALE, eye[2] * MOSCA_SCALE);
+  M4.mul(_moscaEye, _moscaEye, m4trs(_moscaLocal, [0, 0, 0], mosca.rotation, 1));
+}
+function drawMosca(v, base, vp, ex, ey, ez) {
+  if (!mosca || !SK.ready || glLost || v.dead || Math.hypot(v.x - ex, v.y - ey, v.z - ez) > 240) return false;
+  const s = v.moscaViz;
+  const input = { pitch: s?.pitch || 0, roll: s?.roll || 0, yaw: s?.yaw || 0, throttle: v.thr || 0 };
+  const data = { indicated_airspeed: Math.abs(v.speed) * 3.6, altitude: Math.max(0, v.y),
+    engine_rpm: s?.rpm || 0, vertical_speed: v.vyv || 0, heading: (720 - v.yaw * 180 / Math.PI) % 360 };
+  const gearTime = (s?.gear ?? (v.air ? 1 : 0)) * mosca.gearTime;
+  M4.copy(_moscaPlane, base);
+  M4.translate(_moscaPlane, 0, moscaLift(v), 0); M4.scale(_moscaPlane, MOSCA_SCALE, MOSCA_SCALE, MOSCA_SCALE);
+  for (const n of mosca.nodes) {
+    const g = mosca.gear.get(n.i);
+    const t = g ? skBredaSample(g.translation, gearTime, n.t) : n.t;
+    let q = g ? skBredaSample(g.rotation, gearTime, n.q) : n.q;
+    const scale = g ? skBredaSample(g.scale, gearTime, n.s) : n.s;
+    for (const c of mosca.controls.get(n.i) || []) q = qMul(q, qAxis(c.axis, c.angle * input[c.source]));
+    if (n.i === mosca.prop) q = qMul(q, qAxis([0, 0, -1], s?.prop || 0));
+    const dial = mosca.instruments.get(n.i);
+    if (dial && data[dial.source] !== undefined) {
+      const range = dial.maximum - dial.minimum, v = (data[dial.source] - dial.minimum) / range;
+      const a = dial.wrap ? ((v % 1) + 1) % 1 : clamp(v, 0, 1);
+      q = qAxis(dial.axis, lerp(dial.start_angle_deg, dial.end_angle_deg, a) * Math.PI / 180);
+    }
+    m4trs(_moscaLocal, t, q, 1);
+    M4.scale(_moscaLocal, scale[0], scale[1], scale[2]);
+    M4.mul(n.world, n.parent ? n.parent.world : _moscaPlane, _moscaLocal);
+  }
+  skBegin(vp, ex, ey, ez, FOG_N, FOG_F);
+  gl.uniform4fv(SK.U.uB, SK.ident);
+  for (const n of mosca.opaque) { gl.uniformMatrix4fv(SK.U.uM, false, n.world); skParts(n.parts); }
+  skEnd();
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  matState(0, .07, 0);
+  for (const n of mosca.glass) for (const m of n.panes) drawMesh(m, n.world);
+  gl.depthMask(true); gl.disable(gl.BLEND);
+  return true;
+}
+
+
 const _vm = M4.create();
-function drawVehicles() {
+function drawVehicles(vp, ex, ey, ez) {
   for (const v of vehicles) {
     M4.identity(_vm); M4.translate(_vm, v.x, v.y, v.z); M4.rotY(_vm, v.yaw); M4.rotX(_vm, v.pitch + (v.kind === 'plane' && !v.air ? (v.gp || 0) : 0)); M4.rotZ(_vm, v.roll);
     matState(1, 1, 0.08, v.dead ? [0.22, 0.2, 0.18] : null);
     if (v.kind === 'truck') drawMesh(world.truck[v.team], _vm);
-    else if (v.kind === 'plane') drawMesh(world.vm[v.type], _vm);
+    else if (v.kind === 'plane') {
+      if (v.type !== 'mosca' || !drawMosca(v, _vm, vp, ex, ey, ez)) drawMesh(world.vm[v.type], _vm);
+    }
     else {
       const m = world.vm[v.type]; drawMesh(m.hull, _vm);
       M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
@@ -7332,7 +7470,12 @@ function camSetup(dt) {
   if ((game.state === 'play' || game.state === 'pause') && P) {
     if (P.alive && P.veh) {
       const v = P.veh, truck = v.kind === 'truck', plane = v.kind === 'plane';
-      if (plane) {
+      if (plane && moscaPilot()) {
+        moscaCamera(v);
+        cam.x = _moscaEye[12]; cam.y = _moscaEye[13]; cam.z = _moscaEye[14];
+        cam.yaw = Math.atan2(_moscaEye[8], _moscaEye[10]); cam.pitch = Math.asin(clamp(-_moscaEye[9], -1, 1));
+        fov = mosca.fov;
+      } else if (plane) {
         const cpv = Math.cos(v.pitch), yc = v.yaw + (game.planeOrb || 0), dist = 13 + v.speed * 0.07;
         const tx = v.x + Math.sin(yc) * cpv * dist, tz = v.z + Math.cos(yc) * cpv * dist, ty = Math.max(v.y + 4.2 - Math.sin(v.pitch) * dist * 0.7, Math.max(groundAt(tx, tz), waterY) + 1.6);
         const pc = game.pcam || (game.pcam = { x: tx, y: ty, z: tz }), kc = Math.min(1, dt * 4.5);
@@ -7369,10 +7512,12 @@ function render(dt) {
   resize();
   const fp = camSetup(dt), fov = game.fov;
   const asp = canvas.width / canvas.height;
-  M4.perspective(PROJ, fov, asp, 0.15, 3200);
+  const cockpit = moscaPilot();
+  M4.perspective(PROJ, fov, asp, cockpit ? .055 : 0.15, 3200);
   /* con el giroscopio, la cámara también se ladea con el teléfono para que el horizonte del juego siga nivelado con el real */
   cam.roll = P && P.alive && (game.state === 'play' || game.state === 'pause') && !(P.veh && P.veh.kind !== 'tank') ? (P.roll || 0) : 0;
-  M4.identity(VIEW); M4.rotZ(VIEW, -cam.roll); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z);
+  if (cockpit) m4inv(VIEW, _moscaEye);
+  else { M4.identity(VIEW); M4.rotZ(VIEW, -cam.roll); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z); }
   M4.mul(VP, PROJ, VIEW);
   const fg = world.fog;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -7406,7 +7551,7 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   matState(1, 1, 0.1); drawMesh(world.staticMesh); drawMesh(pontoon.mesh); if (pasarela.on) drawMesh(pasarela.mesh);
   vegDrawAll(vp, ex, ey, ez, dt > 0, cull ? xr.headFw : null);
   matState(1, 1, 0.05);
-  drawVehicles(); drawAA(); matState(1, 1, 0.05);
+  drawVehicles(vp, ex, ey, ez); drawAA(); matState(1, 1, 0.05);
   const vis = _visSoldiers; vis.length = 0;
   for (const s of soldiers) if (s.spawned && !s.veh && !s.aa && !(hideP && s === P) && (!cull || cull(s))) vis.push(s);
   if (!skDrawSoldiers(vis, vp, ex, ey, ez, dt > 0)) for (const s of vis) drawSoldier(s);
@@ -8795,7 +8940,7 @@ function gfxUiBoot() {
   new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme); } catch (e) { }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (game.state === 'menu') drawMenuMap(); });
-  vrBoot(); skLoad();
+  vrBoot(); skLoad().then(loadMosca);
   resize(); animateMenu();
   requestAnimationFrame(frame);
   window.__ebro = { game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, navDbg: { NAV, navPath, navLine, navBuild, update } };
