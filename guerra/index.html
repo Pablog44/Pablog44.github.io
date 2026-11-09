@@ -610,6 +610,7 @@ body.nogl #fatal{max-width:none}
       <dt>Z</dt><dd>Tumbarse: apuntas bastante mejor y es muy difícil que te den, pero solo avanzas a rastras. Con un fusil ametrallador (DP-27 o Breda 30) el arma se apoya en el bípode y casi no se desvía ni retrocede. Z o Espacio para levantarte</dd>
       <dt>Espacio</dt><dd>Saltar</dd>
       <dt>R</dt><dd>Recargar</dd>
+      <dt>I</dt><dd>Inspeccionar la Breda 30</dd>
       <dt>1, 2 o Q</dt><dd>Cambiar entre arma larga y pistola</dd>
       <dt>G</dt><dd>Lanzar granada (estalla al chocar)</dd>
       <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
@@ -3948,7 +3949,7 @@ const SK_FILES = ['soldado_republicano.json', 'soldado_nacional.json'], SK_ARMAS
 const SK_H = 1.78;       // altura a la que se escalan los dos soldados (la de los soldados de cajas)
 const SK_FPS = 30;
 /* los clips de apuntar suben el arma, la mantienen y la bajan: se usa el momento en que está arriba */
-const SK_HOLD = { rifle_apuntar: 0.6, pistola_apuntar: 0.75 };
+const SK_HOLD = { rifle_apuntar: 0.6, pistola_apuntar: 0.75, Breda30__Apuntar: 0.97 };
 /* tamaño real: metros por unidad de la malla. El fusil (un Mosin con bayoneta) mide 1,57 de la boca a la cantonera y el real 1,232 m;
    el revólver ya tiene su tamaño (35 cm) */
 const SK_REAL = { rifle: 1.232 / 1.57, pistol: 1 };
@@ -4103,17 +4104,17 @@ async function skBuild(g, tag, maxU) {
     C.pal = b.pal; slot = b.sl;
   }
   let minY = 1e9, maxY = -1e9;
-  C.wp = {}; C.arms = null;
+  C.wp = {}; C.arms = null; C.breda = J.asset && J.asset.extras && J.asset.extras.breda30;
   for (let ni = 0; ni < nodes.length; ni++) {
     const nd = nodes[ni]; if (nd.mesh === undefined || nd.skin === undefined) continue;
     const name = nd.name || '', mesh = J.meshes[nd.mesh], m = /LOD(\d)/i.exec(name), lv = m ? +m[1] : 0, parts = [];
-    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv';
+    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv' || name === 'brazos_breda30_fpv';
     for (const pr of mesh.primitives) {
       parts.push(await skPart(g, pr, cache, slot));
       if (lv === 0 && !wm && !isArm) { const a = J.accessors[pr.attributes.POSITION]; if (a.min && a.max) { minY = Math.min(minY, a.min[1]); maxY = Math.max(maxY, a.max[1]); } }
     }
     if (wm) { (C.wp[wm[1]] = C.wp[wm[1]] || {})[wm[2]] = parts; continue; }
-    if (isArm) { C.arms = parts; continue; }
+    if (isArm) { if (name === 'brazos_breda30_fpv') C.bredaArms = parts; else C.arms = parts; continue; }
     C.lod[lv] = (C.lod[lv] || []).concat(parts);
   }
   if (!C.lod[0]) throw new Error('sin cuerpo');
@@ -4182,8 +4183,141 @@ async function skBuildWeapons(g) {
   }
   for (const k in W) { if (!W[k].full) W[k].full = W[k].lod; if (!W[k].lod) W[k].lod = W[k].full; }
   if (!W.rifle || !W.pistol) throw new Error('faltan armas');
+  if (J.nodes.some(n => n.name === 'breda30')) {
+    try { W.breda30 = await skBuildBreda(g, cache); }
+    catch (e) { console.warn('[Breda 30] se usa el modelo provisional:', e.message); }
+  }
   return W;
 }
+/* Breda 30: las piezas rígidas y los clips salen de los mismos glTF que se usan en Three.js. */
+const BREDA_PRE = 'Breda30__';
+async function skBuildBreda(g, cache) {
+  const J = g.j, nodes = J.nodes;
+  const branch = async name => {
+    const root = nodes.find(n => n.name === name);
+    if (!root) throw new Error('falta ' + name);
+    const groups = [];
+    for (const ni of root.children || []) {
+      const nd = nodes[ni], parts = [];
+      for (const child of nd.children || []) {
+        const mesh = J.meshes[nodes[child].mesh];
+        if (mesh) for (const pr of mesh.primitives) parts.push(await skPart(g, pr, cache));
+      }
+      if (parts.length) groups.push({ ni, name: nd.name, parts, t: nd.translation || [0, 0, 0], q: nd.rotation || [0, 0, 0, 1], s: nd.scale || [1, 1, 1] });
+    }
+    return groups;
+  };
+  const near = await branch('breda30'), far = await branch('breda30_lod');
+  const motions = {};
+  for (const a of J.animations || []) {
+    if (!a.name.startsWith(BREDA_PRE)) continue;
+    const tracks = new Map();
+    for (const c of a.channels) {
+      const s = a.samplers[c.sampler], id = c.target.node, path = c.target.path;
+      if (!tracks.has(id)) tracks.set(id, {});
+      tracks.get(id)[path] = { t: glbAcc(g, s.input), v: glbAcc(g, s.output), w: path === 'rotation' ? 4 : 3 };
+    }
+    motions[a.name.slice(BREDA_PRE.length)] = tracks;
+  }
+  return { near, far, motions };
+}
+function skBredaSample(track, time, fallback) {
+  if (!track) return fallback;
+  const { t, v, w } = track;
+  let lo = 0, hi = t.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (t[mid] <= time) lo = mid; else hi = mid; }
+  const f = clamp((time - t[lo]) / (t[hi] - t[lo] || 1), 0, 1), out = new Array(w);
+  let sg = 1;
+  if (w === 4) {
+    let d = 0; for (let i = 0; i < 4; i++) d += v[lo * 4 + i] * v[hi * 4 + i];
+    if (d < 0) sg = -1;
+  }
+  for (let i = 0; i < w; i++) out[i] = v[lo * w + i] * (1 - f) + sg * v[hi * w + i] * f;
+  if (w === 4) qNorm(out, 0);
+  return out;
+}
+const _bredapart = M4.create(), _bredaworld = M4.create();
+function skBredaParts(weapon, near, root, motion, time, deploy) {
+  const tracks = weapon.motions[motion];
+  for (const group of near ? weapon.near : weapon.far) {
+    const c = tracks && tracks.get(group.ni);
+    const t = skBredaSample(c && c.translation, time, group.t);
+    let r = skBredaSample(c && c.rotation, time, group.q);
+    if (group.name.startsWith('breda30_pata_') && deploy > 0) {
+      r = r.map((v, i) => (i === 3 ? (r[3] < 0 ? -1 : 1) * deploy : 0) + v * (1 - deploy)); qNorm(r, 0);
+    }
+    const scale = skBredaSample(c && c.scale, time, group.s)[0];
+    if (scale < 0.015) continue;
+    m4trs(_bredapart, t, r, scale); M4.mul(_bredaworld, root, _bredapart);
+    gl.uniformMatrix4fv(SK.U.uM, false, _bredaworld);
+    skParts(group.parts);
+  }
+}
+function skBredaState(p, fp) {
+  if (p.reloadT > 0) return ['Recargar', clamp(3.1 - p.reloadT, 0, 3.099)];
+  if (fp && p.switchT > 0) return ['Equipar', clamp(.45 - p.switchT, 0, .449)];
+  const since = game.time - (p.lastShot ?? -99);
+  if (since >= 0 && since < .12) return ['Disparar', since];
+  const inspect = game.time - (p.bredaInspectAt ?? -99);
+  if (fp && inspect >= 0 && inspect < 2.4) return ['Inspeccionar', inspect];
+  return ['Sujetar', game.time % 2];
+}
+function skBredaMatrix(C, st, out) {
+  m4joint(_jm, st.gq, st.gp, C.J.Arma);
+  M4.mul(_jm2, C.base, _jm);
+  return M4.mul(out, _jm2, C.wl.breda30);
+}
+function skBredaCharacter(team, w) {
+  const C = SK.ready && !glLost && SK.W.breda30 && w === WEAPONS.breda30 && SK.chars[team];
+  return C && C.breda && C.bredaArms ? C : null;
+}
+function skBredaCamera(C, p, F, fx = null) {
+  const cfg = C.breda, a = clamp(p.aimT || 0, 0, 1);
+  const walk = p.walkPhase * .5, sway = Math.min(1, p.speed / 5) * (1 - a * .85);
+  const t = cfg.camera.hip.map((v, i) => lerp(v, cfg.camera.aim[i], a) + (fx ? fx.t[i] : 0));
+  t[0] += Math.sin(walk) * .007 * sway;
+  t[1] += Math.abs(Math.cos(walk)) * .007 * sway;
+  const r = fx ? qMul(fx.q, cfg.camera.rotation) : cfg.camera.rotation;
+  m4trs(F, t, r, 1);
+  M4.translate(F, -cfg.sights.rear[0], -cfg.sights.rear[1], -cfg.sights.rear[2]);
+  return F;
+}
+const _bredaFp = { st: null, F: M4.create(), W: M4.create(), gun: M4.create(), arms: M4.create(), tracer: M4.create() };
+function skBredaFpDraw(vp, view, p, ex, ey, ez, vr = false) {
+  const C = skBredaCharacter(p.team, p.weps[p.cur].def);
+  if (!C) return false;
+  const B = _bredaFp, A = C.clips[BREDA_PRE + 'Apuntar'], H = C.clips[BREDA_PRE + 'Sujetar'];
+  if (!B.st || B.st.C !== C) B.st = { C, lr: new Float32Array(C.NJ * 4), lt: new Float32Array(C.NJ * 3), gq: new Float32Array(C.NJ * 4), gp: new Float32Array(C.NJ * 3), bones: new Float32Array(C.pal.length * 12) };
+  const st = B.st, a = clamp(p.aimT || 0, 0, 1), [motion, time] = skBredaState(p, true);
+  skBlend(C, st, H, game.time % H.dur, 1, null);
+  skBlend(C, st, A, A.dur * .97, a, null);
+  let clip = C.clips[BREDA_PRE + motion], t = time;
+  if (motion === 'Sujetar' && p.speed > .35) {
+    clip = C.clips[BREDA_PRE + (p.speed > 3.9 && a < .2 ? 'Correr' : a > .5 ? 'Apuntar_Andando' : 'Andar')];
+    t = ((p.walkPhase / (2 * Math.PI)) % 1 + 1) % 1 * clip.dur;
+  }
+  const overlay = motion === 'Disparar' ? .36 * (1 - a) : motion === 'Sujetar' && clip === H ? 0 : motion === 'Equipar' ? 1 - a : 1;
+  if (overlay > 0) skBlend(C, st, clip, t, overlay, null);
+  skGlobals(C, st);
+  skBredaMatrix(C, st, B.W);
+  skBonesTo(C, st, st.bones);
+  if (vr) M4.copy(B.F, C.bredaVr);
+  else {
+    _lfp.t = [0, 0, 0]; _lfp.q = [0, 0, 0, 1];
+    skLegDispBlend(clip, t, 1);
+    skBredaCamera(C, p, B.F, _lfp);
+  }
+  M4.mul(B.gun, view, B.F);
+  M4.mul(B.arms, B.gun, m4inv(B.W, B.W));
+  skBegin(vp, ex, ey, ez, 1e7, 2e7);
+  gl.uniform4fv(SK.U.uB, SK.ident);
+  skBredaParts(SK.W.breda30, true, B.gun, motion, time, p.proneT || 0);
+  gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, B.arms);
+  skParts(vr ? C.fp.rifle.sides.RightVR : C.bredaArms);
+  skEnd();
+  return true;
+}
+
 /* hueso del arma → malla del arma: el arma se exportó suelta (en el espacio del hueso, pasado a Y arriba): +90° alrededor de X */
 const SK_WLOCAL = m4trs(new Float32Array(16), [0, 0, 0], [Math.SQRT1_2, 0, 0, Math.SQRT1_2], 1);
 /* palma de una mano en el esqueleto: entre la muñeca y el nacimiento de los dedos */
@@ -4242,16 +4376,24 @@ function skSetupWeapons(C) {
     }
     C.fp[kind] = fp;
   }
+  if (C.breda) {
+    const b = C.breda, mount = b.mount;
+    C.wl.breda30 = m4trs(M4.create(), mount.translation, mount.rotation, mount.scale);
+    C.bredaVr = m4trs(M4.create(), [0, .0245, .02], b.camera.rotation, 1);
+    M4.translate(C.bredaVr, -b.sights.rear[0], -b.sights.rear[1], -b.sights.rear[2]);
+    C.bredaVrHand = M4.tp(C.bredaVr, b.rightGrip);
+    C.bredaVrMuzzle = M4.tp(C.bredaVr, b.muzzle);
+  }
   /* hacia dónde apunta el arma en cada clip (respecto al frente del cuerpo): con el fusil, el tirador se pone de perfil y el cañón
      queda unos 55° a su izquierda; para que apunte al enemigo hay que girar el cuerpo esos grados */
   C.wdir = {};
   for (const k in C.clips) {
-    const kind = k.startsWith('rifle') ? 'rifle' : 'pistol', clip = C.clips[k], st = { lr: new Float32Array(NJ * 4), lt: new Float32Array(NJ * 3), gq: new Float32Array(NJ * 4), gp: new Float32Array(NJ * 3), adjQ: null };
+    const kind = C.breda && k.startsWith(BREDA_PRE) ? 'breda30' : k.startsWith('rifle') ? 'rifle' : 'pistol', clip = C.clips[k], st = { lr: new Float32Array(NJ * 4), lt: new Float32Array(NJ * 3), gq: new Float32Array(NJ * 4), gp: new Float32Array(NJ * 3), adjQ: null };
     let sx = 0, sz = 0, sy = 0;
     for (let i = 0; i < 6; i++) {
       skBlend(C, st, clip, clip.dur * (0.15 + 0.7 * i / 5), 1, null); skGlobals(C, st);
       m4joint(_jm, st.gq, st.gp, C.J.Arma); M4.mul(_jm2, _jm, C.wl[kind]);
-      const ax = kind === 'rifle' ? -1 : 1, dx = _jm2[0] * ax, dy = _jm2[1] * ax, dz = _jm2[2] * ax, l = Math.hypot(dx, dy, dz) || 1;
+      const ax = kind === 'pistol' ? 1 : -1, dx = _jm2[0] * ax, dy = _jm2[1] * ax, dz = _jm2[2] * ax, l = Math.hypot(dx, dy, dz) || 1;
       sx += dx / l; sy += dy / l; sz += dz / l;
     }
     C.wdir[k] = { yaw: Math.atan2(sx, sz), el: Math.asin(clamp(sy / 6, -1, 1)) };
@@ -4585,7 +4727,8 @@ function skPose(s, C) {
   st.t += dt;
   const cyc = s.walkPhase / (2 * Math.PI), cl = C.clips, hold = clip => clip.dur * (SK_HOLD[clip.name] || 0.6);
   st.adjOn.fill(0); for (let j = 0; j < C.NJ; j++) { const o = j * 4; st.adjQ[o] = st.adjQ[o + 1] = st.adjQ[o + 2] = 0; st.adjQ[o + 3] = 1; }
-  const mv = alive ? st.mv : 0, aim = st.aim, pre = C.leg ? SK_LEGPRE[skLegKey(s)] : '', aimC = C.leg ? cl[pre + 'Apuntar'] : pistol ? cl.pistola_apuntar : cl.rifle_apuntar;
+  const breda = !C.leg && C.breda && SK.W.breda30 && s.wid === 'breda30';
+  const mv = alive ? st.mv : 0, aim = st.aim, pre = C.leg ? SK_LEGPRE[skLegKey(s)] : '', aimC = C.leg ? cl[pre + 'Apuntar'] : breda ? cl.Breda30__Apuntar : pistol ? cl.pistola_apuntar : cl.rifle_apuntar;
   const hips = C.J.Hips, spine = C.J.Spine;
   if (C.leg) {
     /* legionario: cada arma trae sus clips de cuerpo entero (quieto, apuntando, andando apuntando, andando y corriendo) */
@@ -4595,6 +4738,21 @@ function skPose(s, C) {
     skBlend(C, st, AW, cyc * AW.dur, mv * aim, null);
     skBlend(C, st, Rn, cyc * Rn.dur, mv * st.run, null);
     if (hips >= 0 && spine >= 0 && st.run > 0.01) { const hq = _hq; for (let c = 0; c < 4; c++) hq[c] = st.lr[hips * 4 + c]; skBlend(C, st, aimC, aimC.dur * SK_LEG_HOLD, aim * mv * st.run, C.upper, hq); }
+  } else if (breda) {
+    const H = cl.Breda30__Sujetar, W = cl.Breda30__Andar, WA = cl.Breda30__Apuntar_Andando, R = cl.Breda30__Correr;
+    skBlend(C, st, H, st.t, 1, null);
+    skBlend(C, st, aimC, hold(aimC), aim, null);
+    skBlend(C, st, W, cyc * W.dur, mv, null);
+    skBlend(C, st, WA, cyc * WA.dur, mv * aim, null);
+    skBlend(C, st, R, cyc * R.dur, mv * st.run * (1 - aim), null);
+    if (alive) {
+      const [name, time] = skBredaState(s, false);
+      if (name === 'Recargar' || name === 'Disparar') {
+        const w = name === 'Recargar' ? Math.min(1, time * 7, (3.1 - time) * 7) : Math.sin(time / .12 * Math.PI) * .58;
+        const hq = _hq; for (let c = 0; c < 4; c++) hq[c] = st.lr[hips * 4 + c];
+        skBlend(C, st, cl[BREDA_PRE + name], time, w, C.upper, hq);
+      }
+    }
   } else {
   /* cuerpo entero: de pie (en reposo o apuntando) → andar → correr */
   if (mv < 0.999) { skBlend(C, st, cl.pistola_reposo, st.t, 1, null); skBlend(C, st, aimC, hold(aimC), aim, null); }
@@ -4617,7 +4775,7 @@ function skPose(s, C) {
   /* disparo: capa del brazo derecho con la pistola; con armas largas, un culatazo en la columna */
   const since = now - (s.lastShot || -99);
   if (C.leg) { if (alive) skLegOverlays(s, C, st, pre, since); }
-  else if (alive && since < 0.6) {
+  else if (alive && since < 0.6 && !breda) {
     if (pistol && cl.pistola_disparo_capa) skBlend(C, st, cl.pistola_disparo_capa, since, Math.min(1, (0.6 - since) * 8, since * 30 + 0.3), C.rarm);
     else { const k = Math.exp(-since * 14) * (kind === 'rifle' ? 0.16 : 0.07); skRot(st, C.J.Spine2, pax, 0, paz, -k); skRot(st, C.J.Neck, pax, 0, paz, k * 0.5); }
   }
@@ -4673,8 +4831,9 @@ function skBones(s, C, st) {
   skBonesTo(C, st, st.bones);
   if (C.leg) { st.weapon = null; st.wpk = skLegKey(s); }       // el arma del legionario va cosida a sus huesos: se dibuja con ellos
   else {
-    const kind = skWeaponKey(s);
-    m4joint(_jm, st.gq, st.gp, C.J.Arma); M4.mul(_jm2, C.base, _jm); M4.mul(st.wloc, _jm2, C.wl[kind]);
+    const kind = C.breda && SK.W.breda30 && s.wid === 'breda30' ? 'breda30' : skWeaponKey(s);
+    if (kind === 'breda30') skBredaMatrix(C, st, st.wloc);
+    else { m4joint(_jm, st.gq, st.gp, C.J.Arma); M4.mul(_jm2, C.base, _jm); M4.mul(st.wloc, _jm2, C.wl[kind]); }
     st.weapon = SK.W[kind];
   }
   /* agachado: cuánto hay que bajar el cuerpo para que los pies sigan en el suelo */
@@ -4757,8 +4916,13 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   for (const s of vis) {
     const st = s.sk; if (!st.weapon) continue;
     const d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez);
-    gl.uniformMatrix4fv(SK.U.uM, false, st.wmat);
-    skParts(d2 < dw ? st.weapon.full : st.weapon.lod);
+    if (st.weapon === SK.W.breda30) {
+      const [name, time] = s.alive ? skBredaState(s, false) : ['Sujetar', 0];
+      skBredaParts(st.weapon, d2 < Math.min(dw, 16), st.wmat, name, time, s.proneT || 0);
+    } else {
+      gl.uniformMatrix4fv(SK.U.uM, false, st.wmat);
+      skParts(d2 < dw ? st.weapon.full : st.weapon.lod);
+    }
   }
   skEnd(); matState(1, 1, 0.05);
   return true;
@@ -5092,9 +5256,9 @@ function skFp(kind, team) {
   const C = SK.chars[team]; return C && C.fp[kind] ? C.fp[kind] : null;
 }
 /* dónde va la mano derecha en el arma y dónde sale la bala (en el espacio del arma del juego) */
-function skGunHand(w, team) { const fp = skFp(w.kind, team); return fp ? fp.palmR : null; }
-function skZm(w, team) { const lk = P && skLegFpKey(P); if (lk && SK.leg.fpMuz[lk]) return SK.leg.fpMuz[lk][2] + 0.32; const fp = skFp(w.kind, team); return fp ? fp.zm : null; }
-function skRs(w, team) { const fp = skFp(w.kind, team); return fp ? fp.rs : null; }
+function skGunHand(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrHand; const fp = skFp(w.kind, team); return fp ? fp.palmR : null; }
+function skZm(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrMuzzle[2]; const lk = P && skLegFpKey(P); if (lk && SK.leg.fpMuz[lk]) return SK.leg.fpMuz[lk][2] + 0.32; const fp = skFp(w.kind, team); return fp ? fp.zm : null; }
+function skRs(w, team) { if (skBredaCharacter(team, w)) return .02; const fp = skFp(w.kind, team); return fp ? fp.rs : null; }
 const _fpD = M4.create(), _fpA = M4.create(), _fpL = M4.create();
 /* G: espacio del arma del juego → mundo. sides: qué antebrazos se ven */
 function skFpDraw(vp, G, kind, team, ex, ey, ez, sides) {
@@ -5242,6 +5406,7 @@ addEventListener('keydown', e => {
     switch (e.code) {
       case 'KeyE': case 'KeyF': useVehicle(); break;
       case 'KeyR': startReload(); break;
+      case 'KeyI': if (P.alive && P.reloadT <= 0 && P.switchT <= 0 && skBredaCharacter(P.team, P.weps[P.cur].def)) P.bredaInspectAt = game.time; break;
       case 'Digit1': switchWeapon(0); break;
       case 'Digit2': switchWeapon(1); break;
       case 'KeyQ': switchWeapon(1 - P.cur); break;
@@ -5527,11 +5692,11 @@ function giveLoadout(p, ci) {
 function startReload() {
   const p = P, ws = p.weps[p.cur];
   if (!p.alive || p.reloadT > 0 || ws.ammo >= ws.def.mag || ws.reserve <= 0) return;
-  p.reloadT = ws.def.reload; SFX.click();
+  p.bredaInspectAt = null; p.reloadT = ws.def.reload; SFX.click();
 }
 function switchWeapon(i) {
   const p = P; if (!p.alive || i === p.cur || !p.weps[i]) return;
-  p.cur = i; p.reloadT = 0; p.boltT = 0; p.switchT = 0.45; p.fireT = 0.45; SFX.click();
+  p.bredaInspectAt = null; p.cur = i; p.reloadT = 0; p.boltT = 0; p.switchT = 0.45; p.fireT = 0.45; SFX.click();
 }
 function playerNade() {
   const p = P; if (!p.alive || p.nades <= 0 || p.nadeT > 0) return;
@@ -5597,7 +5762,7 @@ function playerSpread(p, w) {
   return s;
 }
 function playerFire(ws) {
-  const p = P, w = ws.def; ws.ammo--; p.fireT = w.rate; p.lastShot = game.time; input.fireQ = 0;
+  const p = P, w = ws.def; p.bredaInspectAt = null; ws.ammo--; p.fireT = w.rate; p.lastShot = game.time; input.fireQ = 0;
   let spread = playerSpread(p, w);
   const c = camBasis(), a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * spread, sx = Math.cos(a) * r, sy = Math.sin(a) * r;
   let dx = c.fx + c.rx * sx + c.ux * sy, dy = c.fy + c.ry * sx + c.uy * sy, dz = c.fz + c.rz * sx + c.uz * sy; const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l;
@@ -5607,7 +5772,11 @@ function playerFire(ws) {
   if (hv.v) addPart(hx, hy, hz, 0, 0.5, 0, 0.35, 1, 0.2, 1, 0.9, 0.6, 0.7);
   let mx, my, mz;
   if (c === xr.basis) { mx = xr.muz[0]; my = xr.muz[1]; mz = xr.muz[2]; }       // en realidad virtual, la boca del arma que llevas en la mano
-  else {
+  else if (skBredaCharacter(p.team, w)) {
+    const b = skBredaCharacter(p.team, w), m = M4.tp(skBredaCamera(b, p, _bredaFp.tracer), b.breda.muzzle);
+    const fk = Math.tan(game.fov / 2) / Math.tan(fpFov / 2), ar = m[0] * fk, ad = m[1] * fk, af = -m[2];
+    mx = c.ex + c.rx * ar + c.ux * ad + c.fx * af; my = c.ey + c.ry * ar + c.uy * ad + c.fy * af; mz = c.ez + c.rz * ar + c.uz * ad + c.fz * af;
+  } else {
     const fk = Math.tan(game.fov / 2) / Math.tan(fpFov / 2), ar = lerp(0.19, 0, p.aimT) * fk, ad = lerp(-0.2, -0.036, p.aimT) * fk, af = lerp(0.48, 0.32, p.aimT) - fpZm(ws);
     mx = c.ex + c.rx * ar + c.ux * ad + c.fx * af; my = c.ey + c.uy * ad + c.fy * af; mz = c.ez + c.rz * ar + c.uz * ad + c.fz * af;
   }
@@ -5738,6 +5907,7 @@ function updatePlayer(dt) {
 const _fp = M4.create();
 function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
+  if (ws.id === 'breda30' && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
@@ -7987,7 +8157,8 @@ function vrAim() {
   if (!p || !p.weps) return;
   const w = p.weps[p.cur].def, hd = gunHand(w), zm = fpZm(p.weps[p.cur]);
   const rz = (P && skRs(w, P.team)) ?? -0.16;       // alza (la del arma de Blender si se usa)
-  const o = M4.tp(g, [-hd[0], 0.013 - hd[1], rz + 0.06 - hd[2]]), mz = M4.tp(g, [-hd[0], -0.012 - hd[1], zm - hd[2]]), rs = M4.tp(g, [-hd[0], 0.015 - hd[1], rz - hd[2]]);
+  const b30 = skBredaCharacter(p.team, w);
+  const o = M4.tp(g, [-hd[0], 0.013 - hd[1], rz + 0.06 - hd[2]]), mz = M4.tp(g, b30 ? b30.bredaVrMuzzle.map((v, i) => v - hd[i]) : [-hd[0], -0.012 - hd[1], zm - hd[2]]), rs = M4.tp(g, [-hd[0], 0.015 - hd[1], rz - hd[2]]);
   const b = xr.basis || (xr.basis = {});
   b.ex = o[0]; b.ey = o[1]; b.ez = o[2]; b.fx = fx; b.fy = fy; b.fz = fz;
   const rl = Math.hypot(g[0], g[1], g[2]) || 1, ul = Math.hypot(g[4], g[5], g[6]) || 1;
@@ -8275,6 +8446,7 @@ function vrDrawGun(ew) {
   M4.translate(_gk, 0, -rel * 0.06 - p.switchT * 0.2, p.kick * 0.04 * (w.auto ? 0.5 : 1));
   M4.rotX(_gk, p.kick * 0.05 * (w.auto ? 0.4 : 1) - rel * 0.7 - p.switchT * 0.9); M4.rotZ(_gk, -bolt * 0.22 - rel * 0.3);
   M4.translate(_gk, -hd[0], -hd[1], -hd[2]);
+  if (ws.id === 'breda30' && skBredaFpDraw(XVP, _gk, p, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, true)) return;
   if (!skFpDraw(XVP, _gk, w.kind, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR'])) drawMesh(ws.mesh, _gk);
 }
 
