@@ -334,6 +334,7 @@ body.nogl #fatal{max-width:none}
   <button type="button" data-act="thrDn" class="tb tf tf-dn">Motor −</button>
   <button type="button" data-act="brake" class="tb tf tf-brake">Frenos</button>
   <button type="button" data-act="bomb" class="tb tf tf-bomb" id="tbBomb">Bomba</button>
+  <button type="button" data-act="moscaCam" class="tb tf tf-bomb" id="tbMoscaCam" aria-pressed="false" hidden>Cámara</button>
   <button type="button" data-act="rudL" class="tb tf tf-rl">◄ Timón</button>
   <button type="button" data-act="rudR" class="tb tf tf-rr">Timón ►</button>
 </div>
@@ -616,6 +617,7 @@ body.nogl #fatal{max-width:none}
       <dt>E</dt><dd>Subir a un camión, un carro o un caza de tu base, o bajar de él. También sirve para ponerte a una ametralladora antiaérea: el ratón la apunta y el clic izquierdo dispara.</dd>
       <dt>Camión y carro</dt><dd>W y S aceleran y frenan, A y D giran. En el carro, el ratón apunta la torre, también bastante hacia arriba y hacia abajo. La cruz del centro es el punto al que apuntas; el círculo marca dónde caería el disparo con la pieza como está y, cuando alcanza la cruz, se pone amarillo. El cañón corrige solo la caída del proyectil, así que el disparo cae donde marca la cruz; debajo se lee la distancia. Clic izquierdo dispara el cañón y el derecho la ametralladora (en el Panzer I, los dos disparan las ametralladoras).</dd>
       <dt>Caza</dt><dd>W y S suben y bajan el motor. A y D (o el ratón a los lados) inclinan las alas: el avión vira hacia el lado al que se inclina. Las flechas ↓ y ↑ (o el ratón adelante y atrás) mueven el morro; por defecto, hacia atrás sube. Z y C son el timón y Espacio los frenos. Para despegar, da motor y, a unos 80 o 95 km/h según el avión, tira hacia atrás. Si subes demasiado el morro o te quedas sin velocidad entras en pérdida: el morro cae y el avión se hunde; bájalo y da motor. Para aterrizar, llega despacio, con las alas niveladas y sin caer a plomo. Clic izquierdo dispara y G suelta una bomba.</dd>
+      <dt>V en la Mosca</dt><dd>Alternar entre cámara exterior y cabina. En el móvil, toca «Cámara».</dd>
       <dt>Caza en el móvil</dt><dd>La palanca de la izquierda da alabeo y cabeceo. A la derecha, «Motor +» y «Motor −», «Frenos», «Bajar», «Fuego» y «Bomba»; abajo, los dos botones de timón. Arrastrar por la derecha gira la cámara alrededor del avión.</dd>
       <dt>Cada caza vuela distinto</dt><dd>Los biplanos (Chato y Fiat CR.32) son lentos, despegan antes y viran muy cerrado. Los monoplanos (Mosca y Bf 109) son más rápidos, necesitan más velocidad para sostenerse y viran más abierto; el Mosca alabea vivísimo y el Bf 109 es el que más corre.</dd>
       <dt>Tab</dt><dd>Marcador: mantenlo pulsado en combate. En la pausa y al acabar la ronda lo abre y lo cierra, igual que el botón «Ver el marcador».</dd>
@@ -5402,9 +5404,10 @@ addEventListener('keydown', e => {
   input.keys[e.code] = true; input.pad = false;
   if (game.state === 'play') {
     if (P.veh && (e.code === 'KeyG' || (e.code === 'Space' && P.veh.kind !== 'plane'))) { input.bomb = true; return; }       // en el caza, Espacio son los frenos
-    if ((P.veh || P.aa) && !['KeyE', 'KeyF', 'Tab', 'Escape', 'KeyP'].includes(e.code)) return;
+    if ((P.veh || P.aa) && !['KeyE', 'KeyF', 'KeyV', 'Tab', 'Escape', 'KeyP'].includes(e.code)) return;
     switch (e.code) {
       case 'KeyE': case 'KeyF': useVehicle(); break;
+      case 'KeyV': toggleMoscaCamera(); break;
       case 'KeyR': startReload(); break;
       case 'KeyI': if (P.alive && P.reloadT <= 0 && P.switchT <= 0 && skBredaCharacter(P.team, P.weps[P.cur].def)) P.bredaInspectAt = game.time; break;
       case 'Digit1': switchWeapon(0); break;
@@ -5457,6 +5460,7 @@ document.addEventListener('contextmenu', e => { if (game.state === 'play') e.pre
     if (a === 'use') { if (on) useVehicle(); return; }
     if (a === 'pause') { if (on) pauseGame(); return; }
     if (a === 'recenter') { if (on) gyroRecenter(); return; }
+    if (a === 'moscaCam') { if (on) toggleMoscaCamera(); return; }
     if (a === 'thrUp' || a === 'thrDn') { input.thr = on ? (a === 'thrUp' ? 1 : -1) : 0; return; }
     if (a === 'brake') { input.brake = on; return; }
     if (a === 'rudL' || a === 'rudR') { input.rud = on ? (a === 'rudL' ? -1 : 1) : 0; return; }
@@ -6034,7 +6038,9 @@ function takeVehicle(p, v) {
   if (v.driver && !v.driver.isPlayer) ejectBot(v);
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   v.aiOn = false; v.crew.alive = false;
-  v.driver = p; p.veh = v; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
+  v.driver = p; p.veh = v;
+  if (v.type === 'mosca') p.moscaCabin = false;
+  p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
   if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) { v.thr = 0; v.pitch = 0; v.gp = 0.15; } v.sink = 0; v.graceT = 0; game.pcam = null; game.planeOrb = 0; input.thr = 0; input.brake = false; input.rud = 0; }
   gyroSync();
   if (!game.vehTold[v.type] && pushCard(v.name, v.def.hist)) game.vehTold[v.type] = true;
@@ -6581,6 +6587,15 @@ function moscaLift(v) {
 function moscaPilot() {
   return mosca && P?.alive && P.veh?.type === 'mosca' && P.team === REP &&
     (game.state === 'play' || game.state === 'pause') ? P.veh : null;
+}
+function moscaCockpit() {
+  return P?.moscaCabin ? moscaPilot() : null;
+}
+function toggleMoscaCamera() {
+  if (game.state !== 'play' || xr.on || !moscaPilot()) return;
+  P.moscaCabin = !P.moscaCabin;
+  game.pcam = null; game.planeOrb = 0; game.planeOrbT = 0;
+  $('tbMoscaCam').setAttribute('aria-pressed', String(P.moscaCabin));
 }
 function moscaCamera(v) {
   M4.identity(_moscaPlane);
@@ -7470,7 +7485,7 @@ function camSetup(dt) {
   if ((game.state === 'play' || game.state === 'pause') && P) {
     if (P.alive && P.veh) {
       const v = P.veh, truck = v.kind === 'truck', plane = v.kind === 'plane';
-      if (plane && moscaPilot()) {
+      if (plane && moscaCockpit()) {
         moscaCamera(v);
         cam.x = _moscaEye[12]; cam.y = _moscaEye[13]; cam.z = _moscaEye[14];
         cam.yaw = Math.atan2(_moscaEye[8], _moscaEye[10]); cam.pitch = Math.asin(clamp(-_moscaEye[9], -1, 1));
@@ -7512,7 +7527,7 @@ function render(dt) {
   resize();
   const fp = camSetup(dt), fov = game.fov;
   const asp = canvas.width / canvas.height;
-  const cockpit = moscaPilot();
+  const cockpit = moscaCockpit();
   M4.perspective(PROJ, fov, asp, cockpit ? .055 : 0.15, 3200);
   /* con el giroscopio, la cámara también se ladea con el teléfono para que el horizonte del juego siga nivelado con el real */
   cam.roll = P && P.alive && (game.state === 'play' || game.state === 'pause') && !(P.veh && P.veh.kind !== 'tank') ? (P.roll || 0) : 0;
@@ -7896,7 +7911,8 @@ function uiTick(dt) {
     $('wName').textContent = v.name;
     if (v.kind === 'truck') { $('ammo').textContent = Math.round(Math.abs(v.speed) * 3.6) + ' km/h'; $('extra').textContent = input.touch ? 'Toca Bajar para apearte' : padX ? 'X para bajar' : 'E para bajar'; }
     else if (v.kind === 'tank') { $('ammo').textContent = v.def.cannon ? (v.fireT > 0 ? 'Cargando' : 'Cañón listo') : 'Ametralladoras'; $('extra').textContent = 'Blindaje ' + st + (v.def.cannon ? (input.touch ? ' · Apuntar: ametralladora' : xr.on ? ' · lateral: ametralladora' : input.pad ? ' · LT: ametralladora' : ' · clic derecho: ametralladora') : ''); }
-    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = 'Estado ' + st + (v.def.bombs && !input.touch ? (padX ? ' · A: bomba' : ' · G: bomba') : ''); }
+    else { $('ammo').textContent = v.def.bombs ? 'Bombas ' + v.bombs : 'Sin bombas'; $('extra').textContent = 'Estado ' + st + (v.def.bombs && !input.touch ? (padX ? ' · A: bomba' : ' · G: bomba') : '');
+      if (moscaPilot() && !input.touch && !xr.on) $('extra').textContent += p.moscaCabin ? ' · V: exterior' : ' · V: cabina'; }
   }
   else {
     $('wName').textContent = ws.def.name; $('ammo').textContent = p.reloadT > 0 ? 'Recargando' : ws.ammo + ' / ' + ws.reserve;
@@ -7908,6 +7924,9 @@ function uiTick(dt) {
   const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
   const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
   document.body.classList.toggle('fly', fly); fh.hidden = !fly;
+  const moscaButton = $('tbMoscaCam');
+  moscaButton.hidden = !input.touch || xr.on || !moscaPilot();
+  moscaButton.setAttribute('aria-pressed', String(!!moscaCockpit()));
   $('tbRec').hidden = !(opts.gyro && gyro.ok) || fly || !!(p.veh && p.veh.kind === 'truck');
   if (fly) {
     const v = p.veh;
