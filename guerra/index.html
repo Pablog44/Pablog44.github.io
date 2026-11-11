@@ -4913,7 +4913,7 @@ async function skTexture(g, ti, cache) {
   else { const bv = J.bufferViews[img.bufferView]; src = revoke = URL.createObjectURL(new Blob([new Uint8Array(g.bin, bv.byteOffset || 0, bv.byteLength)], { type: img.mimeType || 'image/jpeg' })); }
   const im = await new Promise((res, rej) => { const el = new Image(); el.onload = () => res(el); el.onerror = () => rej(new Error('textura ' + (img.uri || ti))); el.src = src; });
   if (revoke) URL.revokeObjectURL(revoke);
-  const t = { img: im, tex: null }; skTexUpload(t); SK.tex.push(t); cache.set(ti, t); return t;
+  const t = { img: im, tex: null, max: cache.texMax || 0 }; skTexUpload(t); SK.tex.push(t); cache.set(ti, t); return t;
 }
 /* una primitiva al formato de los soldados: posición, normal, UV, 4 huesos y 4 pesos (16 floats). Sin piel: todo al hueso 0 */
 async function skPart(g, pr, cache, slot) {
@@ -4931,7 +4931,7 @@ async function skPart(g, pr, cache, slot) {
   const f = pbr.baseColorFactor || [1, 1, 1, 1];
   const tex = pbr.baseColorTexture ? await skTexture(g, pbr.baseColorTexture.index, cache) : null;
   const b = { src: v, isrc: idx, n: idx.length, vbo: null, ibo: null }; skBufUpload(b); SK.bufs.push(b);
-  return { buf: b, tex, col: [enc(f[0]), enc(f[1]), enc(f[2])], u32: idx instanceof Uint32Array };
+  return { buf: b, tex, col: [enc(f[0]), enc(f[1]), enc(f[2])], u32: idx instanceof Uint32Array, a: mat && mat.alphaMode === 'BLEND' ? f[3] : 1 };
 }
 
 /* prepara un personaje: esqueleto, cuerpo (LOD0 original, LOD1 y LOD2) y animaciones muestreadas a 30 por segundo */
@@ -5440,9 +5440,12 @@ function skFootY(C, clip) {
 function skTexUpload(t) {
   t.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t.tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-  if (t.img) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, t.img);
+  /* texturas muy grandes (la del Panzer, 4096): en los teléfonos, o si la tarjeta no llega, se reducen al subirlas */
+  let src = t.img; const lim = Math.min(t.max || 1e9, gl.getParameter(gl.MAX_TEXTURE_SIZE));
+  if (src && (src.width > lim || src.height > lim)) { const cv = document.createElement('canvas'); cv.width = Math.min(src.width, lim); cv.height = Math.min(src.height, lim); cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height); src = cv; }
+  if (src) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src);
   else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255]));
-  const w = t.img ? t.img.width : 1, h = t.img ? t.img.height : 1, pot = (w & (w - 1)) === 0 && (h & (h - 1)) === 0;
+  const w = src ? src.width : 1, h = src ? src.height : 1, pot = (w & (w - 1)) === 0 && (h & (h - 1)) === 0;
   if (pot) gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, pot ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -5472,16 +5475,17 @@ function skProgram() {
        vec4 w = uM*vec4(sp,1.0); vW = w.xyz; vNor = (uM*vec4(sn,0.0)).xyz; vUV = aUV; gl_Position = uVP*w;
      }`,
     PREC + `varying vec2 vUV; varying vec3 vNor; varying vec3 vW;
-     uniform sampler2D uTex; uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uFogC; uniform vec2 uFog; uniform vec3 uTint;
+     uniform sampler2D uTex; uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uFogC; uniform vec2 uFog; uniform vec3 uTint; uniform float uA;
      void main(){
        vec3 c = texture2D(uTex, vUV).rgb*uTint;
        vec3 n = normalize(vNor);
+       if (!gl_FrontFacing) n = -n;       // caras de dos lados (cabina, chapas finas de los vehículos)
        float nd = dot(n,uSun), d = max(nd,0.0), wrap = nd*0.5+0.5;
        c *= vec3(1.0,0.95,0.84)*(d*0.46 + wrap*wrap*0.2) + mix(vec3(0.36,0.33,0.29), vec3(0.47,0.50,0.55), 0.5+0.5*n.y);
        float f = clamp((length(vW-uCam)-uFog.x)/(uFog.y-uFog.x),0.0,1.0);
-       gl_FragColor = vec4(mix(c,uFogC,f*(2.0-f)*0.92),1.0);
+       gl_FragColor = vec4(mix(c,uFogC,f*(2.0-f)*0.92),uA);
      }`, ['aPos', 'aNor', 'aUV', 'aJ', 'aW']);
-  for (const n of ['uVP', 'uM', 'uB', 'uTex', 'uSun', 'uCam', 'uFogC', 'uFog', 'uTint']) SK.U[n] = gl.getUniformLocation(SK.prog, n);
+  for (const n of ['uVP', 'uM', 'uB', 'uTex', 'uSun', 'uCam', 'uFogC', 'uFog', 'uTint', 'uA']) SK.U[n] = gl.getUniformLocation(SK.prog, n);
 }
 function skRestore() {       // contexto de WebGL recuperado: se vuelve a subir todo
   if (!SK.ready) return;
@@ -5513,6 +5517,7 @@ async function skLoad() {
     SK.nj = nj; skProgram();
     SK.chars = chars; SK.ready = true;
   } catch (e) { SK.failed = true; SK.err = String(e && e.message || e); console.warn('[soldados 3D] se usan los de cajas:', SK.err); }
+  if (SK.ready) vmLoad();       // el Mosca y el Panzer de Blender, sin esperar por ellos
 }
 
 /* ---------- animación ---------- */
@@ -5740,12 +5745,12 @@ function skInView(vp, x, y, z, r) {
   return cw > -r && cx > -cw - m && cx < cw + m && cy > -cw - m && cy < cw + m;
 }
 /* estado de dibujo del programa de los soldados */
-let _skBuf = null, _skTex = null;
+let _skBuf = null, _skTex = null, _skMul = null;       // _skMul: tinte de todo lo que se dibuje (vehículos destruidos)
 function skBegin(vp, ex, ey, ez, fogNear, fogFar) {
   const fg = world.fog;
   gl.useProgram(SK.prog);
   gl.uniformMatrix4fv(SK.U.uVP, false, vp); gl.uniform3f(SK.U.uSun, SUN[0], SUN[1], SUN[2]); gl.uniform3f(SK.U.uCam, ex, ey, ez);
-  gl.uniform3f(SK.U.uFogC, fg[0], fg[1], fg[2]); gl.uniform2f(SK.U.uFog, fogNear, fogFar); gl.uniform1i(SK.U.uTex, 0);
+  gl.uniform3f(SK.U.uFogC, fg[0], fg[1], fg[2]); gl.uniform2f(SK.U.uFog, fogNear, fogFar); gl.uniform1i(SK.U.uTex, 0); gl.uniform1f(SK.U.uA, 1);
   gl.activeTexture(gl.TEXTURE0);
   gl.enableVertexAttribArray(3); gl.enableVertexAttribArray(4);
   _skBuf = null; _skTex = undefined;
@@ -5763,7 +5768,8 @@ function skParts(parts) {
     }
     const t = part.tex || SK.white;
     if (t !== _skTex) { _skTex = t; gl.bindTexture(gl.TEXTURE_2D, t.tex); }
-    gl.uniform3f(SK.U.uTint, part.col[0], part.col[1], part.col[2]);
+    const k = _skMul;
+    if (k) gl.uniform3f(SK.U.uTint, part.col[0] * k[0], part.col[1] * k[1], part.col[2] * k[2]); else gl.uniform3f(SK.U.uTint, part.col[0], part.col[1], part.col[2]);
     gl.drawElements(gl.TRIANGLES, b.n, b.itype, 0);
   }
 }
@@ -7117,7 +7123,12 @@ function destroyVehicle(v, att) {
   v.dead = true; v.deadT = 45; v.speed = 0; v.aiOn = false; v.falling = false; v.air = false; v.crew.alive = false;
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   boomFx(v.x, v.y + 1, v.z, 1.4);
-  const d = v.driver; if (d) { d.veh = null; v.driver = null; applyDamage(d, 400, att && att !== d ? att : null, false, 'Vehículo destruido'); }
+  const d = v.driver;
+  if (d) {      // la dotación sale despedida junto al vehículo: así se ve el cuerpo desde arriba y no queda dentro de los restos
+    d.veh = null; v.driver = null;
+    const es = v.kind === 'plane' ? [v.x - Math.cos(v.yaw) * 5.8, v.z + Math.sin(v.yaw) * 5.8] : exitSpot(v); d.x = es[0];       // del avión, fuera del ala d.z = es[1]; d.y = Math.max(groundAt(es[0], es[1]), waterY); d.yaw = v.yaw;
+    applyDamage(d, 400, att && att !== d ? att : null, false, 'Vehículo destruido');
+  }
 }
 function killVehicle(v, att, cause) {
   if (v.dead || v.falling) return;
@@ -7564,6 +7575,8 @@ function moscaTick(v, dt, ctl) {
   const retract = v.air && (v.y - Math.max(groundAt(v.x, v.z), waterY) > 16 || (v.vyv || 0) > 0);
   s.gear = clamp(s.gear + (retract ? dt : -dt) / 3, 0, 1);
   s.rpm = rpm;
+  s.wheel = ((s.wheel || 0) + (v.air ? 0 : v.speed * dt / 0.35)) % (Math.PI * 2);       // las ruedas giran rodando por el suelo
+  s.warm = clamp((s.warm || 0) + (rpm > 0 ? dt / 90 : -dt / 300), 0, 1);       // aceite y cilindros se calientan con el motor en marcha
 }
 function moscaPilot() {
   return mosca && P?.alive && P.veh?.type === 'mosca' && P.team === REP &&
@@ -7586,10 +7599,19 @@ function planeBase(v, o, wz, gk) {
   M4.rotZ(o, v.roll);
   return o;
 }
-const moscaBase = (v, o) => planeBase(v, o, mosca.wheelZ, mosca.gk);
+function moscaBase(v, o) {
+  if (!vmReady('mosca')) return planeBase(v, o, mosca.wheelZ, mosca.gk);
+  /* modelo de Blender en tierra: la cola descansa en el patín (el morro sube lo justo) salvo que el piloto levante más el morro al despegar */
+  const X = VM3D.mosca; if (v.air) return planeBase(v, o, X.wheelZ, 0);
+  M4.identity(o); M4.translate(o, v.x, v.y, v.z); M4.rotY(o, v.yaw);
+  M4.translate(o, 0, 0, X.wheelZ); M4.rotX(o, Math.max(v.pitch, (v.gp === undefined ? 0.15 : v.gp) * X.gk)); M4.translate(o, 0, 0, -X.wheelZ);
+  M4.rotZ(o, v.roll);
+  return o;
+}
 function moscaCamera(v) {
   moscaBase(v, _moscaPlane);
-  M4.copy(_moscaEye, _moscaPlane); M4.translate(_moscaEye, mosca.eye[0], mosca.eye[1], mosca.eye[2]); M4.rotX(_moscaEye, -0.2);
+  const eye = vmReady('mosca') ? VM3D.mosca.eye : mosca.eye;       // el ojo del piloto: el que marca el modelo de Blender (Pilot_View) o el del de código
+  M4.copy(_moscaEye, _moscaPlane); M4.translate(_moscaEye, eye[0], eye[1], eye[2]); M4.rotX(_moscaEye, -0.2);
 }
 function drawMosca(v) {
   const s = v.moscaViz, base = moscaBase(v, _moscaPlane), pitch = s?.pitch || 0, roll = s?.roll || 0, yaw = s?.yaw || 0, thr = v.thr || 0, gear = s?.gear ?? (v.air ? 1 : 0), rpm = s?.rpm || 0;
@@ -7639,14 +7661,266 @@ function drawVehicles(vp, ex, ey, ez) {
     matState(1, 1, 0.08, v.dead ? [0.22, 0.2, 0.18] : null);
     if (v.kind === 'truck') drawModel(world.truck[v.team], _vm);
     else if (v.kind === 'plane') {
-      if (v.type === 'mosca') drawMosca(v); else drawPlane(v, _vm);
+      if (v.type === 'mosca') { if (vmReady('mosca')) vmDrawMosca(v, vp, ex, ey, ez); else drawMosca(v); } else drawPlane(v, _vm);
     }
+    else if (v.type === 'pz1' && vmReady('pz1')) vmDrawPz1(v, _vm, vp, ex, ey, ez);
     else {
       const m = world.vm[v.type]; drawModel(m.hull, _vm);
       M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
       drawModel(m.turret, _vm);
     }
   }
+}
+
+/* ============ vehículos con modelo de Blender (Mosca CM-249 y Panzer I) ============
+   Los dos vienen en glTF de texto (.json con el búfer en base64 y la textura en un .jpg al lado), como los soldados, y se dibujan con
+   el mismo programa de huesos. El Mosca es el modelo original sin tocar (todas sus piezas: hélice, tren, alerones, timones, palanca,
+   pedales, gases y las agujas del tablero, movidos con los enlaces que trae el propio fichero). El Panzer trae tres niveles de detalle
+   por pieza (el original tenía 1,9 millones de triángulos), la torre, la ametralladora y las dos orugas con sus 120 eslabones cada una,
+   animadas con sus clips según lo que avanza cada lado del carro. Si no cargan, se siguen usando los vehículos hechos por código. */
+const VM3D = { mosca: null, pz1: null, err: '' };
+const VM_FILES = { mosca: 'mosca_cm249.json', pz1: 'panzer_i.json' };
+const DEG = Math.PI / 180;
+/* matriz con escala no uniforme (las riostras del tren del Mosca se estiran al recogerlo) */
+function m4trs3(o, t, q, s) {
+  m4trs(o, t, q, 1);
+  o[0] *= s[0]; o[1] *= s[0]; o[2] *= s[0]; o[4] *= s[1]; o[5] *= s[1]; o[6] *= s[1]; o[8] *= s[2]; o[9] *= s[2]; o[10] *= s[2];
+  return o;
+}
+const qAA = (ax, a, o = [0, 0, 0, 1]) => { const s = Math.sin(a / 2); o[0] = ax[0] * s; o[1] = ax[1] * s; o[2] = ax[2] * s; o[3] = Math.cos(a / 2); return o; };
+/* prepara un glTF de piezas rígidas (y pieles): nodos en reposo, mallas por nivel de detalle y clips */
+async function vmBuild(g, texMax) {
+  const J = g.j, N = J.nodes, n = N.length, cache = new Map(); cache.texMax = texMax || 0;
+  const M = { J, n, parent: new Int32Array(n).fill(-1), order: [], names: N.map(x => x.name || ''), ix: {}, restT: new Float32Array(n * 3), restR: new Float32Array(n * 4), restS: new Float32Array(n * 3), meshes: [], clips: {}, skins: [] };
+  N.forEach((nd, i) => { (nd.children || []).forEach(c => { M.parent[c] = i; }); M.ix[nd.name] = i;
+    M.restT.set(nd.translation || [0, 0, 0], i * 3); M.restR.set(nd.rotation || [0, 0, 0, 1], i * 4); M.restS.set(nd.scale || [1, 1, 1], i * 3); });
+  const visit = i => { M.order.push(i); (N[i].children || []).forEach(visit); };
+  J.scenes[J.scene || 0].nodes.forEach(visit);
+  for (const i of M.order) {
+    const nd = N[i]; if (nd.mesh === undefined) continue;
+    const ids = [nd.mesh].concat(nd.extras && nd.extras.lod || []), lods = [];
+    for (const mi of ids) { const parts = []; for (const pr of J.meshes[mi].primitives) parts.push(await skPart(g, pr, cache)); lods.push(parts); await new Promise(r => setTimeout(r, 0)); }
+    while (lods.length < 3) lods.push(lods[lods.length - 1]);
+    M.meshes.push({ node: i, skin: nd.skin, lods: lods.map(ps => ({ solid: ps.filter(p => p.a >= 1), glass: ps.filter(p => p.a < 1) })) });
+  }
+  for (const s of J.skins || []) M.skins.push({ joints: s.joints, ibm: glbAcc(g, s.inverseBindMatrices), B: new Float32Array(s.joints.length * 12) });
+  for (const an of J.animations || []) {
+    const ch = []; let dur = 0;
+    for (const c of an.channels) {
+      const s = an.samplers[c.sampler], path = c.target.path; if (path !== 'rotation' && path !== 'translation' && path !== 'scale') continue;
+      const t = glbAcc(g, s.input), v = glbAcc(g, s.output); dur = Math.max(dur, t[t.length - 1]);
+      ch.push({ node: c.target.node, path, t, v, w: path === 'rotation' ? 4 : 3, step: s.interpolation === 'STEP' });
+    }
+    M.clips[an.name] = { dur, ch };
+  }
+  return M;
+}
+/* estado de una instancia: postura local y matrices del mundo de cada nodo */
+function vmState(M) { return { t: M.restT.slice(), r: M.restR.slice(), s: M.restS.slice(), W: new Float32Array(M.n * 16), bonesFid: -1 }; }
+function vmRest(M, P) { P.t.set(M.restT); P.r.set(M.restR); P.s.set(M.restS); }
+/* aplica un clip en el instante t (solo los nodos que acepte filter, si se da) */
+function vmClip(M, P, name, time, filter) {
+  const C = M.clips[name]; if (!C) return;
+  time = clamp(time, 0, C.dur);
+  for (const c of C.ch) {
+    if (filter && !filter(c.node)) continue;
+    const T = c.t, w = c.w; let lo = 0, hi = T.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= time) lo = m; else hi = m; }
+    const f = c.step ? (time >= T[hi] ? 1 : 0) : clamp((time - T[lo]) / (T[hi] - T[lo] || 1), 0, 1), dst = c.path === 'rotation' ? P.r : c.path === 'translation' ? P.t : P.s, o = c.node * w;
+    let sg = 1;
+    if (w === 4) { let d = 0; for (let k = 0; k < 4; k++) d += c.v[lo * 4 + k] * c.v[hi * 4 + k]; if (d < 0) sg = -1; }
+    for (let k = 0; k < w; k++) dst[o + k] = c.v[lo * w + k] * (1 - f) + c.v[hi * w + k] * f * sg;
+    if (w === 4) qNorm(dst, o);
+  }
+}
+/* giro extra de un nodo sobre su giro de reposo (rest · eje-ángulo) o desde la identidad (fromIdentity) */
+const _vq = [0, 0, 0, 1], _vq2 = [0, 0, 0, 0];
+function vmTurn(M, P, i, axis, ang, fromIdentity) {
+  if (i === undefined || i < 0) return;
+  qAA(axis, ang, _vq);
+  if (fromIdentity) { P.r[i * 4] = _vq[0]; P.r[i * 4 + 1] = _vq[1]; P.r[i * 4 + 2] = _vq[2]; P.r[i * 4 + 3] = _vq[3]; return; }
+  qmulTo(_vq2, 0, P.r, i * 4, _vq, 0); for (let k = 0; k < 4; k++) P.r[i * 4 + k] = _vq2[k]; qNorm(P.r, i * 4);
+}
+const _vmL = M4.create();
+function vmWorld(M, P) {
+  for (const i of M.order) {
+    m4trs3(_vmL, P.t.subarray(i * 3, i * 3 + 3), P.r.subarray(i * 4, i * 4 + 4), P.s.subarray(i * 3, i * 3 + 3));
+    const p = M.parent[i], Wi = P.W.subarray(i * 16, i * 16 + 16);
+    if (p >= 0) M4.mul(Wi, P.W.subarray(p * 16, p * 16 + 16), _vmL); else Wi.set(_vmL);
+  }
+}
+/* dibuja la instancia: base lleva el espacio del glTF al mundo; lod 0, 1 o 2; tint para los destruidos */
+const _vmM = M4.create(), _vmJ = M4.create();
+function vmDraw(M, P, base, lod, tint, vp, ex, ey, ez, after) {
+  skBegin(vp, ex, ey, ez, FOG_N, FOG_F);
+  _skMul = tint || null;
+  for (let pass = 0; pass < 2; pass++) {
+    if (pass) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); }
+    for (const m of M.meshes) {
+      const L = m.lods[lod], parts = pass ? L.glass : L.solid; if (!parts.length) continue;
+      if (m.skin !== undefined) {
+        const S = M.skins[m.skin];
+        if (P.bonesFid !== P.fid) for (const sk of M.skins) {      // huesos: articulación en el mundo del glTF × inversa de unión, en filas
+          for (let k = 0; k < sk.joints.length; k++) {
+            M4.mul(_vmJ, P.W.subarray(sk.joints[k] * 16, sk.joints[k] * 16 + 16), sk.ibm.subarray(k * 16, k * 16 + 16));
+            const o = k * 12, B = sk.B;
+            B[o] = _vmJ[0]; B[o + 1] = _vmJ[4]; B[o + 2] = _vmJ[8]; B[o + 3] = _vmJ[12];
+            B[o + 4] = _vmJ[1]; B[o + 5] = _vmJ[5]; B[o + 6] = _vmJ[9]; B[o + 7] = _vmJ[13];
+            B[o + 8] = _vmJ[2]; B[o + 9] = _vmJ[6]; B[o + 10] = _vmJ[10]; B[o + 11] = _vmJ[14];
+          }
+        }
+        P.bonesFid = P.fid;
+        gl.uniform4fv(SK.U.uB, S.B); gl.uniformMatrix4fv(SK.U.uM, false, base);
+      } else {
+        gl.uniform4fv(SK.U.uB, SK.ident); gl.uniformMatrix4fv(SK.U.uM, false, M4.mul(_vmM, base, P.W.subarray(m.node * 16, m.node * 16 + 16)));
+      }
+      if (pass) for (const p of parts) { gl.uniform1f(SK.U.uA, p.a); skParts([p]); }
+      else skParts(parts);
+    }
+    if (pass) { gl.depthMask(true); gl.disable(gl.BLEND); gl.uniform1f(SK.U.uA, 1); }
+  }
+  _skMul = null;
+  skEnd();
+  if (after) after();
+}
+/* nivel de detalle de un vehículo según la distancia y la calidad de los modelos elegida */
+function vmLod(x, y, z, ex, ey, ez) {
+  const ML = GFX_OPT.models[GFX.models], d2 = (x - ex) * (x - ex) + (y - ey) * (y - ey) + (z - ez) * (z - ez);
+  const d0 = ML.d0 ? ML.d0 * 4 + 14 : 0, d1 = ML.d1 * 3 + 20;
+  return d2 < d0 * d0 ? 0 : d2 < d1 * d1 ? 1 : 2;
+}
+const vmReady = k => VM3D[k] && SK.ready && !glLost;
+
+/* ---- Mosca ---- */
+function vmSetupMosca(M) {
+  const ex = M.J.nodes[M.ix.Skyhawk] && M.J.nodes[M.ix.Skyhawk].extras || {}, rig = ex.FPV_Rig || {}, ctl = rig.controls || {};
+  /* el glTF tiene el morro hacia -Z y el eje del fuselaje en y = 0; las ruedas (tren fuera) tocan el suelo en y = -2,014 */
+  const P0 = vmState(M); vmWorld(M, P0);
+  const wheelN = M.ix.Gear_Wheel_L, wy = P0.W[wheelN * 16 + 13], wz = P0.W[wheelN * 16 + 14], wr = (ctl.wheels && ctl.wheels.radius_m) || 0.35;
+  const ground = -(wy - wr), eyeN = M.ix.Pilot_View;
+  const prop = M.J.meshes[M.J.nodes[M.ix.Propeller].mesh].primitives.map(p => M.J.accessors[p.attributes.POSITION]);
+  const propR = Math.max(...prop.map(a => Math.max(Math.abs(a.min[0]), Math.abs(a.max[0]), Math.abs(a.min[1]), Math.abs(a.max[1]))));
+  /* el patín de cola: con el morro levantado alrededor de las ruedas hasta que la cola toca el suelo (0,248 rad en este modelo) */
+  const tailDown = 0.2476;
+  const base = M4.create(); M4.translate(base, 0, ground, 0);
+  const tgt = arr => (arr || []).map(t => ({ i: M.ix[t.node], axis: t.axis, k: t.degrees_per_unit * DEG, rest: t.rest_quaternion }));
+  const ins = Object.entries(ex.FPV_Rig && rig.instruments || {}).map(([name, b]) => ({ i: M.ix[name], ...b }));
+  return { M, P: vmState(M), base, wheelZ: wz, gk: tailDown / 0.15, wheelR: wr, eye: [P0.W[eyeN * 16 + 12], P0.W[eyeN * 16 + 13] + ground, P0.W[eyeN * 16 + 14]],
+    prop: { i: M.ix.Propeller, at: [P0.W[M.ix.Propeller * 16 + 12], P0.W[M.ix.Propeller * 16 + 13] + ground, P0.W[M.ix.Propeller * 16 + 14]], R: propR },
+    pitch: tgt(ctl.pitch && ctl.pitch.targets), roll: tgt(ctl.roll && ctl.roll.targets), yaw: tgt(ctl.yaw && ctl.yaw.targets),
+    thr: ctl.throttle ? [{ i: M.ix[ctl.throttle.node], axis: ctl.throttle.axis, k: ctl.throttle.degrees_per_unit * DEG }] : [],
+    wheels: (ctl.wheels && ctl.wheels.nodes || []).map(nm => M.ix[nm]), ins };
+}
+/* valor de cada aguja del tablero */
+function moscaGauge(v, s, src) {
+  const on = !v.dead && (v.driver || v.aiOn || v.air);
+  switch (src) {
+    case 'indicated_airspeed': return Math.abs(v.speed) * 3.6;
+    case 'altitude': return Math.max(0, v.y);
+    case 'heading': return ((-v.yaw / DEG) % 360 + 360) % 360;
+    case 'engine_rpm': return s.rpm || 0;
+    case 'vertical_speed': return v.vyv || 0;
+    case 'manifold_pressure': return on ? lerp(520, 1010, v.thr || 0) : 760;
+    case 'oil_pressure': return on ? 5.4 : 0;
+    case 'oil_temperature': return s.warm * 55 + 20;
+    case 'cylinder_temperature': return s.warm * 175 + 20;
+    default: return 0;
+  }
+}
+function vmMoscaPose(v) {
+  const X = VM3D.mosca, M = X.M, P = X.P, s = v.moscaViz || { pitch: 0, roll: 0, yaw: 0, prop: 0, gear: v.air ? 1 : 0, rpm: 0 };
+  if (s.warm === undefined) s.warm = 0;
+  vmRest(M, P);
+  /* tren: el clip de recogerlo, en el punto que toque (tres segundos de recorrido) */
+  vmClip(M, P, 'Gear_Retract', (s.gear || 0) * 3);
+  /* mandos: palanca, alerones, timón de profundidad, timón y pedales, con los enlaces del fichero (cabeceo +: morro arriba; alabeo +: ala derecha abajo; guiñada +: morro a la derecha) */
+  for (const [list, val] of [[X.pitch, s.pitch], [X.roll, s.roll], [X.yaw, s.yaw], [X.thr, v.thr || 0]]) for (const t of list) vmTurn(M, P, t.i, t.axis, t.k * (val || 0));
+  vmTurn(M, P, X.prop.i, [0, 0, -1], s.prop || 0);
+  for (const w of X.wheels) vmTurn(M, P, w, [1, 0, 0], -(s.wheel || 0));
+  for (const g of X.ins) {
+    const val = moscaGauge(v, s, g.source); let u = (val - g.minimum) / (g.maximum - g.minimum);
+    u = g.wrap ? u - Math.floor(u) : clamp(u, 0, 1);
+    vmTurn(M, P, g.i, g.axis, (g.start_angle_deg + u * (g.end_angle_deg - g.start_angle_deg)) * DEG, true);
+  }
+  P.fid = (P.fid || 0) + 1;
+  vmWorld(M, P);
+}
+const _vmBase = M4.create(), _vmDisc = M4.create();
+function vmDrawMosca(v, vp, ex, ey, ez) {
+  const X = VM3D.mosca, s = v.moscaViz, rpm = s ? s.rpm || 0 : 0;
+  vmMoscaPose(v);
+  M4.mul(_vmBase, moscaBase(v, _moscaPlane), X.base);
+  vmDraw(X.M, X.P, _vmBase, 0, v.dead ? [0.3, 0.28, 0.26] : null, vp, ex, ey, ez, () => {
+    /* con el motor deprisa, el disco translúcido de la hélice (el mismo de antes, a la medida de esta) */
+    if (v.dead || rpm <= 300 || !mosca) return;
+    const disc = mosca.parts.find(p => p.name === 'disc'); if (!disc) return;
+    M4.copy(_vmDisc, _moscaPlane); M4.translate(_vmDisc, X.prop.at[0], X.prop.at[1], X.prop.at[2] - 0.12); M4.rotZ(_vmDisc, s.prop || 0);
+    const k = X.prop.R / 1.4; M4.scale(_vmDisc, k, k, 1);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    matState(1, disc.glass, 0); drawModel(disc.mesh, _vmDisc);
+    gl.depthMask(true); gl.disable(gl.BLEND); matState(1, 1, 0.08);
+  });
+}
+
+/* ---- Panzer I ---- */
+function vmSetupPz1(M) {
+  const ex = M.J.asset.extras.panzer, S = ex.scale, P0 = vmState(M); vmWorld(M, P0);
+  /* el carro mira a -X en el glTF: se gira para que mire a -Z (su izquierda, +Z, queda a la izquierda del juego) y se escala a su tamaño real */
+  let low = 1e9; for (const m of M.meshes) for (const p of M.J.meshes[M.J.nodes[m.node].mesh].primitives) { const a = M.J.accessors[p.attributes.POSITION], W = P0.W.subarray(m.node * 16); if (m.skin !== undefined) low = Math.min(low, a.min[1]); else low = Math.min(low, a.min[1] + W[13]); }
+  const base = new Float32Array([0, 0, S, 0, 0, S, 0, 0, -S, 0, 0, 0, 0, -low * S, 0, 1]);
+  const tur = M.ix[ex.turret], gun = M.ix[ex.gun], tw = P0.W.subarray(tur * 16, tur * 16 + 16), gw = P0.W.subarray(gun * 16, gun * 16 + 16);
+  const piv = M4.tp(base, [tw[12], tw[13], tw[14]]), mz = M4.tp(base, M4.tp(gw, ex.muzzle));
+  const clipNodes = nm => new Set((M.clips[nm] ? M.clips[nm].ch : []).map(c => c.node));
+  /* separación de las orugas (para repartir el giro entre los dos lados) */
+  const half = Math.abs(M4.tp(base, [0, 0, 0.365])[0]);
+  return { M, S, base, tur, gun, gunAxis: ex.gunAxis || [0, 0, -1], pivot: piv, muzzle: mz[1] - piv[1], loop: ex.trackLoop * S, cycle: ex.trackCycle,
+    clipL: ex.tracks.left, clipR: ex.tracks.right, nodesL: clipNodes(ex.tracks.left), nodesR: clipNodes(ex.tracks.right), half, states: new Map() };
+}
+/* las orugas avanzan lo que haya avanzado cada lado: en recto las dos igual; al girar, una más que la otra (o en sentidos contrarios) */
+function vmPz1Tracks(v, X) {
+  if (v.vmT === game.time) return;
+  const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw);
+  if (v.vmT === undefined || Math.hypot(v.x - v.vmX, v.z - v.vmZ) > 6) { v.trL = v.trL || 0; v.trR = v.trR || 0; }
+  else {
+    const d = (v.x - v.vmX) * fx + (v.z - v.vmZ) * fz, dy = angDiff(v.yaw, v.vmYaw) * X.half;
+    v.trL = ((v.trL || 0) + (d - dy) / X.loop * X.cycle) % X.cycle; v.trR = ((v.trR || 0) + (d + dy) / X.loop * X.cycle) % X.cycle;
+  }
+  v.vmT = game.time; v.vmX = v.x; v.vmZ = v.z; v.vmYaw = v.yaw;
+}
+function vmDrawPz1(v, m, vp, ex, ey, ez) {
+  const X = VM3D.pz1, M = X.M;
+  let P = X.states.get(v); if (!P) { P = vmState(M); X.states.set(v, P); }
+  vmPz1Tracks(v, X);
+  vmRest(M, P);
+  const ph = t => ((t % X.cycle) + X.cycle) % X.cycle;
+  vmClip(M, P, X.clipL, ph(v.trL || 0), i => X.nodesL.has(i));
+  vmClip(M, P, X.clipR, ph(v.trR || 0), i => X.nodesR.has(i));
+  vmTurn(M, P, X.tur, [0, 1, 0], angDiff(v.tyaw, v.yaw));
+  vmTurn(M, P, X.gun, X.gunAxis, v.tpitch || 0);
+  P.fid = (P.fid || 0) + 1;
+  vmWorld(M, P);
+  M4.mul(_vmBase, m, X.base);
+  vmDraw(M, P, _vmBase, vmLod(v.x, v.y + 1, v.z, ex, ey, ez), v.dead ? [0.3, 0.28, 0.26] : null, vp, ex, ey, ez);
+}
+
+/* carga, cuando los soldados ya tienen su programa (los vehículos usan el mismo) */
+async function vmLoad() {
+  if (!SK.ready) return;
+  const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
+  const one = async (key, setup, texMax) => {
+    try {
+      const g = await get(VM_FILES[key]);
+      /* las orugas del Panzer tienen 120 huesos: hace falta que la tarjeta los admita (se mira antes de subir nada) */
+      const nj = Math.max(0, ...(g.j.skins || []).map(s => s.joints.length));
+      if (nj * 3 + 12 > gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)) throw new Error('la tarjeta no admite ' + nj + ' huesos');
+      const M = await vmBuild(g, texMax), X = setup(M);
+      if (nj > SK.nj) { SK.nj = nj; skProgram(); }       // el programa de los soldados se rehace con sitio para ellos
+      VM3D[key] = X;
+      if (key === 'pz1' && world.vm && world.vm.pz1) { world.vm.pz1.pivot = X.pivot; world.vm.pz1.muzzle = X.muzzle; }
+    } catch (e) { VM3D.err += key + ': ' + (e && e.message || e) + ' '; console.warn('[' + key + ' 3D] se usa el modelo por código:', e && e.message || e); }
+  };
+  await one('mosca', vmSetupMosca, 0);
+  await one('pz1', vmSetupPz1, GFX_TOUCH ? 2048 : 0);
 }
 
 /* ============ ametralladoras antiaéreas fijas ============ */
@@ -7799,7 +8073,7 @@ function applyDamage(t, dmg, att, head, cause) {
     game.tickets[t.team] = Math.max(0, game.tickets[t.team] - 1);
     if (att && att !== t && att.team !== t.team) att.kills++;
     addFeed(att, t, cause, head);
-    if (t.isPlayer) { game.deadT = 1.9; game.respawnT = 6; game.killer = att && att !== t ? att : null; game.killCause = cause || ''; input.fire = false; input.aim = false; }
+    if (t.isPlayer) { deathCam(cause); game.respawnT = 6; game.killer = att && att !== t ? att : null; game.killCause = cause || ''; input.fire = false; input.aim = false; }
   }
   if (t.remote && duoOn()) { if (t.alive) duoEv('hit', Math.round(t.hp), duoIdOf(att), head ? 1 : 0, cause || ''); else duoEv('die', duoIdOf(att), cause || '', head ? 1 : 0); }
 }
@@ -8240,7 +8514,7 @@ function duoGuestStart(H) {
 function duoGuestDie(att, cause) {
   const t = P; if (!t.alive) return;
   t.alive = false; t.hp = 0; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.crouch = false; t.prone = false;
-  game.deadT = 1.9; game.respawnT = 6; game.killer = att && att !== t ? att : null; game.killCause = cause || ''; input.fire = false; input.aim = false;
+  deathCam(cause); game.respawnT = 6; game.killer = att && att !== t ? att : null; game.killCause = cause || ''; input.fire = false; input.aim = false;
 }
 function duoGuestEvent(e) {
   const t = e[1];
@@ -8467,6 +8741,31 @@ function resize() {
   const ov = $('ov'), od = Math.min(devicePixelRatio || 1, 2); ov.width = Math.round(w * od); ov.height = Math.round(h * od); ovScale = od;
   uiResize();
 }
+/* ---- al morir (a pie o en cualquier vehículo): la cámara sale de donde estaba, sube girando un poco y se queda un momento mirando al
+   caído desde arriba; luego viene la pantalla de despliegue ---- */
+const DEATH_RISE = 0.9, DEATH_HOLD = 1.15;
+function deathCam(cause) {
+  game.deadT = DEATH_RISE + DEATH_HOLD;
+  game.dcam = null;       // se toma la cámara de ese momento en el primer fotograma de la animación
+  game.dcamH = cause === 'Vehículo destruido' || cause === 'Avión estrellado' ? 11 : 8.5;       // con los restos del vehículo, algo más alta
+}
+function deathCamera(dt) {
+  const d = game.dcam || (game.dcam = { x: cam.x, y: cam.y, z: cam.z, yaw: cam.yaw, pitch: cam.pitch, t: 0 });
+  d.t += dt;
+  const e = x => x * x * (3 - 2 * x), k = e(clamp(d.t / DEATH_RISE, 0, 1)), kl = e(clamp(d.t / (DEATH_RISE * 0.6), 0, 1));
+  /* se mira a la cadera del cuerpo caído (con el modelo 3D; si no, a donde cayó), siguiéndola con suavidad mientras cae */
+  const st = P.sk, C = st && st.C, hip = C && C.J && C.J.Hips >= 0 && st.gp ? M4.tp(st.model, M4.tp(C.base, [st.gp[C.J.Hips * 3], st.gp[C.J.Hips * 3 + 1], st.gp[C.J.Hips * 3 + 2]])) : null;
+  const f = hip && Math.hypot(hip[0] - P.x, hip[2] - P.z) < 3 ? hip : [P.x, P.y + 0.3, P.z];
+  if (!d.f) d.f = f.slice(); else for (let i = 0; i < 3; i++) d.f[i] = lerp(d.f[i], f[i], Math.min(1, dt * 6));
+  const H = game.dcamH || 8.5, gx = d.f[0], gz = d.f[2], gy = d.f[1];
+  /* desde arriba, casi en vertical (un poco inclinada para que se lea el suelo), girando despacio alrededor del cuerpo */
+  const oy = d.yaw + k * 0.55 + d.t * 0.1, hd = H * 0.22;
+  const tx = gx + Math.sin(oy) * hd, tz = gz + Math.cos(oy) * hd, ty = gy + H;
+  cam.x = lerp(d.x, tx, k); cam.z = lerp(d.z, tz, k);
+  cam.y = Math.max(lerp(d.y, ty, k) + Math.sin(Math.PI * k) * H * 0.15, Math.max(groundAt(cam.x, cam.z), waterY) + 1.2);
+  const lx = gx - cam.x, ly = gy - cam.y, lz = gz - cam.z, lyaw = Math.atan2(-lx, -lz), lpit = Math.atan2(ly, Math.hypot(lx, lz));
+  cam.yaw = d.yaw + angDiff(lyaw, d.yaw) * kl; cam.pitch = lerp(d.pitch, lpit, kl);
+}
 /* coloca la cámara de la pantalla según lo que haga el jugador; devuelve si se ve en primera persona */
 function camSetup(dt) {
   let fov = BASE_FOV, fp = false;
@@ -8500,7 +8799,7 @@ function camSetup(dt) {
     } else if (P.alive) {
       const c = camBasis(); cam.x = c.ex; cam.y = c.ey; cam.z = c.ez; cam.yaw = c.yaw; cam.pitch = c.pitch;
       fov = BASE_FOV * lerp(1, P.weps[P.cur].def.zoom, P.aimT); fp = true;
-    } else { cam.x = P.x; cam.z = P.z; cam.y = P.y + lerp(1.6, 0.45, P.fall); cam.yaw = P.yaw; cam.pitch = lerp(P.pitch, 0.45, P.fall); }
+    } else deathCamera(dt);
   } else {
     const f = game.selSpawn || FLAGS[3], a = performance.now() / 1000 * 0.07, gy = terrainH(f.x, f.z);
     cam.x = f.x + Math.cos(a) * 64; cam.z = f.z + Math.sin(a) * 64; cam.y = Math.max(gy + 34, terrainH(cam.x, cam.z) + 14);
@@ -9951,7 +10250,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, navDbg: { NAV, navPath, navLine, navBuild, update } };
 })();
 
 </script>
