@@ -4911,7 +4911,9 @@ async function skTexture(g, ti, cache) {
   let src, revoke = null;
   if (img.uri) src = new URL(img.uri, g.url || location.href).href;
   else { const bv = J.bufferViews[img.bufferView]; src = revoke = URL.createObjectURL(new Blob([new Uint8Array(g.bin, bv.byteOffset || 0, bv.byteLength)], { type: img.mimeType || 'image/jpeg' })); }
-  const im = await new Promise((res, rej) => { const el = new Image(); el.onload = () => res(el); el.onerror = () => rej(new Error('textura ' + (img.uri || ti))); el.src = src; });
+  let im;
+  try { im = await new Promise((res, rej) => { const el = new Image(); el.onload = () => res(el); el.onerror = () => rej(new Error('textura ' + (img.uri || ti))); el.src = src; }); }
+  catch (e) { if (!cache.soft) throw e; console.warn('[vehículos 3D] falta la ' + e.message + ': se pinta sin textura'); cache.set(ti, SK.white); return SK.white; }
   if (revoke) URL.revokeObjectURL(revoke);
   const t = { img: im, tex: null, max: cache.texMax || 0 }; skTexUpload(t); SK.tex.push(t); cache.set(ti, t); return t;
 }
@@ -5228,6 +5230,7 @@ function skSetupWeapons(C) {
     /* en primera persona, la mano izquierda se adelanta hasta el guardamanos (en la animación sujetaba el cajón del cierre, muy cerca de la cara) */
     if (kind === 'rifle') { C.fpSt0 = { lr: st.lr.slice(), lt: st.lt.slice(), gq: st.gq.slice(), gp: st.gp.slice() }; C.fpWsk = Wsk; skFpRifleArms(C, st, Wsk, F); }
     const fp = { F, WskInv, bones: new Float32Array(C.pal.length * 12), zm: M4.tp(F, G.muzzle)[2], rs: G.at[2], palmR: M4.tp(F, grip), palmL: null, sides: {} };
+    skFingers(C, st, kind === 'pistol' ? { Right: 'pistol', Left: 'relax' } : { Right: 'stock', Left: 'fore' });
     skBonesTo(C, st, fp.bones);
     { const g = (j) => j >= 0 ? M4.tp(F, M4.tp(WskInv, M4.tp(C.base, [st.gp[j * 3], st.gp[j * 3 + 1], st.gp[j * 3 + 2]]))).map(v => +v.toFixed(3)) : null;
       fp.dbg = { shL: g(C.J.LeftArm), elL: g(C.J.LeftForeArm), wrL: g(C.J.LeftHand), shR: g(C.J.RightArm), elR: g(C.J.RightForeArm), wrR: g(C.J.RightHand), head: g(C.J.Head) }; }
@@ -5690,6 +5693,72 @@ function m4joint(o, gq, gp, j) {
   o[0] = 1 - (yy + zz); o[1] = xy + wz; o[2] = xz - wy; o[3] = 0; o[4] = xy - wz; o[5] = 1 - (xx + zz); o[6] = yz + wx; o[7] = 0;
   o[8] = xz + wy; o[9] = yz - wx; o[10] = 1 - (xx + yy); o[11] = 0; o[12] = gp[j * 3]; o[13] = gp[j * 3 + 1]; o[14] = gp[j * 3 + 2]; o[15] = 1; return o;
 }
+/* ---------- dedos: cada mano se cierra alrededor de lo que agarra ----------
+   Los clips de los soldados traen los dedos medio estirados o abiertos (vienen de otras armas), así que encima de la animación se
+   rehacen desde la pose de enlace (la mano plana) cerrando cada falange hacia la palma con los ángulos de cada agarre. El pulgar
+   primero se opone (gira por debajo de la palma) y luego se dobla. f: grados de las falanges de índice, corazón, anular y meñique;
+   t: pulgar [oposición, base, medio, punta], o null para dejar el del clip (los clips ya lo ponen bien a lo largo del arma). */
+const SK_GRIPF = {
+  stock: { f: [[26, 38, 24], [70, 80, 50], [74, 82, 52], [78, 84, 54]], t: null },      // garganta de la culata o empuñadura: el índice en el gatillo
+  fore: { f: [[60, 70, 46], [64, 74, 48], [68, 76, 50], [72, 78, 52]], t: null },       // guardamanos o cargador: los dedos lo rodean
+  pistol: { f: [[22, 32, 24], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null },     // culata de pistola o revólver
+  relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null }        // mano libre, algo cerrada
+};
+function skFingerRig(C) {
+  if (C.fingerRig !== undefined) return C.fingerRig;
+  const NJ = C.NJ, bi = m4inv(M4.create(), C.base), Q = [], Pp = [], I3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  /* pose de enlace en el espacio del esqueleto (el mismo de st.gq y st.gp) */
+  for (let j = 0; j < NJ; j++) {
+    const m = M4.mul(M4.create(), bi, m4inv(M4.create(), C.ibmJ[j])), col = k => v3nrm([m[k * 4], m[k * 4 + 1], m[k * 4 + 2]]);
+    Q.push(skFrameQ(I3, [col(0), col(1), col(2)])); Pp.push([m[12], m[13], m[14]]);
+  }
+  const up = C.J.Head >= 0 && C.J.Hips >= 0 ? v3nrm(v3sub(Pp[C.J.Head], Pp[C.J.Hips])) : [0, 1, 0], rig = { Q, P: Pp };
+  for (const side of ['Left', 'Right']) {
+    const jx = n => C.jx['mixamorig:' + side + 'Hand' + n], H = C.J[side + 'Hand'], i1 = jx('Index1'), k1 = jx('Pinky1');
+    if (H < 0 || i1 === undefined || k1 === undefined) continue;
+    let n = v3nrm(v3cross(v3sub(Pp[i1], Pp[H]), v3sub(Pp[k1], Pp[H]))); if (v3dot(n, up) > 0) n = v3mul(n, -1);       // la palma (en la pose en T mira abajo)
+    const chain = f => [1, 2, 3, 4].map(i => jx(f + i)).filter(j => j !== undefined);
+    const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].map(f => { const c = chain(f); return c.length > 1 ? { c, a: v3nrm(v3cross(v3nrm(v3sub(Pp[c[1]], Pp[c[0]])), n)) } : null; });
+    const tc = chain('Thumb'); let thumb = null;
+    if (tc.length > 1) {
+      const fd = v3nrm(v3sub(Pp[jx('Middle1') !== undefined ? jx('Middle1') : i1], Pp[H])), td = v3nrm(v3sub(Pp[tc[1]], Pp[tc[0]]));
+      const s = v3sub(Pp[tc[1]], Pp[H]), sp = v3nrm(v3sub(s, v3mul(fd, v3dot(s, fd))));
+      thumb = { c: tc, a: v3nrm(v3cross(td, n)), o: v3nrm(v3cross(sp, n)) };
+    }
+    rig[side] = { H, fingers, thumb };
+  }
+  return (C.fingerRig = rig);
+}
+const _fpos = [0, 0, 0];
+function skFingerChain(st, R, H, Rh, c, pre, axis, angs) {
+  const gq = st.gq, gp = st.gp;
+  let p = v3add([gp[H * 3], gp[H * 3 + 1], gp[H * 3 + 2]], qRot(Rh, v3sub(R.P[c[0]], R.P[H]))), cum = 0;
+  for (let k = 0; k < c.length; k++) {
+    const j = c[k]; cum += (angs[k] || 0) * DEG;
+    const Q = qMul(qMul(Rh, pre), qAA(axis, cum));
+    gp[j * 3] = p[0]; gp[j * 3 + 1] = p[1]; gp[j * 3 + 2] = p[2];
+    const g = qMul(Q, R.Q[j]); for (let i = 0; i < 4; i++) gq[j * 4 + i] = g[i]; qNorm(gq, j * 4);
+    if (k + 1 < c.length) p = v3add(p, qRot(Q, v3sub(R.P[c[k + 1]], R.P[j])));
+  }
+}
+/* grips: { Left: 'fore', Right: 'stock' } (las claves de SK_GRIPF) */
+function skFingers(C, st, grips) {
+  const R = skFingerRig(C); if (!R || !grips) return;
+  for (const side in grips) {
+    const G = SK_GRIPF[grips[side]], S = R[side]; if (!G || !S) continue;
+    const H = S.H, Rh = qMul([st.gq[H * 4], st.gq[H * 4 + 1], st.gq[H * 4 + 2], st.gq[H * 4 + 3]], qConj(R.Q[H])), I = [0, 0, 0, 1];
+    S.fingers.forEach((f, i) => { if (f) skFingerChain(st, R, H, Rh, f.c, I, f.a, G.f[i]); });
+    if (S.thumb && G.t) skFingerChain(st, R, H, Rh, S.thumb.c, qAA(S.thumb.o, G.t[0] * DEG), S.thumb.a, G.t.slice(1));
+  }
+}
+/* el agarre de cada mano de un soldado en tercera persona según su arma (null: se deja lo del clip) */
+function skGripsFor(s, C) {
+  if (!s.alive) return null;
+  if (C.leg) { if (s.boltT > 0) return null; const k = skLegKey(s); return { Right: k === 'revolver' ? 'pistol' : 'stock' }; }       // la izquierda del legionario ya se apoya en el arma (skLegGrip)
+  if (s.wid === 'breda30' && C.breda) return null;       // la Breda trae en sus clips las manos hechas para ella
+  if (s.wpn && s.wpn.kind === 'pistol') return { Right: 'pistol', Left: 'relax' };
+  return { Right: 'stock', Left: s.reloadT > 0 ? 'relax' : 'fore' };
+}
 /* huesos de una pose en filas (base × global × inversa de unión) */
 function skBonesTo(C, st, B) {
   const gq = st.gq, gp = st.gp, pal = C.pal, sc = st.scOn ? st.sc : null; st.scOn = false;      // sc: escala de algunos huesos (los dedos de la mano izquierda del legionario)
@@ -5721,6 +5790,7 @@ function skBones(s, C, st) {
     else if (g) { st.weapon = null; st.gun = g; gunLeftHand(s, C, st, g); }
     else st.weapon = SK.W[kind];
   }
+  skFingers(C, st, skGripsFor(s, C));
   skBonesTo(C, st, st.bones);
   /* agachado: cuánto hay que bajar el cuerpo para que los pies sigan en el suelo */
   st.drop = 0;
@@ -5869,7 +5939,7 @@ function gunFp(w, team) {
     let bones = base.bones;
     if (g.ik && C.fpSt0) {       // los brazos, rehechos con la mano izquierda en su sitio
       const st = { lr: C.fpSt0.lr.slice(), lt: C.fpSt0.lt.slice(), gq: C.fpSt0.gq.slice(), gp: C.fpSt0.gp.slice(), adjQ: null };
-      skFpRifleArms(C, st, C.fpWsk, base.F, M4.tp(g.A, g.ref.left)); bones = new Float32Array(base.bones.length); skBonesTo(C, st, bones);
+      skFpRifleArms(C, st, C.fpWsk, base.F, M4.tp(g.A, g.ref.left)); skFingers(C, st, { Right: 'stock', Left: 'fore' }); bones = new Float32Array(base.bones.length); skBonesTo(C, st, bones);
     }
     f = C.fpw[id] = { g, base, bones, G: M4.mul(M4.create(), T, GA), arms: M4.mul(M4.create(), M4.mul(M4.create(), T, base.F), base.WskInv), zm: M4.tp(GA, g.ref.muzzle)[2] + d[2], rs: at[2] - push, palmR: [base.palmR[0] + d[0], base.palmR[1] + d[1], base.palmR[2] + d[2]] };
   }
@@ -6282,6 +6352,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   if (capa && since < capa.dur && ow < 0.5) skBlend(C, st, capa, since, 0.6 * Math.min(1, (capa.dur - since) * 8, since * 30 + 0.3), C.capa[pre]);
   skGlobals(C, st);
   if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
+  if (lev < 0.05) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
   skBonesTo(C, st, _lfp.B);
   m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
@@ -7690,7 +7761,7 @@ function m4trs3(o, t, q, s) {
 const qAA = (ax, a, o = [0, 0, 0, 1]) => { const s = Math.sin(a / 2); o[0] = ax[0] * s; o[1] = ax[1] * s; o[2] = ax[2] * s; o[3] = Math.cos(a / 2); return o; };
 /* prepara un glTF de piezas rígidas (y pieles): nodos en reposo, mallas por nivel de detalle y clips */
 async function vmBuild(g, texMax) {
-  const J = g.j, N = J.nodes, n = N.length, cache = new Map(); cache.texMax = texMax || 0;
+  const J = g.j, N = J.nodes, n = N.length, cache = new Map(); cache.texMax = texMax || 0; cache.soft = true;       // sin la textura se dibuja igual
   const M = { J, n, parent: new Int32Array(n).fill(-1), order: [], names: N.map(x => x.name || ''), ix: {}, restT: new Float32Array(n * 3), restR: new Float32Array(n * 4), restS: new Float32Array(n * 3), meshes: [], clips: {}, skins: [] };
   N.forEach((nd, i) => { (nd.children || []).forEach(c => { M.parent[c] = i; }); M.ix[nd.name] = i;
     M.restT.set(nd.translation || [0, 0, 0], i * 3); M.restR.set(nd.rotation || [0, 0, 0, 1], i * 4); M.restS.set(nd.scale || [1, 1, 1], i * 3); });
