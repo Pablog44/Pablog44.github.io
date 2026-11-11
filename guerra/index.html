@@ -5326,22 +5326,44 @@ function skLeftGrip(C, st, Wsk) {
 /* primera persona con el fusil: los hombros donde estarían con la culata en el hombro y la cara en la culata (en la animación el
    tirador lleva el fusil a un lado de la cabeza), y los brazos se cierran hasta las manos: la derecha en la garganta de la culata,
    la izquierda bajo el guardamanos. Las posiciones van en el espacio del arma del juego (metros; el ojo, al apuntar, en z = 0,32) */
-const SK_FPSH = { Right: [0.11, -0.08, 0.55], Left: [-0.17, -0.11, 0.28] }, SK_FPPOLE = { Right: [0.6, -1, 0], Left: [-0.5, -1, -0.1] };
+const SK_FPSH = { Right: [0.11, -0.08, 0.55], Left: [-0.2, -0.21, 0.17] }, SK_FPPOLE = { Right: [0.6, -1, 0], Left: [-0.55, -1, 0.15] };
+/* la mano izquierda, en primera persona: el hueco del puño en el centro del guardamanos del fusil, a media madera (15 cm por delante del alza) */
+const SK_FPLEFT = [0, -0.045, -0.2];
+/* gira una mano (y sus dedos) en la muñeca para que los dedos vayan hacia fDes y la palma mire hacia nDes (direcciones en el esqueleto) */
+function skOrientHand(C, st, side, fDes, nDes) {
+  const H = C.J[side + 'Hand'], M1 = C.jx['mixamorig:' + side + 'HandMiddle1']; if (H < 0 || M1 === undefined) return;
+  const Bd = skBind(C), fB = v3nrm(v3sub(Bd.p[M1], Bd.p[H])), nB = v3mul(Bd.up, -1);       // pose en T: dedos hacia fuera, palma abajo
+  const R = qMul([st.gq[H * 4], st.gq[H * 4 + 1], st.gq[H * 4 + 2], st.gq[H * 4 + 3]], qConj(Bd.q[H]));
+  const q = skFrameQ(skFrame(qRot(R, fB), qRot(R, nB)), skFrame(fDes, nDes));
+  const wx = st.gp[H * 3], wy = st.gp[H * 3 + 1], wz = st.gp[H * 3 + 2], v = [0, 0, 0], o = [0, 0, 0];
+  for (let j = 0; j < C.NJ; j++) if (C.under(j, H)) {
+    qmulTo(st.gq, j * 4, q, 0, st.gq, j * 4); qNorm(st.gq, j * 4);
+    v[0] = st.gp[j * 3] - wx; v[1] = st.gp[j * 3 + 1] - wy; v[2] = st.gp[j * 3 + 2] - wz; qrotV(q, 0, v, o);
+    st.gp[j * 3] = wx + o[0]; st.gp[j * 3 + 1] = wy + o[1]; st.gp[j * 3 + 2] = wz + o[2];
+  }
+}
 function skFpRifleArms(C, st, Wsk, F, leftAt) {
   const Fi = m4inv(M4.create(), F), toSk = p => M4.tp(Wsk, M4.tp(Fi, p));
   const dirSk = v => { const a = toSk([0, 0, 0]), b = toSk(v); return [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; };
   /* la mano izquierda se queda donde la dejó la animación (hecha en Blender con los dedos cerrados sobre el guardamanos):
      solo se rehace el brazo desde el hombro nuevo, así los dedos siguen agarrando el arma */
-  const keepL = skGripPt(C, st, 'Left');
   for (const side of ['Right', 'Left']) {
     const A = C.J[side + 'Arm']; if (A < 0) continue;
     /* el brazo entero se lleva al hombro nuevo */
     const sh = toSk(SK_FPSH[side]), dv = [sh[0] - st.gp[A * 3], sh[1] - st.gp[A * 3 + 1], sh[2] - st.gp[A * 3 + 2]];
     for (let j = 0; j < C.NJ; j++) if (C.under(j, A)) { st.gp[j * 3] += dv[0]; st.gp[j * 3 + 1] += dv[1]; st.gp[j * 3 + 2] += dv[2]; }
-    let target;
-    if (side === 'Left') { if (leftAt) target = M4.tp(Wsk, leftAt); else { const d = dirSk(SK_FPLOWER); target = [keepL[0] + d[0], keepL[1] + d[1], keepL[2] + d[2]]; } }
-    else target = M4.tp(Wsk, SK_GRIP.rifle);
-    skReach(C, st, target, side === 'Left' ? skGripPt(C, st, side) : skPalm(C, st, side), side, dirSk(SK_FPPOLE[side]));
+    if (side === 'Left') {
+      /* la izquierda, como en los juegos de disparos: el antebrazo sube desde abajo y la mano sigue recta (sin doblar la muñeca),
+         la palma hacia arriba bajo el guardamanos y los dedos rodeándolo por el otro lado. Unas vueltas: el codo cambia con la mano */
+      const target = leftAt ? M4.tp(Wsk, leftAt) : toSk(SK_FPLEFT), up = v3nrm(dirSk([0, 1, 0])), E = C.J.LeftForeArm, H = C.J.LeftHand;
+      for (let it = 0; it < 4; it++) {
+        /* los dedos siguen al antebrazo pero en horizontal bajo el arma (si subieran con él, asomarían por encima junto a la mira) */
+        let fa = it ? v3nrm([st.gp[H * 3] - st.gp[E * 3], st.gp[H * 3 + 1] - st.gp[E * 3 + 1], st.gp[H * 3 + 2] - st.gp[E * 3 + 2]]) : v3nrm(dirSk([0.6, 0, -0.7]));
+        fa = v3nrm(v3sub(fa, v3mul(up, v3dot(fa, up) * 0.85)));
+        skOrientHand(C, st, 'Left', fa, up);
+        skReach(C, st, target, skGripPt(C, st, 'Left'), 'Left', dirSk(SK_FPPOLE.Left));
+      }
+    } else skReach(C, st, M4.tp(Wsk, SK_GRIP.rifle), skPalm(C, st, side), side, dirSk(SK_FPPOLE[side]));
   }
 }
 /* vectores de 3 y giros para el brazo */
@@ -5700,7 +5722,7 @@ function m4joint(o, gq, gp, j) {
    t: pulgar [oposición, base, medio, punta], o null para dejar el del clip (los clips ya lo ponen bien a lo largo del arma). */
 const SK_GRIPF = {
   stock: { f: [[26, 38, 24], [70, 80, 50], [74, 82, 52], [78, 84, 54]], t: null },      // garganta de la culata o empuñadura: el índice en el gatillo
-  fore: { f: [[60, 70, 46], [64, 74, 48], [68, 76, 50], [72, 78, 52]], t: null },       // guardamanos o cargador: los dedos lo rodean
+  fore: { f: [[46, 52, 30], [50, 56, 32], [54, 58, 34], [58, 60, 36]], t: null },       // guardamanos o cargador: los dedos lo rodean
   pistol: { f: [[22, 32, 24], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null },     // culata de pistola o revólver
   relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null }        // mano libre, algo cerrada
 };
@@ -7054,7 +7076,8 @@ function drawFpWeapon(camWorld) {
   M4.copy(_fp, camWorld); M4.translate(_fp, x, y, z);
   M4.rotY(_fp, lerp(0.03, 0, a)); M4.rotX(_fp, p.kick * 0.03 * (w.auto ? 0.4 : 1) - rel * 0.6 - p.switchT * 0.8); M4.rotZ(_fp, -bolt * 0.22 - rel * 0.3);
   /* con los modelos de Blender: los brazos del soldado del jugador y el arma de verdad */
-  const sides = w.kind === 'pistol' ? ['Right'] : ['Right', 'Left'];
+  /* con las armas largas solo se ve el brazo izquierdo: la mano derecha queda debajo de la cara al apuntar y fuera de la vista a la cadera */
+  const sides = w.kind === 'pistol' ? ['Right'] : ['Left'];
   if (!gunFpDraw(FPVP, _fp, w, p.team, cam.x, cam.y, cam.z, sides) && !skFpDraw(FPVP, _fp, w.kind, p.team, cam.x, cam.y, cam.z, sides)) drawMesh(ws.mesh, _fp);
 }
 
@@ -7735,6 +7758,7 @@ function drawVehicles(vp, ex, ey, ez) {
       if (v.type === 'mosca') { if (vmReady('mosca')) vmDrawMosca(v, vp, ex, ey, ez); else drawMosca(v); } else drawPlane(v, _vm);
     }
     else if (v.type === 'pz1' && vmReady('pz1')) vmDrawPz1(v, _vm, vp, ex, ey, ez);
+    else if (v.type === 't26n' && vmReady('t26n')) vmDrawT26(v, _vm, vp, ex, ey, ez);
     else {
       const m = world.vm[v.type]; drawModel(m.hull, _vm);
       M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
@@ -7749,8 +7773,8 @@ function drawVehicles(vp, ex, ey, ez) {
    pedales, gases y las agujas del tablero, movidos con los enlaces que trae el propio fichero). El Panzer trae tres niveles de detalle
    por pieza (el original tenía 1,9 millones de triángulos), la torre, la ametralladora y las dos orugas con sus 120 eslabones cada una,
    animadas con sus clips según lo que avanza cada lado del carro. Si no cargan, se siguen usando los vehículos hechos por código. */
-const VM3D = { mosca: null, pz1: null, err: '' };
-const VM_FILES = { mosca: 'mosca_cm249.json', pz1: 'panzer_i.json' };
+const VM3D = { mosca: null, pz1: null, t26n: null, err: '' };
+const VM_FILES = { mosca: 'mosca_cm249.json', pz1: 'panzer_i.json', t26n: 't26.json' };
 const DEG = Math.PI / 180;
 /* matriz con escala no uniforme (las riostras del tren del Mosca se estiran al recogerlo) */
 function m4trs3(o, t, q, s) {
@@ -7974,6 +7998,36 @@ function vmDrawPz1(v, m, vp, ex, ey, ez) {
   vmDraw(M, P, _vmBase, vmLod(v.x, v.y + 1, v.z, ex, ey, ez), v.dead ? [0.3, 0.28, 0.26] : null, vp, ex, ey, ez);
 }
 
+/* ---- T-26 (el capturado del bando nacional) ----
+   Su rig: frente en +Z, en metros y con el origen a ras del suelo. Torre (gira sobre su eje vertical), cañón (sube con giro positivo
+   sobre su eje lateral) con su retroceso, 64 eslabones por oruga, ruedas, rodillos, rueda motriz y tensora: todo va con un único
+   esqueleto. Las orugas usan el clip de marcha (1,6 s por ciclo, 3,91 m de oruga) a la fase de cada lado. */
+function vmSetupT26(M) {
+  const P0 = vmState(M); vmWorld(M, P0);
+  const base = new Float32Array([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1]);       // media vuelta: el frente a -Z
+  const at = n => { const i = M.ix[n]; return M4.tp(base, [P0.W[i * 16 + 12], P0.W[i * 16 + 13], P0.W[i * 16 + 14]]); };
+  const piv = at('Turret'), mz = at('Socket_Muzzle'), rig = M.J.nodes[M.ix.T26_Rig] && M.J.nodes[M.ix.T26_Rig].extras || {};
+  const drive = M.clips.Drive_Forward, side = c => new Set(drive ? drive.ch.filter(x => new RegExp('_' + c + '\\d*$').test(M.names[x.node])).map(x => x.node) : []);
+  return { M, base, tur: M.ix.Turret, gun: M.ix.Gun_Pitch, pivot: piv, muzzle: mz[1] - piv[1], loop: rig['Avance por ciclo (m)'] || 3.9129, cycle: drive ? drive.dur : 1.6,
+    nodesL: side('L'), nodesR: side('R'), half: Math.abs(at('Sprocket_L')[0]), states: new Map() };
+}
+function vmDrawT26(v, m, vp, ex, ey, ez) {
+  const X = VM3D.t26n, M = X.M;
+  let P = X.states.get(v); if (!P) { P = vmState(M); X.states.set(v, P); }
+  vmPz1Tracks(v, X);
+  vmRest(M, P);
+  const ph = t => ((t % X.cycle) + X.cycle) % X.cycle;
+  vmClip(M, P, 'Drive_Forward', ph(v.trL || 0), i => X.nodesL.has(i));
+  vmClip(M, P, 'Drive_Forward', ph(v.trR || 0), i => X.nodesR.has(i));
+  if (v.kick > 0.01) vmClip(M, P, 'Fire_Recoil', (1 - Math.min(1, v.kick)) * M.clips.Fire_Recoil.dur);       // retroceso del cañón (y el cabeceo del casco)
+  vmTurn(M, P, X.tur, [0, 0, 1], angDiff(v.tyaw, v.yaw));
+  vmTurn(M, P, X.gun, [0, 1, 0], v.tpitch || 0);
+  P.fid = (P.fid || 0) + 1;
+  vmWorld(M, P);
+  M4.mul(_vmBase, m, X.base);
+  vmDraw(M, P, _vmBase, 0, v.dead ? [0.3, 0.28, 0.26] : null, vp, ex, ey, ez);
+}
+
 /* carga, cuando los soldados ya tienen su programa (los vehículos usan el mismo) */
 async function vmLoad() {
   if (!SK.ready) return;
@@ -7987,11 +8041,12 @@ async function vmLoad() {
       const M = await vmBuild(g, texMax), X = setup(M);
       if (nj > SK.nj) { SK.nj = nj; skProgram(); }       // el programa de los soldados se rehace con sitio para ellos
       VM3D[key] = X;
-      if (key === 'pz1' && world.vm && world.vm.pz1) { world.vm.pz1.pivot = X.pivot; world.vm.pz1.muzzle = X.muzzle; }
+      if ((key === 'pz1' || key === 't26n') && world.vm && world.vm[key]) { world.vm[key].pivot = X.pivot; world.vm[key].muzzle = X.muzzle; }
     } catch (e) { VM3D.err += key + ': ' + (e && e.message || e) + ' '; console.warn('[' + key + ' 3D] se usa el modelo por código:', e && e.message || e); }
   };
   await one('mosca', vmSetupMosca, 0);
   await one('pz1', vmSetupPz1, GFX_TOUCH ? 2048 : 0);
+  await one('t26n', vmSetupT26, GFX_TOUCH ? 2048 : 0);
 }
 
 /* ============ ametralladoras antiaéreas fijas ============ */
