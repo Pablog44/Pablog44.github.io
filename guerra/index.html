@@ -1554,7 +1554,7 @@ function gMp28(q, o) {
   q.tube([-0.0262, 0.004, -0.15], [0.0262, 0.004, -0.15], 0.0045, 0.0045, GNC.steel, 8);
   gSights(q, y0, ys, -0.07, zM + 0.024, { ears: true, fb: 0.02, rb: 0.0215 });
   gLoop(q, -0.08, 0.2, 0.013, 0.018); q.T(-0.0215, y0 - 0.004, -0.33, () => gLoop(q, 0, 0, 0.011, 0.016), 0, 0, -Math.PI / 2);
-  return { muzzle: [0, y0, zM], sight: [0, ys, -0.07], left: [-0.004, 0.0, -0.2], butt: zB };
+  return { muzzle: [0, y0, zM], sight: [0, ys, -0.07], left: [0, 0.018, -0.262], butt: zB };       // la izquierda en la madera, delante del cargador
 }
 /* DP-27: plato encima, camisa con ventanas, apagallamas cónico y bípode plegado; las miras, altas, por encima del plato */
 function gDp27(q) {
@@ -5328,7 +5328,9 @@ function skLeftGrip(C, st, Wsk) {
    la izquierda bajo el guardamanos. Las posiciones van en el espacio del arma del juego (metros; el ojo, al apuntar, en z = 0,32) */
 const SK_FPSH = { Right: [0.11, -0.08, 0.55], Left: [-0.2, -0.21, 0.17] }, SK_FPPOLE = { Right: [0.6, -1, 0], Left: [-0.55, -1, 0.15] };
 /* la mano izquierda, en primera persona: el hueco del puño en el centro del guardamanos del fusil, a media madera (15 cm por delante del alza) */
-const SK_FPLEFT = [-0.004, -0.032, -0.2];
+const SK_FPLEFT = [0, -0.035, -0.2];
+/* la palma de la izquierda mira arriba y un poco hacia el arma; SK_FPWRIST: cuánto se endereza la mano respecto al antebrazo (1: del todo) */
+const SK_FPPALM = [0.4, 1, 0], SK_FPWRIST = 0.8;
 /* gira una mano (y sus dedos) en la muñeca para que los dedos vayan hacia fDes y la palma mire hacia nDes (direcciones en el esqueleto) */
 function skOrientHand(C, st, side, fDes, nDes) {
   const H = C.J[side + 'Hand'], M1 = C.jx['mixamorig:' + side + 'HandMiddle1']; if (H < 0 || M1 === undefined) return;
@@ -5353,13 +5355,14 @@ function skFpRifleArms(C, st, Wsk, F, leftAt) {
     const sh = toSk(SK_FPSH[side]), dv = [sh[0] - st.gp[A * 3], sh[1] - st.gp[A * 3 + 1], sh[2] - st.gp[A * 3 + 2]];
     for (let j = 0; j < C.NJ; j++) if (C.under(j, A)) { st.gp[j * 3] += dv[0]; st.gp[j * 3 + 1] += dv[1]; st.gp[j * 3 + 2] += dv[2]; }
     if (side === 'Left') {
-      /* la izquierda, como en los juegos de disparos: el antebrazo sube desde abajo y la mano lo sigue recta (sin doblar la muñeca);
-         la palma contra el costado izquierdo del guardamanos (desde la cámara se ve el dorso) y los dedos lo rodean por encima.
-         Unas vueltas: el codo cambia con la mano */
-      const target = leftAt ? M4.tp(Wsk, leftAt) : toSk(SK_FPLEFT), side = v3nrm(dirSk([1, 0.25, 0])), E = C.J.LeftForeArm, H = C.J.LeftHand;
+      /* la izquierda, como en los juegos de disparos: el arma descansa en la palma (hacia arriba y algo vuelta hacia el arma), el
+         pulgar sube a la vista por el costado izquierdo y los demás dedos rodean el guardamanos por el lado derecho. Los dedos
+         siguen la dirección del antebrazo (la muñeca casi recta). Unas vueltas: el codo cambia con la mano */
+      const target = leftAt ? M4.tp(Wsk, leftAt) : toSk(SK_FPLEFT), pn = v3nrm(dirSk(SK_FPPALM)), E = C.J.LeftForeArm, H = C.J.LeftHand;
       for (let it = 0; it < 4; it++) {
-        let fa = it ? v3nrm([st.gp[H * 3] - st.gp[E * 3], st.gp[H * 3 + 1] - st.gp[E * 3 + 1], st.gp[H * 3 + 2] - st.gp[E * 3 + 2]]) : v3nrm(dirSk([0.2, 0.7, -0.7]));
-        skOrientHand(C, st, 'Left', fa, side);
+        let fa = it ? v3nrm([st.gp[H * 3] - st.gp[E * 3], st.gp[H * 3 + 1] - st.gp[E * 3 + 1], st.gp[H * 3 + 2] - st.gp[E * 3 + 2]]) : v3nrm(dirSk([0.7, 0.2, -0.6]));
+        fa = v3nrm(v3sub(fa, v3mul(pn, v3dot(fa, pn) * SK_FPWRIST)));
+        skOrientHand(C, st, 'Left', fa, pn);
         skReach(C, st, target, skGripPt(C, st, 'Left'), 'Left', dirSk(SK_FPPOLE.Left));
       }
     } else skReach(C, st, M4.tp(Wsk, SK_GRIP.rifle), skPalm(C, st, side), side, dirSk(SK_FPPOLE[side]));
@@ -5721,7 +5724,7 @@ function m4joint(o, gq, gp, j) {
    t: pulgar [oposición, base, medio, punta], o null para dejar el del clip (los clips ya lo ponen bien a lo largo del arma). */
 const SK_GRIPF = {
   stock: { f: [[26, 38, 24], [70, 80, 50], [74, 82, 52], [78, 84, 54]], t: null },      // garganta de la culata o empuñadura: el índice en el gatillo
-  fore: { f: [[46, 52, 30], [50, 56, 32], [54, 58, 34], [58, 60, 36]], t: [50, 18, 22, 14] },       // el pulgar, por debajo del arma       // guardamanos o cargador: los dedos lo rodean
+  fore: { f: [[50, 58, 34], [54, 60, 36], [58, 62, 38], [62, 64, 40]], t: [30, 8, 10, 6] },       // el pulgar, estirado por el costado       // guardamanos o cargador: los dedos lo rodean
   pistol: { f: [[22, 32, 24], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null },     // culata de pistola o revólver
   relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null }        // mano libre, algo cerrada
 };
