@@ -801,6 +801,649 @@ class Geo {
   }
 }
 
+/* ============ modelado por código ============
+   Superficies lisas (normales por vértice) con color por vértice, en el mismo formato de malla que el resto del juego
+   (posición, normal y color). Con esto se construyen los vehículos y las armas: secciones que se unen (loft), piezas de torno,
+   tubos, chapas extruidas, ruedas y orugas. Todo en metros; el frente de los vehículos mira a -Z. */
+const w3 = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  len: a => Math.hypot(a[0], a[1], a[2]), nrm: a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+};
+class Mdl {
+  constructor() { this.slots = new Map(); this.defs = {}; this.m = null; this.a = null; this.cur = null; this.mat('_'); }
+  /* material de lo que se construya a continuación (o solo dentro de fn) */
+  mat(key, fn) { const prev = this.cur; if (!this.slots.has(key)) this.slots.set(key, []); this.cur = key; this.a = this.slots.get(key); if (fn) { fn(this); this.cur = prev; this.a = this.slots.get(prev); } return this; }
+  /* calca plana: textura `tex` proyectada con uv = (A·p + A[3], B·p + B[3]) en el espacio del modelo */
+  decal(tex, A, B, fn, spec = 0) { const key = 'decal:' + tex + ':' + A.join(',') + B.join(','); this.defs[key] = { tex, A: new Float32Array(A), B: new Float32Array(B), spec }; return this.mat(key, fn); }
+  mesh() { const subs = []; for (const [k, a] of this.slots) if (a.length) subs.push({ key: k, mesh: makeMesh(a), mat: this.defs[k] || MATS[k] || null }); return { subs }; }
+  /* fn se construye dentro de la transformación m (se apilan) */
+  at(m, fn) { const p = this.m; this.m = p ? M4.mul(M4.create(), p, m) : m; fn(this); this.m = p; return this; }
+  /* atajo: traslación y giros (Y, luego X, luego Z) */
+  T(x, y, z, fn, ry = 0, rx = 0, rz = 0, s = 1) { const m = M4.create(); M4.translate(m, x, y, z); if (ry) M4.rotY(m, ry); if (rx) M4.rotX(m, rx); if (rz) M4.rotZ(m, rz); if (s !== 1) M4.scale(m, s, s, s); return this.at(m, fn); }
+  /* espejo en X: la pieza y su simétrica */
+  mir(fn) { fn(this, 1); const m = M4.create(); m[0] = -1; return this.at(m, () => fn(this, -1)); }
+  v(p, n, c) {
+    let x = p[0], y = p[1], z = p[2], nx = n[0], ny = n[1], nz = n[2]; const m = this.m;
+    if (m) {
+      const X = m[0] * x + m[4] * y + m[8] * z + m[12], Y = m[1] * x + m[5] * y + m[9] * z + m[13], Z = m[2] * x + m[6] * y + m[10] * z + m[14];
+      const NX = m[0] * nx + m[4] * ny + m[8] * nz, NY = m[1] * nx + m[5] * ny + m[9] * nz, NZ = m[2] * nx + m[6] * ny + m[10] * nz, l = Math.hypot(NX, NY, NZ) || 1;
+      x = X; y = Y; z = Z; nx = NX / l; ny = NY / l; nz = NZ / l;
+    }
+    this.a.push(x, y, z, nx, ny, nz, c[0], c[1], c[2]);
+  }
+  tri(a, b, c, col, na, nb, nc) {
+    if (!na) { na = nb = nc = w3.nrm(w3.cross(w3.sub(b, a), w3.sub(c, a))); }
+    this.v(a, na, col); this.v(b, nb, col); this.v(c, nc, col);
+  }
+  quad(a, b, c, d, col) { const n = w3.nrm(w3.cross(w3.sub(b, a), w3.sub(d, a))); this.tri(a, b, c, col, n, n, n); this.tri(a, c, d, col, n, n, n); }
+  box(cx, cy, cz, w, h, d, col) {
+    const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2, z0 = cz - d / 2, z1 = cz + d / 2;
+    const P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+    for (const [a, b, c, e] of [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [3, 7, 6, 2], [0, 4, 7, 3], [1, 2, 6, 5]]) this.quad(P[a], P[b], P[c], P[e], col);
+    return this;
+  }
+  /* une secciones (anillos cerrados de igual número de puntos). col: color o función (p, i, j) → color */
+  loft(rings, col, o = {}) {
+    const R = rings.length, N = rings[0].length, fn = typeof col === 'function' ? col : null, open = !!o.open, flat = !!o.flat;
+    const cen = rings.map(r => { const c = [0, 0, 0]; for (const p of r) { c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; } return w3.mul(c, 1 / N); });
+    const nor = rings.map((r, i) => r.map((p, j) => {
+      const jp = open ? Math.min(N - 1, j + 1) : (j + 1) % N, jm = open ? Math.max(0, j - 1) : (j + N - 1) % N;
+      const tu = w3.sub(r[jp], r[jm]), tv = w3.sub(rings[Math.min(R - 1, i + 1)][j], rings[Math.max(0, i - 1)][j]);
+      let n = w3.cross(tu, tv), l = w3.len(n);
+      if (l < 1e-9) { n = w3.sub(p, cen[i]); l = w3.len(n); if (l < 1e-9) { n = w3.sub(cen[i], cen[i ? i - 1 : 1]); if (!i) n = w3.mul(n, -1); } }
+      n = w3.nrm(n);
+      if (!open && w3.dot(n, w3.sub(p, cen[i])) < 0) n = w3.mul(n, -1);
+      else if (open && o.up && w3.dot(n, o.up) < 0) n = w3.mul(n, -1);
+      return n;
+    }));
+    const C = (i, j) => fn ? fn(rings[i][j], i, j) : col;
+    for (let i = 0; i < R - 1; i++) for (let j = 0; j < (open ? N - 1 : N); j++) {
+      const j2 = (j + 1) % N, a = rings[i][j], b = rings[i][j2], c = rings[i + 1][j2], d = rings[i + 1][j];
+      if (flat) { const cc = C(i, j); if (w3.len(w3.sub(a, b)) > 1e-7) this.tri(a, b, c, cc); if (w3.len(w3.sub(c, d)) > 1e-7) this.tri(a, c, d, cc); continue; }
+      const ca = C(i, j), cb = C(i, j2), ccc = C(i + 1, j2), cd = C(i + 1, j), na = nor[i][j], nb = nor[i][j2], nc = nor[i + 1][j2], nd = nor[i + 1][j];
+      this.v(a, na, ca); this.v(b, nb, cb); this.v(c, nc, ccc); this.v(a, na, ca); this.v(c, nc, ccc); this.v(d, nd, cd);
+    }
+    const cap = (i, flip) => { const r = rings[i], c = cen[i], cc = fn ? fn(c, i, 0) : col; let n = w3.nrm(w3.cross(w3.sub(r[0], c), w3.sub(r[Math.floor(N / 4)], c))); const out = w3.sub(c, cen[i ? i - 1 : 1]); if (w3.dot(n, i ? out : out) < 0) n = w3.mul(n, -1);
+      for (let j = 0; j < N; j++) this.tri(c, r[j], r[(j + 1) % N], fn ? fn(r[j], i, j) : cc, n, n, n); };
+    if (o.capA) cap(0); if (o.capB) cap(R - 1);
+    return this;
+  }
+  /* pieza de torno alrededor del eje Z: perfil [[radio, z], ...] */
+  lathe(pts, col, seg = 14, o = {}) {
+    const rings = pts.map(([r, z]) => { const a = []; for (let k = 0; k < seg; k++) { const t = k / seg * Math.PI * 2; a.push([Math.cos(t) * Math.max(r, 1e-5), Math.sin(t) * Math.max(r, 1e-5), z]); } return a; });
+    const fn = typeof col === 'function' ? col : null;
+    /* normales del perfil (no del centroide: sirve también para caras interiores) */
+    const R = pts.length;
+    for (let i = 0; i < R - 1; i++) {
+      const [r0, z0] = pts[i], [r1, z1] = pts[i + 1]; if (Math.abs(r0 - r1) < 1e-7 && Math.abs(z0 - z1) < 1e-7) continue;
+      const nrm = k => { const p = pts[Math.max(0, k - 1)], q = pts[Math.min(R - 1, k + 1)]; let dr = q[0] - p[0], dz = q[1] - p[1]; const l = Math.hypot(dr, dz) || 1; return [dz / l, -dr / l]; };
+      const hard = o.hard, nA = hard ? (() => { const l = Math.hypot(r1 - r0, z1 - z0) || 1; return [(z1 - z0) / l, -(r1 - r0) / l]; })() : nrm(i), nB = hard ? nA : nrm(i + 1);
+      for (let k = 0; k < seg; k++) {
+        const k2 = (k + 1) % seg, t0 = k / seg * Math.PI * 2, t1 = k2 / seg * Math.PI * 2, c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
+        const a = rings[i][k], b = rings[i][k2], c = rings[i + 1][k2], d = rings[i + 1][k];
+        const na = [c0 * nA[0], s0 * nA[0], nA[1]], nb = [c1 * nA[0], s1 * nA[0], nA[1]], nc = [c1 * nB[0], s1 * nB[0], nB[1]], nd = [c0 * nB[0], s0 * nB[0], nB[1]];
+        const ca = fn ? fn(a, i, k) : col, cc = fn ? fn(c, i + 1, k2) : col;
+        if (r0 > 1e-6) { this.v(a, na, ca); this.v(b, nb, ca); this.v(c, nc, cc); }
+        if (r1 > 1e-6) { this.v(a, na, ca); this.v(c, nc, cc); this.v(d, nd, cc); }
+      }
+    }
+    return this;
+  }
+  /* torno alrededor del eje Y: perfil [[radio, y], ...] */
+  latheY(pts, col, seg = 14, o = {}) { const m = M4.create(); M4.rotX(m, -Math.PI / 2); return this.at(m, () => this.lathe(pts, col, seg, o)); }
+  /* fila de remaches entre dos puntos */
+  rivets(a, b, n, col, r = 0.014) { for (let i = 0; i < n; i++) { const p = w3.lerp(a, b, n > 1 ? i / (n - 1) : 0.5); this.box(p[0], p[1], p[2], r * 2, r * 2, r * 2, col); } return this; }
+  /* cilindro o cono entre dos puntos */
+  tube(p0, p1, r0, r1, col, seg = 10, caps = true) {
+    if (r1 === undefined || r1 === null) r1 = r0;
+    const d = w3.sub(p1, p0), L = w3.len(d); if (L < 1e-8) return this;
+    const z = w3.mul(d, 1 / L), up = Math.abs(z[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0], x = w3.nrm(w3.cross(up, z)), y = w3.cross(z, x);
+    const m = new Float32Array([x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, p0[0], p0[1], p0[2], 1]);
+    return this.at(m, () => this.lathe(caps ? [[0, 0], [r0, 0], [r0, 0], [r1, L], [r1, L], [0, L]] : [[r0, 0], [r1, L]], col, seg, caps ? { hard: true } : {}));
+  }
+  /* tubo que sigue una línea quebrada */
+  pipe(pts, r, col, seg = 8) { for (let i = 0; i < pts.length - 1; i++) { this.tube(pts[i], pts[i + 1], r, r, col, seg, i === 0 || i === pts.length - 2); if (i) this.ball(pts[i], r, col, seg, 4); } return this; }
+  ball(c, r, col, seg = 12, lat = 6, sy = 1, sz = 1) { const pts = []; for (let i = 0; i <= lat; i++) { const t = i / lat * Math.PI; pts.push([Math.sin(t) * r, -Math.cos(t) * r]); } const m = M4.create(); M4.translate(m, c[0], c[1], c[2]); M4.scale(m, 1, sy, sz); return this.at(m, () => this.lathe(pts, col, seg)); }
+  /* chapa: polígono 2D extruido. plano 'xy' (extruye en z), 'zy' (extruye en x) o 'xz' (extruye en y) */
+  plate(poly, a, b, col, plane = 'xy') {
+    const P = (p, w) => plane === 'xy' ? [p[0], p[1], w] : plane === 'zy' ? [w, p[1], p[0]] : [p[0], w, p[1]];
+    const n = poly.length, tris = Mdl.earcut(poly);
+    for (const [i, j, k] of tris) { this.tri(P(poly[i], a), P(poly[j], a), P(poly[k], a), col); this.tri(P(poly[i], b), P(poly[j], b), P(poly[k], b), col); }
+    for (let i = 0; i < n; i++) { const p = poly[i], q = poly[(i + 1) % n]; this.quad(P(p, a), P(q, a), P(q, b), P(p, b), col); }
+    return this;
+  }
+  static earcut(poly) {
+    const n = poly.length, idx = [...Array(n).keys()], out = []; let area = 0;
+    for (let i = 0; i < n; i++) { const p = poly[i], q = poly[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; }
+    const sg = area > 0 ? 1 : -1, cr = (a, b, c) => ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) * sg;
+    let guard = 0;
+    while (idx.length > 3 && guard++ < 4000) {
+      let cut = false;
+      for (let i = 0; i < idx.length; i++) {
+        const a = idx[(i + idx.length - 1) % idx.length], b = idx[i], c = idx[(i + 1) % idx.length];
+        if (cr(poly[a], poly[b], poly[c]) <= 1e-12) continue;
+        let ok = true;
+        for (const k of idx) { if (k === a || k === b || k === c) continue; const p = poly[k]; if (cr(poly[a], poly[b], p) > 0 && cr(poly[b], poly[c], p) > 0 && cr(poly[c], poly[a], p) > 0) { ok = false; break; } }
+        if (!ok) continue;
+        out.push([a, b, c]); idx.splice(i, 1); cut = true; break;
+      }
+      if (!cut) idx.splice(0, 1);
+    }
+    if (idx.length === 3) out.push(idx);
+    return out;
+  }
+  /* caja de cantos redondeados a lo largo de Z (sección de rectángulo redondeado) */
+  rbox(cx, cy, cz, w, h, d, r, col, o = {}) { return this.loft([Mdl.rrect(cz - d / 2, cx, cy, w, h, r), Mdl.rrect(cz + d / 2, cx, cy, w, h, r)], col, { capA: true, capB: true, ...o }); }
+  /* rueda de neumático con eje X, centrada en el origen: R radio, w ancho, rim radio de la llanta */
+  wheel(R, w, rim, tire, hub, o = {}) {
+    const h = w / 2, m = M4.create(); M4.rotY(m, Math.PI / 2);
+    return this.at(m, () => {
+      this.lathe([[rim, -h * 0.82], [R - w * 0.34, -h], [R - w * 0.08, -h * 0.82], [R, -h * 0.45], [R, h * 0.45], [R - w * 0.08, h * 0.82], [R - w * 0.34, h], [rim, h * 0.82]], tire, o.seg || 18);
+      const dish = o.dish === undefined ? 0.35 : o.dish;
+      this.lathe([[0, -h * dish - 0.02], [rim * 0.28, -h * dish - 0.02], [rim * 0.34, -h * dish], [rim * 0.9, -h * 0.75], [rim, -h * 0.82], [rim, h * 0.82], [rim * 0.9, h * 0.75], [rim * 0.34, h * dish], [rim * 0.28, h * dish + 0.02], [0, h * dish + 0.02]], hub, o.seg || 18);
+      if (o.nuts) for (let k = 0; k < o.nuts; k++) { const t = k / o.nuts * Math.PI * 2, rr = rim * 0.2; for (const s of [-1, 1]) this.tube([Math.cos(t) * rr, Math.sin(t) * rr, s * (h * dish + 0.02)], [Math.cos(t) * rr, Math.sin(t) * rr, s * (h * dish + 0.045)], 0.014, 0.014, o.nutCol || tire, 5); }
+    });
+  }
+  /* oruga: eslabones a lo largo del contorno que envuelve unas ruedas (en el plano ZY, a la altura x). circ: [[z, y, radio], ...] en orden */
+  track(x, width, circ, col, o = {}) {
+    const pts = Mdl.hullLoop(circ, o.step || 0.11), th = o.th || 0.035, n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i], q = pts[(i + 1) % n], dz = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dz, dy) || 1, ang = Math.atan2(dy, dz), m = M4.create();
+      M4.translate(m, x, (p[1] + q[1]) / 2, (p[0] + q[0]) / 2); M4.rotX(m, -ang);
+      this.at(m, () => { this.box(0, th / 2, 0, width, th, L * 0.86, i % 2 ? col : shade(col, 0.86)); if (o.teeth) this.box(0, -0.02, 0, width * 0.16, 0.05, L * 0.4, shade(col, 0.8)); if (o.grouser) this.box(0, th + 0.008, 0, width, 0.016, L * 0.2, shade(col, 0.75)); });
+    }
+    return this;
+  }
+  /* contorno exterior (envolvente convexa) de varios círculos, muestreado cada `step` */
+  static hullLoop(circ, step) {
+    const pts = [], n = circ.length, tan = [];
+    for (let i = 0; i < n; i++) {
+      const a = circ[i], b = circ[(i + 1) % n], dz = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dz, dy), base = Math.atan2(dy, dz), off = Math.acos(clamp((a[2] - b[2]) / d, -1, 1));
+      const ang = base + off * (Mdl._ccw ? -1 : 1);
+      tan.push({ from: [a[0] + Math.cos(ang) * a[2], a[1] + Math.sin(ang) * a[2]], to: [b[0] + Math.cos(ang) * b[2], b[1] + Math.sin(ang) * b[2]], ang });
+    }
+    for (let i = 0; i < n; i++) {
+      const t = tan[i], prev = tan[(i + n - 1) % n], c = circ[i];
+      let a0 = prev.ang, a1 = t.ang; if (Mdl._ccw) { while (a1 > a0) a1 -= Math.PI * 2; } else { while (a1 < a0) a1 += Math.PI * 2; }
+      const arc = Math.abs(a1 - a0) * c[2], k = Math.max(1, Math.round(arc / step));
+      for (let s = 0; s < k; s++) { const a = a0 + (a1 - a0) * s / k; pts.push([c[0] + Math.cos(a) * c[2], c[1] + Math.sin(a) * c[2]]); }
+      const L = Math.hypot(t.to[0] - t.from[0], t.to[1] - t.from[1]), m = Math.max(1, Math.round(L / step));
+      for (let s = 0; s < m; s++) pts.push([t.from[0] + (t.to[0] - t.from[0]) * s / m, t.from[1] + (t.to[1] - t.from[1]) * s / m]);
+    }
+    return pts;
+  }
+  /* anillos de sección */
+  static ell(z, cx, cy, rx, ry, n = 20, p = 2, ph = 0) { const r = [], e = 2 / p; for (let k = 0; k < n; k++) { const t = (k + ph) / n * Math.PI * 2, c = Math.cos(t), s = Math.sin(t); r.push([cx + rx * Math.sign(c) * Math.pow(Math.abs(c), e), cy + ry * Math.sign(s) * Math.pow(Math.abs(s), e), z]); } return r; }
+  static rrect(z, cx, cy, w, h, r, k = 3) {
+    r = Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4); const o = [];
+    for (const [sx, sy, a0] of [[1, 1, 0], [-1, 1, 90], [-1, -1, 180], [1, -1, 270]]) for (let i = 0; i <= k; i++) { const a = (a0 + 90 * i / k) * Math.PI / 180; o.push([cx + sx * (w / 2 - r) + r * Math.cos(a), cy + sy * (h / 2 - r) + r * Math.sin(a), z]); }
+    return o;
+  }
+  /* sección cualquiera dada en (x, y) puesta a la altura z, con escala */
+  static sec(z, pts, sx = 1, sy = 1, cx = 0, cy = 0) { return pts.map(p => [cx + p[0] * sx, cy + p[1] * sy, z]); }
+  /* perfil alar: anillo en el plano ZY (cuerda a lo largo de +Z, borde de ataque en z0) a la envergadura x */
+  static foil(x, y, z0, chord, thick, n = 9, twist = 0, camber = 0.02, u0 = 0, u1 = 1) {
+    const up = [], lo = [];
+    for (let i = 0; i <= n; i++) { const u = u0 + (u1 - u0) * (0.5 - 0.5 * Math.cos(Math.PI * i / n)), yt = 5 * thick * (0.2969 * Math.sqrt(u) - 0.126 * u - 0.3516 * u * u + 0.2843 * u * u * u - 0.1015 * u * u * u * u), yc = camber * 4 * u * (1 - u); up.push([u, yc + yt]); lo.push([u, yc - yt]); }
+    const pts = up.concat(lo.reverse()), c = Math.cos(twist), s = Math.sin(twist);
+    return pts.map(([u, h]) => { const zz = (u - 0.3) * chord, yy = h * chord; return [x, y + yy * c - zz * s, z0 + 0.3 * chord + zz * c + yy * s]; });
+  }
+  /* arco de elipse (sección abierta) entre dos ángulos en grados */
+  static arc(z, cx, cy, rx, ry, a0, a1, n = 14, p = 2) { const r = [], e = 2 / p; for (let k = 0; k <= n; k++) { const t = (a0 + (a1 - a0) * k / n) * Math.PI / 180, c = Math.cos(t), s = Math.sin(t); r.push([cx + rx * Math.sign(c) * Math.pow(Math.abs(c), e), cy + ry * Math.sign(s) * Math.pow(Math.abs(s), e), z]); } return r; }
+}
+Mdl._ccw = false;
+const mdl = (fn, mat) => { const q = new Mdl(); if (mat) q.mat(mat); fn(q); return q.mesh(); };
+
+/* ============ vehículos por código ============ */
+const VC = { dk: hex(0x1c1c1b), tire: hex(0x161617), wd: hex(0x7d6040), glass: hex(0x27333a), steel: hex(0x3b3e3b), lamp: hex(0xe8e0be), red: hex(0xc8281e), yel: hex(0xf2c21e), pur: hex(0x5f2d7a), wht: hex(0xe8e6dc), canvas: hex(0xb5aa88), rust: hex(0x4a3524) };
+/* camiones: ZiS-5 soviético (capó anguloso, cabina de madera y chapa) y Ford V8 con toldo */
+function mkTruck(team) {
+  return mdl(q => {
+    q.mat('tpaint');
+    const rep = team === REP, body = rep ? hex(0x5c6b45) : hex(0x74735f), bd = shade(body, 0.82), { dk, tire, wd, glass, steel, lamp } = VC, wd2 = shade(wd, 0.84), hubc = shade(body, 0.75);
+    /* bastidor, ejes y transmisión */
+    q.mir(q => { q.box(0.42, 0.66, 0.1, 0.07, 0.16, 5.3, dk); q.box(0.6, 0.6, -2.1, 0.07, 0.05, 1.1, dk); q.box(0.62, 0.6, 1.7, 0.07, 0.08, 1.3, dk); });
+    for (const z of [-2.45, -1.2, 0.2, 1.4, 2.65]) q.box(0, 0.66, z, 0.84, 0.1, 0.07, dk);
+    q.tube([-0.84, 0.46, -2.1], [0.84, 0.46, -2.1], 0.045, 0.045, dk, 8); q.tube([-0.98, 0.46, 1.7], [0.98, 0.46, 1.7], 0.065, 0.065, dk, 8); q.ball([0, 0.46, 1.7], 0.19, dk, 10, 6);
+    q.tube([0, 0.62, -1.3], [0, 0.48, 1.55], 0.032, 0.032, dk, 6); q.box(0, 0.62, -1.75, 0.5, 0.42, 0.9, dk);
+    q.pipe([[0.3, 0.55, -1.4], [0.52, 0.5, 0.3], [0.92, 0.5, 0.9]], 0.03, VC.rust, 6);
+    q.mir(q => { q.T(0.86, 0.46, -2.1, () => q.wheel(0.46, 0.24, 0.27, tire, hubc, { nuts: 6 })); q.T(0.73, 0.46, 1.7, () => q.wheel(0.46, 0.23, 0.27, tire, hubc, { nuts: 6 })); q.T(0.985, 0.46, 1.7, () => q.wheel(0.46, 0.23, 0.27, tire, hubc)); });
+    q.T(0, 0.6, 2.42, () => q.wheel(0.44, 0.22, 0.27, tire, hubc), 0, 0, Math.PI / 2);
+    /* capó y radiador */
+    const hw = z => lerp(0.36, 0.5, (z + 2.66) / 1.08);
+    if (rep) {
+      const ring = (z, w, ys, yt) => [[-w, 0.8, z], [w, 0.8, z], [w, ys, z], [0, yt, z], [-w, ys, z]];
+      q.loft([ring(-2.66, 0.36, 1.25, 1.34), ring(-1.58, 0.5, 1.37, 1.46)], body, { flat: true, capA: true });
+      q.tube([0, 1.345, -2.66], [0, 1.465, -1.58], 0.012, 0.012, bd, 5);
+      q.mir(q => { for (let i = 0; i < 10; i++) { const z = -2.48 + i * 0.075; q.box(hw(z) + 0.004, 1.07, z, 0.012, 0.24, 0.028, shade(body, 0.5)); } });
+      q.box(0, 1.06, -2.69, 0.76, 0.58, 0.06, bd); q.box(0, 1.05, -2.722, 0.62, 0.46, 0.02, dk);
+      for (let i = -4; i <= 4; i++) q.box(i * 0.068, 1.05, -2.735, 0.012, 0.46, 0.012, steel);
+      q.tube([0, 1.34, -2.68], [0, 1.4, -2.68], 0.03, 0.022, steel, 8);
+      q.box(0, 0.62, -2.86, 1.9, 0.11, 0.05, dk);
+    } else {
+      const E = (z, w, cy, ry) => Mdl.ell(z, 0, cy, w, ry, 16, 3.2);
+      q.loft([E(-2.76, 0.2, 1.02, 0.2), E(-2.7, 0.3, 1.04, 0.29), E(-2.2, 0.43, 1.09, 0.32), E(-1.58, 0.5, 1.12, 0.35)], body, { capA: true });
+      q.box(0, 1.0, -2.745, 0.36, 0.44, 0.05, dk); for (let i = 0; i < 8; i++) q.box(0, 0.82 + i * 0.052, -2.775, 0.34 - Math.abs(i - 3.5) * 0.03, 0.014, 0.012, hex(0xa8aaa6));
+      q.box(0, 1.03, -2.785, 0.02, 0.5, 0.02, hex(0xa8aaa6));
+      q.mir(q => { for (let i = 0; i < 6; i++) q.box(hw(-2.1 + i * 0.07) + 0.012, 1.1, -2.1 + i * 0.07, 0.012, 0.16, 0.03, shade(body, 0.5)); });
+      q.rbox(0, 0.6, -2.88, 1.86, 0.12, 0.05, 0.02, hex(0x8f918c));
+    }
+    /* aletas y estribos */
+    q.mir(q => { const path = [[-2.68, 0.7], [-2.6, 0.9], [-2.42, 1.03], [-2.1, 1.08], [-1.8, 1.03], [-1.62, 0.9], [-1.5, 0.74], [-1.42, 0.64], [-0.36, 0.64]], t = 0.035;
+      q.loft(path.map(([z, y]) => [[0.5, y + t, z], [1.06, y + t * 0.6, z], [1.08, y - 0.03, z], [0.5, y, z]]), bd, { capA: true, capB: true }); });
+    /* faros */
+    q.mir(q => { q.T(0.58, 1.16, -2.6, () => { q.lathe([[0.001, 0.17], [0.07, 0.14], [0.115, 0.05], [0.12, 0], [0.108, -0.012]], dk, 12); q.lathe([[0, -0.006], [0.108, -0.012]], lamp, 12, { hard: true }); }); q.tube([0.58, 1.05, -2.56], [0.58, 0.95, -2.5], 0.02, 0.02, dk, 6); });
+    q.tube([-0.58, 1.04, -2.56], [0.58, 1.04, -2.56], 0.016, 0.016, dk, 6);
+    /* cabina */
+    q.box(0, 1.115, -0.96, 1.9, 0.67, 1.24, body);
+    q.mir(q => {
+      q.box(0.92, 1.76, -1.55, 0.06, 0.62, 0.06, body); q.box(0.92, 1.76, -0.37, 0.06, 0.62, 0.06, body); q.box(0.945, 1.76, -0.96, 0.02, 0.56, 1.1, glass);
+      q.box(0.953, 1.12, -1.44, 0.008, 0.62, 0.014, shade(body, 0.55)); q.box(0.953, 1.12, -0.5, 0.008, 0.62, 0.014, shade(body, 0.55)); q.box(0.965, 1.37, -0.6, 0.02, 0.022, 0.11, steel);
+      const st = rep ? [VC.red, VC.yel, VC.pur] : [VC.red, VC.yel, VC.red]; st.forEach((c, i) => q.box(0.954, 1.26 - i * 0.055, -0.97, 0.006, 0.055, 0.3, c));
+      q.box(1.0, 0.9, -0.96, 0.02, 0.2, 0.9, bd);
+    });
+    q.box(0, 1.76, -1.56, 1.78, 0.58, 0.02, glass); q.box(0, 1.76, -1.572, 0.04, 0.6, 0.02, body); q.box(0, 1.76, -0.385, 1.86, 0.62, 0.04, body); q.box(0, 1.8, -0.36, 0.8, 0.3, 0.012, glass);
+    q.box(0, 2.07, -0.96, 1.9, 0.05, 1.24, body);
+    if (rep) { q.rbox(0, 2.13, -0.96, 1.98, 0.1, 1.36, 0.04, bd); q.box(0, 2.1, -1.7, 1.8, 0.03, 0.2, bd); }
+    else q.loft([Mdl.ell(-1.64, 0, 2.08, 0.96, 0.07, 14, 2.6), Mdl.ell(-1.2, 0, 2.12, 0.99, 0.12, 14, 2.6), Mdl.ell(-0.6, 0, 2.12, 0.99, 0.12, 14, 2.6), Mdl.ell(-0.3, 0, 2.08, 0.96, 0.07, 14, 2.6)], bd, { capA: true, capB: true });
+    /* caja de madera */
+    q.mat('wood');
+    q.box(0, 0.98, 1.25, 2.15, 0.1, 3.02, wd); for (const z of [-0.1, 0.65, 1.4, 2.15, 2.68]) q.box(0, 0.87, z, 2.1, 0.12, 0.08, wd2);
+    q.mir(q => { q.box(0.42, 0.8, 1.25, 0.1, 0.12, 3.0, wd2);
+      for (let k = 0; k < 3; k++) q.box(1.05, 1.125 + k * 0.2, 1.25, 0.045, 0.19, 3.0, k % 2 ? wd : wd2);
+      for (const z of [-0.08, 0.82, 1.7, 2.58]) q.box(1.08, 1.32, z, 0.014, 0.6, 0.07, steel); });
+    for (let k = 0; k < 3; k++) { q.box(0, 1.125 + k * 0.2, -0.24, 2.1, 0.19, 0.045, k % 2 ? wd2 : wd); q.box(0, 1.125 + k * 0.2, 2.745, 2.1, 0.19, 0.045, k % 2 ? wd : wd2); }
+    q.mir(q => { q.box(0.6, 1.32, 2.775, 0.07, 0.6, 0.012, steel); }); q.box(-0.9, 0.9, 2.8, 0.1, 0.1, 0.05, VC.red);
+    if (!rep) {
+      q.mat('canvas');
+      const cv = VC.canvas, prof = [[-1.1, 1.62], [-1.1, 2.05], [-0.97, 2.36], [-0.55, 2.58], [0, 2.64], [0.55, 2.58], [0.97, 2.36], [1.1, 2.05], [1.1, 1.62]], rings = [];
+      for (let i = 0; i <= 12; i++) { const z = -0.27 + 3.04 * i / 12, sag = 1 - 0.035 * Math.abs(Math.sin(i / 12 * Math.PI * 4)); rings.push(prof.map(([x, y]) => [x * (y > 2.1 ? sag : 1), y > 2.1 ? 1.62 + (y - 1.62) * sag : y, z])); }
+      q.loft(rings, (p, i) => shade(cv, 0.92 + 0.08 * Math.abs(Math.sin(i / 12 * Math.PI * 4))), { capA: true, capB: true });
+      q.mir(q => { for (const z of [0.2, 1.25, 2.3]) q.tube([1.11, 1.7, z], [1.09, 1.45, z], 0.008, 0.008, hex(0x6b5c40), 4); });
+    }
+  });
+}
+/* banda rojigualda alrededor de una torre de radio r a la altura y */
+const natBand = (q, r, y, h = 0.06) => { q.latheY([[r, y + h * 1.5], [r, y + h * 0.5]], VC.red, 14, { hard: true }); q.latheY([[r, y + h * 0.5], [r, y - h * 0.5]], VC.yel, 14, { hard: true }); q.latheY([[r, y - h * 0.5], [r, y - h * 1.5]], VC.red, 14, { hard: true }); };
+/* tren de rodaje: oruga con sus ruedas. o: { x, w, spr:[z,y,r], idl:[z,y,r], road:[[z,r],...], ret:[[z,y],...], col } */
+function tankRun(q, o) {
+  const tk = hex(0x2b2824), rub = hex(0x1a1a1a), y0 = 0.035;
+  const circ = [o.spr, o.idl, ...o.road.slice().reverse().map(([z, r]) => [z, y0 + r, r])];
+  q.track(o.x, o.w, circ.map(c => [c[0], c[1], c[2] + 0.018]), tk, { step: 0.105, teeth: true, grouser: true });
+  const disc = (z, y, r, col, spokes, wd = o.w * 0.5) => q.T(o.x, y, z, () => { const m = M4.create(); M4.rotY(m, Math.PI / 2); q.at(m, () => {
+    q.lathe([[0, -wd / 2 - 0.02], [r * 0.3, -wd / 2 - 0.02], [r * 0.42, -wd / 2], [r * 0.86, -wd / 2], [r, -wd / 2 + 0.02], [r, wd / 2 - 0.02], [r * 0.86, wd / 2], [r * 0.42, wd / 2], [r * 0.3, wd / 2 + 0.02], [0, wd / 2 + 0.02]], col, 14);
+    if (spokes) for (let k = 0; k < spokes; k++) { const a = k / spokes * Math.PI * 2; q.box(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, 0, r * 0.2, r * 0.2, wd + 0.012, shade(col, 0.6)); } }); });
+  disc(o.spr[0], o.spr[1], o.spr[2], o.col, 6); disc(o.idl[0], o.idl[1], o.idl[2], o.col, 6);
+  for (const [z, r] of o.road) { disc(z, y0 + r, r, rub, 0, o.w * 0.42); disc(z, y0 + r, r * 0.72, o.col, 0, o.w * 0.46); }
+  for (const [z, y] of o.ret || []) disc(z, y, 0.085, rub, 0, o.w * 0.4);
+}
+function mkT26(team) {
+  const col = team === REP ? hex(0x57663f) : hex(0x5f6646), c2 = shade(col, 0.9), c3 = shade(col, 0.78), { dk, steel } = VC, rv = shade(col, 0.7);
+  return {
+    hull: mdl(q => {
+      q.mat('armor');
+      q.mir(q => {
+        tankRun(q, { x: 1.07, w: 0.27, col: c3, spr: [-1.93, 0.66, 0.3], idl: [1.93, 0.6, 0.25], road: [-1.42, -1.02, -0.6, -0.2, 0.22, 0.62, 1.04, 1.44].map(z => [z, 0.15]), ret: [[-1.1, 0.8], [-0.35, 0.8], [0.4, 0.8], [1.15, 0.8]] });
+        for (const zc of [-1.22, -0.4, 0.42, 1.24]) { q.box(1.0, 0.33, zc, 0.06, 0.07, 0.62, c3); q.box(1.0, 0.25, zc - 0.2, 0.05, 0.14, 0.06, c3); q.box(1.0, 0.25, zc + 0.2, 0.05, 0.14, 0.06, c3); }
+        for (const zc of [-0.81, 0.83]) { q.box(0.99, 0.48, zc, 0.07, 0.07, 1.0, dk); q.box(0.99, 0.43, zc, 0.07, 0.04, 0.7, dk); q.tube([0.9, 0.5, zc], [1.04, 0.5, zc], 0.06, 0.06, c3, 8); }
+        /* guardabarros */
+        const path = [[-2.3, 0.78], [-2.22, 0.95], [-2.0, 1.02], [1.95, 1.02], [2.2, 0.95], [2.3, 0.8]];
+        q.loft(path.map(([z, y]) => [[0.86, y + 0.025, z], [1.24, y + 0.025, z], [1.24, y, z], [0.86, y, z]]), c2, { capA: true, capB: true, flat: true });
+        q.box(1.22, 0.99, 0, 0.02, 0.05, 3.9, c3);
+        q.tube([0.7, 0.95, -2.25], [0.7, 0.84, -2.32], 0.03, 0.03, dk, 6);
+      });
+      /* barcaza y superestructura */
+      q.plate([[-2.15, 0.62], [-2.0, 0.4], [1.75, 0.4], [2.15, 0.62], [2.15, 1.02], [-1.3, 1.02], [-2.08, 0.84]], -0.88, 0.88, c2, 'zy');
+      q.box(0, 1.29, 0.22, 1.74, 0.54, 2.2, col); q.box(0.4, 1.2, -1.08, 0.78, 0.36, 0.42, col); q.box(0.4, 1.385, -1.08, 0.7, 0.02, 0.36, c2);
+      q.box(0.4, 1.26, -1.3, 0.3, 0.07, 0.02, dk);
+      for (const sx of [-1, 1]) { q.rivets([sx * 0.874, 1.5, -0.8], [sx * 0.874, 1.5, 1.25], 14, rv); q.rivets([sx * 0.874, 1.08, -0.8], [sx * 0.874, 1.08, 1.25], 14, rv); q.rivets([sx * 0.884, 0.5, -1.8], [sx * 0.884, 0.5, 1.9], 22, rv); }
+      q.rivets([-0.8, 1.5, -0.884], [0.8, 1.5, -0.884], 11, rv); q.rivets([-0.8, 0.97, -1.52], [0.8, 0.95, -1.7], 10, rv);
+      /* cubierta del motor: rejilla de aire y silenciador */
+      q.box(0, 1.1, 1.72, 1.7, 0.18, 0.86, c2); for (let i = 0; i < 7; i++) q.box(0, 1.2, 1.4 + i * 0.1, 1.2, 0.02, 0.05, dk);
+      q.tube([-0.62, 1.3, 2.02], [0.62, 1.3, 2.02], 0.1, 0.1, VC.rust, 10); q.tube([0.62, 1.3, 2.02], [0.78, 1.3, 2.1], 0.035, 0.035, VC.rust, 6);
+      /* faro, ganchos, pala y eslabones de respeto */
+      q.T(-0.55, 1.16, -1.5, () => { q.lathe([[0.001, 0.12], [0.07, 0.08], [0.085, 0], [0.078, -0.01]], c3, 10); q.lathe([[0, -0.005], [0.078, -0.01]], VC.lamp, 10, { hard: true }); });
+      q.mir(q => { q.box(0.55, 0.62, -2.17, 0.1, 0.1, 0.08, dk); q.box(0.55, 0.7, 2.17, 0.1, 0.1, 0.08, dk); });
+      q.tube([-1.05, 1.07, -0.6], [-1.05, 1.07, 0.5], 0.018, 0.018, VC.wd, 6); q.box(-1.05, 1.07, 0.6, 0.2, 0.02, 0.26, steel);
+      for (let i = 0; i < 4; i++) q.box(1.05, 1.07, 0.9 + i * 0.13, 0.26, 0.04, 0.11, hex(0x2b2824));
+      if (team === NAT) [VC.red, VC.yel, VC.red].forEach((c, i) => q.plate([[-1.98, 0.875 - 0.001], [-1.42, 1.012], [-1.42, 1.02], [-1.98, 0.883]], -0.36 + i * 0.24, -0.12 + i * 0.24, c, 'zy'));
+    }),
+    turret: mdl(q => {
+      q.mat('armor');
+      q.latheY([[0.001, 0], [0.76, 0], [0.76, 0.02], [0.74, 0.6], [0.72, 0.64], [0.001, 0.64]], col, 18);
+      q.box(0, 0.33, 0.78, 0.92, 0.52, 0.56, col); q.box(0, 0.6, 0.78, 0.9, 0.02, 0.54, c2);
+      q.box(0, 0.33, -0.72, 0.6, 0.42, 0.22, c2); q.box(0, 0.33, -0.84, 0.36, 0.3, 0.1, c3);
+      q.tube([0, 0.33, -0.85], [0, 0.33, -1.25], 0.085, 0.075, c3, 10); q.tube([0, 0.33, -1.25], [0, 0.33, -2.25], 0.052, 0.046, dk, 10); q.tube([0, 0.33, -2.25], [0, 0.33, -2.27], 0.056, 0.056, dk, 10);
+      q.ball([0.27, 0.33, -0.74], 0.1, c3, 10, 6); q.tube([0.27, 0.33, -0.78], [0.27, 0.33, -1.18], 0.028, 0.024, dk, 8);
+      q.box(-0.2, 0.655, 0.25, 0.46, 0.025, 0.6, c2); q.box(0.3, 0.655, 0.25, 0.46, 0.025, 0.6, c2); q.tube([-0.2, 0.66, -0.2], [-0.2, 0.72, -0.2], 0.05, 0.05, c3, 8); q.ball([0.25, 0.66, -0.3], 0.1, c3, 10, 4, 0.5);
+      for (const sx of [-1, 1]) q.box(sx * 0.745, 0.42, -0.1, 0.02, 0.03, 0.16, dk);
+      for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2 + 0.2; if (Math.abs(Math.sin(a)) < 0.25 && Math.cos(a) < 0) continue; q.box(Math.sin(a) * 0.755, 0.56, Math.cos(a) * 0.755, 0.026, 0.026, 0.026, rv); q.box(Math.sin(a) * 0.765, 0.08, Math.cos(a) * 0.765, 0.026, 0.026, 0.026, rv); }
+      if (team === NAT) { natBand(q, 0.765, 0.33, 0.07); q.box(0, 0.672, 0.25, 0.5, 0.012, 0.5, VC.wht); q.tube([-0.2, 0.68, 0.05], [0.2, 0.68, 0.45], 0.022, 0.022, dk, 4); q.tube([0.2, 0.68, 0.05], [-0.2, 0.68, 0.45], 0.022, 0.022, dk, 4); }
+    }),
+    pivot: [-0.18, 1.56, 0.2], muzzle: 0.33
+  };
+}
+/* Panzer I Ausf. A: rueda tensora a ras de suelo, viga exterior y torre a la derecha con dos MG 13 */
+function mkPz1() {
+  const col = hex(0x6b6e68), c2 = shade(col, 0.9), c3 = shade(col, 0.76), { dk, steel } = VC, brown = hex(0x6a5a42);
+  const camo = p => { const n = Math.sin(p[0] * 2.3 + p[2] * 1.7) + Math.sin(p[2] * 2.9 - p[1] * 2.1 + 1.3) * 0.8 + Math.sin(p[0] * 4.1 + 2.0) * 0.5; return n > 0.9 ? brown : n < -1.1 ? hex(0x565f4a) : col; };
+  return {
+    hull: mdl(q => {
+      q.mat('armor');
+      q.mir(q => {
+        tankRun(q, { x: 0.87, w: 0.27, col: c3, spr: [-1.72, 0.6, 0.27], idl: [1.52, 0.33, 0.28], road: [[-1.0, 0.2], [-0.42, 0.2], [0.16, 0.2], [0.74, 0.2]], ret: [[-0.85, 0.74], [-0.1, 0.72], [0.65, 0.66]] });
+        q.box(1.02, 0.25, 0.7, 0.04, 0.09, 1.75, c3); q.box(1.02, 0.3, 0.45, 0.04, 0.16, 0.5, c3);
+        for (const z of [-0.42, 0.16, 0.74, 1.52]) q.tube([0.98, z > 1 ? 0.33 : 0.235, z], [1.05, z > 1 ? 0.33 : 0.235, z], 0.05, 0.05, dk, 8);
+        const path = [[-2.02, 0.7], [-1.95, 0.86], [-1.7, 0.92], [1.6, 0.92], [1.9, 0.86], [1.98, 0.7]];
+        q.loft(path.map(([z, y]) => [[0.7, y + 0.02, z], [1.03, y + 0.02, z], [1.03, y, z], [0.7, y, z]]), c2, { capA: true, capB: true, flat: true });
+        q.tube([0.9, 1.0, 1.25], [0.9, 1.0, 1.85], 0.075, 0.075, VC.rust, 10); q.tube([0.9, 1.0, 1.85], [0.98, 1.0, 1.95], 0.025, 0.025, VC.rust, 6);
+        q.T(0.78, 1.0, -1.72, () => { q.lathe([[0.001, 0.1], [0.06, 0.07], [0.075, 0], [0.068, -0.01]], c3, 10); q.lathe([[0, -0.005], [0.068, -0.01]], VC.lamp, 10, { hard: true }); });
+      });
+      q.plate([[-1.95, 0.6], [-1.78, 0.36], [1.5, 0.36], [1.85, 0.56], [1.85, 0.92], [-1.25, 0.92], [-1.9, 0.78]], -0.72, 0.72, c2, 'zy');
+      /* superestructura de chapas inclinadas */
+      const rect = (y, w, z0, z1) => [[-w, y, z0], [w, y, z0], [w, y, z1], [-w, y, z1]];
+      q.loft([rect(0.92, 0.98, -0.95, 1.2), rect(1.37, 0.8, -0.72, 1.05)], camo, { flat: true, capB: true });
+      q.loft([rect(0.92, 0.72, 1.2, 1.86), rect(1.16, 0.66, 1.05, 1.75)], camo, { flat: true, capB: true });
+      for (let i = 0; i < 5; i++) q.box(0, 1.17, 1.2 + i * 0.11, 0.9, 0.02, 0.05, dk);
+      q.box(-0.36, 1.2, -0.86, 0.34, 0.2, 0.03, c3); q.box(-0.36, 1.2, -0.88, 0.2, 0.04, 0.02, dk);
+      [VC.red, VC.yel, VC.red].forEach((c, i) => q.plate([[-1.86, 0.795], [-1.3, 0.928], [-1.3, 0.936], [-1.86, 0.803]], -0.36 + i * 0.24, -0.12 + i * 0.24, c, 'zy'));
+      q.box(0.3, 0.98, 1.3, 0.5, 0.12, 0.3, brown); q.tube([-0.95, 0.97, -0.5], [-0.95, 0.97, 0.5], 0.016, 0.016, VC.wd, 6); q.box(-0.95, 0.97, 0.6, 0.18, 0.02, 0.24, steel);
+      q.mir(q => { q.box(0.5, 0.56, -1.97, 0.09, 0.09, 0.07, dk); });
+      q.tube([-0.6, 1.37, 0.9], [-0.6, 2.3, 0.95], 0.008, 0.005, dk, 4);
+    }),
+    turret: mdl(q => {
+      q.mat('armor');
+      q.latheY([[0.001, 0], [0.56, 0], [0.5, 0.42], [0.47, 0.44], [0.001, 0.44]], col, 16);
+      q.box(0, 0.22, -0.46, 0.62, 0.34, 0.14, c2); natBand(q, 0.535, 0.22, 0.05);
+      for (const sx of [-1, 1]) { q.ball([sx * 0.15, 0.22, -0.52], 0.075, c3, 8, 5); q.tube([sx * 0.15, 0.22, -0.55], [sx * 0.15, 0.22, -1.1], 0.03, 0.03, dk, 8); for (let i = 0; i < 6; i++) q.tube([sx * 0.15, 0.22, -0.66 - i * 0.06], [sx * 0.15, 0.22, -0.69 - i * 0.06], 0.038, 0.038, c3, 8); }
+      q.box(0, 0.45, 0.08, 0.5, 0.025, 0.46, c2); q.box(0, 0.47, 0.3, 0.3, 0.03, 0.05, dk);
+      for (const sx of [-1, 1]) q.box(sx * 0.52, 0.3, 0.05, 0.02, 0.03, 0.14, dk);
+    }),
+    pivot: [0.22, 1.37, 0.15], muzzle: 0.22
+  };
+}
+/* ---------- aviones ---------- */
+/* fuselaje por estaciones [z, rx, ry, cy, p]: interpola una estación y da la x de la piel a una altura */
+const fusAt = (st, z) => { let i = 0; while (i < st.length - 2 && z > st[i + 1][0]) i++; const a = st[i], b = st[i + 1], t = clamp((z - a[0]) / (b[0] - a[0]), 0, 1); return [z, lerp(a[1], b[1], t), lerp(a[2], b[2], t), lerp(a[3] || 0, b[3] || 0, t), lerp(a[4] || 2, b[4] || 2, t)]; };
+const fusX = (st, z, y) => { const s = fusAt(st, z), u = Math.abs((y - s[3]) / s[2]); return u >= 1 ? 0 : s[1] * Math.pow(1 - Math.pow(u, s[4]), 1 / s[4]); };
+const fusRings = (st, n = 18) => st.map(s => Mdl.ell(s[0], 0, s[3] || 0, s[1], s[2], n, s[4] || 2));
+/* letras de matrícula (3 × 5) pintadas sobre la piel del fuselaje */
+const PIXF = { C: '111100100100111', M: '101111111101101', '-': '000000111000000', 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001001001', 8: '111101111101111', 9: '111101111001111', N: '101111111111101', A: '111101111101101' };
+function fusText(q, st, txt, zA, y0, px, col, side) {
+  let col0 = 0;
+  for (const ch of txt) { const g = PIXF[ch]; if (g) for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (g[r * 3 + c] === '1') {
+    const zc = side > 0 ? zA - (col0 + c) * px : zA + (col0 + c) * px, y = y0 + (4 - r) * px, P = (z, yy) => [side * (fusX(st, z, yy) + 0.004), yy, z];
+    q.quad(P(zc - px / 2, y - px / 2), P(zc + px / 2, y - px / 2), P(zc + px / 2, y + px / 2), P(zc - px / 2, y + px / 2), col); }
+    col0 += 4; }
+}
+/* disco pintado sobre la piel del fuselaje (escarapela) */
+function fusDisc(q, st, zc, yc, r, col, side, inner) { const n = 14, P = (a, rr) => { const z = zc + Math.cos(a) * rr, y = yc + Math.sin(a) * rr; return [side * (fusX(st, z, y) + (inner ? 0.006 : 0.004)), y, z]; };
+  for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, b = (k + 1) / n * Math.PI * 2; q.tri(P(0, 0), P(a, r * 0.5), P(b, r * 0.5), col); q.quad(P(a, r * 0.5), P(a, r), P(b, r), P(b, r * 0.5), col); } }
+/* ala (media): secciones [x, y, zLE, cuerda, grosor] unidas; col(p, arriba) */
+function wingHalf(q, secs, col, o = {}) {
+  const n = o.n || 8, rings = secs.map(s => Mdl.foil(s[0], s[1], s[2], s[3], s[4], n, 0, o.camber === undefined ? 0.02 : o.camber, o.u0 || 0, o.u1 === undefined ? 1 : o.u1));
+  q.loft(rings, typeof col === 'function' ? (p, i, j) => col(p, j <= n, i) : col, { capA: o.capA, capB: o.capB !== false });
+}
+/* hélice: palas con torsión alrededor del eje Z (mirando a -Z), centrada en el origen */
+function propeller(q, blades, R, col, spinner, spinCol, back) {
+  for (let b = 0; b < blades; b++) q.T(0, 0, 0, () => {
+    const rings = []; for (let i = 0; i <= 6; i++) { const t = i / 6, r = lerp(R * 0.12, R, t), ch = R * (0.07 + 0.11 * Math.sin(Math.PI * Math.pow(t, 0.7)) * (1 - t * 0.35)), th = lerp(0.045, 0.012, t), pitch = lerp(1.05, 0.33, Math.pow(t, 0.7)), c = Math.cos(pitch), s = Math.sin(pitch);
+      rings.push([[-1, 0], [-0.5, 1], [0.5, 1], [1, 0], [0.5, -1], [-0.5, -1]].map(([u, w]) => { const a = u * ch / 2, d = w * th / 2; return [a * c - d * s, r, a * s + d * c]; })); }
+    q.loft(rings, (p, i, j) => j >= 3 ? (back || col) : i >= 6 ? VC.yel : col, { capB: true });
+  }, 0, 0, b / blades * Math.PI * 2);
+  if (spinner) q.lathe(spinner, spinCol, 14);
+}
+/* calca de matrícula sobre el costado del fuselaje: renglón `row` de la textura 'marks', entre z0 y z1, centrada en yc */
+function fusMark(q, st, row, z0, z1, yc, side) {
+  const h = (z1 - z0) / 4, sg = side > 0 ? -1 : 1, A = [0, 0, sg / (z1 - z0), side > 0 ? z1 / (z1 - z0) : -z0 / (z1 - z0)], B = [0, 0.25 / h, 0, 1 - (row + 0.5) * 0.25 - 0.25 * yc / h];
+  q.decal('marks', A, B, () => { const n = 10, m = 4, P = (i, j) => { const z = lerp(z0, z1, i / n), y = yc - h / 2 + h * j / m; return [side * (fusX(st, z, y) + 0.004), y, z]; };
+    for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) q.quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1), [1, 1, 1]); });
+}
+/* Polikarpov I-16 tipo 10 «Mosca» CM-249: piezas móviles aparte (hélice, tren, alerones, timones, palanca, gases y agujas) */
+/* esferas del tablero: [x, y, radio, casilla de la textura, dato]; las que no llevan dato se quedan fijas */
+const MOSCA_DIALS = [[-0.27, 0.35, 0.05, 7, null], [-0.14, 0.37, 0.058, 0, 'kmh'], [0, 0.385, 0.064, 4, 'hdg'], [0.14, 0.37, 0.058, 1, 'alt'], [0.27, 0.35, 0.05, 2, 'rpm'], [-0.2, 0.215, 0.05, 5, null], [-0.068, 0.225, 0.052, 3, 'vs'], [0.068, 0.225, 0.052, 6, null], [0.2, 0.215, 0.05, 8, 'clock']];
+let mosca = null;
+const MOSCA_HT = 1.55, MOSCA_ZN = -2.55;
+function mkMosca() {
+  const H = MOSCA_HT, ZN = MOSCA_ZN, green = hex(0x4c6037), g2 = shade(green, 0.86), blue = hex(0x98bbd0), red = hex(0xc22a1f), dk = VC.dk, intc = hex(0x76816f), alu = hex(0x9a9d9f), lea = hex(0x4a3020), NS = 28;
+  const ST = [[0.0, 0.5, 0.5, 0, 2], [0.04, 0.62, 0.62, 0, 2], [0.25, 0.685, 0.685, 0, 2], [0.95, 0.69, 0.69, 0, 2], [1.06, 0.665, 0.665, 0, 2], [1.07, 0.61, 0.63, 0, 2.1], [1.9, 0.56, 0.62, 0, 2.2], [2.5, 0.5, 0.58, 0, 2.2], [3.3, 0.43, 0.52, 0.02, 2.2], [4.2, 0.29, 0.4, 0.05, 2.1], [5.0, 0.15, 0.28, 0.08, 2], [5.55, 0.045, 0.2, 0.1, 2]];
+  const full = z => { const t = fusAt(ST, z); return Mdl.ell(z, 0, t[3], t[1], t[2], NS, t[4]); };
+  const skin = p => p[2] > 3.42 && p[2] < 3.82 ? red : p[1] < fusAt(ST, p[2])[3] - fusAt(ST, p[2])[2] * 0.45 ? blue : green;
+  const parts = [], part = (name, pivot, axis, fn, o = {}) => { const q = new Mdl(); q.mat(o.mat || 'paint'); q.T(-pivot[0], H - pivot[1], ZN - pivot[2], fn); parts.push({ name, pivot, axis, mesh: q.mesh(), glass: o.glass || 0, dial: o.dial }); };
+  const OP0 = 128, OP1 = 412, ZC0 = 2.5, ZC1 = 3.3;
+  const wy = -0.42, dih = x => wy + Math.max(0, x - 1.5) * 0.087, LE = x => x < 1.5 ? 1.02 : lerp(1.02, 1.3, (x - 1.5) / 2.5), CH = x => x < 1.5 ? 1.95 : lerp(1.95, 1.28, (x - 1.5) / 2.5), TH = x => lerp(0.15, 0.1, x / 4.5);
+  const wcol = (p, up) => p[0] > 3.92 ? red : up ? green : blue, WS = x => [x, dih(x), LE(x), CH(x), TH(x)], WO = { n: 10 };
+  const finLE = t => 4.55 + 0.55 * t, finCH = t => 1.5 - 0.7 * t, finY = t => 0.12 + 0.9 * t, HU = 0.62, elevHinge = 4.75 + 0.55;
+  const stab = [[0.06, 1.0, 4.75], [0.6, 0.92, 4.8], [1.0, 0.82, 4.86], [1.5, 0.6, 5.0], [1.72, 0.3, 5.18]].map(([x, c, z]) => [x, 0.12, z, c, 0.09]);
+  /* parabrisas curvo: aro trasero y borde delantero sobre el lomo */
+  const WB = a => [Math.cos(a) * 0.37, 0.49 + 0.07 * Math.sin(a), 2.92 - Math.sin(a) * 0.44], WH = a => [Math.cos(a) * 0.35, 0.49 + Math.sin(a) * 0.43, 2.95 - Math.sin(a) * 0.05];
+  const wsRow = t => { const r = []; for (let k = 0; k <= 18; k++) { const a = k / 18 * Math.PI, b = WB(a), h = WH(a), p = w3.lerp(b, h, t), bulge = Math.sin(t * Math.PI) * 0.05 * Math.sin(a); r.push([p[0], p[1] + bulge * 0.6, p[2] - bulge]); } return r; };
+  /* --- célula --- */
+  part('body', [0, H, ZN], null, q => {
+    q.loft([0, 0.04, 0.25, 0.6, 0.95, 1.06].map(full), p => p[1] < -0.31 ? blue : green, {});                                   // capó
+    q.mat('metal', () => { q.lathe([[0.5, 0], [0.27, 0.03]], g2, NS, { hard: true });
+      for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; q.T(0, 0, 0, () => q.plate([[0.29, -0.05], [0.47, -0.09], [0.47, 0.09], [0.29, 0.05]], 0.012, 0.03, hex(0x0c0d0e)), 0, 0, a); }
+      q.lathe([[0.692, 0.94], [0.7, 0.96], [0.7, 1.05], [0.665, 1.06], [0.6, 1.075]], dk, NS, { hard: true });
+      for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; if (Math.sin(a) > 0.8) continue; const c = Math.cos(a), s = Math.sin(a); q.tube([c * 0.64, s * 0.64, 0.8], [c * 0.735, s * 0.735, 1.07], 0.038, 0.032, VC.rust, 8); q.tube([c * 0.735, s * 0.735, 1.069], [c * 0.735, s * 0.735, 1.071], 0.026, 0.026, hex(0x0c0c0c), 8); } });
+    q.loft([1.07, 1.5, 1.9, 2.2, 2.5].map(full), skin, {});
+    const arcs = []; for (let i = 0; i <= 4; i++) { const s = fusAt(ST, lerp(ZC0, ZC1, i / 4)); arcs.push(Mdl.arc(s[0], 0, s[3], s[1], s[2], OP0, OP1, 22, s[4])); }
+    q.loft(arcs, skin, { open: true });
+    q.mat('_', () => { q.loft(arcs.map(r => r.map(p => [p[0] * 0.96, p[1] * 0.96, p[2]])), intc, { open: true });
+      for (let i = 0; i < 4; i++) for (const k of [0, 22]) q.tube(arcs[i][k], arcs[i + 1][k], 0.024, 0.024, lea, 6); q.ball(arcs[0][0], 0.024, lea, 6, 4); q.ball(arcs[0][22], 0.024, lea, 6, 4); });
+    q.loft([3.3, 3.415, 3.425, 3.6, 3.815, 3.825, 4.2, 4.6, 5.0, 5.3, 5.55].map(full), skin, {});
+    { const s = fusAt(ST, ZC0), a = Mdl.arc(ZC0, 0, s[3], s[1], s[2], 52, 128, 8, s[4]); for (let k = 0; k < 8; k++) q.tri(a[k], a[k + 1], [0, s[3] + s[2] * 0.6, ZC0], green); }
+    q.loft([Mdl.ell(3.28, 0, 0.5, 0.2, 0.2, 12), Mdl.ell(3.5, 0, 0.5, 0.17, 0.18, 12), Mdl.ell(3.9, 0, 0.46, 0.11, 0.11, 12), Mdl.ell(4.3, 0, 0.42, 0.05, 0.05, 12)], green, { capA: true });
+    /* interior */
+    q.mat('_', () => {
+      q.box(0, 0.52, 3.27, 0.22, 0.2, 0.03, lea);
+      q.box(0, -0.47, 2.9, 0.7, 0.03, 0.85, intc); q.rbox(0, -0.1, 3.24, 0.44, 0.62, 0.04, 0.06, intc); q.box(0, -0.38, 3.05, 0.42, 0.05, 0.4, intc); q.rbox(0, -0.04, 3.215, 0.34, 0.46, 0.02, 0.05, lea); q.box(0, -0.345, 3.05, 0.36, 0.03, 0.36, lea);
+      q.mir(q => { q.box(0.19, 0.1, 3.2, 0.04, 0.5, 0.012, hex(0x8a7a4a)); q.box(0.4, -0.05, 2.9, 0.03, 0.06, 0.62, alu); q.box(0.4, 0.14, 2.75, 0.03, 0.12, 0.2, hex(0x16181a)); });
+      q.plate([[-0.42, 0.06], [0.42, 0.06], [0.36, 0.44], [0.2, 0.49], [-0.2, 0.49], [-0.36, 0.44]], ZC0 + 0.07, ZC0 + 0.09, hex(0x191b1d));
+      for (const [dx, dy, r] of MOSCA_DIALS) q.T(dx, dy, ZC0 + 0.09, () => q.lathe([[r, 0.0], [r + 0.008, 0.004], [r + 0.008, 0.009], [r, 0.012]], hex(0x2b2e30), 20, { hard: true }));
+      for (let k = 0; k < 4; k++) { q.tube([0.3 + k * 0.035, 0.1, ZC0 + 0.09], [0.3 + k * 0.035, 0.1, ZC0 + 0.11], 0.007, 0.007, alu, 6); q.ball([0.3 + k * 0.035, 0.1, ZC0 + 0.115], 0.01, k % 2 ? red : alu, 6, 4); }
+      q.tube([0, 0.5, ZC0 + 0.1], [0, 0.545, ZC0 + 0.1], 0.01, 0.01, dk, 6); q.tube([0, 0.56, ZC0 - 0.2], [0, 0.56, ZC0 + 0.2], 0.019, 0.019, dk, 10); q.tube([0, 0.56, ZC0 + 0.2], [0, 0.56, ZC0 + 0.225], 0.026, 0.026, lea, 10);
+    });
+    MOSCA_DIALS.forEach(([dx, dy, r, cell]) => { const col = cell % 3, row = Math.floor(cell / 3), k = 1 / (6 * r) * 0.94;
+      q.decal('dials', [k, 0, 0, (col + 0.5) / 3 - dx * k], [0, k, 0, 1 - (row + 0.5) / 3 - dy * k], () => q.T(dx, dy, ZC0 + 0.0915, () => q.lathe([[0, 0], [r, 0]], [1, 1, 1], 20, { hard: true })), 0.25); });
+    /* parabrisas: aro con remaches, borde y dos tirantes */
+    q.mat('metal', () => { const hp = [], bp = []; for (let k = 0; k <= 18; k++) { hp.push(WH(k / 18 * Math.PI)); bp.push(WB(k / 18 * Math.PI)); }
+      q.pipe(hp, 0.016, g2, 6); q.pipe(bp, 0.009, g2, 5); for (let k = 1; k < 18; k++) { const p = hp[k], n = w3.nrm([p[0], p[1] - 0.49, 0]); q.ball([p[0] + n[0] * 0.016, p[1] + n[1] * 0.016, p[2] + 0.012], 0.006, alu, 5, 3); }
+      q.mir(q => q.tube([0.13, 0.62, 2.3], WH(Math.PI * 0.37), 0.008, 0.008, g2, 5)); });
+    /* armas, tubo pitot, patín, luces */
+    q.mat('metal', () => { q.mir(q => { q.loft([[0.1, 0.03], [0.5, 0.05], [1.0, 0.035]].map(([z, r]) => Mdl.arc(z, 0.2, 0.655 + (z > 0.9 ? 0.02 : 0), r, r, 0, 180, 6)), g2, { open: true }); q.tube([0.2, 0.675, -0.03], [0.2, 0.675, 0.16], 0.016, 0.016, dk, 6);
+      q.tube([1.32, dih(1.32) + 0.02, LE(1.32) - 0.22], [1.32, dih(1.32) + 0.02, LE(1.32) + 0.1], 0.02, 0.02, dk, 6); });
+      q.tube([3.3, dih(3.3) - 0.01, LE(3.3) + 0.1], [3.3, dih(3.3) - 0.03, LE(3.3) - 0.35], 0.012, 0.008, alu, 5);
+      q.tube([0, -0.1, 5.25], [0, -0.42, 5.5], 0.025, 0.02, dk, 6); q.box(0, -0.43, 5.52, 0.05, 0.03, 0.14, VC.steel); });
+    q.mat('chrome', () => { q.ball([4.47, dih(4.47), LE(4) + 0.85], 0.022, red, 6, 4); q.ball([-4.47, dih(4.47), LE(4) + 0.85], 0.022, hex(0x2a9a4a), 6, 4); });
+    /* alas, carenado de raíz y huecos del tren */
+    q.mir(q => {
+      wingHalf(q, [0, 0.6, 1.0, 1.5].map(WS), wcol, { ...WO, capB: false });
+      wingHalf(q, [1.5, 2.0, 2.6, 3.2, 3.9, 3.94, 4.0].map(WS), wcol, { ...WO, u1: 0.745, capA: true });
+      wingHalf(q, [[4.0, 1.28, 0], [4.15, 1.14, 0.05], [4.3, 0.9, 0.16], [4.42, 0.58, 0.32], [4.5, 0.22, 0.52]].map(([x, c, dz]) => [x, dih(x), LE(4) + dz, c, TH(x)]), wcol, { ...WO, capA: true });
+      q.loft([[0.56, 1.0], [0.6, 1.6], [0.56, 2.4], [0.5, 2.98]].map(([w, z]) => [[w - 0.06, -0.2, z], [w + 0.1, wy + 0.1, z], [w + 0.22, wy + 0.02, z], [w - 0.06, wy - 0.08, z]]), p => p[1] < -0.45 ? blue : green, { open: true });
+      q.mat('_', () => { q.T(0.52, wy - 0.105 + 0.006, 1.68, () => q.latheY([[0.001, 0], [0.37, 0]], hex(0x15181a), 16, { hard: true })); q.box(0.9, wy - 0.1, 1.72, 0.3, 0.004, 0.12, hex(0x15181a)); });
+      wingHalf(q, stab, (p, up) => up ? green : blue, { n: 8, u1: 0.54, camber: 0 });
+    });
+    q.T(0, 0, 0, () => wingHalf(q, [0, 0.35, 0.7, 0.92, 1].map(t => [finY(t), 0, finLE(t), finCH(t) * (t > 0.9 ? 0.86 : 1), 0.09]), green, { u1: HU - 0.01, camber: 0 }), 0, 0, Math.PI / 2);
+    for (const s of [1, -1]) fusMark(q, ST, 0, 3.92, 4.98, 0.02, s);
+  });
+  part('glass', [0, H, ZN], null, q => q.loft([0, 0.25, 0.5, 0.75, 1].map(wsRow), hex(0xbfd8e0), { open: true }), { glass: 0.2, mat: 'chrome' });
+  /* hélice (negra con las puntas amarillas) y su disco cuando gira deprisa */
+  part('prop', [0, H, ZN - 0.1], [0, 0, -1], q => propeller(q, 2, 1.4, hex(0x17181a), [[0.001, -0.42], [0.1, -0.36], [0.21, -0.18], [0.26, 0.02], [0.27, 0.12]], g2, hex(0x17181a)), { mat: 'metal' });
+  part('disc', [0, H, ZN - 0.1], [0, 0, -1], q => q.lathe([[0.2, 0], [1.33, 0], [1.33, 0.001], [1.4, 0.001]], p => Math.hypot(p[0], p[1]) > 1.36 ? VC.yel : hex(0x2a2a2a), 28, { hard: true }), { glass: 0.08, mat: '_' });
+  /* tren: se pliega hacia dentro; pata con amortiguador, compuertas y tapa de rueda */
+  for (const s of [1, -1]) part(s > 0 ? 'gearR' : 'gearL', [s * 1.02, H + wy - 0.06, ZN + 1.72], [0, 0, 1], q => {
+    const top = [s * 1.02, wy - 0.06, 1.72], ax = [s * 1.02, -(H - 0.35), 1.68];
+    q.tube(top, [ax[0], ax[1] + 0.36, ax[2]], 0.048, 0.042, g2, 10); q.tube([ax[0], ax[1] + 0.37, ax[2]], [ax[0], ax[1] + 0.02, ax[2]], 0.03, 0.03, hex(0xc4c7c9), 8); q.tube([ax[0], ax[1] + 0.36, ax[2]], [ax[0], ax[1] + 0.33, ax[2]], 0.052, 0.052, dk, 10);
+    q.tube(ax, [ax[0] - s * 0.17, ax[1], ax[2]], 0.03, 0.03, dk, 6);
+    q.mat('rubber', () => q.T(ax[0] - s * 0.13, ax[1], ax[2], () => q.wheel(0.35, 0.15, 0.2, VC.tire, g2, { seg: 22 })));
+    q.T(ax[0] - s * 0.215, ax[1], ax[2], () => { const m = M4.create(); M4.rotY(m, Math.PI / 2 * s); q.at(m, () => q.lathe([[0.001, 0.012], [0.12, 0.008], [0.2, 0]], blue, 16)); });
+    q.plate([[1.44, wy - 0.1], [2.0, wy - 0.1], [1.93, ax[1] + 0.3], [1.82, ax[1] + 0.06], [1.56, ax[1] + 0.06], [1.5, ax[1] + 0.3]], s * 1.075, s * 1.09, blue, 'zy');
+    q.plate([[1.46, wy - 0.105], [1.98, wy - 0.105], [1.98, wy - 0.095], [1.46, wy - 0.095]], s * 0.62, s * 1.0, blue, 'zy');
+    q.tube([s * 1.02, wy - 0.25, 1.72], [s * 0.66, wy - 0.07, 1.74], 0.018, 0.018, alu, 6); q.tube([s * 1.02, ax[1] + 0.34, 1.7], [s * 1.02, ax[1] + 0.2, 1.84], 0.012, 0.012, alu, 5);
+  });
+  /* alerones entelados */
+  for (const s of [1, -1]) { const hp = x => [s * x, dih(x), LE(x) + CH(x) * 0.755], a = hp(1.52), b = hp(3.98);
+    part(s > 0 ? 'ailR' : 'ailL', w3.add(w3.lerp(a, b, 0.5), [0, H, ZN]), w3.nrm(w3.sub(b, a)).map(v => v * s), q => { const m = M4.create(); m[0] = s; q.at(m, () => wingHalf(q, [1.52, 2.0, 2.6, 3.2, 3.9, 3.94, 3.98].map(WS), wcol, { n: 6, u0: 0.76, capA: true })); }, { mat: 'fabric' }); }
+  part('elev', [0, H + 0.12, ZN + elevHinge], [1, 0, 0], q => q.mir(q => wingHalf(q, stab, (p, up) => up ? green : blue, { n: 6, u0: 0.55, camber: 0, capA: true })), { mat: 'fabric' });
+  { const hz = t => finLE(t) + finCH(t) * HU, a = [0, finY(0), hz(0)], b = [0, finY(1), hz(1)];
+    part('rudder', w3.add(a, [0, H, ZN]), w3.nrm(w3.sub(b, a)), q => { [[-0.25, 0.3, VC.pur], [0.3, 0.63, VC.yel], [0.63, 1.0, red]].forEach(([t0, t1, c]) => q.T(0, 0, 0, () => wingHalf(q, [t0, (t0 + t1) / 2, t1].map(t => [finY(t), 0, finLE(Math.max(0, t)), (finCH(Math.max(0, t)) - (t < 0 ? 0.25 : 0)) * (t > 0.9 ? 0.86 : 1), 0.09]), c, { n: 6, u0: HU, camber: 0, capA: true }), 0, 0, Math.PI / 2)); }, { mat: 'fabric' }); }
+  /* mandos de la cabina y agujas */
+  part('stick', [0, H - 0.45, ZN + 2.98], [1, 0, 0], q => { q.tube([0, -0.45, 2.98], [0, 0.0, 2.93], 0.016, 0.014, hex(0x2a2d2f), 8); q.T(0, 0.045, 2.93, () => { const m = M4.create(); M4.rotX(m, Math.PI / 2); q.at(m, () => q.lathe([[0.048, -0.014], [0.062, 0], [0.048, 0.014], [0.034, 0], [0.048, -0.014]], hex(0x2a1a10), 14)); }); q.ball([0.048, 0.06, 2.93], 0.012, red, 6, 4); }, { mat: 'metal' });
+  part('throttle', [-0.4, H - 0.06, ZN + 2.82], [1, 0, 0], q => { q.tube([-0.38, -0.06, 2.82], [-0.38, 0.09, 2.82], 0.009, 0.009, alu, 6); q.ball([-0.38, 0.11, 2.82], 0.026, red, 10, 6); }, { mat: 'chrome' });
+  MOSCA_DIALS.forEach(([dx, dy, r, cell, src], i) => part('dial' + i, [dx, H + dy, ZN + ZC0 + 0.097], [0, 0, 1], q => { q.plate([[-r * 0.07, -r * 0.2], [r * 0.07, -r * 0.2], [r * 0.02, r * 0.82], [-r * 0.02, r * 0.82]].map(([x, y]) => [dx + x, dy + y]), ZC0 + 0.096, ZC0 + 0.098, VC.wht); q.tube([dx, dy, ZC0 + 0.095], [dx, dy, ZC0 + 0.101], r * 0.13, r * 0.13, hex(0x2b2e30), 8); }, { mat: '_', dial: src || 'fix' + cell }));
+  return { parts, eye: [0, H + 0.72, ZN + 3.2], wheelZ: ZN + 1.68, gk: 1.87, fov: 1.15 };
+}
+/* ---------- cazas de una pieza (más hélice y, si se recoge, tren) ---------- */
+function planeFus(q, d) {
+  const ST = d.ST, c = d.cock, zs = new Set(ST.map(s => s[0]));
+  for (const z of d.cuts || []) { zs.add(z - 0.004); zs.add(z + 0.004); }
+  if (c) { zs.add(c[0]); zs.add(c[1]); for (let i = 1; i < 3; i++) zs.add(lerp(c[0], c[1], i / 3)); }
+  const Z = [...zs].sort((a, b) => a - b), n = d.n || 18, ha = c ? c[2] : 0;
+  const full = z => { const t = fusAt(ST, z); return Mdl.ell(z, 0, t[3], t[1], t[2], n, t[4]); }, arc = z => { const t = fusAt(ST, z); return Mdl.arc(z, 0, t[3], t[1], t[2], 90 + ha, 450 - ha, n - 2, t[4]); };
+  let run = [], open = false; const flush = () => { if (run.length > 1) q.loft(run, d.skin, { open }); run = []; };
+  for (let i = 0; i < Z.length; i++) {
+    const z = Z[i], inC = c && z >= c[0] - 1e-6 && z <= c[1] + 1e-6;
+    if (inC !== open) { if (inC) { run.push(full(z)); flush(); open = true; run.push(arc(z)); } else { flush(); open = false; run.push(full(Z[i - 1])); run.push(full(z)); } continue; }
+    run.push(open ? arc(z) : full(z));
+  }
+  flush();
+  if (c) {
+    const intc = d.intc || hex(0x7b8674), lea = hex(0x4a3020), A = [c[0], lerp(c[0], c[1], 1 / 3), lerp(c[0], c[1], 2 / 3), c[1]].map(arc);
+    q.loft(A.map(r => r.map(p => [p[0] * 0.95, p[1] * 0.95, p[2]])), intc, { open: true });
+    for (let i = 0; i < 3; i++) for (const k of [0, n - 2]) q.tube(A[i][k], A[i + 1][k], 0.02, 0.02, lea, 5);
+    const t0 = fusAt(ST, c[0]), t1 = fusAt(ST, c[1]), zm = (c[0] + c[1]) / 2;
+    q.box(0, t0[3] - t0[2] * 0.75, zm, t0[1] * 1.3, 0.03, c[1] - c[0], intc); q.box(0, t1[3] - 0.1, c[1] - 0.06, t1[1] * 1.1, t1[2] * 1.1, 0.04, intc); q.box(0, t1[3] + t1[2] * 0.8, c[1] - 0.04, 0.2, 0.2, 0.04, lea);
+    q.box(0, t0[3] + t0[2] * 0.35, c[0] + 0.06, t0[1] * 1.5, t0[2] * 0.8, 0.02, hex(0x16181a));
+    for (const s of [-1, 1]) for (let k = 0; k < 2; k++) q.T(s * (0.1 + k * 0.16), t0[3] + t0[2] * (0.45 - k * 0.12), c[0] + 0.072, () => { q.lathe([[0, 0], [0.045, 0]], hex(0x08090a), 10, { hard: true }); q.box(0, 0.012, 0.002, 0.005, 0.035, 0.002, VC.wht); });
+  }
+}
+/* deriva (fija) y timón de dirección con los colores de cada bando. f: { y0, y1, le, ch, hu, col } */
+function planeFin(q, f, marks) {
+  const T = t => [lerp(f.y0, f.y1, t), 0, f.le[0] + f.le[1] * t, (f.ch[0] + f.ch[1] * t) * (t > 0.9 ? 0.85 : 1), 0.09];
+  q.T(0, 0, 0, () => {
+    wingHalf(q, [0, 0.35, 0.7, 0.92, 1].map(T), f.col, { u1: f.hu - 0.01, camber: 0 });
+    if (marks === 'rep') [[0, 0.34, VC.pur], [0.34, 0.67, VC.yel], [0.67, 1, VC.red]].forEach(([a, b, c]) => wingHalf(q, [a, (a + b) / 2, b].map(T), c, { u0: f.hu, camber: 0, capA: true }));
+    else wingHalf(q, [0, 0.35, 0.7, 0.92, 1].map(T), VC.wht, { u0: f.hu, camber: 0, capA: true });
+  }, 0, 0, Math.PI / 2);
+  if (marks !== 'rep') { const P = (t, u) => { const s = T(t); return [0, s[0], s[2] + s[3] * u]; }, a = P(0.12, f.hu + 0.06), b = P(0.88, 0.94), c = P(0.88, f.hu + 0.06), e = P(0.12, 0.94);
+    for (const sx of [0.03, -0.03]) for (const [u, v] of [[a, b], [c, e]]) q.tube([sx, u[1], u[2]], [sx, v[1], v[2]], 0.022, 0.022, VC.dk, 4, false); }
+}
+function mkPlane(d) {
+  const out = { H: d.H, wheelZ: d.ZN + d.wz, gk: d.gk, propAt: [0, d.H + (d.propY || 0), d.ZN + (d.propZ || -0.1)] };
+  out.body = mdl(q => q.T(0, d.H, d.ZN, () => {
+    q.mat(d.mat || 'paint');
+    planeFus(q, d);
+    for (const w of d.wings) q.mir(q => wingHalf(q, w.secs, w.col, w.o));
+    planeFin(q, d.fin, d.marks);
+    if (d.wind) { const w = d.wind, P = { bl: [-w.w, w.y, w.z], br: [w.w, w.y, w.z], tl: [-w.w * 0.7, w.y + w.h, w.z + w.h * 0.6], tr: [w.w * 0.7, w.y + w.h, w.z + w.h * 0.6], sl: [-w.w * 1.25, w.y - 0.03, w.z + w.h * 1.1], sr: [w.w * 1.25, w.y - 0.03, w.z + w.h * 1.1] }, gc = hex(0x9db9c4);
+      q.quad(P.bl, P.br, P.tr, P.tl, gc); q.tri(P.bl, P.tl, P.sl, gc); q.tri(P.br, P.sr, P.tr, gc);
+      for (const [a, b] of [['bl', 'tl'], ['br', 'tr'], ['tl', 'tr'], ['bl', 'br'], ['tl', 'sl'], ['tr', 'sr']]) q.tube(P[a], P[b], 0.012, 0.012, VC.dk, 4); }
+    d.extra && d.extra(q);
+    if (d.gear && !d.gearUp) d.gear(q);
+  }));
+  out.prop = mdl(q => propeller(q, d.blades || 2, d.propR, d.propCol || hex(0x8a8d8e), d.spinner, d.spinCol, hex(0x151515)), 'metal');
+  out.disc = mdl(q => q.lathe([[0.2, 0], [d.propR, 0]], hex(0x2a2a2a), 20, { hard: true }));
+  if (d.gear && d.gearUp) out.gear = mdl(q => q.T(0, d.H, d.ZN, () => d.gear(q)), 'metal');
+  return out;
+}
+/* tren fijo: pata carenada con rueda (y carena de rueda si lleva) */
+const fixedGear = (q, H, x0, y0, x1, z, R, col, spat) => q.mir(q => {
+  q.loft([[x0, y0], [lerp(x0, x1, 0.5), lerp(y0, -(H - R), 0.5)], [x1, -(H - R) + 0.05]].map(([x, y]) => Mdl.ell(0, 0, 0, 0.05, 0.13, 8).map(p => [x + p[0], y, z + p[1]])), col, {});
+  q.T(x1 + 0.1, -(H - R), z, () => q.wheel(R, 0.13, R * 0.5, VC.tire, shade(col, 0.8)));
+  if (spat) q.loft([[-R * 1.5, 0.03, 0.03], [-R * 0.9, 0.085, R * 0.75], [0, 0.1, R * 0.95], [R * 1.1, 0.085, R * 0.7], [R * 2.0, 0.02, 0.05]].map(([dz, w, h]) => Mdl.arc(z + dz, x1 + 0.1, -(H - R) + R * 0.25, w, h, 0, 180, 8)), col, { open: true });
+});
+function mkChato() {
+  const H = 1.5, green = hex(0x4f6238), g2 = shade(green, 0.86), blue = hex(0x9bbdd2), red = VC.red, dk = VC.dk;
+  const ST = [[0, 0.52, 0.52], [0.05, 0.66, 0.66], [0.55, 0.67, 0.67], [0.6, 0.52, 0.54], [1.5, 0.5, 0.58, 0, 2.2], [2.45, 0.44, 0.56, 0, 2.2], [3.1, 0.38, 0.5, 0.02, 2.2], [4.3, 0.24, 0.36, 0.05], [5.2, 0.1, 0.24, 0.08], [5.7, 0.04, 0.18, 0.1]];
+  const skin = p => p[2] > 3.3 && p[2] < 3.68 ? red : p[2] > 0.58 && p[1] < fusAt(ST, p[2])[3] - fusAt(ST, p[2])[2] * 0.5 ? blue : green, wc = lim => (p, up) => p[0] > lim ? red : up ? green : blue;
+  const up = x => x < 0.35 ? 0.52 : x < 1.0 ? lerp(0.52, 1.08, (x - 0.35) / 0.65) : 1.08 + (x - 1) * 0.02;
+  return mkPlane({ mat: 'fabric', H, ZN: -2.55, wz: 1.35, gk: 1.7, ST, skin, cuts: [3.3, 3.68], cock: [2.5, 3.05, 40], marks: 'rep', propR: 1.4, propZ: -0.08, spinner: [[0.001, -0.3], [0.09, -0.24], [0.16, -0.08], [0.17, 0.05]], spinCol: g2,
+    wings: [{ secs: [0.3, 0.6, 1.0, 2.5, 4.3, 4.33, 4.6, 4.78, 4.87].map(x => [x, up(x), 0.9 + (x > 4.33 ? (x - 4.33) * 0.7 : 0), 1.6 * (x > 4.33 ? 1 - (x - 4.33) * 1.4 : 1), 0.1]), col: wc(4.31) },
+      { secs: [0, 0.5, 2.0, 3.2, 3.23, 3.5, 3.68, 3.75].map(x => [x, -0.46 + x * 0.03, 1.4 + (x > 3.23 ? (x - 3.23) * 0.7 : 0), 1.22 * (x > 3.23 ? 1 - (x - 3.23) * 1.5 : 1), 0.11]), col: wc(3.21) },
+      { secs: [[0, 0.95, 4.8], [0.9, 0.8, 4.9], [1.4, 0.55, 5.05], [1.6, 0.25, 5.25]].map(([x, c, z]) => [x, 0.12, z, c, 0.08]), col: (p, u) => u ? green : blue, o: { camber: 0 } }],
+    fin: { y0: 0.1, y1: 0.98, le: [4.75, 0.45], ch: [1.4, -0.65], hu: 0.6, col: green }, wind: { z: 2.42, y: 0.5, w: 0.2, h: 0.28 },
+    extra: q => {
+      q.lathe([[0.52, 0], [0.2, 0.05]], dk, 18, { hard: true }); q.lathe([[0.66, 0.55], [0.5, 0.62]], dk, 18, { hard: true });
+      for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; q.tube([Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.2], [Math.cos(a) * 0.5, Math.sin(a) * 0.5, 0.24], 0.07, 0.06, hex(0x3a3d3f), 6); }
+      q.mir(q => { q.loft([[2.55, -0.38, 1.6], [2.55, 1.1, 1.25]].map(([x, y, z]) => Mdl.ell(0, 0, 0, 0.035, 0.42, 8).map(p => [x + p[0], y, z + 0.4 + p[1] * (y > 0 ? 1.2 : 0.85)])), g2, {});
+        q.tube([0.3, 0.3, 1.2], [0.75, 0.9, 1.25], 0.025, 0.025, dk, 5); q.tube([0.3, 0.3, 1.9], [0.75, 0.9, 1.95], 0.025, 0.025, dk, 5);
+        q.tube([0.25, 0.6, 0.15], [0.25, 0.62, 0.75], 0.03, 0.03, g2, 6); q.tube([0.25, 0.61, 0.0], [0.25, 0.61, 0.18], 0.014, 0.014, dk, 5); });
+      q.tube([0, -0.1, 5.3], [0, -0.4, 5.55], 0.025, 0.02, dk, 6);
+      for (const s of [1, -1]) fusMark(q, ST, 1, 3.76, 4.72, 0.02, s);
+    },
+    gear: q => fixedGear(q, H, 0.42, -0.45, 0.82, 1.35, 0.33, green, true) });
+}
+function mkFiat() {
+  const H = 1.55, sand = hex(0xb3a474), grn = hex(0x5d6a3c), brn = hex(0x7a5a3a), under = hex(0xaab4b6), dk = VC.dk, alu = hex(0x8d9092);
+  const mott = p => { const n = Math.sin(p[0] * 3.1 + p[2] * 2.3) + Math.sin(p[2] * 4.3 - p[0] * 1.9 + p[1] * 3 + 1.7) * 0.9 + Math.sin(p[0] * 6.7 + p[2] * 5.9 + 0.6) * 0.5; return n > 0.75 ? grn : n < -1.25 ? brn : sand; };
+  const ST = [[0, 0.16, 0.18, 0], [0.25, 0.34, 0.42, -0.04, 2.3], [1.2, 0.42, 0.56, -0.07, 2.3], [2.3, 0.42, 0.56, -0.04, 2.3], [3.3, 0.38, 0.5, 0], [5.2, 0.22, 0.34, 0.05], [6.4, 0.09, 0.22, 0.08], [7.0, 0.035, 0.16, 0.1]];
+  const skin = p => p[1] < fusAt(ST, p[2])[3] - fusAt(ST, p[2])[2] * 0.55 ? under : mott(p), wc = lim => (p, u) => p[0] > lim ? VC.wht : u ? mott(p) : under;
+  const sp = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i / n));
+  const uw = x => 1.02 + x * 0.012, lw = x => -0.42 + x * 0.03;
+  return mkPlane({ mat: 'fabric', H, ZN: -3.1, wz: 1.7, gk: 1.49, ST, skin, n: 18, cock: [3.0, 3.6, 42], marks: 'nat', propR: 1.42, propZ: -0.12, spinner: [[0.001, -0.42], [0.08, -0.3], [0.15, -0.1], [0.17, 0.08]], spinCol: alu,
+    wings: [{ secs: [...sp(0, 4.1, 9), 4.13, 4.45, 4.66, 4.75].map(x => [x, uw(x), 1.05 + (x > 4.13 ? (x - 4.13) * 0.8 : 0), 1.55 * (x > 4.13 ? 1 - (x - 4.13) * 1.3 : 1), 0.09]), col: wc(4.11) },
+      { secs: [...sp(0, 2.6, 6), 2.63, 2.9, 3.05, 3.09].map(x => [x, lw(x), 1.6 + (x > 2.63 ? (x - 2.63) * 0.7 : 0), 1.1 * (x > 2.63 ? 1 - (x - 2.63) * 1.7 : 1), 0.1]), col: wc(2.61) },
+      { secs: [[0, 0.95, 6.0], [0.9, 0.8, 6.1], [1.4, 0.55, 6.25], [1.6, 0.25, 6.45]].map(([x, c, z]) => [x, 0.14, z, c, 0.08]), col: (p, u) => u ? mott(p) : under, o: { camber: 0 } }],
+    fin: { y0: 0.1, y1: 1.05, le: [5.95, 0.4], ch: [1.3, -0.55], hu: 0.55, col: sand }, wind: { z: 2.9, y: 0.48, w: 0.2, h: 0.26 },
+    extra: q => {
+      q.loft([[0.35, 0.16, 0.2], [0.7, 0.26, 0.42], [1.2, 0.27, 0.46], [1.7, 0.18, 0.3]].map(([z, w, h]) => Mdl.ell(z, 0, -0.42 - h * 0.35, w, h, 12, 2.5)), under, { capA: true, capB: true }); q.box(0, -0.62, 0.36, 0.3, 0.3, 0.02, dk);
+      q.mir(q => { for (let k = 0; k < 6; k++) q.tube([0.36, -0.02, 0.5 + k * 0.16], [0.43, -0.06, 0.6 + k * 0.16], 0.025, 0.025, VC.rust, 5);
+        const W = [[0.5, lw(0.5), 1], [1.25, uw(1.25), 0], [2.0, lw(2.0), 1], [2.75, uw(2.75), 0], [3.0, lw(3.0), 1]];
+        for (let i = 0; i < W.length - 1; i++) for (const dz of [0.35, 0.95]) { const a = W[i], b = W[i + 1]; q.tube([a[0], a[1], (a[2] ? 1.6 : 1.05) + dz * (a[2] ? 0.85 : 1.1)], [b[0], b[1], (b[2] ? 1.6 : 1.05) + dz * (b[2] ? 0.85 : 1.1)], 0.028, 0.028, alu, 5); }
+        q.tube([0.3, 0.4, 1.3], [0.45, 1.0, 1.35], 0.025, 0.025, alu, 5); q.tube([0.3, 0.4, 2.3], [0.45, 1.0, 2.25], 0.025, 0.025, alu, 5); q.tube([0.3, 0.4, 2.3], [0.45, 1.0, 1.35], 0.02, 0.02, alu, 5);
+        q.tube([0.18, 0.5, 0.6], [0.18, 0.52, 2.2], 0.025, 0.025, dk, 5); });
+      q.tube([0, -0.08, 6.6], [0, -0.38, 6.85], 0.025, 0.02, dk, 6);
+      for (const s of [1, -1]) { fusDisc(q, ST, 4.3, 0.02, 0.27, VC.dk, s); fusMark(q, ST, 2, 4.72, 5.5, 0.02, s); }
+    },
+    gear: q => fixedGear(q, H, 0.3, -0.5, 0.75, 1.7, 0.32, sand, true) });
+}
+function mkBf109() {
+  const H = 1.5, gry = hex(0x9aa4a4), g2 = shade(gry, 0.85), under = hex(0x9db4c2), dk = VC.dk, glass = hex(0x86a6b4);
+  const ST = [[0, 0.17, 0.19, 0], [0.32, 0.33, 0.4, -0.02, 2.4], [1.7, 0.4, 0.54, -0.03, 2.4], [2.6, 0.4, 0.56, 0, 2.3], [3.7, 0.36, 0.52, 0.03, 2.2], [6.0, 0.2, 0.34, 0.08], [7.6, 0.08, 0.2, 0.12], [8.2, 0.03, 0.14, 0.14]];
+  const skin = p => p[1] < fusAt(ST, p[2])[3] - fusAt(ST, p[2])[2] * 0.5 ? under : gry, wy = -0.4, dih = x => wy + x * 0.11;
+  const wc = (p, u) => p[0] > 4.3 ? VC.wht : u ? gry : under;
+  return mkPlane({ H, ZN: -3.6, wz: 2.3, gk: 1.25, ST, skin, marks: 'nat', propR: 1.45, propZ: -0.12, spinner: [[0.001, -0.5], [0.08, -0.38], [0.15, -0.15], [0.175, 0.08]], spinCol: hex(0x2a2e30), gearUp: true,
+    wings: [{ secs: [0, 0.5, 2.2, 4.28, 4.32, 4.7, 4.87, 4.93].map(x => [x, dih(x), 1.85 + x * 0.09, lerp(2.1, 1.1, x / 4.93) * (x > 4.7 ? 1 - (x - 4.7) * 2.2 : 1), lerp(0.14, 0.1, x / 4.93)]), col: wc },
+      { secs: [[0, 1.0, 7.0], [1.0, 0.8, 7.1], [1.35, 0.55, 7.25], [1.5, 0.25, 7.45]].map(([x, c, z]) => [x, 0.52, z, c, 0.08]), col: (p, u) => u ? gry : under, o: { camber: 0 } }],
+    fin: { y0: 0.12, y1: 1.2, le: [6.9, 0.45], ch: [1.4, -0.6], hu: 0.55, col: gry },
+    extra: q => {
+      /* cabina acristalada de bastidores rectos */
+      const C = (z, w, h) => [[-w, 0.5, z], [-w * 0.85, 0.5 + h * 0.8, z], [0, 0.5 + h, z], [w * 0.85, 0.5 + h * 0.8, z], [w, 0.5, z]];
+      q.loft([C(2.65, 0.3, 0.06), C(3.0, 0.3, 0.42), C(3.8, 0.29, 0.42), C(4.5, 0.24, 0.12)], glass, { open: true, flat: true });
+      for (const z of [3.0, 3.4, 3.8]) { const r = C(z, 0.3, 0.42).map(p => [p[0] * 1.01, p[1] + 0.004, p[2]]); for (let k = 0; k < 4; k++) q.tube(r[k], r[k + 1], 0.012, 0.012, g2, 4); }
+      for (const k of [0, 2, 4]) { const a = C(3.0, 0.3, 0.42)[k], b = C(3.8, 0.29, 0.42)[k]; q.tube([a[0], a[1] + 0.004, a[2]], [b[0], b[1] + 0.004, b[2]], 0.012, 0.012, g2, 4); }
+      q.loft([[0.5, 0.2, 0.14], [0.9, 0.26, 0.24], [1.5, 0.24, 0.22], [1.9, 0.12, 0.1]].map(([z, w, h]) => Mdl.ell(z, 0, -0.5 - h * 0.3, w, h, 10, 2.4)), under, { capA: true, capB: true }); q.box(0, -0.6, 0.5, 0.3, 0.18, 0.02, dk);
+      q.mir(q => { for (let k = 0; k < 6; k++) q.tube([0.36, -0.2, 0.55 + k * 0.17], [0.42, -0.24, 0.66 + k * 0.17], 0.025, 0.025, VC.rust, 5);
+        q.tube([0.25, 0.0, 7.2], [1.0, 0.5, 7.45], 0.02, 0.02, gry, 5); q.tube([0.16, 0.47, 0.5], [0.16, 0.5, 1.6], 0.025, 0.025, g2, 5);
+        q.box(1.8, dih(1.8) - 0.12, 2.9, 0.5, 0.08, 0.7, under); });
+      q.tube([0, 0.9, 3.9], [0, 1.25, 3.95], 0.012, 0.008, dk, 4); q.tube([0, -0.12, 7.6], [0, -0.3, 7.75], 0.02, 0.02, dk, 5); q.T(0, -0.34, 7.76, () => q.wheel(0.12, 0.07, 0.06, VC.tire, g2));
+      for (const s of [1, -1]) { fusMark(q, ST, 3, 4.3, 5.7, 0.04, s); }
+    },
+    gear: q => q.mir(q => { const top = [0.55, wy - 0.02, 2.5], ax = [1.02, -(H - 0.33), 2.3]; q.tube(top, ax, 0.04, 0.03, hex(0x8d9092), 6); q.T(ax[0] + 0.09, ax[1], ax[2], () => q.wheel(0.33, 0.14, 0.16, VC.tire, g2), 0, 0, -0.12);
+      q.plate([[2.05, wy - 0.05], [2.75, wy - 0.05], [2.5, ax[1] + 0.02], [2.15, ax[1] + 0.02]], 0, 0.012, under, 'zy'); }) });
+}
+/* bombardero bimotor (Heinkel He 111 B): centrado en el origen, morro hacia -Z */
+function mkBomber() {
+  return mdl(q => q.T(0, 0, -8.6, () => {
+    q.mat('paint');
+    const gry = hex(0x8f9a9a), under = hex(0x9db4c2), dk = VC.dk, glass = hex(0x86a6b4);
+    const ST = [[0, 0.35, 0.4, -0.25], [0.5, 0.7, 0.75, -0.12, 2.4], [2.0, 0.85, 0.98, 0, 2.5], [5.5, 0.86, 1.0, 0, 2.5], [10, 0.6, 0.8, 0.1, 2.3], [15, 0.22, 0.4, 0.3], [17.2, 0.05, 0.2, 0.4]];
+    planeFus(q, { ST, n: 16, skin: p => p[2] < 1.9 && p[1] > -0.2 ? glass : p[1] < fusAt(ST, p[2])[3] - fusAt(ST, p[2])[2] * 0.5 ? under : gry, cuts: [1.9] });
+    const ch = x => 4.2 * Math.sqrt(Math.max(0.02, 1 - Math.pow(x / 11.4, 2))) * (x < 2 ? 1 : 1), le = x => 4.6 + (4.2 - ch(x)) * 0.35;
+    q.mir(q => { wingHalf(q, [0, 1.5, 2.75, 4.5, 6.5, 8.5, 9.8, 9.84, 10.6, 11.1, 11.3].map(x => [x, -0.45 + x * 0.09, le(x), ch(x), 0.13]), (p, u) => p[0] > 9.82 ? VC.wht : u ? gry : under, { n: 7 });
+      q.loft([[3.0, 0.3], [3.5, 0.55], [5.0, 0.56], [6.6, 0.42], [8.2, 0.12]].map(([z, r]) => Mdl.ell(z, 2.75, -0.3, r, r * 1.1, 12)), gry, { capA: true, capB: true }); q.lathe([[0.001, -0.5], [0.18, -0.2], [0.22, 0.1]], dk, 10, {}); 
+      q.T(2.75, -0.3, 2.95, () => { q.lathe([[0.001, -0.5], [0.16, -0.25], [0.24, 0.06]], dk, 10); q.lathe([[0.2, 0], [1.6, 0]], hex(0x55585a), 16, { hard: true }); });
+      wingHalf(q, [[0, 2.0, 14.6], [2.0, 1.6, 14.9], [3.2, 1.0, 15.4], [3.8, 0.4, 15.9]].map(([x, c, z]) => [x, 0.45, z, c, 0.08]), (p, u) => u ? gry : under, { camber: 0 }); });
+    planeFin(q, { y0: 0.4, y1: 2.6, le: [14.3, 1.2], ch: [3.0, -1.6], hu: 0.55, col: gry }, 'nat');
+    q.loft([[7.6, 0.3, 0.2], [8.2, 0.42, 0.5], [9.2, 0.42, 0.5], [10.0, 0.25, 0.2]].map(([z, w, h]) => Mdl.ell(z, 0, -0.8 - h * 0.4, w, h, 10)), gry, { capA: true, capB: true });
+    q.loft([[6.6, 0.3, 0.15], [7.2, 0.4, 0.3], [7.9, 0.3, 0.15]].map(([z, w, h]) => Mdl.arc(z, 0, 0.95, w, h, 0, 180, 8)), glass, { open: true });
+    for (const s of [1, -1]) fusDisc(q, ST, 11, 0.15, 0.5, VC.dk, s);
+  }));
+}
+
 /* ============ WebGL ============ */
 const canvas = $('gl');
 const gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' }) || canvas.getContext('experimental-webgl');
@@ -828,9 +1471,10 @@ function initPrograms() {
 progMesh = compile(
   `attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol;
    uniform mat4 uVP; uniform mat4 uM;
-   varying vec3 vCol; varying vec3 vNor; varying vec3 vW;
-   void main(){ vec4 w = uM*vec4(aPos,1.0); vW = w.xyz; vNor = (uM*vec4(aNor,0.0)).xyz; vCol = aCol; gl_Position = uVP*w; }`,
-  PREC + `varying vec3 vCol; varying vec3 vNor; varying vec3 vW;
+   varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
+   void main(){ vec4 w = uM*vec4(aPos,1.0); vW = w.xyz; vNor = (uM*vec4(aNor,0.0)).xyz; vCol = aCol; vO = aPos; vNO = aNor; gl_Position = uVP*w; }`,
+  PREC + `varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
+   uniform sampler2D uTx; uniform float uTxMode; uniform vec4 uTxA; uniform vec4 uTxB; uniform float uSpec;
    uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uFogC; uniform vec2 uFog;
    uniform float uLit; uniform float uAlpha; uniform float uDetail; uniform vec3 uTint; uniform vec2 uScroll; uniform float uTer;
    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -841,6 +1485,10 @@ progMesh = compile(
      return mix(mix(hash(i), hash(vec2(j.x, i.y)), f.x), mix(hash(vec2(i.x, j.y)), hash(j), f.x), f.y); }
    void main(){
      vec3 c = vCol*uTint;
+     /* modelos por código: textura de detalle por los tres ejes del objeto (1) o calca plana (2) */
+     if(uTxMode>0.5){ if(uTxMode<1.5){ vec3 tw = abs(normalize(vNO)); tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
+       c *= (texture2D(uTx, vO.zy*ts).rgb*tw.x + texture2D(uTx, vO.zx*ts).rgb*tw.y + texture2D(uTx, vO.xy*ts).rgb*tw.z)*2.0; }
+     else { vec4 tc = texture2D(uTx, vec2(dot(uTxA.xyz,vO)+uTxA.w, dot(uTxB.xyz,vO)+uTxB.w)); if(tc.a<0.5) discard; c = tc.rgb*uTint; } }
      if(uLit>0.5){
        vec3 n = normalize(vNor);
        vec2 q = vW.xz+uScroll; float fade = 0.0;
@@ -857,6 +1505,7 @@ progMesh = compile(
        if(uDetail>0.0){ float nz = vn(q*0.37)*0.4 + vn(q*2.1)*0.35 + vn(q*9.7)*0.25; c *= 1.0 + (nz-0.5)*uDetail; }
        if(uTer>0.5){ c *= 0.92 + 0.16*vnw(q*0.043); float gr = vnw(q*23.0)*0.6 + vnw(q*53.0)*0.4; c *= 1.0 + (gr-0.5)*0.32*fade; }
        c *= light;
+       if(uSpec>0.0){ vec3 sv = normalize(uCam-vW); float sp = pow(max(dot(n, normalize(uSun+sv)),0.0), 26.0); c += vec3(1.0,0.96,0.88)*sp*uSpec*uTint; }
      }
      float f = clamp((length(vW-uCam)-uFog.x)/(uFog.y-uFog.x),0.0,1.0);
      c = mix(c,uFogC,f*(2.0-f)*0.92);
@@ -869,12 +1518,109 @@ progPart = compile(
   `precision mediump float; varying vec4 vCol;
    void main(){ float r = length(gl_PointCoord-0.5)*2.0; float a = smoothstep(1.0,0.3,r); gl_FragColor = vec4(vCol.rgb, vCol.a*a); }`,
   ['aPos', 'aSize', 'aCol']);
-for (const n of ['uVP', 'uM', 'uSun', 'uCam', 'uFogC', 'uFog', 'uLit', 'uAlpha', 'uDetail', 'uTint', 'uScroll', 'uTer']) U[n] = gl.getUniformLocation(progMesh, n);
+for (const n of ['uVP', 'uM', 'uSun', 'uCam', 'uFogC', 'uFog', 'uLit', 'uAlpha', 'uDetail', 'uTint', 'uScroll', 'uTer', 'uTx', 'uTxMode', 'uTxA', 'uTxB', 'uSpec']) U[n] = gl.getUniformLocation(progMesh, n);
 UP.uVP = gl.getUniformLocation(progPart, 'uVP'); UP.uScale = gl.getUniformLocation(progPart, 'uScale');
 gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
 gl.useProgram(progMesh);
+gl.uniform1i(U.uTx, 0); gl.uniform1f(U.uTxMode, 0); gl.uniform1f(U.uSpec, 0);
 }
 initPrograms();
+/* ============ texturas hechas por código ============
+   Los modelos por código llevan color por vértice; encima se les multiplica una textura de detalle dibujada aquí con un lienzo 2D
+   (líneas de paneles y remaches, veta de madera, acero rozado, lona, costillas entelado) proyectada por los tres ejes del
+   objeto, sin coordenadas UV. Gris medio = no cambia el color. Las calcas (esferas del tablero, matrículas) van aparte, planas. */
+const TX = {};
+function txMake(key, size, draw, o = {}) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d'); draw(c, size);
+  const t = TX[key] = { cv, tex: null, clamp: !!o.clamp }; txUpload(t); return t;
+}
+function txUpload(t) {
+  t.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t.tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, t.cv); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const w = t.clamp ? gl.CLAMP_TO_EDGE : gl.REPEAT; gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, w); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, w);
+  const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, 4);
+}
+function txRestore() { for (const k in TX) txUpload(TX[k]); }
+function txInit() {
+  const R = seeded(77), g = (v, a = 1) => 'rgba(' + v + ',' + v + ',' + v + ',' + a + ')';
+  /* manchas suaves que se repiten al salir por los bordes */
+  const blot = (c, S, n, r0, r1, lo, hi, a) => { for (let i = 0; i < n; i++) { const x = R() * S, y = R() * S, r = r0 + R() * (r1 - r0), v = Math.round(lo + R() * (hi - lo)); for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { const gr = c.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); gr.addColorStop(0, g(v, a)); gr.addColorStop(1, g(v, 0)); c.fillStyle = gr; c.fillRect(x + dx - r, y + dy - r, r * 2, r * 2); } } };
+  /* chapa de avión: paneles, remaches, churretes */
+  txMake('skin', 512, (c, S) => {
+    c.fillStyle = g(128); c.fillRect(0, 0, S, S); blot(c, S, 60, 20, 90, 96, 150, 0.16);
+    for (let i = 0; i < 26; i++) { const x = R() * S, y = R() * S, l = 30 + R() * 90; const gr = c.createLinearGradient(x, y, x + l, y); gr.addColorStop(0, g(70, 0.2)); gr.addColorStop(1, g(70, 0)); c.fillStyle = gr; c.fillRect(x, y, l, 2 + R() * 5); }
+    const line = (x0, y0, x1, y1) => { c.strokeStyle = g(40, 0.7); c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); c.strokeStyle = g(190, 0.35); c.lineWidth = 1; c.beginPath(); c.moveTo(x0 + (y0 === y1 ? 0 : 2), y0 + (y0 === y1 ? 2 : 0)); c.lineTo(x1 + (y0 === y1 ? 0 : 2), y1 + (y0 === y1 ? 2 : 0)); c.stroke(); };
+    const riv = (x, y) => { c.fillStyle = g(60, 0.6); c.beginPath(); c.arc(x, y, 1.7, 0, 7); c.fill(); c.fillStyle = g(200, 0.5); c.beginPath(); c.arc(x - 0.6, y - 0.6, 0.8, 0, 7); c.fill(); };
+    for (const x of [0, 256]) { line(x + 1, 0, x + 1, S); for (let y = 8; y < S; y += 16) { riv(x + 9, y); riv((x + S - 7) % S, y); } }
+    for (const y of [0, 170, 341]) { line(0, y + 1, S, y + 1); for (let x = 8; x < S; x += 16) riv(x, y + 9); }
+    for (const y of [85, 256, 426]) for (let x = 8; x < S; x += 16) riv(x, y);
+  });
+  /* entelado: costillas con su cinta y el paño algo hundido entre ellas */
+  txMake('fabric', 256, (c, S) => {
+    for (let y = 0; y < S; y++) { const u = (y % 64) / 64, v = 128 + Math.round(-14 * Math.sin(u * Math.PI)); c.fillStyle = g(v); c.fillRect(0, y, S, 1); }
+    blot(c, S, 30, 15, 50, 105, 150, 0.12);
+    for (let y = 0; y < S; y += 64) { c.fillStyle = g(165, 0.6); c.fillRect(0, y, S, 5); c.fillStyle = g(70, 0.5); c.fillRect(0, y + 5, S, 1.5); for (let x = 4; x < S; x += 8) { c.fillStyle = g(90, 0.5); c.fillRect(x, y + 1.5, 3, 1.5); } }
+    for (const x of [0, 128]) { c.fillStyle = g(60, 0.3); c.fillRect(x, 0, 1.5, S); }
+  });
+  /* acero pintado: rozaduras, desconchones y polvo */
+  txMake('steel', 256, (c, S) => {
+    c.fillStyle = g(128); c.fillRect(0, 0, S, S); blot(c, S, 70, 8, 45, 92, 158, 0.2);
+    for (let i = 0; i < 90; i++) { const x = R() * S, y = R() * S, a = R() * Math.PI, l = 6 + R() * 40; c.strokeStyle = g(R() < 0.5 ? 175 : 75, 0.16); c.lineWidth = 0.5 + R() * 0.8; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke(); }
+    for (let i = 0; i < 160; i++) { c.fillStyle = g(R() < 0.5 ? 60 : 190, 0.35); c.fillRect(R() * S, R() * S, 1 + R() * 2, 1 + R() * 2); }
+  });
+  /* madera: veta a lo largo de U */
+  txMake('wood', 256, (c, S) => {
+    c.fillStyle = g(128); c.fillRect(0, 0, S, S);
+    for (let i = 0; i < 150; i++) { const y = R() * S, h = 0.6 + R() * 3.2, v = R() < 0.55 ? 62 + R() * 40 : 150 + R() * 45, ph = R() * 7, am = 1 + R() * 5; c.strokeStyle = g(Math.round(v), 0.2 + R() * 0.3); c.lineWidth = h; c.beginPath(); for (let x = 0; x <= S; x += 8) { const yy = y + Math.sin(x / S * Math.PI * 2 + ph) * am; x ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke(); }
+    for (let i = 0; i < 3; i++) { const x = R() * S, y = R() * S; for (let r = 9; r > 1; r -= 2) { c.strokeStyle = g(55, 0.3); c.lineWidth = 1; c.beginPath(); c.ellipse(x, y, r * 2.2, r, 0, 0, 7); c.stroke(); } }
+  });
+  /* tablones (camiones): veta más juntas entre tablas */
+  txMake('planks', 256, (c, S) => {
+    c.drawImage(TX.wood.cv, 0, 0); blot(c, S, 30, 10, 40, 90, 150, 0.22);
+    for (let y = 0; y < S; y += 64) { c.fillStyle = g(30, 0.75); c.fillRect(0, y, S, 3); c.fillStyle = g(180, 0.3); c.fillRect(0, y + 3, S, 1.5); for (let x = 20; x < S; x += 128) { c.fillStyle = g(40, 0.7); c.beginPath(); c.arc(x, y + 14, 2.2, 0, 7); c.arc(x, y + 50, 2.2, 0, 7); c.fill(); } }
+  });
+  /* lona: trama y arrugas */
+  txMake('canvas', 256, (c, S) => {
+    c.fillStyle = g(128); c.fillRect(0, 0, S, S); blot(c, S, 50, 15, 60, 90, 160, 0.22);
+    for (let i = 0; i < S; i += 3) { c.fillStyle = g(100, 0.16); c.fillRect(i, 0, 1, S); c.fillRect(0, i, S, 1); }
+    for (let i = 0; i < 14; i++) { const y = R() * S; c.strokeStyle = g(R() < 0.5 ? 70 : 180, 0.22); c.lineWidth = 2 + R() * 4; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(S / 3, y + R() * 30 - 15, S * 2 / 3, y + R() * 30 - 15, S, y); c.stroke(); }
+  });
+  /* esferas del tablero: 3 × 3, cada una con su escala y su rótulo */
+  txMake('dials', 1024, (c, S) => {
+    c.fillStyle = '#050607'; c.fillRect(0, 0, S, S);
+    const D = [['KM/H', [0, 100, 200, 300, 400, 500, 600], 150], ['M ×1000', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 360], ['OB/MIN ×100', [0, 5, 10, 15, 20, 25, 30], 150], ['M/S', [-20, -10, 0, 10, 20], 150], ['N E S O', null, 0], ['°C AGUA', [0, 40, 80, 120], 120], ['ACEITE', [0, 5, 10, 15], 120], ['GASOLINA', [0, 1, 2, 3, 4], 110], ['HORAS', [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 360]];
+    D.forEach(([name, nums, sweep], i) => {
+      const cx = (i % 3 + 0.5) * S / 3, cy = (Math.floor(i / 3) + 0.5) * S / 3, r = S / 6 - 10;
+      c.fillStyle = '#0b0c0d'; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); c.strokeStyle = '#3a3d40'; c.lineWidth = 5; c.stroke();
+      c.fillStyle = c.strokeStyle = '#e9e6d6'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      if (!nums) { for (let k = 0; k < 36; k++) { const a = k / 36 * Math.PI * 2; c.lineWidth = k % 3 ? 2 : 5; c.beginPath(); c.moveTo(cx + Math.sin(a) * r * 0.9, cy - Math.cos(a) * r * 0.9); c.lineTo(cx + Math.sin(a) * r * (k % 3 ? 0.8 : 0.72), cy - Math.cos(a) * r * (k % 3 ? 0.8 : 0.72)); c.stroke(); } c.font = 'bold 34px sans-serif'; ['N', 'E', 'S', 'O'].forEach((t, k) => c.fillText(t, cx + Math.sin(k * Math.PI / 2) * r * 0.52, cy - Math.cos(k * Math.PI / 2) * r * 0.52)); return; }
+      const n = nums.length, full = sweep >= 360, a0 = full ? 0 : -sweep * Math.PI / 180, a1 = full ? Math.PI * 2 * (1 - 1 / n) : sweep * Math.PI / 180;
+      for (let k = 0; k < n; k++) { const a = n > 1 ? a0 + (a1 - a0) * k / (n - 1) : 0; c.lineWidth = 6; c.beginPath(); c.moveTo(cx + Math.sin(a) * r * 0.92, cy - Math.cos(a) * r * 0.92); c.lineTo(cx + Math.sin(a) * r * 0.74, cy - Math.cos(a) * r * 0.74); c.stroke(); c.font = 'bold ' + (n > 8 ? 26 : 30) + 'px sans-serif'; c.fillText(String(nums[k]), cx + Math.sin(a) * r * 0.55, cy - Math.cos(a) * r * 0.55);
+        if (k < n - 1) for (let m = 1; m < 5; m++) { const b = a + (a1 - a0) / (n - 1) * m / 5; c.lineWidth = 2; c.beginPath(); c.moveTo(cx + Math.sin(b) * r * 0.92, cy - Math.cos(b) * r * 0.92); c.lineTo(cx + Math.sin(b) * r * 0.82, cy - Math.cos(b) * r * 0.82); c.stroke(); } }
+      c.font = '17px sans-serif'; c.fillStyle = '#b9b6a8'; c.fillText(name, cx, cy + r * 0.3);
+    });
+  }, { clamp: true });
+  /* rótulos de los aviones (negro sobre transparente): cuatro renglones */
+  txMake('marks', 512, (c, S) => { c.clearRect(0, 0, S, S); c.fillStyle = '#0c0c0c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 104px sans-serif'; ['CM-249', 'CA-125', '3-51', '6 ● 56'].forEach((t, i) => c.fillText(t, S / 2, S / 8 + i * S / 4, S - 16)); }, { clamp: true });
+}
+/* materiales de los modelos por código: textura de detalle, metros por repetición y brillo */
+const MATS = {
+  paint: { tex: 'skin', s: 1 / 1.3, spec: 0.3 }, fabric: { tex: 'fabric', s: 1 / 1.1, spec: 0.06 }, armor: { tex: 'steel', s: 1 / 1.1, spec: 0.14 }, tpaint: { tex: 'steel', s: 1 / 1.6, spec: 0.2 },
+  wood: { tex: 'planks', s: 1 / 0.8, spec: 0.04 }, canvas: { tex: 'canvas', s: 1 / 1.2, spec: 0 }, metal: { tex: 'steel', s: 2.2, spec: 0.4 }, rubber: { tex: null, spec: 0.06 },
+  gunwood: { tex: 'wood', s: 5.5, spec: 0.3 }, gunsteel: { tex: 'steel', s: 9, spec: 0.6 }, chrome: { tex: null, spec: 0.9 }
+};
+let _txOn = false;
+function txState(m) {
+  if (m && m.tex) { const t = TX[m.tex]; gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.uniform1f(U.uTxMode, m.A ? 2 : 1); if (m.A) { gl.uniform4fv(U.uTxA, m.A); gl.uniform4fv(U.uTxB, m.B); } else gl.uniform4f(U.uTxA, m.s, 0, 0, 0); _txOn = true; }
+  else if (_txOn) { gl.uniform1f(U.uTxMode, 0); _txOn = false; }
+  gl.uniform1f(U.uSpec, m ? m.spec || 0 : 0);
+}
+/* dibuja un modelo por código (una malla por material) */
+function drawModel(md, M) { for (const s of md.subs) { txState(s.mat); drawMesh(s.mesh, M); } txState(null); }
+txInit();
+
 
 /* ============ ajustes de gráficos ============
    Cuatro niveles (bajo, medio, alto y ultra) y «automático», que elige uno según el aparato y, mientras juegas, baja la resolución
@@ -1056,7 +1802,7 @@ function drawTracers(dt) {
 }
 canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); glLost = true; });
 canvas.addEventListener('webglcontextrestored', () => {
-  initPrograms(); for (const m of allMeshes) uploadMesh(m); skRestore(); vegRestore();
+  initPrograms(); for (const m of allMeshes) uploadMesh(m); txRestore(); skRestore(); vegRestore();
   partVbo = gl.createBuffer(); trVbo = gl.createBuffer();
   xr.gl = null;       // los recursos de la realidad virtual se rehacen al usarlos
   glLost = false;
@@ -1976,88 +2722,11 @@ const world = { houses: [] };
   };
   /* granada y bombardero */
   const ng = new Geo(); ng.box(0, 0, 0, 0.09, 0.13, 0.09, hex(0x30342c)); world.nade = makeMesh(ng.a);
-  const pg = new Geo(), pc = hex(0x5a6258);
-  pg.box(0, 0, 0, 1.8, 1.9, 16, pc); pg.box(0, -0.2, -1, 22, 0.35, 4.2, shade(pc, 0.92)); pg.box(0, 0.4, 7.2, 8, 0.25, 2, pc); pg.box(0, 1.5, 7.4, 0.25, 2.4, 2, pc);
-  pg.box(-4.2, -0.3, -2.6, 1.1, 1.1, 3, shade(pc, 0.7)); pg.box(4.2, -0.3, -2.6, 1.1, 1.1, 3, shade(pc, 0.7));
-  world.plane = makeMesh(pg.a);
-  /* camiones: ZiS-5 soviético y Ford con toldo */
-  const truck = team => {
-    const tg = new Geo(), body = team === REP ? hex(0x5c6b45) : hex(0x74735f), dk = hex(0x1f1f1f), wd = hex(0x7a5c3a), glass = hex(0x2a3338);
-    tg.box(0, 0.62, 0.1, 1.0, 0.18, 5.4, dk);
-    tg.box(0, 1.12, -2.15, 1.25, 0.75, 1.2, body); tg.box(0, 1.1, -2.77, 1.0, 0.6, 0.06, dk);
-    for (const sd of [-1, 1]) { tg.box(sd * 0.92, 0.98, -2.1, 0.5, 0.1, 1.25, dk); tg.box(sd * 0.78, 1.22, -2.74, 0.2, 0.2, 0.12, hex(0xd8d2b0)); tg.box(sd * 0.985, 1.8, -0.95, 0.04, 0.5, 0.7, glass); tg.box(sd * 1.05, 1.35, 1.25, 0.07, 0.6, 3.0, wd); }
-    tg.box(0, 1.45, -0.95, 1.95, 1.5, 1.2, body); tg.box(0, 2.24, -0.95, 2.0, 0.08, 1.3, shade(body, 0.8)); tg.box(0, 1.8, -1.565, 1.6, 0.55, 0.04, glass);
-    tg.box(0, 0.98, 1.25, 2.15, 0.14, 3.0, wd); tg.box(0, 1.35, 2.73, 2.15, 0.6, 0.07, wd); tg.box(0, 1.35, -0.23, 2.15, 0.6, 0.07, wd);
-    if (team === NAT) { const cv = hex(0xb5aa88); tg.gable(-1.09, 1.09, -0.26, 2.76, 1.95, 0.6, cv, false, shade(cv, 0.85), true); for (const sd of [-1, 1]) tg.box(sd * 1.07, 1.8, 1.25, 0.04, 0.34, 3.02, cv); }
-    const wheel = (x, z, wdt) => { const m = M4.create(); M4.translate(m, x, 0.46, z); M4.rotZ(m, Math.PI / 2); tg.with(m, () => tg.cyl(0, 0, 0, 0.46, 0.46, wdt, 10, dk, true)); };
-    wheel(-0.95, -2.1, 0.26); wheel(0.95, -2.1, 0.26); wheel(-0.9, 1.7, 0.5); wheel(0.9, 1.7, 0.5);
-    return makeMesh(tg.a);
-  };
-  world.truck = { [REP]: truck(REP), [NAT]: truck(NAT) };
+  world.plane = mkBomber();
+  /* camiones, carros y cazas: modelos hechos por código (ver «vehículos por código») */
+  world.truck = { [REP]: mkTruck(REP), [NAT]: mkTruck(NAT) };
   /* carros de combate: casco y torre por separado */
   const mk = fn => { const q = new Geo(); fn(q); return makeMesh(q.a); }, GUNW = hex(0x5e4026), DK = hex(0x242421), RED = hex(0xc8281e), YEL = hex(0xf2c21e), WHT = hex(0xe8e6dc);
-  const natBand = (q, r, y) => { q.cyl(0, y + 0.07, 0, r, r, 0.06, 10, RED); q.cyl(0, y, 0, r, r, 0.08, 10, YEL); q.cyl(0, y - 0.07, 0, r, r, 0.06, 10, RED); };
-  const t26 = team => {
-    const col = team === REP ? hex(0x57663f) : hex(0x5f6646);
-    return {
-      hull: mk(q => {
-        for (const sd of [-1, 1]) q.box(sd * 1.02, 0.48, 0, 0.4, 0.96, 4.4, DK);
-        q.box(0, 0.72, 0, 1.66, 0.6, 4.2, col); q.box(0, 1.28, 0.25, 1.7, 0.55, 2.3, shade(col, 0.95)); q.box(0, 1.08, -1.5, 1.6, 0.3, 1.0, shade(col, 0.9)); q.box(0, 1.15, 2.0, 1.2, 0.2, 0.3, DK);
-        if (team === NAT) { q.box(-0.25, 1.24, -1.5, 0.25, 0.02, 0.6, RED); q.box(0, 1.24, -1.5, 0.25, 0.02, 0.6, YEL); q.box(0.25, 1.24, -1.5, 0.25, 0.02, 0.6, RED); }
-      }),
-      turret: mk(q => {
-        q.cyl(0, 0.33, 0, 0.8, 0.74, 0.66, 10, col, true); q.box(0, 0.33, -0.72, 0.66, 0.44, 0.3, shade(col, 0.9));
-        q.limb([0, 0.33, -0.8], [0, 0.33, -2.25], 0.11, 0.11, DK); q.limb([0.26, 0.33, -0.8], [0.26, 0.33, -1.2], 0.05, 0.05, DK); q.box(0, 0.69, 0.15, 0.6, 0.06, 0.6, shade(col, 0.85));
-        if (team === NAT) { natBand(q, 0.81, 0.36); q.box(0, 0.73, 0.15, 0.5, 0.02, 0.5, WHT); q.limb([-0.2, 0.745, -0.05], [0.2, 0.745, 0.35], 0.07, 0.01, DK); q.limb([0.2, 0.745, -0.05], [-0.2, 0.745, 0.35], 0.07, 0.01, DK); }
-      }),
-      pivot: [-0.18, 1.56, 0.2], muzzle: 0.33
-    };
-  };
-  const pz1 = () => {
-    const col = hex(0x6b6e68);
-    return {
-      hull: mk(q => {
-        for (const sd of [-1, 1]) q.box(sd * 0.9, 0.42, 0, 0.36, 0.84, 3.9, DK);
-        q.box(0, 0.62, 0, 1.46, 0.5, 3.7, col); q.box(0, 1.12, 0.2, 1.7, 0.5, 2.2, col); q.box(0, 0.95, 1.5, 1.4, 0.25, 1.0, shade(col, 0.9)); q.box(0, 0.9, -1.4, 1.4, 0.2, 0.9, shade(col, 0.9));
-        q.box(-0.25, 1.02, -1.4, 0.25, 0.02, 0.5, RED); q.box(0, 1.02, -1.4, 0.25, 0.02, 0.5, YEL); q.box(0.25, 1.02, -1.4, 0.25, 0.02, 0.5, RED);
-        q.box(0.3, 0.9, 1.2, 0.7, 0.3, 0.9, hex(0x7a6a4c));
-      }),
-      turret: mk(q => {
-        q.cyl(0, 0.22, 0, 0.56, 0.5, 0.44, 8, col, true); natBand(q, 0.57, 0.24);
-        q.limb([-0.14, 0.22, -0.45], [-0.14, 0.22, -1.1], 0.05, 0.05, DK); q.limb([0.14, 0.22, -0.45], [0.14, 0.22, -1.1], 0.05, 0.05, DK);
-      }),
-      pivot: [0.22, 1.37, 0.15], muzzle: 0.22
-    };
-  };
-  /* cazas */
-  const plane = o => mk(q => {
-    const H = 1.25, L = o.len, z0 = -L * 0.42, z1 = L * 0.58, fw = o.fw, wz = z0 + L * 0.3, rep_ = o.marks === 'rep', tip = rep_ ? RED : WHT, c = o.col;
-    q.box(0, H, z0 + L * 0.2, fw, fw * 1.05, L * 0.4, c); q.box(0, H + 0.03, z0 + L * 0.58, fw * 0.78, fw * 0.85, L * 0.36, c); q.box(0, H + 0.08, z0 + L * 0.88, fw * 0.45, fw * 0.55, L * 0.26, c);
-    let pz = z0 - 0.3;
-    if (o.radial) q.box(0, H, z0 - 0.12, fw * 1.08, fw * 1.12, 0.3, DK);
-    else { q.box(0, H, z0 - 0.3, fw * 0.7, fw * 0.78, 0.6, c); q.box(0, H, z0 - 0.7, 0.3, 0.3, 0.2, o.spin || DK); pz = z0 - 0.82; }
-    q.box(0, H, pz, 2.5, 0.14, 0.05, DK); q.box(0, H, pz, 0.14, 2.5, 0.05, DK);
-    q.box(0, H + fw * 0.56, z0 + L * 0.42, fw * 0.5, 0.3, 0.8, hex(0x2a3338));
-    const wing = (y, span, chord, zc) => { q.box(0, y, zc, span - 1.4, 0.13, chord, c); for (const sd of [-1, 1]) q.box(sd * (span / 2 - 0.35), y, zc, 0.7, 0.135, chord, tip); };
-    if (o.span2) {
-      wing(H - 0.45, o.span2, 1.25, wz + 0.25); wing(H + 1.1, o.span, 1.45, wz - 0.15);
-      for (const sd of [-1, 1]) {
-        q.limb([sd * o.span2 * 0.36, H - 0.4, wz + 0.1], [sd * o.span * 0.33, H + 1.05, wz - 0.3], 0.07, 0.07, DK);
-        q.limb([sd * o.span2 * 0.36, H - 0.4, wz + 0.6], [sd * o.span * 0.33, H + 1.05, wz + 0.3], 0.07, 0.07, DK);
-        q.limb([sd * 0.3, H + 0.45, wz - 0.2], [sd * 0.5, H + 1.05, wz - 0.2], 0.06, 0.06, DK);
-      }
-    } else wing(H - 0.4, o.span, 1.75, wz + 0.2);
-    const tz = z1 - 0.55;
-    q.box(0, H + 0.15, tz, 3.0, 0.1, 0.85, c); q.box(0, H + 0.75, tz - 0.1, 0.1, 1.15, 0.6, c);
-    if (rep_) { q.box(0, H + 1.14, tz + 0.38, 0.11, 0.37, 0.4, RED); q.box(0, H + 0.77, tz + 0.38, 0.11, 0.37, 0.4, YEL); q.box(0, H + 0.4, tz + 0.38, 0.11, 0.37, 0.4, hex(0x5f2d7a)); q.box(0, H + 0.03, z0 + L * 0.62, fw * 0.8, fw * 0.87, 0.45, RED); }
-    else {
-      q.box(0, H + 0.77, tz + 0.38, 0.11, 1.1, 0.4, WHT);
-      q.limb([0.07, H + 0.4, tz + 0.24], [0.07, H + 1.14, tz + 0.52], 0.02, 0.07, DK); q.limb([0.07, H + 1.14, tz + 0.24], [0.07, H + 0.4, tz + 0.52], 0.02, 0.07, DK);
-      q.limb([-0.07, H + 0.4, tz + 0.24], [-0.07, H + 1.14, tz + 0.52], 0.02, 0.07, DK); q.limb([-0.07, H + 1.14, tz + 0.24], [-0.07, H + 0.4, tz + 0.52], 0.02, 0.07, DK);
-      q.box(0, H + 0.03, z0 + L * 0.6, fw * 0.8, fw * 0.5, 0.5, DK);
-    }
-    for (const sd of [-1, 1]) { q.limb([sd * 0.75, H - 0.45, wz], [sd * 0.9, 0.3, wz - 0.1], 0.08, 0.08, DK); q.box(sd * 0.9, 0.3, wz - 0.1, 0.16, 0.6, 0.6, DK); }
-  });
   world.aa = {
     maxim: mk(q => {
       const m = M4.create(); M4.translate(m, 0, 0, -0.52); M4.rotX(m, Math.PI / 2); q.with(m, () => q.cyl(0, 0, 0, 0.07, 0.07, 0.75, 8, hex(0x4b5340), true));
@@ -2070,13 +2739,8 @@ const world = { houses: [] };
       q.limb([0, 0.08, -0.25], [0, 0.2, -0.25], 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.12, 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.012, 0.12, 0.012, DK);
     })
   };
-  world.vm = {
-    t26: t26(REP), t26n: t26(NAT), pz1: pz1(),
-    mosca: plane({ len: 6.1, fw: 1.2, span: 9, radial: true, marks: 'rep', col: hex(0x5d6e45) }),
-    chato: plane({ len: 6.1, fw: 1.15, span: 9.7, span2: 7.5, radial: true, marks: 'rep', col: hex(0x5d6e45) }),
-    fiat: plane({ len: 7.4, fw: 0.95, span: 9.5, span2: 6.2, marks: 'nat', col: hex(0xb3a474) }),
-    bf109: plane({ len: 8.6, fw: 0.9, span: 9.9, marks: 'nat', col: hex(0x9aa4a4) })
-  };
+  world.vm = { t26: mkT26(REP), t26n: mkT26(NAT), pz1: mkPz1(), chato: mkChato(), fiat: mkFiat(), bf109: mkBf109() };
+  mosca = mkMosca();
 })();
 
 /* ============ vegetación: árboles, matorral y hierba ============
@@ -6501,74 +7165,9 @@ function updateVehicles(dt) {
     }
   }
 }
-/* CM-249 republicano: el modelo usa el mismo shader de los demás glTF del juego. */
-let mosca = null;
-const MOSCA_SCALE = 9 / 9.6, MOSCA_H = 1.92;
-const _moscaPlane = M4.create(), _moscaEye = M4.create(), _moscaLocal = M4.create();
-async function loadMosca() {
-  if (!SK.ready) return;
-  try {
-    const url = new URL('mosca_cm249.glb', location.href);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const g = glbParse(await res.arrayBuffer()), J = g.j, cache = new Map();
-    const rig = J.nodes[J.scenes[J.scene || 0].nodes[0]].extras.FPV_Rig;
-    const names = new Map(J.nodes.map((n, i) => [n.name, i])), nodes = [], opaque = [], glass = [];
-    const visit = (i, parent) => {
-      const nd = J.nodes[i];
-      const node = { i, parent, t: nd.translation || [0, 0, 0], q: nd.rotation || [0, 0, 0, 1],
-        s: nd.scale || [1, 1, 1], world: M4.create(), parts: [], panes: [] };
-      nodes.push(node);
-      for (const child of nd.children || []) visit(child, node);
-    };
-    for (const root of J.scenes[J.scene || 0].nodes) visit(root, null);
-    for (const node of nodes) {
-      const mesh = J.meshes[J.nodes[node.i].mesh];
-      if (!mesh) continue;
-      for (const pr of mesh.primitives) {
-        const mat = J.materials[pr.material];
-        if (mat.alphaMode !== 'BLEND') node.parts.push(await skPart(g, pr, cache));
-        else {
-          const p = glbAcc(g, pr.attributes.POSITION), n = glbAcc(g, pr.attributes.NORMAL);
-          const col = mat.pbrMetallicRoughness.baseColorFactor;
-          const vertices = new Float32Array(p.length * 3);
-          for (let i = 0; i < p.length / 3; i++) {
-            vertices.set(p.subarray(i * 3, i * 3 + 3), i * 9);
-            vertices.set(n.subarray(i * 3, i * 3 + 3), i * 9 + 3);
-            vertices.set([enc(col[0]), enc(col[1]), enc(col[2])], i * 9 + 6);
-          }
-          node.panes.push(makeMesh(vertices, glbAcc(g, pr.indices, true)));
-        }
-      }
-      if (node.parts.length) opaque.push(node);
-      if (node.panes.length) glass.push(node);
-    }
-    const controls = new Map();
-    for (const source of ['pitch', 'roll', 'yaw', 'throttle']) {
-      const c = rig.controls[source];
-      for (const binding of c.targets || [c]) {
-        const id = names.get(binding.node);
-        if (!controls.has(id)) controls.set(id, []);
-        controls.get(id).push({ source, axis: binding.axis, angle: binding.degrees_per_unit * Math.PI / 180 });
-      }
-    }
-    const gear = new Map();
-    const retract = J.animations.find(a => a.name === 'Gear_Retract');
-    let gearTime = 0;
-    for (const { sampler, target } of retract.channels) {
-      const s = retract.samplers[sampler], t = glbAcc(g, s.input), path = target.path;
-      const track = { t, v: glbAcc(g, s.output), w: path === 'rotation' ? 4 : 3 };
-      gearTime = Math.max(gearTime, t[t.length - 1]);
-      if (!gear.has(target.node)) gear.set(target.node, {});
-      gear.get(target.node)[path] = track;
-    }
-    const instruments = new Map(Object.entries(rig.instruments).map(([name, binding]) => [names.get(name), binding]));
-    const cameraNode = J.nodes[names.get('FPV_Camera')];
-    const camera = J.cameras[cameraNode.camera].perspective;
-    mosca = { nodes, opaque, glass, controls, gear, gearTime, instruments, prop: names.get('Propeller'),
-      eye: J.nodes[names.get('Pilot_View')].translation, rotation: cameraNode.rotation, fov: camera.yfov };
-  } catch (e) { console.warn('[Mosca CM-249] se usa el modelo provisional:', e.message); }
-}
+/* CM-249 republicano: construido por código (mkMosca), con sus piezas móviles: hélice, tren que se recoge, alerones, timones,
+   palanca, mando de gases y las agujas del tablero. */
+const _moscaPlane = M4.create(), _moscaEye = M4.create(), _moscaLocal = M4.create(), _moscaT = M4.create();
 function moscaTick(v, dt, ctl) {
   const s = v.moscaViz || (v.moscaViz = { pitch: 0, roll: 0, yaw: 0, prop: 0, gear: v.air ? 1 : 0 });
   const pilot = v.driver?.isPlayer, gain = Math.min(1, dt * 12);
@@ -6580,9 +7179,6 @@ function moscaTick(v, dt, ctl) {
   const retract = v.air && (v.y - Math.max(groundAt(v.x, v.z), waterY) > 16 || (v.vyv || 0) > 0);
   s.gear = clamp(s.gear + (retract ? dt : -dt) / 3, 0, 1);
   s.rpm = rpm;
-}
-function moscaLift(v) {
-  return MOSCA_H - (v.air ? 0 : 1.1 * Math.tan(clamp(v.pitch + (v.gp || 0), -.25, .25)));
 }
 function moscaPilot() {
   return mosca && P?.alive && P.veh?.type === 'mosca' && P.team === REP &&
@@ -6597,50 +7193,57 @@ function toggleMoscaCamera() {
   game.pcam = null; game.planeOrb = 0; game.planeOrbT = 0;
   $('tbMoscaCam').setAttribute('aria-pressed', String(P.moscaCabin));
 }
-function moscaCamera(v) {
-  M4.identity(_moscaPlane);
-  M4.translate(_moscaPlane, v.x, v.y, v.z);
-  M4.rotY(_moscaPlane, v.yaw); M4.rotX(_moscaPlane, v.pitch + (!v.air ? v.gp || 0 : 0)); M4.rotZ(_moscaPlane, v.roll);
-  const eye = mosca.eye;
-  M4.copy(_moscaEye, _moscaPlane);
-  M4.translate(_moscaEye, eye[0] * MOSCA_SCALE, moscaLift(v) + eye[1] * MOSCA_SCALE, eye[2] * MOSCA_SCALE);
-  M4.mul(_moscaEye, _moscaEye, m4trs(_moscaLocal, [0, 0, 0], mosca.rotation, 1));
+/* matriz de un avión: en tierra se apoya en las ruedas y baja la cola hasta el patín (wz: dónde van las ruedas; gk: cuánto baja) */
+function planeBase(v, o, wz, gk) {
+  M4.identity(o); M4.translate(o, v.x, v.y, v.z); M4.rotY(o, v.yaw);
+  if (v.air) M4.rotX(o, v.pitch);
+  else { M4.translate(o, 0, 0, wz); M4.rotX(o, v.pitch + (v.gp === undefined ? 0.15 : v.gp) * gk); M4.translate(o, 0, 0, -wz); }
+  M4.rotZ(o, v.roll);
+  return o;
 }
-function drawMosca(v, base, vp, ex, ey, ez) {
-  if (!mosca || !SK.ready || glLost || v.dead || Math.hypot(v.x - ex, v.y - ey, v.z - ez) > 240) return false;
-  const s = v.moscaViz;
-  const input = { pitch: s?.pitch || 0, roll: s?.roll || 0, yaw: s?.yaw || 0, throttle: v.thr || 0 };
-  const data = { indicated_airspeed: Math.abs(v.speed) * 3.6, altitude: Math.max(0, v.y),
-    engine_rpm: s?.rpm || 0, vertical_speed: v.vyv || 0, heading: (720 - v.yaw * 180 / Math.PI) % 360 };
-  const gearTime = (s?.gear ?? (v.air ? 1 : 0)) * mosca.gearTime;
-  M4.copy(_moscaPlane, base);
-  M4.translate(_moscaPlane, 0, moscaLift(v), 0); M4.scale(_moscaPlane, MOSCA_SCALE, MOSCA_SCALE, MOSCA_SCALE);
-  for (const n of mosca.nodes) {
-    const g = mosca.gear.get(n.i);
-    const t = g ? skBredaSample(g.translation, gearTime, n.t) : n.t;
-    let q = g ? skBredaSample(g.rotation, gearTime, n.q) : n.q;
-    const scale = g ? skBredaSample(g.scale, gearTime, n.s) : n.s;
-    for (const c of mosca.controls.get(n.i) || []) q = qMul(q, qAxis(c.axis, c.angle * input[c.source]));
-    if (n.i === mosca.prop) q = qMul(q, qAxis([0, 0, -1], s?.prop || 0));
-    const dial = mosca.instruments.get(n.i);
-    if (dial && data[dial.source] !== undefined) {
-      const range = dial.maximum - dial.minimum, v = (data[dial.source] - dial.minimum) / range;
-      const a = dial.wrap ? ((v % 1) + 1) % 1 : clamp(v, 0, 1);
-      q = qAxis(dial.axis, lerp(dial.start_angle_deg, dial.end_angle_deg, a) * Math.PI / 180);
+const moscaBase = (v, o) => planeBase(v, o, mosca.wheelZ, mosca.gk);
+function moscaCamera(v) {
+  moscaBase(v, _moscaPlane);
+  M4.copy(_moscaEye, _moscaPlane); M4.translate(_moscaEye, mosca.eye[0], mosca.eye[1], mosca.eye[2]); M4.rotX(_moscaEye, -0.2);
+}
+function drawMosca(v) {
+  const s = v.moscaViz, base = moscaBase(v, _moscaPlane), pitch = s?.pitch || 0, roll = s?.roll || 0, yaw = s?.yaw || 0, thr = v.thr || 0, gear = s?.gear ?? (v.air ? 1 : 0), rpm = s?.rpm || 0;
+  const D = Math.PI / 180, now = new Date();
+  const dial = { kmh: (-150 + 300 * clamp(Math.abs(v.speed) * 3.6 / 600, 0, 1)) * D, alt: Math.max(0, v.y) / 1000 * 36 * D, rpm: (-150 + 300 * clamp(rpm / 3000, 0, 1)) * D, vs: (-150 + 300 * (clamp(v.vyv || 0, -20, 20) + 20) / 40) * D, hdg: -v.yaw,
+    clock: (now.getHours() % 12 + now.getMinutes() / 60) * 30 * D, fix7: 66 * D, fix5: 24 * D, fix6: 0 };
+  const ang = p => {
+    if (p.dial) return -(dial[p.dial] || 0);
+    switch (p.name) {
+      case 'prop': case 'disc': return s?.prop || 0;
+      case 'gearR': return -gear * 1.52; case 'gearL': return gear * 1.52;
+      case 'ailR': return -roll * 0.35; case 'ailL': return roll * 0.35;
+      case 'elev': return -pitch * 0.4; case 'rudder': return yaw * 0.45;
+      case 'throttle': return (0.5 - thr) * 0.9;
+      default: return 0;
     }
-    m4trs(_moscaLocal, t, q, 1);
-    M4.scale(_moscaLocal, scale[0], scale[1], scale[2]);
-    M4.mul(n.world, n.parent ? n.parent.world : _moscaPlane, _moscaLocal);
-  }
-  skBegin(vp, ex, ey, ez, FOG_N, FOG_F);
-  gl.uniform4fv(SK.U.uB, SK.ident);
-  for (const n of mosca.opaque) { gl.uniformMatrix4fv(SK.U.uM, false, n.world); skParts(n.parts); }
-  skEnd();
+  };
+  const place = p => {
+    let q = p.axis ? qAxis(p.axis, ang(p)) : [0, 0, 0, 1];
+    if (p.name === 'stick') q = qMul(qAxis([1, 0, 0], pitch * 0.22), qAxis([0, 0, 1], -roll * 0.22));
+    M4.mul(_moscaLocal, base, m4trs(_moscaT, p.pivot, q, 1));
+    return _moscaLocal;
+  };
+  for (const p of mosca.parts) if (!p.glass) drawModel(p.mesh, place(p));
+  if (v.dead) return;
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-  matState(0, .07, 0);
-  for (const n of mosca.glass) for (const m of n.panes) drawMesh(m, n.world);
-  gl.depthMask(true); gl.disable(gl.BLEND);
-  return true;
+  for (const p of mosca.parts) if (p.glass && (p.name !== 'disc' || rpm > 300)) { matState(1, p.glass, 0); drawModel(p.mesh, place(p)); }
+  gl.depthMask(true); gl.disable(gl.BLEND); matState(1, 1, 0.08);
+}
+/* los demás cazas: célula, tren (si se recoge, solo cerca del suelo) y hélice girando */
+const _vp2 = M4.create();
+function drawPlane(v, m) {
+  const g = world.vm[v.type], on = !v.dead && (v.driver || v.aiOn || v.air);
+  planeBase(v, m, g.wheelZ, g.gk);
+  drawModel(g.body, m);
+  if (g.gear && (!v.air || v.y - Math.max(groundAt(v.x, v.z), waterY) < 14)) drawModel(g.gear, m);
+  M4.copy(_vp2, m); M4.translate(_vp2, g.propAt[0], g.propAt[1], g.propAt[2]); M4.rotZ(_vp2, on ? (performance.now() * 0.045 + v.x) % (Math.PI * 2) : 0.5);
+  drawModel(g.prop, _vp2);
+  if (on) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); matState(1, 0.1, 0); drawModel(g.disc, _vp2); gl.depthMask(true); gl.disable(gl.BLEND); matState(1, 1, 0.08); }
 }
 
 
@@ -6649,14 +7252,14 @@ function drawVehicles(vp, ex, ey, ez) {
   for (const v of vehicles) {
     M4.identity(_vm); M4.translate(_vm, v.x, v.y, v.z); M4.rotY(_vm, v.yaw); M4.rotX(_vm, v.pitch + (v.kind === 'plane' && !v.air ? (v.gp || 0) : 0)); M4.rotZ(_vm, v.roll);
     matState(1, 1, 0.08, v.dead ? [0.22, 0.2, 0.18] : null);
-    if (v.kind === 'truck') drawMesh(world.truck[v.team], _vm);
+    if (v.kind === 'truck') drawModel(world.truck[v.team], _vm);
     else if (v.kind === 'plane') {
-      if (v.type !== 'mosca' || !drawMosca(v, _vm, vp, ex, ey, ez)) drawMesh(world.vm[v.type], _vm);
+      if (v.type === 'mosca') drawMosca(v); else drawPlane(v, _vm);
     }
     else {
-      const m = world.vm[v.type]; drawMesh(m.hull, _vm);
+      const m = world.vm[v.type]; drawModel(m.hull, _vm);
       M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
-      drawMesh(m.turret, _vm);
+      drawModel(m.turret, _vm);
     }
   }
 }
@@ -7571,7 +8174,7 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   for (const s of soldiers) if (s.spawned && !s.veh && !s.aa && !(hideP && s === P) && (!cull || cull(s))) vis.push(s);
   if (!skDrawSoldiers(vis, vp, ex, ey, ez, dt > 0)) for (const s of vis) drawSoldier(s);
   for (const p of projectiles) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); if (p.kind !== 'shell') M4.rotX(TMP, p.spin); if (p.kind === 'bomb') M4.scale(TMP, 3.2, 7, 3.2); else if (p.kind === 'shell') M4.scale(TMP, 2, 2, 2); drawMesh(world.nade, TMP); }
-  for (const p of planes) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); M4.rotY(TMP, Math.PI); drawMesh(world.plane, TMP); }
+  for (const p of planes) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); M4.rotY(TMP, Math.PI); drawModel(world.plane, TMP); }
   matState(0, 1, 0);
   for (const f of FLAGS) {
     M4.identity(TMP); M4.translate(TMP, f.x, terrainH(f.x, f.z) + 8.1, f.z); M4.rotY(TMP, 0.6 + Math.sin(game.time * 1.3 + f.x) * 0.22);
@@ -8959,7 +9562,7 @@ function gfxUiBoot() {
   new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme); } catch (e) { }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (game.state === 'menu') drawMenuMap(); });
-  vrBoot(); skLoad().then(loadMosca);
+  vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
   window.__ebro = { game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, navDbg: { NAV, navPath, navLine, navBuild, update } };
