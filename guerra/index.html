@@ -1444,6 +1444,217 @@ function mkBomber() {
   }));
 }
 
+/* ============ armas por código ============
+   Espacio del arma: metros, cañón hacia -Z, arriba +Y, derecha del tirador +X. En las armas largas el origen es la garganta
+   de la culata (donde cierra la mano derecha); en la pistola, el talón de la empuñadura. Cada arma devuelve además sus puntos
+   de referencia: boca, alza, punto de mira y dónde agarra la mano izquierda. */
+const GNC = { wal: hex(0x5b3a1f), birch: hex(0x8a5a2e), beech: hex(0x9a6a3a), blued: hex(0x22262a), steel: hex(0x4b5055), bright: hex(0x8d9296), brass: hex(0xa8843a), dark: hex(0x101214), bake: hex(0x2c1d14) };
+const gSec = (z, cy, w, h, p = 2.6, n = 10) => Mdl.ell(z, 0, cy, w / 2, h / 2, n, p);
+const gStock = (q, st, col) => q.mat('gunwood', () => q.loft(st.map(s => gSec(s[0], s[1], s[2], s[3], s[4], 14)), col, { capA: true, capB: true }));
+const gBand = (q, z, cy, w, h, col = GNC.blued, len = 0.016) => q.loft([gSec(z - len / 2, cy, w, h), gSec(z + len / 2, cy, w, h)], col, { capA: true, capB: true });
+const gGuard = (q, pts, r = 0.0035) => q.pipe(pts.map(([z, y]) => [0, y, z]), r, GNC.blued, 5);
+const gArc = (z, cy, R, a0, a1, n) => Mdl.arc(z, 0, cy, R, R, a0, a1, n);
+/* tubo abierto con espesor (cajón con ventana): hay material entre los ángulos a0..a1 (grados; 0 = derecha, 90 = arriba), z0 < z1 */
+function gPort(q, z0, z1, cy, R, t, a0, a1, col, n = 12) {
+  q.loft([gArc(z0, cy, R, a0, a1, n), gArc(z1, cy, R, a0, a1, n)], col, { open: true });
+  q.loft([gArc(z1, cy, R - t, a0, a1, n), gArc(z0, cy, R - t, a0, a1, n)], col, { open: true });
+  [a0, a1].forEach((a, i) => { const cs = Math.cos(a * Math.PI / 180), sn = Math.sin(a * Math.PI / 180), P = (r, z) => [cs * r, cy + sn * r, z]; if (i) q.quad(P(R, z1), P(R, z0), P(R - t, z0), P(R - t, z1), col); else q.quad(P(R, z0), P(R, z1), P(R - t, z1), P(R - t, z0), col); });
+  [z0, z1].forEach((z, i) => { const A = gArc(z, cy, R, a0, a1, n), B = gArc(z, cy, R - t, a0, a1, n); for (let k = 0; k < n; k++) { if (i) q.quad(A[k], A[k + 1], B[k + 1], B[k], col); else q.quad(A[k + 1], A[k], B[k], B[k + 1], col); } });
+}
+/* anilla portafusil colgando en (y, z) */
+const gLoop = (q, y, z, w = 0.013, h = 0.02, col = GNC.blued) => { q.pipe([[-w, y, z], [-w, y - h, z], [w, y - h, z], [w, y, z]], 0.0021, col, 5); q.box(0, y + 0.001, z, w * 2 + 0.008, 0.004, 0.012, col); };
+/* disparador curvo */
+const gTrig = (q, z, y, col = GNC.blued) => q.plate([[z + 0.004, y], [z - 0.003, y], [z - 0.008, y - 0.012], [z - 0.005, y - 0.023], [z - 0.001, y - 0.024], [z - 0.003, y - 0.012]], -0.003, 0.003, col, 'zy');
+/* muesca del alza: plaquita con su U */
+function gNotch(q, ys, z, c, w = 0.017, down = 0.01) { q.box(0, ys + 0.002 - down / 2, z, w, down, 0.0035, c); for (const s of [-1, 1]) q.box(s * (0.003 + (w / 2 - 0.003) / 2), ys + 0.004, z, w / 2 - 0.003, 0.004, 0.0035, c); }
+/* alza tangente (base con rampas, hoja abisagrada delante y corredera con muesca) y punto de mira; ys: altura de la línea de mira; rb: radio del cañón bajo el alza */
+function gSights(q, y0, ys, zr, zf, o = {}) {
+  const c = GNC.blued, yb = y0 + (o.rb || 0.014), fb = o.fb || 0.014;
+  q.box(0, yb + 0.002, zr - 0.033, 0.019, 0.007, 0.078, c);
+  for (const s of [-1, 1]) q.plate([[zr + 0.006, yb + 0.004], [zr - 0.072, yb + 0.004], [zr - 0.072, yb + 0.009], [zr - 0.05, yb + 0.012], [zr - 0.02, Math.min(yb + 0.015, ys - 0.006)], [zr + 0.006, Math.min(yb + 0.013, ys - 0.007)]], s * 0.0068, s * 0.0092, c, 'zy');
+  q.plate([[zr - 0.068, yb + 0.0075], [zr + 0.001, ys - 0.0075], [zr + 0.001, ys - 0.004], [zr - 0.068, yb + 0.011]], -0.0058, 0.0058, GNC.steel, 'zy');
+  q.tube([-0.0098, yb + 0.0095, zr - 0.068], [0.0098, yb + 0.0095, zr - 0.068], 0.0032, 0.0032, c, 6);
+  q.box(0, ys - 0.006, zr - 0.012, 0.021, 0.006, 0.012, c); for (const s of [-1, 1]) q.tube([s * 0.0105, ys - 0.006, zr - 0.012], [s * 0.0125, ys - 0.006, zr - 0.012], 0.0035, 0.0035, GNC.steel, 6);
+  gNotch(q, ys, zr, c);
+  /* punto de mira: abrazadera, rampa y hoja */
+  q.tube([0, y0, zf - 0.013], [0, y0, zf + 0.013], fb + 0.001, fb + 0.001, c, 10);
+  q.plate([[zf - 0.012, y0 + fb], [zf + 0.012, y0 + fb], [zf + 0.009, y0 + fb + 0.008], [zf - 0.009, y0 + fb + 0.008]], -0.005, 0.005, c, 'zy');
+  q.plate([[zf - 0.004, y0 + fb + 0.006], [zf + 0.005, y0 + fb + 0.006], [zf + 0.003, ys + 0.006], [zf - 0.001, ys + 0.006]], -0.0013, 0.0013, c, 'zy');
+  if (o.hood) q.T(0, ys - 0.004, zf, () => q.lathe([[0.012, -0.012], [0.0135, -0.012], [0.0135, 0.012], [0.012, 0.012], [0.012, -0.012]], c, 12, { hard: true }));
+  if (o.ears) for (const s of [-1, 1]) q.plate([[zf - 0.008, y0 + fb + 0.004], [zf + 0.008, y0 + fb + 0.004], [zf + 0.006, ys + 0.009], [zf - 0.003, ys + 0.011]], s * 0.0095, s * 0.012, c, 'zy');
+}
+/* fusil de cerrojo. o: L largo total, wood, mag ('mosin' | 'carcano' | null), bent (palanca acodada), split (puente partido: la palanca va delante),
+   knob (botón del percutor en vez de aleta de seguro), bands, hg (guardamanos), hood, exp (cañón libre), rod */
+function gBoltRifle(q, o) {
+  const y0 = 0.047, zB = o.zB || 0.286, zM = zB - o.L, zF = zM + (o.exp || 0.1), wd = o.wood, w2 = shade(wd, 0.86), c = GNC.blued, br = GNC.bright, ys = y0 + 0.036, zr = o.zr || -0.3, RR = 0.0172;
+  gStock(q, [[zB, -0.035, 0.04, 0.122], [zB - 0.03, -0.034, 0.046, 0.128], [0.14, -0.014, 0.045, 0.088], [0.03, -0.002, 0.04, 0.052], [-0.05, 0.004, 0.044, 0.058], [-0.15, 0.012, 0.05, 0.068], [-0.3, 0.02, 0.046, 0.052], [zF, 0.027, 0.04, 0.04]], wd);
+  q.loft([gSec(zB, -0.035, 0.042, 0.124), gSec(zB + 0.004, -0.035, 0.042, 0.124), gSec(zB + 0.007, -0.035, 0.037, 0.118)], c, { capB: true });
+  for (const y of [-0.07, 0.0]) q.tube([0, y, zB + 0.006], [0, y, zB + 0.0082], 0.0045, 0.0045, br, 8);
+  if (o.hg) q.mat('gunwood', () => q.loft([o.hg[0], (o.hg[0] + o.hg[1]) / 2, o.hg[1]].map(z => Mdl.ell(z, 0, y0 + 0.004, 0.019, 0.018, 12)), w2, { capA: true, capB: true }));
+  /* cañón escalonado y boca */
+  q.tube([0, y0, -0.168], [0, y0, -0.215], 0.0166, 0.0166, c, 12); q.tube([0, y0, -0.215], [0, y0, zF + 0.02], 0.0152, 0.0125, c, 12); q.tube([0, y0, zF + 0.02], [0, y0, zM], 0.0105, 0.0086, c, 12); q.tube([0, y0, zM - 0.0006], [0, y0, zM + 0.004], 0.0042, 0.0042, GNC.dark, 8);
+  /* cajón: anillo, ventana de carga con la pared izquierda alta, puente; debajo, la caja */
+  const zp = o.split ? -0.05 : -0.04, hz = o.split ? -0.059 : -0.001;
+  q.tube([0, y0, -0.17], [0, y0, -0.128], RR, RR, c, 14); gPort(q, -0.128, zp, y0, RR, 0.0034, 128, 368, c, 12); q.tube([0, y0, zp], [0, y0, -0.009], RR, RR, c, 14);
+  if (!o.split) for (const s of [-1, 1]) q.box(s * 0.0085, y0 + RR, -0.033, 0.005, 0.004, 0.012, c);
+  q.box(0, y0 - 0.018, -0.07, 0.03, 0.02, 0.19, c); q.box(-0.0176, y0 - 0.004, -0.02, 0.003, 0.008, 0.02, c);
+  /* cerrojo: cuerpo, extractor, palanca */
+  q.tube([0, y0, -0.166], [0, y0, zp + 0.004], 0.0092, 0.0092, br, 12); q.tube([0, y0, -0.01], [0, y0, 0.01], 0.0092, 0.0092, c, 12); q.box(0.0088, y0 + 0.0025, -0.088, 0.0028, 0.006, 0.076, GNC.steel);
+  q.tube([0, y0, hz - 0.0075], [0, y0, hz + 0.0075], 0.0108, 0.0108, o.split ? br : GNC.steel, 12);
+  if (o.bent) { q.pipe([[0.008, y0, hz], [0.036, y0 - 0.002, hz], [0.048, y0 - 0.03, hz + 0.004]], 0.0052, br, 8); q.ball([0.049, y0 - 0.039, hz + 0.004], 0.0115, br, 10, 6); }
+  else { q.tube([0.008, y0 + 0.001, hz], [0.052, y0 + 0.004, hz], 0.0056, 0.0046, br, 8); q.ball([0.06, y0 + 0.0045, hz], 0.0115, br, 10, 6); }
+  /* cola del cerrojo: nuez con aleta de seguro, o botón del percutor */
+  q.T(0, y0, 0, () => {
+    if (o.knob) { q.lathe([[0.0092, 0.008], [0.0112, 0.012], [0.0112, 0.036], [0.0085, 0.04], [0.0085, 0.046], [0.0155, 0.048], [0.0155, 0.055], [0.012, 0.058], [0.001, 0.058]], c, 14); for (let i = 0; i < 3; i++) q.lathe([[0.0158, 0.0492 + i * 0.002], [0.0158, 0.0502 + i * 0.002]], GNC.dark, 14, { hard: true }); }
+    else { q.lathe([[0.0105, 0.009], [0.0128, 0.013], [0.0128, 0.033], [0.0105, 0.039], [0.0078, 0.041], [0.0078, 0.056], [0.0045, 0.06], [0.001, 0.06]], c, 14);
+      q.plate(o.split ? [[0.004, 0.01], [0.012, 0.012], [0.016, 0.02], [0.008, 0.02]] : [[-0.0035, 0.011], [0.0035, 0.011], [0.004, 0.024], [-0.011, 0.03], [-0.0145, 0.024], [-0.006, 0.02]], 0.017, 0.0225, c, 'xy'); }
+  });
+  q.box(0, 0.0255, 0.03, 0.014, 0.005, 0.052, c); q.tube([0, 0.0265, 0.045], [0, 0.0288, 0.045], 0.0038, 0.0038, br, 8);
+  /* guarnición de abajo: depósito, guardamonte y disparador */
+  if (o.mag === 'mosin') { q.plate([[-0.2, -0.016], [-0.112, -0.02], [-0.11, -0.058], [-0.165, -0.08], [-0.202, -0.052]], -0.0115, 0.0115, c, 'zy'); q.plate([[-0.112, -0.058], [-0.165, -0.081], [-0.168, -0.077], [-0.116, -0.055]], -0.0128, 0.0128, GNC.steel, 'zy'); }
+  else if (o.mag === 'carcano') { q.plate([[-0.218, -0.014], [-0.118, -0.02], [-0.116, -0.05], [-0.128, -0.06], [-0.2, -0.066], [-0.218, -0.05]], -0.0125, 0.0125, c, 'zy'); q.box(0, -0.04, -0.168, 0.0262, 0.036, 0.004, GNC.steel); }
+  else { q.plate([[-0.11, -0.0255], [-0.218, -0.0165], [-0.218, -0.0125], [-0.11, -0.0205]], -0.011, 0.011, c, 'zy'); q.tube([0, -0.0178, -0.205], [0, -0.0196, -0.205], 0.004, 0.004, br, 8); }
+  gGuard(q, [[-0.108, -0.022], [-0.102, -0.05], [-0.06, -0.058], [-0.02, -0.046], [-0.008, -0.026]]); gTrig(q, -0.05, -0.024);
+  q.box(0, -0.027, -0.0, 0.012, 0.004, 0.03, c); q.tube([0, -0.028, 0.004], [0, -0.0302, 0.004], 0.0036, 0.0036, br, 8);
+  /* pasador del cajón, abrazaderas con su anilla, bocacha con tetón de bayoneta, baqueta */
+  q.tube([-0.0262, 0.004, -0.16], [0.0262, 0.004, -0.16], 0.0048, 0.0048, GNC.steel, 8);
+  (o.bands || []).forEach((z, i) => { const cy = lerp(0.02, 0.027, clamp((-0.3 - z) / (-0.3 - zF), 0, 1)) + 0.008; gBand(q, z, cy, 0.05, 0.062); q.box(0.0255, cy + 0.004, z, 0.004, 0.008, 0.008, br); if (!i) gLoop(q, cy - 0.031, z, 0.012, 0.016); });
+  gBand(q, zF + 0.012, 0.03, 0.046, 0.058, c, 0.03); q.box(0, 0.0, zF + 0.016, 0.008, 0.012, 0.026, c);
+  gSights(q, y0, ys, zr, zM + 0.035, { hood: o.hood, fb: 0.011, rb: 0.0148 });
+  if (o.rod) { q.tube([0, y0 - 0.026, zF + 0.05], [0, y0 - 0.026, zM + 0.02], 0.003, 0.003, br, 6); q.tube([0, y0 - 0.026, zM + 0.03], [0, y0 - 0.026, zM + 0.018], 0.0042, 0.0042, br, 6); }
+  gLoop(q, -0.08, 0.2, 0.013, 0.018);
+  return { muzzle: [0, y0, zM], sight: [0, ys, zr], left: [0, 0.005, o.left || -0.42], butt: zB, back: 0.06 };
+}
+/* subfusil de la familia MP 28: cañón con camisa perforada y cargador recto a la izquierda */
+function gMp28(q, o) {
+  const y0 = 0.05, zB = 0.286, zM = zB - 0.813, wd = o.wood, c = GNC.blued, hc = o.housing || c, ys = y0 + 0.04;
+  gStock(q, [[zB, -0.04, 0.04, 0.118], [zB - 0.03, -0.038, 0.046, 0.124], [0.13, -0.02, 0.044, 0.085], [0.045, -0.008, 0.04, 0.056], [0.0, -0.002, 0.042, 0.062], [-0.06, 0.0, 0.046, 0.07], [-0.12, 0.012, 0.05, 0.062], [-0.24, 0.018, 0.048, 0.05], [-0.285, 0.022, 0.04, 0.036]], wd);
+  q.loft([gSec(zB, -0.04, 0.042, 0.12), gSec(zB + 0.004, -0.04, 0.042, 0.12), gSec(zB + 0.007, -0.04, 0.037, 0.114)], c, { capB: true });
+  for (const y of [-0.075, -0.005]) q.tube([0, y, zB + 0.006], [0, y, zB + 0.0082], 0.0045, 0.0045, GNC.bright, 8);
+  /* cajón tubular con su tapón moleteado y el pestillo */
+  q.tube([0, y0, 0.05], [0, y0, -0.2], 0.0215, 0.0215, c, 16, false);
+  q.T(0, y0, 0, () => { q.lathe([[0.0215, 0.048], [0.0236, 0.05], [0.0236, 0.068], [0.021, 0.074], [0.013, 0.078], [0.0125, 0.0765], [0.001, 0.0765]], c, 16); for (let i = 0; i < 5; i++) q.lathe([[0.0241, 0.0525 + i * 0.0032], [0.0241, 0.054 + i * 0.0032]], GNC.dark, 16, { hard: true }); });
+  q.box(0, y0 + 0.0235, 0.04, 0.009, 0.005, 0.02, GNC.steel);
+  /* camisa perforada, brocal de la boca */
+  q.tube([0, y0, -0.2], [0, y0, zM + 0.014], 0.019, 0.019, shade(c, 1.12), 12, false); q.T(0, y0, 0, () => q.lathe([[0.019, zM + 0.016], [0.0212, zM + 0.014], [0.0212, zM + 0.002], [0.019, zM], [0.0085, zM], [0.0085, zM - 0.008], [0.0046, zM - 0.008]], c, 12));
+  q.tube([0, y0, zM - 0.0082], [0, y0, zM + 0.002], 0.0046, 0.0046, GNC.dark, 8);
+  for (let i = 0; i < 7; i++) for (let k = 0; k < 6; k++) { const a = (k + (i % 2) * 0.5) / 6 * Math.PI * 2, z = -0.232 - i * 0.04, cs = Math.cos(a), sn = Math.sin(a); q.tube([cs * 0.016, y0 + sn * 0.016, z], [cs * 0.01875, y0 + sn * 0.01875, z], 0.0062, 0.0062, GNC.dark, 8); }
+  /* brocal del cargador a la izquierda, con su retenida; cargador con nervios y fondo */
+  q.tube([0, y0, -0.198], [0, y0, -0.254], 0.0238, 0.0238, hc, 16);
+  q.T(-0.018, y0, -0.226, () => { q.rbox(0, 0, 0.022, 0.046, 0.031, 0.044, 0.004, hc); q.rbox(0, 0, 0.046, 0.052, 0.037, 0.006, 0.004, hc);
+    q.rbox(0, 0, 0.049 + o.magL / 2, 0.037, 0.0215, o.magL, 0.0035, GNC.blued);
+    for (const s of [-1, 1]) q.box(0.004, s * 0.0109, 0.049 + o.magL * 0.52, 0.011, 0.0012, o.magL * 0.82, shade(GNC.blued, 1.5));
+    q.rbox(0, 0, 0.049 + o.magL + 0.0025, 0.041, 0.0255, 0.005, 0.0035, c); }, -Math.PI / 2);
+  q.box(-0.046, y0 + 0.004, -0.196, 0.016, 0.012, 0.01, hc); q.tube([-0.046, y0 + 0.004, -0.192], [-0.046, y0 + 0.004, -0.186], 0.0045, 0.0045, GNC.bright, 8);
+  /* ranura y palanca de armar a la derecha; ventana de expulsión */
+  q.box(0.0212, y0 + 0.004, -0.06, 0.002, 0.007, 0.15, GNC.dark); q.tube([0.02, y0 + 0.004, -0.11], [0.04, y0 + 0.004, -0.11], 0.005, 0.0042, GNC.bright, 8); q.ball([0.046, y0 + 0.004, -0.11], 0.0098, GNC.bright, 10, 6);
+  q.box(0.0205, y0 + 0.006, -0.172, 0.004, 0.017, 0.036, GNC.dark); q.box(0.0196, y0 + 0.006, -0.166, 0.004, 0.013, 0.02, GNC.bright);
+  gGuard(q, [[-0.11, -0.016], [-0.105, -0.044], [-0.062, -0.052], [-0.022, -0.04], [-0.012, -0.024]]); gTrig(q, -0.054, -0.02);
+  if (o.selector) { q.tube([-0.027, -0.004, -0.085], [0.027, -0.004, -0.085], 0.0042, 0.0042, GNC.bright, 8); }
+  q.tube([-0.0262, 0.004, -0.15], [0.0262, 0.004, -0.15], 0.0045, 0.0045, GNC.steel, 8);
+  gSights(q, y0, ys, -0.07, zM + 0.024, { ears: true, fb: 0.02, rb: 0.0215 });
+  gLoop(q, -0.08, 0.2, 0.013, 0.018); q.T(-0.0215, y0 - 0.004, -0.33, () => gLoop(q, 0, 0, 0.011, 0.016), 0, 0, -Math.PI / 2);
+  return { muzzle: [0, y0, zM], sight: [0, ys, -0.07], left: [-0.004, 0.0, -0.2], butt: zB };
+}
+/* DP-27: plato encima, camisa con ventanas, apagallamas cónico y bípode plegado; las miras, altas, por encima del plato */
+function gDp27(q) {
+  const y0 = 0.045, zB = 0.286, zM = zB - 1.27, wd = GNC.birch, c = GNC.blued, ys = y0 + 0.084, zs = 0.0, zf = -0.725;
+  gStock(q, [[zB, -0.04, 0.042, 0.125], [zB - 0.03, -0.04, 0.048, 0.135], [0.15, -0.03, 0.046, 0.115], [0.06, -0.006, 0.042, 0.06], [0.01, 0.0, 0.042, 0.056], [-0.04, 0.006, 0.044, 0.06]], wd);
+  q.loft([gSec(zB, -0.04, 0.044, 0.127), gSec(zB + 0.004, -0.04, 0.044, 0.127), gSec(zB + 0.007, -0.04, 0.039, 0.12)], c, { capB: true });
+  q.rbox(0, y0 - 0.006, -0.17, 0.046, 0.074, 0.3, 0.012, c); q.box(0, y0 - 0.05, -0.2, 0.03, 0.03, 0.2, c);
+  q.box(0, y0 + 0.028, -0.17, 0.05, 0.008, 0.2, shade(c, 1.1));
+  /* plato de 47 cartuchos: tapa con nervios radiales, seguro del centro */
+  q.T(0, y0 + 0.033, -0.17, () => { q.latheY([[0.001, 0], [0.131, 0], [0.135, 0.005], [0.135, 0.022], [0.129, 0.028], [0.04, 0.0305], [0.001, 0.0305]], shade(c, 1.2), 28);
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; q.T(0, 0.0305, 0, () => q.box(0, 0, 0.084, 0.006, 0.0028, 0.084, c), a); }
+    q.latheY([[0.04, 0.03], [0.04, 0.034], [0.03, 0.037], [0.012, 0.037], [0.012, 0.042], [0.001, 0.043]], c, 14); q.box(0, 0.039, 0, 0.05, 0.004, 0.008, GNC.steel);
+    for (let k = 0; k < 28; k++) { const a = k / 28 * Math.PI * 2; q.T(0, 0.0135, 0, () => q.box(0, 0, 0.1352, 0.004, 0.012, 0.001, GNC.dark), a); } });
+  /* camisa del cañón con ventanas, cañón, toma de gases y apagallamas */
+  q.tube([0, y0, -0.32], [0, y0, -0.74], 0.022, 0.022, shade(c, 1.15), 12); for (let i = 0; i < 4; i++) for (let k = 0; k < 4; k++) { const a = (k + 0.5) / 4 * Math.PI * 2; q.T(Math.cos(a) * 0.0222, y0 + Math.sin(a) * 0.0222, -0.39 - i * 0.085, () => q.box(0, 0, 0, 0.002, 0.012, 0.05, GNC.dark), 0, 0, a); }
+  q.tube([0, y0, -0.74], [0, y0, zM + 0.07], 0.0125, 0.0115, c, 10); q.T(0, y0, 0, () => q.lathe([[0.012, zM + 0.075], [0.016, zM + 0.07], [0.032, zM], [0.029, zM], [0.012, zM + 0.06]], c, 14));
+  q.tube([0, y0 - 0.03, -0.3], [0, y0 - 0.03, -0.76], 0.009, 0.009, c, 8); q.tube([0, y0 - 0.03, -0.76], [0, y0 - 0.03, -0.79], 0.011, 0.011, c, 8);
+  for (const s of [-1, 1]) { q.tube([s * 0.016, y0 - 0.03, -0.75], [s * 0.03, y0 - 0.05, -0.4], 0.006, 0.005, c, 6); q.box(s * 0.03, y0 - 0.054, -0.39, 0.024, 0.006, 0.04, c); }
+  gBand(q, -0.75, y0 - 0.008, 0.052, 0.07, c, 0.02);
+  /* palanca de armar a la derecha, guardamonte, disparador y seguro de empuñadura */
+  q.box(0.0235, y0 - 0.012, -0.13, 0.002, 0.008, 0.16, GNC.dark); q.tube([0.022, y0 - 0.012, -0.19], [0.044, y0 - 0.012, -0.19], 0.005, 0.005, GNC.bright, 8);
+  gGuard(q, [[-0.11, -0.01], [-0.105, -0.04], [-0.062, -0.05], [-0.022, -0.04], [-0.012, -0.022]]); gTrig(q, -0.054, -0.016);
+  q.plate([[-0.008, -0.026], [0.03, -0.034], [0.03, -0.03], [-0.008, -0.02]], -0.005, 0.005, GNC.steel, 'zy');
+  /* alza: torreta con orejetas y muesca; punto de mira alto con orejetas sobre la camisa */
+  q.box(0, y0 + 0.036, zs - 0.006, 0.03, 0.012, 0.034, c); q.box(0, (y0 + 0.04 + ys - 0.006) / 2, zs, 0.007, ys - 0.006 - y0 - 0.04, 0.006, c);
+  for (const s of [-1, 1]) q.plate([[zs - 0.02, y0 + 0.04], [zs + 0.008, y0 + 0.04], [zs + 0.006, ys + 0.012], [zs - 0.008, ys + 0.012]], s * 0.0125, s * 0.015, c, 'zy');
+  gNotch(q, ys, zs, c, 0.016, 0.009);
+  q.box(0, y0 + 0.026, zf, 0.026, 0.01, 0.024, c); q.plate([[zf - 0.004, y0 + 0.03], [zf + 0.005, y0 + 0.03], [zf + 0.003, ys + 0.006], [zf - 0.001, ys + 0.006]], -0.0014, 0.0014, c, 'zy');
+  for (const s of [-1, 1]) q.plate([[zf - 0.01, y0 + 0.03], [zf + 0.01, y0 + 0.03], [zf + 0.006, ys + 0.01], [zf - 0.004, ys + 0.012]], s * 0.0105, s * 0.013, c, 'zy');
+  gLoop(q, -0.085, 0.2, 0.013, 0.018);
+  return { muzzle: [0, y0, zM], sight: [0, ys, zs], left: [0, -0.012, -0.3], butt: zB };
+}
+/* carabina de palanca «El Tigre»: depósito tubular bajo el cañón, martillo a la vista y anilla de silla */
+function gTigre(q) {
+  const y0 = 0.045, zB = 0.286, zM = zB - 0.96, wd = GNC.wal, c = GNC.blued, ys = y0 + 0.028;
+  gStock(q, [[zB, -0.045, 0.036, 0.11], [zB - 0.03, -0.043, 0.042, 0.115], [0.12, -0.02, 0.04, 0.075], [0.03, -0.004, 0.036, 0.046], [-0.01, 0.0, 0.034, 0.05]], wd);
+  q.loft([[zB, 0.11], [zB + 0.006, 0.105]].map(([z, h]) => gSec(z, -0.045, 0.038, h)), c, { capB: true });
+  q.rbox(0, y0 - 0.012, -0.1, 0.034, 0.066, 0.19, 0.008, c); q.box(0.0172, y0 + 0.002, -0.13, 0.002, 0.014, 0.05, GNC.dark);
+  q.plate([[0.0, 0.03], [0.012, 0.045], [0.03, 0.05], [0.02, 0.028]], -0.004, 0.004, c, 'zy');
+  gStock(q, [[-0.195, y0 - 0.02, 0.04, 0.05], [-0.42, y0 - 0.018, 0.036, 0.044]], wd); gBand(q, -0.425, y0 - 0.012, 0.042, 0.056);
+  q.tube([0, y0, -0.19], [0, y0, zM], 0.0105, 0.0095, c, 10); q.tube([0, y0 - 0.022, -0.19], [0, y0 - 0.022, zM + 0.02], 0.0085, 0.0085, c, 8); gBand(q, zM + 0.06, y0 - 0.01, 0.026, 0.05, c, 0.012);
+  gGuard(q, [[-0.1, -0.018], [-0.095, -0.05], [-0.04, -0.056], [-0.02, -0.03]], 0.004); gGuard(q, [[-0.02, -0.03], [0.02, -0.07], [0.09, -0.066], [0.105, -0.04], [0.06, -0.026]], 0.0045); q.box(0, -0.034, -0.062, 0.005, 0.02, 0.006, c);
+  q.T(-0.02, y0 - 0.01, -0.06, () => { const m = M4.create(); M4.rotY(m, Math.PI / 2); q.at(m, () => q.lathe([[0.011, -0.002], [0.014, 0], [0.011, 0.002], [0.008, 0], [0.011, -0.002]], GNC.bright, 10)); });
+  gSights(q, y0, ys, -0.24, zM + 0.03, { fb: 0.01 });
+  return { muzzle: [0, y0, zM], sight: [0, ys, -0.24], left: [0, 0.0, -0.32], butt: zB };
+}
+/* Thompson M1928 con tambor, cañón de aletas, compensador y empuñadura delantera */
+function gThompson(q) {
+  const y0 = 0.045, zB = 0.3, zM = zB - 0.86, wd = GNC.wal, c = GNC.blued, ys = y0 + 0.04;
+  gStock(q, [[zB, -0.05, 0.04, 0.12], [zB - 0.03, -0.048, 0.046, 0.125], [0.12, -0.025, 0.042, 0.075], [0.07, -0.01, 0.036, 0.04]], wd);
+  q.rbox(0, y0 - 0.008, -0.09, 0.042, 0.062, 0.33, 0.008, c);
+  q.mat('gunwood', () => q.plate([[0.03, -0.01], [-0.005, -0.01], [-0.02, -0.1], [0.022, -0.105]], -0.014, 0.014, wd, 'zy'));
+  q.T(0, y0 - 0.085, -0.175, () => { const m = M4.create(); M4.rotY(m, Math.PI / 2); q.at(m, () => { q.lathe([[0.001, -0.03], [0.082, -0.03], [0.086, -0.024], [0.086, 0.024], [0.082, 0.03], [0.001, 0.03]], shade(c, 1.15), 22); }); q.box(0.031, 0, 0, 0.004, 0.02, 0.1, GNC.bright); });
+  q.tube([0, y0, -0.255], [0, y0, zM + 0.05], 0.0125, 0.0105, c, 10); for (let i = 0; i < 14; i++) q.tube([0, y0, -0.265 - i * 0.012], [0, y0, -0.27 - i * 0.012], 0.019, 0.019, c, 10);
+  q.tube([0, y0, zM + 0.05], [0, y0, zM], 0.016, 0.016, c, 10); for (let i = 0; i < 3; i++) q.box(0, y0 + 0.016, zM + 0.012 + i * 0.012, 0.012, 0.003, 0.005, GNC.dark);
+  q.mat('gunwood', () => q.plate([[-0.37, y0 - 0.014], [-0.33, y0 - 0.014], [-0.325, -0.07], [-0.355, -0.085], [-0.385, -0.07]], -0.016, 0.016, wd, 'zy')); q.box(0, y0 - 0.02, -0.33, 0.02, 0.014, 0.14, c);
+  q.box(0, y0 + 0.026, -0.11, 0.014, 0.008, 0.02, GNC.bright); gGuard(q, [[-0.07, -0.014], [-0.068, -0.04], [-0.03, -0.045], [-0.005, -0.03]]); q.box(0, -0.03, -0.035, 0.005, 0.02, 0.006, c);
+  gSights(q, y0, ys, 0.04, zM + 0.035, { fb: 0.016 });
+  return { muzzle: [0, y0, zM], sight: [0, ys, 0.04], left: [0, -0.05, -0.355], butt: zB };
+}
+/* Astra 400: corredera tubular. Origen en el talón de la empuñadura */
+function gAstra(q) {
+  const yb = 0.108, c = GNC.blued, wd = GNC.wal;
+  q.plate([[0.0, 0.0], [-0.036, 0.0], [-0.05, 0.086], [-0.006, 0.09]], -0.0125, 0.0125, c, 'zy');
+  q.mat('gunwood', () => { for (const s of [-1, 1]) q.plate([[-0.004, 0.008], [-0.033, 0.008], [-0.045, 0.074], [-0.01, 0.078]], s * 0.0125, s * 0.0155, wd, 'zy'); });
+  q.box(0, 0.088, -0.07, 0.024, 0.02, 0.13, c);
+  q.tube([0, yb, 0.03], [0, yb, -0.19], 0.0138, 0.0138, c, 12); q.T(0, yb, 0, () => { q.lathe([[0.001, 0.04], [0.011, 0.038], [0.0138, 0.03]], c, 12); for (let i = 0; i < 5; i++) q.lathe([[0.0145, 0.004 + i * 0.006], [0.0145, 0.007 + i * 0.006]], GNC.dark, 12, { hard: true }); });
+  q.tube([0, yb, -0.19], [0, yb, -0.198], 0.0125, 0.0125, GNC.bright, 12); q.tube([0, yb, -0.198], [0, yb, -0.2], 0.0046, 0.0046, GNC.dark, 6);
+  q.box(0.0125, yb + 0.006, -0.07, 0.004, 0.011, 0.034, GNC.dark); q.box(0.0118, yb + 0.006, -0.066, 0.004, 0.008, 0.02, GNC.bright);
+  q.T(0, yb, 0, () => { for (let i = 0; i < 4; i++) q.lathe([[0.0144, -0.172 - i * 0.004], [0.0144, -0.174 - i * 0.004]], GNC.dark, 12, { hard: true }); });
+  gGuard(q, [[-0.052, 0.078], [-0.062, 0.05], [-0.098, 0.046], [-0.108, 0.078]], 0.003); gTrig(q, -0.07, 0.078);
+  q.plate([[0.001, 0.028], [0.0055, 0.031], [0.0035, 0.072], [-0.002, 0.074]], -0.0065, 0.0065, GNC.steel, 'zy');       // seguro de empuñadura
+  q.box(0, -0.0015, -0.018, 0.023, 0.004, 0.038, c); q.box(-0.0135, 0.088, -0.03, 0.003, 0.006, 0.018, GNC.steel);
+  for (const sx of [-1, 1]) q.tube([sx * 0.0152, 0.042, -0.026], [sx * 0.0163, 0.042, -0.026], 0.003, 0.003, GNC.bright, 8);
+  q.box(0, yb + 0.016, 0.018, 0.012, 0.006, 0.006, c); q.box(0, yb + 0.0165, -0.18, 0.003, 0.007, 0.01, c);
+  q.tube([0, -0.004, -0.018], [0, -0.016, -0.018], 0.005, 0.005, GNC.bright, 6, false);
+  return { muzzle: [0, yb, -0.2], sight: [0, yb + 0.02, 0.018], butt: 0.04 };
+}
+/* Breda 30 de una pieza (para cuando se cae al suelo): cajón, cargador abatible a la derecha, cañón de aletas, bípode */
+function gBreda(q) {
+  const y0 = 0.04, zB = 0.3, zM = zB - 1.23, c = GNC.blued, wd = GNC.wal;
+  gStock(q, [[zB, -0.04, 0.04, 0.12], [zB - 0.03, -0.04, 0.046, 0.128], [0.14, -0.02, 0.044, 0.09], [0.07, -0.004, 0.04, 0.06]], wd);
+  q.rbox(0, y0 - 0.01, -0.16, 0.06, 0.09, 0.46, 0.01, c); q.mat('gunwood', () => q.plate([[0.04, -0.03], [0.0, -0.03], [-0.012, -0.11], [0.03, -0.115]], -0.014, 0.014, wd, 'zy'));
+  q.box(0.075, y0, -0.2, 0.1, 0.045, 0.17, shade(c, 1.15));
+  q.tube([0, y0, -0.39], [0, y0, zM + 0.06], 0.014, 0.012, c, 10); for (let i = 0; i < 16; i++) q.tube([0, y0, -0.41 - i * 0.016], [0, y0, -0.416 - i * 0.016], 0.02, 0.02, c, 10);
+  q.lathe([[0.012, zM + 0.06], [0.02, zM + 0.05], [0.02, zM], [0.012, zM]].map(([r, z]) => [r, z]), c, 10); 
+  for (const s of [-1, 1]) q.tube([s * 0.02, y0 - 0.03, -0.72], [s * 0.035, y0 - 0.05, -0.42], 0.006, 0.006, c, 6);
+  gGuard(q, [[-0.04, -0.03], [-0.04, -0.06], [0.0, -0.064]]); gSights(q, y0 + 0.03, y0 + 0.075, -0.02, zM + 0.1, { fb: 0.0 });
+  return { muzzle: [0, y0, zM], sight: [0, y0 + 0.075, -0.02], butt: zB };
+}
+const GUN_DEF = {
+  mosin: q => gBoltRifle(q, { L: 1.232, wood: GNC.birch, mag: 'mosin', split: true, knob: true, bands: [-0.47, -0.72], hg: [-0.34, -0.74], hood: true, rod: true, exp: 0.09, zr: -0.3 }),
+  mauser93: q => gBoltRifle(q, { L: 1.235, wood: GNC.wal, mag: null, bands: [-0.52], hg: [-0.33, -0.5], rod: true, exp: 0.13, zr: -0.3, left: -0.4 }),
+  mauser16: q => gBoltRifle(q, { L: 1.05, wood: GNC.wal, mag: null, bent: true, bands: [-0.45], hg: [-0.33, -0.6], exp: 0.07, zr: -0.3, left: -0.38 }),
+  carcano: q => gBoltRifle(q, { L: 1.29, wood: GNC.beech, mag: 'carcano', split: true, bands: [-0.55, -0.8], hg: [-0.36, -0.55], rod: true, exp: 0.12, zr: -0.32, left: -0.42 }),
+  naranjero: q => gMp28(q, { wood: GNC.beech, magL: 0.23, housing: GNC.steel }),
+  mp28: q => gMp28(q, { wood: GNC.wal, magL: 0.2, selector: true }),
+  dp27: gDp27, tigre: gTigre, thompson: gThompson, astra: gAstra, breda30: gBreda
+};
+
 /* ============ WebGL ============ */
 const canvas = $('gl');
 const gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' }) || canvas.getContext('experimental-webgl');
@@ -5015,7 +5226,7 @@ function skSetupWeapons(C) {
     const rs = [G.sight[0] * k, G.sight[1] * k, G.sight[2] * k], rr = [c * rs[0] + s * rs[2], rs[1], -s * rs[0] + c * rs[2]];
     M4.translate(F, G.at[0] - rr[0], G.at[1] - rr[1], G.at[2] - rr[2]); M4.rotY(F, G.rot); M4.scale(F, k, k, k);
     /* en primera persona, la mano izquierda se adelanta hasta el guardamanos (en la animación sujetaba el cajón del cierre, muy cerca de la cara) */
-    if (kind === 'rifle') skFpRifleArms(C, st, Wsk, F);
+    if (kind === 'rifle') { C.fpSt0 = { lr: st.lr.slice(), lt: st.lt.slice(), gq: st.gq.slice(), gp: st.gp.slice() }; C.fpWsk = Wsk; skFpRifleArms(C, st, Wsk, F); }
     const fp = { F, WskInv, bones: new Float32Array(C.pal.length * 12), zm: M4.tp(F, G.muzzle)[2], rs: G.at[2], palmR: M4.tp(F, grip), palmL: null, sides: {} };
     skBonesTo(C, st, fp.bones);
     { const g = (j) => j >= 0 ? M4.tp(F, M4.tp(WskInv, M4.tp(C.base, [st.gp[j * 3], st.gp[j * 3 + 1], st.gp[j * 3 + 2]]))).map(v => +v.toFixed(3)) : null;
@@ -5113,7 +5324,7 @@ function skLeftGrip(C, st, Wsk) {
    tirador lleva el fusil a un lado de la cabeza), y los brazos se cierran hasta las manos: la derecha en la garganta de la culata,
    la izquierda bajo el guardamanos. Las posiciones van en el espacio del arma del juego (metros; el ojo, al apuntar, en z = 0,32) */
 const SK_FPSH = { Right: [0.11, -0.08, 0.55], Left: [-0.17, -0.11, 0.28] }, SK_FPPOLE = { Right: [0.6, -1, 0], Left: [-0.5, -1, -0.1] };
-function skFpRifleArms(C, st, Wsk, F) {
+function skFpRifleArms(C, st, Wsk, F, leftAt) {
   const Fi = m4inv(M4.create(), F), toSk = p => M4.tp(Wsk, M4.tp(Fi, p));
   const dirSk = v => { const a = toSk([0, 0, 0]), b = toSk(v); return [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; };
   /* la mano izquierda se queda donde la dejó la animación (hecha en Blender con los dedos cerrados sobre el guardamanos):
@@ -5125,7 +5336,7 @@ function skFpRifleArms(C, st, Wsk, F) {
     const sh = toSk(SK_FPSH[side]), dv = [sh[0] - st.gp[A * 3], sh[1] - st.gp[A * 3 + 1], sh[2] - st.gp[A * 3 + 2]];
     for (let j = 0; j < C.NJ; j++) if (C.under(j, A)) { st.gp[j * 3] += dv[0]; st.gp[j * 3 + 1] += dv[1]; st.gp[j * 3 + 2] += dv[2]; }
     let target;
-    if (side === 'Left') { const d = dirSk(SK_FPLOWER); target = [keepL[0] + d[0], keepL[1] + d[1], keepL[2] + d[2]]; }
+    if (side === 'Left') { if (leftAt) target = M4.tp(Wsk, leftAt); else { const d = dirSk(SK_FPLOWER); target = [keepL[0] + d[0], keepL[1] + d[1], keepL[2] + d[2]]; } }
     else target = M4.tp(Wsk, SK_GRIP.rifle);
     skReach(C, st, target, side === 'Left' ? skGripPt(C, st, side) : skPalm(C, st, side), side, dirSk(SK_FPPOLE[side]));
   }
@@ -5385,6 +5596,7 @@ function skPose(s, C) {
       bones: new Float32Array(C.pal.length * 12), adjQ: new Float32Array(C.NJ * 4), adjOn: new Uint8Array(C.NJ), model: M4.create(), wmat: M4.create(), wloc: M4.create(), drop: 0, weapon: null, mv: 0, run: 0, aim: 0, crouch: 0, turn: 0, t: Math.random() * 4, last: 0, fid: -1 };
   }
   const now = game.time, dt = clamp(now - (st.last || now), 0, 0.1); st.last = now;
+  if (s.alive) st.dieT = 0; else if (st.dieT === undefined) st.dieT = s.fall >= 1 ? 9 : 0;
   const alive = s.alive, kind = s.wpn.kind, pistol = kind === 'pistol', spd = alive ? s.speed : 0;
   const kk = Math.min(1, dt * 8);
   st.mv = skEase(st.mv, alive && spd > 0.35 ? 1 : 0, kk);
@@ -5446,7 +5658,7 @@ function skPose(s, C) {
     else { const k = Math.exp(-since * 14) * (kind === 'rifle' ? 0.16 : 0.07); skRot(st, C.J.Spine2, pax, 0, paz, -k); skRot(st, C.J.Neck, pax, 0, paz, k * 0.5); }
   }
   /* agachado: muslos adelante, rodillas dobladas, tronco algo inclinado */
-  const cr = alive ? s.crouchT : Math.min(0.6, s.fall * 0.8), pt = alive ? (s.proneT || 0) : 0;
+  const cr = alive ? s.crouchT : skDeath(s, C, st, dt), pt = alive ? (s.proneT || 0) : 0;
   st.crouch = cr;
   if (cr > 0.001) {
     for (const [up, lo, ft] of [[C.J.LeftUpLeg, C.J.LeftLeg, C.J.LeftFoot], [C.J.RightUpLeg, C.J.RightLeg, C.J.RightFoot]]) {
@@ -5459,13 +5671,12 @@ function skPose(s, C) {
     const ap = -(s.aimPitch || 0) * (1 - pt) * st.aim;
     skRot(st, spine, pax, 0, paz, ap * 0.3); skRot(st, C.J.Spine1, pax, 0, paz, ap * 0.35); skRot(st, C.J.Spine2, pax, 0, paz, ap * 0.35);
     if (pt > 0) { skAdd(st, C.J.Neck, -0.6 * pt); skAdd(st, C.J.Head, -0.5 * pt); skRot(st, C.J.LeftArm, pax, 0, paz, -1.2 * pt); skRot(st, C.J.RightArm, pax, 0, paz, -1.2 * pt); }
-  } else {
-    skAdd(st, spine, 0.35 * s.fall); skAdd(st, C.J.Neck, 0.4 * s.fall);
   }
   skGlobals(C, st);
   return st;
 }
 /* arma de cada soldado según la que lleva */
+for (const k in WEAPONS) WEAPONS[k].gid = k;
 const skWeaponKey = s => s.wpn.kind === 'pistol' ? 'pistol' : 'rifle';
 const _jm = M4.create(), _jm2 = M4.create();
 /* matriz de un hueso a partir de su giro y posición globales (sin crear objetos) */
@@ -5494,26 +5705,33 @@ function skBones(s, C, st) {
     const k = skLegKey(s);
     if (k !== 'revolver' && s.alive) { const r = k === 'thompson' && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
   }
-  skBonesTo(C, st, st.bones);
-  if (C.leg) { st.weapon = null; st.wpk = skLegKey(s); }       // el arma del legionario va cosida a sus huesos: se dibuja con ellos
+  st.gun = null;
+  if (C.leg) { st.weapon = null; st.wpk = s.alive ? skLegKey(s) : null; }       // el arma del legionario va cosida a sus huesos: se dibuja con ellos (muerto, la suelta)
   else {
     const kind = C.breda && SK.W.breda30 && s.wid === 'breda30' ? 'breda30' : skWeaponKey(s);
     if (kind === 'breda30') skBredaMatrix(C, st, st.wloc);
     else { m4joint(_jm, st.gq, st.gp, C.J.Arma); M4.mul(_jm2, C.base, _jm); M4.mul(st.wloc, _jm2, C.wl[kind]); }
-    st.weapon = SK.W[kind];
+    const g = gunFor(s, C);
+    if (!s.alive) st.weapon = null;       // al morir suelta el arma (cae aparte)
+    else if (g) { st.weapon = null; st.gun = g; gunLeftHand(s, C, st, g); }
+    else st.weapon = SK.W[kind];
   }
+  skBonesTo(C, st, st.bones);
   /* agachado: cuánto hay que bajar el cuerpo para que los pies sigan en el suelo */
   st.drop = 0;
-  if (s.alive && st.crouch > 0.001 && C.J.LeftFoot >= 0) st.drop = (Math.min(st.gp[C.J.LeftFoot * 3 + 1], st.gp[C.J.RightFoot * 3 + 1]) - C.footRest) * Math.min(1, st.crouch * 3);
+  if (st.crouch > 0.001 && C.J.LeftFoot >= 0) st.drop = (Math.min(st.gp[C.J.LeftFoot * 3 + 1], st.gp[C.J.RightFoot * 3 + 1]) - C.footRest) * Math.min(1, st.crouch * 3);
 }
 /* matriz del soldado (cada fotograma): posición, rumbo (el modelo mira a +Z y el juego a -Z) y escala; tumbado o cayendo, gira sobre los pies */
 function skModel(s, C, st) {
   const m = st.model, pt = s.alive ? (s.proneT || 0) : 0;
-  M4.identity(m); M4.translate(m, s.x, s.y + (s.alive ? 0 : 0.12 * s.fall), s.z); M4.rotY(m, s.yaw + Math.PI - st.turn);
-  if (!s.alive) M4.rotX(m, -s.fall * 1.52 * s.fallDir);
+  const die = s.alive ? null : st.die;
+  M4.identity(m); M4.translate(m, s.x, s.y + (s.alive ? 0 : die ? die.lift : 0.12 * s.fall), s.z); M4.rotY(m, s.yaw + Math.PI - st.turn);
+  if (die) { if (die.side) M4.rotZ(m, die.ang); else M4.rotX(m, die.ang); }
+  else if (!s.alive) M4.rotX(m, -s.fall * 1.52 * s.fallDir);
   else if (pt > 0) { M4.translate(m, 0, 0.18 * pt, -0.85 * pt); M4.rotX(m, 1.47 * pt); }
   M4.scale(m, C.scale, C.scale, C.scale); M4.translate(m, 0, -C.foot - st.drop, 0);
   if (st.weapon) M4.mul(st.wmat, m, st.wloc);
+  else if (st.gun) { M4.mul(_jm, st.wloc, st.gun.A); M4.mul(st.wmat, m, _jm); }
 }
 /* ¿cae dentro de lo que ve la cámara? (esfera alrededor del soldado contra la proyección, con margen) */
 function skInView(vp, x, y, z, r) {
@@ -5565,7 +5783,8 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
     if (!st || st.fid !== SK.fid) {
       /* la postura se recalcula cada fotograma de cerca, uno de cada dos a media distancia y uno de cada cuatro lejos; la posición, siempre */
       const d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez), every = d2 < (lowVR ? 20 * 20 : ML.ev * ML.ev) ? 1 : d2 < 90 * 90 ? 2 : 4;
-      if (!st || st.C !== C || (SK.fid + s.id) % every === 0 || st.alive !== s.alive || st.wk !== s.wid) { st = skPose(s, C); skBones(s, C, st); st.alive = s.alive; st.wk = s.wid; }
+      if (st && st.C === C && st.alive && !s.alive && st.fid >= SK.fid - 8) gunDrop(s, st);
+      if (!st || st.C !== C || (SK.fid + s.id) % every === 0 || st.alive !== s.alive || st.wk !== s.wid || (!s.alive && st.dieT < 1.6)) { st = skPose(s, C); skBones(s, C, st); st.alive = s.alive; st.wk = s.wid; }
       skModel(s, C, st); st.fid = SK.fid;
     }
     vis.push(s);
@@ -5590,8 +5809,173 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
       skParts(d2 < dw ? st.weapon.full : st.weapon.lod);
     }
   }
-  skEnd(); matState(1, 1, 0.05);
+  skEnd(); matState(1, 1, 0);
+  /* armas por código de los soldados y las caídas en el suelo */
+  for (const s of vis) { const st = s.sk; if (st.gun) drawModel(st.gun.model, st.wmat); }
+  if (newFrame) gunDropsDraw(ex, ez);
+  matState(1, 1, 0.05);
   return true;
+}
+
+/* ============ armas por código en el juego ============
+   Cada arma que no tiene modelo de Blender se construye con GUN_DEF y se cuelga del mismo hueso (y de las mismas manos) que el
+   fusil o el revólver de los soldados: en tercera persona, en primera y en las gafas. Las armas caen al suelo al morir. */
+const GUNS = {};
+let _gunA = null;
+function gunGet(id) {
+  let g = GUNS[id];
+  if (g === undefined) {
+    if (!GUN_DEF[id]) return GUNS[id] = null;
+    if (!_gunA) {
+      const k = 1 / SK_REAL.rifle, m = M4.create(); M4.translate(m, 0.585, 0.025, -0.022); M4.scale(m, k, k, k);
+      _gunA = { rifle: M4.mul(M4.create(), m, new Float32Array([0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1])), pistol: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1]) };
+    }
+    const q = new Mdl(); q.mat('gunsteel'); const ref = GUN_DEF[id](q), base = id === 'astra' ? 'pistol' : 'rifle';
+    g = GUNS[id] = { id, model: q.mesh(), ref, base, A: _gunA[base], ik: !!(WEAPONS[id] && (WEAPONS[id].kind === 'smg' || WEAPONS[id].kind === 'lmg')) };
+  }
+  return g;
+}
+/* arma por código de un soldado (null: usa la de Blender) */
+function gunFor(s, C) {
+  if (C.leg || s.wid === 'mosin' || (s.wid === 'breda30' && C.breda && SK.W.breda30)) return null;
+  return gunGet(s.wid);
+}
+/* tercera persona: la mano izquierda va a su sitio en el arma (subfusiles y fusiles ametralladores) */
+const _gunM = M4.create();
+function gunLeftHand(s, C, st, g) {
+  if (!g.ik || !g.ref.left || !s.alive || s.reloadT > 0 || (s.proneT || 0) > 0.5) return;
+  M4.mul(_gunM, st.wloc, g.A);
+  skReach(C, st, M4.tp(_gunM, g.ref.left), skGripPt(C, st, 'Left'), 'Left', [0.5, -1, 0.1]);
+}
+/* primera persona: dónde queda cada arma por código respecto a los brazos del arma base, con su alza en el eje de la mira */
+function gunFp(w, team) {
+  if (!SK.ready || glLost || !w) return null;
+  const C = SK.chars[team]; if (!C || (P && skLegFpKey(P))) return null;
+  const id = w.gid; if (!id || id === 'mosin' || (id === 'breda30' && skBredaCharacter(team, w))) return null;
+  const g = gunGet(id); if (!g) return null;
+  const base = C.fp[g.base]; if (!base) return null;
+  C.fpw = C.fpw || {}; let f = C.fpw[id];
+  if (!f) {
+    const GA = M4.mul(M4.create(), base.F, g.A), s = M4.tp(GA, [g.ref.sight[0], g.ref.sight[1] + 0.004, g.ref.sight[2]]), at = SK_FPGUN[g.base].at, d = [at[0] - s[0], at[1] - s[1], at[2] - s[2]];
+    /* el ojo queda a 30 cm del alza: si la cola del arma llegaría hasta él, el arma se adelanta lo justo (alza algo más lejos) */
+    const push = g.ref.back === undefined ? 0 : Math.max(0, g.ref.back + 0.1 - (g.ref.sight[2] + 0.3)); d[2] -= push;
+    const T = M4.create(); M4.translate(T, d[0], d[1], d[2]);
+    let bones = base.bones;
+    if (g.ik && C.fpSt0) {       // los brazos, rehechos con la mano izquierda en su sitio
+      const st = { lr: C.fpSt0.lr.slice(), lt: C.fpSt0.lt.slice(), gq: C.fpSt0.gq.slice(), gp: C.fpSt0.gp.slice(), adjQ: null };
+      skFpRifleArms(C, st, C.fpWsk, base.F, M4.tp(g.A, g.ref.left)); bones = new Float32Array(base.bones.length); skBonesTo(C, st, bones);
+    }
+    f = C.fpw[id] = { g, base, bones, G: M4.mul(M4.create(), T, GA), arms: M4.mul(M4.create(), M4.mul(M4.create(), T, base.F), base.WskInv), zm: M4.tp(GA, g.ref.muzzle)[2] + d[2], rs: at[2] - push, palmR: [base.palmR[0] + d[0], base.palmR[1] + d[1], base.palmR[2] + d[2]] };
+  }
+  return f;
+}
+const _gfM = M4.create();
+function gunFpDraw(vp, G, w, team, ex, ey, ez, sides) {
+  const f = gunFp(w, team); if (!f) return false;
+  matState(1, 1, 0); drawModel(f.g.model, M4.mul(_gfM, G, f.G));
+  M4.mul(_gfM, G, f.arms);
+  skBegin(vp, ex, ey, ez, 1e7, 2e7);
+  gl.uniform4fv(SK.U.uB, f.bones); gl.uniformMatrix4fv(SK.U.uM, false, _gfM);
+  for (const sd of sides) if (f.base.sides[sd]) skParts(f.base.sides[sd]);
+  skEnd();
+  return true;
+}
+/* ---------- armas caídas ---------- */
+const gunDrops = [];
+const _gdM = M4.create();
+function gunDrop(s, st) {
+  const C = st.C, g = gunGet(s.wid) || gunGet('mosin'); if (!g) return;
+  const m = M4.create();
+  if (st.gun) M4.copy(m, st.wmat);
+  else if (st.weapon && st.weapon !== SK.W.breda30) M4.mul(m, st.wmat, gunGet(s.wpn.kind === 'pistol' ? 'astra' : 'mosin').A);
+  else { /* legionario o Breda: desde la mano derecha */
+    m4joint(_jm, st.gq, st.gp, C.J.RightHand); M4.mul(_jm2, C.base, _jm); M4.mul(m, st.model, _jm2);
+  }
+  /* se queda solo con la posición y la orientación (sin escala) */
+  const p = [m[12], m[13], m[14]], ax = c => { const l = Math.hypot(m[c * 4], m[c * 4 + 1], m[c * 4 + 2]) || 1; return [m[c * 4] / l, m[c * 4 + 1] / l, m[c * 4 + 2] / l]; };
+  const X = ax(0), Y = ax(1), Z = ax(2);
+  gunDrops.push({ g, p, X, Y, Z, v: [(s.vx || 0) * 0.5 + rnd(-0.6, 0.6), 0.5 + Math.random() * 0.7, (s.vz || 0) * 0.5 + rnd(-0.6, 0.6)], w: rnd(-3.5, 3.5), wz: rnd(-2.5, 2.5), t: 0, rest: false, M: M4.create(), yaw: Math.atan2(-Z[0], -Z[2]) + Math.PI, side: Math.random() < 0.5 ? 1 : -1 });
+  if (gunDrops.length > 36) gunDrops.shift();
+}
+function gunDropsTick(dt) {
+  for (let i = gunDrops.length - 1; i >= 0; i--) {
+    const d = gunDrops[i]; d.t += dt;
+    if (d.t > 40) { gunDrops.splice(i, 1); continue; }
+    if (!d.rest) {
+      d.v[1] -= 9.8 * dt; d.p[0] += d.v[0] * dt; d.p[1] += d.v[1] * dt; d.p[2] += d.v[2] * dt;
+      /* voltea alrededor de su eje lateral y del cañón */
+      const rot = (a, b, ang) => { const c = Math.cos(ang), s = Math.sin(ang); for (let k = 0; k < 3; k++) { const u = a[k], w = b[k]; a[k] = u * c + w * s; b[k] = -u * s + w * c; } };
+      rot(d.Y, d.Z, d.w * dt); rot(d.X, d.Y, d.wz * dt);
+      const gy = Math.max(groundAt(d.p[0], d.p[2]), waterY - 0.4) + 0.035;
+      if (d.p[1] <= gy) {
+        d.p[1] = gy;
+        if (d.v[1] < -2.2 && !d.b) { d.b = 1; d.v[1] *= -0.25; d.v[0] *= 0.5; d.v[2] *= 0.5; d.w *= 0.5; }
+        else { d.rest = true; d.yaw = Math.atan2(-d.Z[0], -d.Z[2]); d.r0 = d.t; d.M0 = [d.X[0], d.X[1], d.X[2], 0, d.Y[0], d.Y[1], d.Y[2], 0, d.Z[0], d.Z[1], d.Z[2], 0, d.p[0], d.p[1], d.p[2], 1]; }
+      }
+    }
+    const M = d.M;
+    if (d.rest) {       // tumbada de lado sobre el terreno
+      const e = 0.01, gx = (groundAt(d.p[0] + e, d.p[2]) - groundAt(d.p[0] - e, d.p[2])) / (2 * e), gz = (groundAt(d.p[0], d.p[2] + e) - groundAt(d.p[0], d.p[2] - e)) / (2 * e);
+      M4.identity(M); M4.translate(M, d.p[0], d.p[1], d.p[2]); M4.rotY(M, d.yaw + Math.PI);
+      const c = Math.cos(d.yaw), s = Math.sin(d.yaw); M4.rotX(M, Math.atan(clamp(-(gx * -s + gz * -c), -1, 1))); M4.rotZ(M, d.side * (Math.PI / 2 - 0.06));
+      if (d.M0) { const k = (d.t - d.r0) / 0.16; if (k >= 1) d.M0 = null; else { const e2 = k * k * (3 - 2 * k); for (let j = 0; j < 16; j++) M[j] = d.M0[j] + (M[j] - d.M0[j]) * e2; } }       // se asienta sin salto
+    } else { M[0] = d.X[0]; M[1] = d.X[1]; M[2] = d.X[2]; M[3] = 0; M[4] = d.Y[0]; M[5] = d.Y[1]; M[6] = d.Y[2]; M[7] = 0; M[8] = d.Z[0]; M[9] = d.Z[1]; M[10] = d.Z[2]; M[11] = 0; M[12] = d.p[0]; M[13] = d.p[1]; M[14] = d.p[2]; M[15] = 1; }
+  }
+}
+/* recoger un arma del suelo: se cambia por la principal, que se queda en su sitio */
+function gunNear(p) {
+  if (!p || !p.alive || p.veh || p.aa || !p.weps || !SK.ready || duo.role) return null;
+  let best = null, bd = 1.9 * 1.9;
+  for (const d of gunDrops) {
+    const id = d.g.id; if (!d.rest || d.g.base !== 'rifle' || id === p.weps[0].id || WEAPONS[id].leg || id === 'breda30') continue;
+    const q = (d.p[0] - p.x) * (d.p[0] - p.x) + (d.p[2] - p.z) * (d.p[2] - p.z); if (q < bd && Math.abs(d.p[1] - p.y) < 2.5) { bd = q; best = d; }
+  }
+  return best;
+}
+function gunPick(p) {
+  const d = gunNear(p); if (!d) return false;
+  const old = gunGet(p.weps[0].id), id = d.g.id, W = WEAPONS[id];
+  p.weps[0] = { id, def: W, ammo: W.mag, reserve: Math.round(W.reserve / 2), mesh: fpMesh(id, p.team) };
+  p.wid = id; p.wpn = W; p.prim = null; p.bredaInspectAt = null; p.cur = 0; p.reloadT = 0; p.boltT = 0; p.switchT = 0.5; p.fireT = 0.5; p.aimT = 0; SFX.click();
+  if (old) { d.g = old; d.t = 0; d.side = -d.side; } else gunDrops.splice(gunDrops.indexOf(d), 1);
+  return true;
+}
+let _gdLast = 0;
+function gunDropsDraw(ex, ez) {
+  if (!gunDrops.length) return;
+  const dt = clamp(game.time - _gdLast, 0, 0.05); _gdLast = game.time; if (dt > 0) gunDropsTick(dt);
+  matState(1, 1, 0);
+  for (const d of gunDrops) if ((d.p[0] - ex) * (d.p[0] - ex) + (d.p[2] - ez) * (d.p[2] - ez) < 120 * 120) drawModel(d.g.model, d.M);
+}
+/* ---------- muerte: tres caídas distintas, por fases ----------
+   De espaldas (el impacto lo echa atrás, se le doblan las rodillas y cae con los brazos abiertos), de bruces (cae de rodillas y
+   se vence hacia delante) o de lado. st.die guarda el giro del cuerpo, cuánto se levanta del suelo y cuánto dobla las piernas. */
+function skDeath(s, C, st, dt) {
+  const T = st.dieT = (st.dieT || 0) + dt, kind = s.fallDir > 0 ? (s.id % 3 === 0 ? 2 : 0) : 1, sd = s.id % 2 ? 1 : -1;
+  const d = st.die || (st.die = { ang: 0, side: 0, lift: 0, cr: 0 });
+  const J = C.J, hit = smooth(0, 0.16, T), ease = x => { x = clamp(x, 0, 1); return x * x * (2 - x) * (2 - x) * 0.25 + x * x * 0.75; };
+  let fall, set = 0;
+  if (kind === 0) {             // de espaldas
+    fall = ease((T - 0.12) / 0.62); set = T > 0.74 ? Math.exp(-(T - 0.74) * 8) * Math.sin((T - 0.74) * 26) * 0.045 : 0;
+    d.side = 0; d.ang = -(1.5 * fall - set); d.lift = 0.13 * fall; d.cr = 0.5 * hit * (1 - fall * 0.72);
+    skAdd(st, J.Spine, -0.3 * hit * (1 - fall)); skAdd(st, J.Spine2, -0.25 * hit * (1 - fall * 0.6)); skAdd(st, J.Neck, -0.45 * hit + 0.25 * fall);
+    skRot(st, J.LeftArm, 0, 0, 1, 0.9 * hit + 0.45 * fall); skRot(st, J.RightArm, 0, 0, 1, -(0.7 * hit + 0.7 * fall)); skAdd(st, J.LeftArm, -0.7 * hit * (1 - fall) - 0.25 * fall); skAdd(st, J.RightArm, -0.5 * hit * (1 - fall) - 0.5 * fall);
+    skAdd(st, J.LeftForeArm, -0.5 * fall); skAdd(st, J.RightForeArm, -0.3 * hit);
+    skAdd(st, sd > 0 ? J.LeftUpLeg : J.RightUpLeg, -0.55 * fall); skAdd(st, sd > 0 ? J.LeftLeg : J.RightLeg, 1.0 * fall); skRot(st, sd > 0 ? J.RightUpLeg : J.LeftUpLeg, 0, 0, 1, -sd * 0.2 * fall);
+  } else if (kind === 1) {      // de bruces: primero de rodillas
+    const kn = smooth(0, 0.3, T); fall = ease((T - 0.28) / 0.6); set = T > 0.88 ? Math.exp(-(T - 0.88) * 9) * Math.sin((T - 0.88) * 28) * 0.035 : 0;
+    d.side = 0; d.ang = 1.5 * fall - set; d.lift = 0.1 * fall; d.cr = 0.95 * kn * (1 - fall * 0.8);
+    skAdd(st, J.Spine, 0.4 * kn * (1 - fall)); skAdd(st, J.Neck, 0.5 * kn - 0.9 * fall); skRot(st, J.Head, 0, 1, 0, sd * 0.7 * fall);
+    skAdd(st, J.LeftArm, -0.5 * kn - 0.9 * fall); skAdd(st, J.RightArm, -0.3 * kn - 0.5 * fall); skRot(st, J.LeftArm, 0, 0, 1, 0.5 * fall); skRot(st, J.RightArm, 0, 0, 1, -0.9 * fall);
+    skAdd(st, J.LeftForeArm, -0.6 * fall); skAdd(st, sd > 0 ? J.LeftLeg : J.RightLeg, 0.5 * fall);
+  } else {                      // de lado
+    fall = ease((T - 0.1) / 0.6); set = T > 0.7 ? Math.exp(-(T - 0.7) * 8) * Math.sin((T - 0.7) * 26) * 0.04 : 0;
+    d.side = 1; d.ang = sd * (1.48 * fall - set); d.lift = 0.2 * fall; d.cr = 0.45 * hit * (1 - fall * 0.3);
+    skRot(st, J.Spine, 0, 0, 1, sd * 0.3 * hit * (1 - fall * 0.5)); skAdd(st, J.Spine, 0.3 * fall); skRot(st, J.Neck, 0, 0, 1, -sd * 0.4 * fall);
+    skRot(st, J.LeftArm, 0, 0, 1, 0.5 * hit); skRot(st, J.RightArm, 0, 0, 1, -0.5 * hit); skAdd(st, sd > 0 ? J.LeftArm : J.RightArm, -0.9 * fall); skAdd(st, sd > 0 ? J.RightArm : J.LeftArm, 0.4 * fall);
+    skAdd(st, sd > 0 ? J.LeftUpLeg : J.RightUpLeg, -0.5 * fall); skAdd(st, sd > 0 ? J.LeftLeg : J.RightLeg, 0.7 * fall);
+  }
+  return d.cr;
 }
 
 /* ---------- el legionario: modelo propio para el fusilero (carabina de palanca) y el de asalto (Thompson) nacionales ----------
@@ -5922,9 +6306,9 @@ function skFp(kind, team) {
   const C = SK.chars[team]; return C && C.fp[kind] ? C.fp[kind] : null;
 }
 /* dónde va la mano derecha en el arma y dónde sale la bala (en el espacio del arma del juego) */
-function skGunHand(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrHand; const fp = skFp(w.kind, team); return fp ? fp.palmR : null; }
-function skZm(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrMuzzle[2]; const lk = P && skLegFpKey(P); if (lk && SK.leg.fpMuz[lk]) return SK.leg.fpMuz[lk][2] + 0.32; const fp = skFp(w.kind, team); return fp ? fp.zm : null; }
-function skRs(w, team) { if (skBredaCharacter(team, w)) return .02; const fp = skFp(w.kind, team); return fp ? fp.rs : null; }
+function skGunHand(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrHand; const gf = gunFp(w, team); if (gf) return gf.palmR; const fp = skFp(w.kind, team); return fp ? fp.palmR : null; }
+function skZm(w, team) { const b = skBredaCharacter(team, w); if (b) return b.bredaVrMuzzle[2]; const gf = gunFp(w, team); if (gf) return gf.zm; const lk = P && skLegFpKey(P); if (lk && SK.leg.fpMuz[lk]) return SK.leg.fpMuz[lk][2] + 0.32; const fp = skFp(w.kind, team); return fp ? fp.zm : null; }
+function skRs(w, team) { if (skBredaCharacter(team, w)) return .02; const gf = gunFp(w, team); if (gf) return gf.rs; const fp = skFp(w.kind, team); return fp ? fp.rs : null; }
 const _fpD = M4.create(), _fpA = M4.create(), _fpL = M4.create();
 /* G: espacio del arma del juego → mundo. sides: qué antebrazos se ven */
 function skFpDraw(vp, G, kind, team, ex, ey, ez, sides) {
@@ -6593,7 +6977,8 @@ function drawFpWeapon(camWorld) {
   M4.copy(_fp, camWorld); M4.translate(_fp, x, y, z);
   M4.rotY(_fp, lerp(0.03, 0, a)); M4.rotX(_fp, p.kick * 0.03 * (w.auto ? 0.4 : 1) - rel * 0.6 - p.switchT * 0.8); M4.rotZ(_fp, -bolt * 0.22 - rel * 0.3);
   /* con los modelos de Blender: los brazos del soldado del jugador y el arma de verdad */
-  if (!skFpDraw(FPVP, _fp, w.kind, p.team, cam.x, cam.y, cam.z, w.kind === 'pistol' ? ['Right'] : ['Right', 'Left'])) drawMesh(ws.mesh, _fp);
+  const sides = w.kind === 'pistol' ? ['Right'] : ['Right', 'Left'];
+  if (!gunFpDraw(FPVP, _fp, w, p.team, cam.x, cam.y, cam.z, sides) && !skFpDraw(FPVP, _fp, w.kind, p.team, cam.x, cam.y, cam.z, sides)) drawMesh(ws.mesh, _fp);
 }
 
 /* ============ vehículos: camiones, carros de combate y cazas ============ */
@@ -6695,7 +7080,7 @@ function useVehicle() {
   const p = P; if (!p || !p.alive || game.state !== 'play') return;
   if (p.aa) { leaveAA(p); return; }
   if (p.veh) { exitVehicle(p); return; }
-  const v = nearVehicle(p); if (!v) { const a = nearAA(p); if (a) manAA(p, a); return; }
+  const v = nearVehicle(p); if (!v) { const a = nearAA(p); if (a) manAA(p, a); else gunPick(p); return; }
   takeVehicle(p, v);
 }
 function takeVehicle(p, v) {
@@ -8522,7 +8907,8 @@ function uiTick(dt) {
     $('extra').textContent = 'Granadas ' + p.nades + (p.prone ? (ws.def.kind === 'lmg' ? ' · tumbado, bípode apoyado' : ' · tumbado') : p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
   }
   if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : padX ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; }
-  else if (!input.touch && !input.locked && !lockOff() && !(input.pad && pad.on) && !xr.on) { pr.textContent = 'Haz clic para capturar el ratón'; pr.hidden = false; }       // sin captura no se apunta bien: se avisa siempre
+  else if (!input.touch && !input.locked && !lockOff() && !(input.pad && pad.on) && !xr.on) { pr.textContent = 'Haz clic para capturar el ratón'; pr.hidden = false; }
+  else if (!input.touch && !p.veh && !p.aa && gunNear(p)) { pr.textContent = (padX ? 'Pulsa X' : 'Pulsa E') + ' para coger: ' + WEAPONS[gunNear(p).g.id].name; pr.hidden = false; }       // sin captura no se apunta bien: se avisa siempre
   else pr.hidden = true;
   const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
   const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
@@ -9214,7 +9600,7 @@ function vrDrawGun(ew) {
   M4.rotX(_gk, p.kick * 0.05 * (w.auto ? 0.4 : 1) - rel * 0.7 - p.switchT * 0.9); M4.rotZ(_gk, -bolt * 0.22 - rel * 0.3);
   M4.translate(_gk, -hd[0], -hd[1], -hd[2]);
   if (ws.id === 'breda30' && skBredaFpDraw(XVP, _gk, p, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, true)) return;
-  if (!skFpDraw(XVP, _gk, w.kind, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR'])) drawMesh(ws.mesh, _gk);
+  if (!gunFpDraw(XVP, _gk, w, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR']) && !skFpDraw(XVP, _gk, w.kind, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR'])) drawMesh(ws.mesh, _gk);
 }
 
 /* ---- paneles: lienzos 2D que se pegan como textura delante del jugador ---- */
