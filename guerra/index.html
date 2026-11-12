@@ -7898,6 +7898,9 @@ function drawVehicles(vp, ex, ey, ez) {
    animadas con sus clips según lo que avanza cada lado del carro. Si no cargan, se siguen usando los vehículos hechos por código. */
 const VM3D = { mosca: null, pz1: null, t26n: null, t26: null, err: '' };
 const VM_FILES = { mosca: 'mosca_cm249.json', pz1: 'panzer_i.json', t26n: 't26.json', t26: 't26_republicano.json' };       // t26: el republicano, en verde oliva
+/* versiones para móvil: menos triángulos, texturas de 2048, y las orugas sin huesos de eslabón (los móviles no admiten 120-169 huesos).
+   En el móvil se carga primero esta; en el ordenador, la completa y, si la tarjeta no puede con ella, esta. El modelo por código solo si fallan las dos */
+const VM_FILES_M = { mosca: 'mosca_cm249_m.json', pz1: 'panzer_i_m.json', t26n: 't26_m.json', t26: 't26_republicano_m.json' };
 const DEG = Math.PI / 180;
 /* matriz con escala no uniforme (las riostras del tren del Mosca se estiran al recogerlo) */
 function m4trs3(o, t, q, s) {
@@ -8156,8 +8159,9 @@ async function vmLoad() {
   if (!SK.ready) return;
   const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
   const one = async (key, setup, texMax) => {
-    try {
-      const g = await get(VM_FILES[key]);
+    const files = GFX_TOUCH ? [VM_FILES_M[key], VM_FILES[key]] : [VM_FILES[key], VM_FILES_M[key]];
+    for (let fi = 0; fi < files.length; fi++) try {
+      const g = await get(files[fi]);
       /* las orugas del Panzer tienen 120 huesos: hace falta que la tarjeta los admita (se mira antes de subir nada) */
       const nj = Math.max(0, ...(g.j.skins || []).map(s => s.joints.length));
       if (nj * 3 + 12 > gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)) throw new Error('la tarjeta no admite ' + nj + ' huesos');
@@ -8165,7 +8169,12 @@ async function vmLoad() {
       if (nj > SK.nj) { SK.nj = nj; skProgram(); }       // el programa de los soldados se rehace con sitio para ellos
       VM3D[key] = X;
       if ((key === 'pz1' || key === 't26n' || key === 't26') && world.vm && world.vm[key]) { world.vm[key].pivot = X.pivot; world.vm[key].muzzle = X.muzzle; }
-    } catch (e) { VM3D.err += key + ': ' + (e && e.message || e) + ' '; console.warn('[' + key + ' 3D] se usa el modelo por código:', e && e.message || e); }
+      X.file = files[fi]; return;
+    } catch (e) {
+      const last = fi === files.length - 1;
+      if (last) VM3D.err += key + ': ' + (e && e.message || e) + ' ';
+      console.warn('[' + key + ' 3D] ' + files[fi] + ' no carga' + (last ? ', se usa el modelo por código:' : ', se prueba la otra versión:'), e && e.message || e);
+    }
   };
   await one('mosca', vmSetupMosca, gfxTexCap());       // texturas según «Calidad de las texturas»
   await one('pz1', vmSetupPz1, gfxTexCap());
