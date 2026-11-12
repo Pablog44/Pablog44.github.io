@@ -1,4 +1,5 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}#wCard .altw{display:flex;gap:6px;margin:0 0 8px}#wCard .altw button{flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(0,0,0,.25);background:rgba(255,255,255,.35);font:inherit;cursor:pointer}#wCard .altw button[aria-pressed="true"]{background:#2f3a2a;color:#f3ecd8;border-color:#2f3a2a}
+</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -529,7 +530,14 @@ body.nogl #fatal{max-width:none}
       <label for="g_ground">Suelo</label><select id="g_ground" data-gk="ground"></select>
       <label for="g_models">Detalle de los soldados</label><select id="g_models" data-gk="models"></select>
       <label for="g_fx">Humo, polvo y fogonazos</label><select id="g_fx" data-gk="fx"></select>
+      <label for="g_aa">Suavizado de bordes (antialiasing)</label><select id="g_aa" data-gk="aa"></select>
+      <label for="g_sharp">Nitidez</label><select id="g_sharp" data-gk="sharp"></select>
+      <label for="g_aniso">Filtrado anisótropo (suelo y texturas en ángulo)</label><select id="g_aniso" data-gk="aniso"></select>
+      <label for="g_tex">Calidad de las texturas</label><select id="g_tex" data-gk="tex"></select>
+      <label for="g_ss">Supersampling (pinta a más resolución y la reduce)</label><select id="g_ss" data-gk="ss"></select>
     </div>
+    <p id="gAaNote" class="quiet" aria-live="polite" hidden></p>
+    <p class="quiet">MSAA lo hace la tarjeta y suaviza las siluetas; FXAA filtra la imagen ya pintada (más barato, algo más blando) y se combina bien con la nitidez. El supersampling es el suavizado de más calidad, pero pinta 2,25 o 4 veces los píxeles: solo para tarjetas potentes. Las texturas de 8192 solo se ofrecen si la tarjeta las admite; al cambiar la calidad, la Lewis se recarga en el momento y los vehículos, al volver a cargar la página.</p>
     <label class="chk" for="gFps"><input type="checkbox" id="gFps"> Mostrar en una esquina las imágenes por segundo y la resolución.</label>
     <p class="quiet">Con «Árboles y matas: realistas» (Alto y Ultra) cada planta está hecha solo de ramas y hojas, de cerca y de lejos, y la hierba, de briznas y espigas dibujadas; es lo que más pide a la tarjeta gráfica. La hierba y el matorral solo se ven: no tapan las balas ni a los bots. Los árboles y los obstáculos son los mismos con cualquier ajuste.</p>
   </div>
@@ -1652,12 +1660,15 @@ const GUN_DEF = {
   carcano: q => gBoltRifle(q, { L: 1.29, wood: GNC.beech, mag: 'carcano', split: true, bands: [-0.55, -0.8], hg: [-0.36, -0.55], rod: true, exp: 0.12, zr: -0.32, left: -0.42 }),
   naranjero: q => gMp28(q, { wood: GNC.beech, magL: 0.23, housing: GNC.steel }),
   mp28: q => gMp28(q, { wood: GNC.wal, magL: 0.2, selector: true }),
+  lewis: q => ({ ...gDp27(q), left: [0, -0.008, -0.5], muzzle: [0, 0.045, -0.99], back: 0.29 }),       // de lejos y mientras carga el modelo texturado
   dp27: gDp27, tigre: gTigre, thompson: gThompson, astra: gAstra, breda30: gBreda
 };
 
 /* ============ WebGL ============ */
 const canvas = $('gl');
-const gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' }) || canvas.getContext('experimental-webgl');
+/* el suavizado MSAA se pide al crear el contexto: si se cambia en Gráficos, vale desde la próxima carga */
+const GL_MSAA = (() => { try { const o = JSON.parse(localStorage.getItem('ebro1938gfx') || '{}') || {}; return o.aa === undefined || o.aa === 1; } catch (e) { return true; } })();
+const gl = canvas.getContext('webgl', { antialias: GL_MSAA, alpha: false, powerPreference: 'high-performance' }) || canvas.getContext('experimental-webgl');
 if (!gl) { document.body.classList.add('nogl'); throw new Error('WebGL no disponible'); }
 
 function compile(vs, fs, attribs) {
@@ -1699,6 +1710,11 @@ progMesh = compile(
      /* modelos por código: textura de detalle por los tres ejes del objeto (1) o calca plana (2) */
      if(uTxMode>0.5){ if(uTxMode<1.5){ vec3 tw = abs(normalize(vNO)); tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
        c *= (texture2D(uTx, vO.zy*ts).rgb*tw.x + texture2D(uTx, vO.zx*ts).rgb*tw.y + texture2D(uTx, vO.xy*ts).rgb*tw.z)*2.0; }
+     else if(uTxMode>2.5){       /* mampostería (3): foto de piedra proyectada por los tres ejes del mundo; los tejados (inclinados) se quedan con su color */
+       vec3 nn = normalize(vNO), tw = abs(nn);
+       if(tw.y < 0.6 || tw.y > 0.97){ tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
+         vec3 st = texture2D(uTx, vec2(vO.z, vO.y)*ts).rgb*tw.x + texture2D(uTx, vO.xz*ts).rgb*tw.y + texture2D(uTx, vec2(vO.x, vO.y)*ts).rgb*tw.z;
+         c = st*clamp(vCol/vec3(0.74,0.66,0.52), 0.55, 1.25)*uTint; } }
      else { vec4 tc = texture2D(uTx, vec2(dot(uTxA.xyz,vO)+uTxA.w, dot(uTxB.xyz,vO)+uTxB.w)); if(tc.a<0.5) discard; c = tc.rgb*uTint; } }
      if(uLit>0.5){
        vec3 n = normalize(vNor);
@@ -1754,6 +1770,24 @@ function txUpload(t) {
   const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, 4);
 }
 function txRestore() { for (const k in TX) txUpload(TX[k]); }
+/* fotos de muro de piedra seca (cuatro variantes) para casas, iglesia y márgenes; en el móvil, la mitad de grandes */
+function stoneTexLoad() {
+  for (let i = 0; i < 4; i++) {
+    const im = new Image();
+    im.onload = () => { TX['piedra' + i] = { cv: im, tex: null, clamp: false }; txUpload(TX['piedra' + i]); };
+    im.src = 'piedra_' + i + (GFX_TOUCH || gfxTexLevel() === 0 ? '_m' : '') + '.jpg';
+  }
+}
+/* las mallas de piedra: cada una con su foto, un paño de 2,3 m */
+function drawStone() {
+  if (!world.stone) return;
+  for (let i = 0; i < 4; i++) {
+    const m = world.stone[i]; if (!m) continue; const t = TX['piedra' + i];
+    if (t && t.tex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.uniform1f(U.uTxMode, 3); gl.uniform4f(U.uTxA, 1 / 2.3, 0, 0, 0); }
+    drawMesh(m);
+    if (t && t.tex) gl.uniform1f(U.uTxMode, 0);
+  }
+}
 function txInit() {
   const R = seeded(77), g = (v, a = 1) => 'rgba(' + v + ',' + v + ',' + v + ',' + a + ')';
   /* manchas suaves que se repiten al salir por los bordes */
@@ -1846,15 +1880,20 @@ const GFX_OPT = {
   trees: [{ near: 0, real: 0, t: 'Sencillos' }, { near: 70, real: 0, t: 'Normales' }, { near: 150, real: 1, rn: 55, t: 'Realistas: solo ramas y hojas' }, { near: 340, real: 2, rn: 130, t: 'Realistas, todo el detalle hasta lejos' }],
   models: [{ d0: 0, d1: 12, dw: 5, ev: 15, t: 'Bajo' }, { d0: 5, d1: 22, dw: 9, ev: 25, t: 'Medio' }, { d0: 9, d1: 32, dw: 12, ev: 35, t: 'Alto' }, { d0: 16, d1: 55, dw: 18, ev: 60, t: 'Ultra' }],
   fx: [{ k: 0.35, t: 'Pocos' }, { k: 0.65, t: 'Normales' }, { k: 1, t: 'Todos' }],
-  ground: [{ t: 'Liso' }, { t: 'Con grano y manchas' }, { t: 'Con relieve de cerca' }]
+  ground: [{ t: 'Liso' }, { t: 'Con grano y manchas' }, { t: 'Con relieve de cerca' }],
+  aa: [{ t: 'Sin suavizado' }, { t: 'MSAA (el de la tarjeta)' }, { t: 'FXAA (filtro sobre la imagen)' }],
+  sharp: [{ k: 0, t: 'Nada' }, { k: 0.3, t: 'Suave' }, { k: 0.6, t: 'Fuerte' }],
+  aniso: [{ a: 1, t: 'Desactivado' }, { a: 4, t: '4×' }, { a: 8, t: '8×' }, { a: 16, t: '16×' }],
+  tex: [{ s: 1024, t: 'Baja (1024)' }, { s: 2048, t: 'Media (2048)' }, { s: 4096, t: 'Alta (4096)' }, { s: 8192, t: 'Máxima (8192)' }],
+  ss: [{ k: 1, t: 'Desactivado' }, { k: 1.5, t: '1,5× (2,25 veces los píxeles)' }, { k: 2, t: '2× (4 veces los píxeles)' }]
 };
 const GFX_PRE = {
-  bajo: { res: GFX_TOUCH ? 0.6 : 0.7, dist: 0, grass: 0, plants: 1, trees: 0, models: 0, fx: 0, ground: 0 },
-  medio: { res: GFX_TOUCH ? 0.85 : 1, dist: 1, grass: 1, plants: 2, trees: 1, models: 1, fx: 1, ground: 1 },
-  alto: { res: GFX_TOUCH ? 1.25 : 1.5, dist: 2, grass: 2, plants: 3, trees: 2, models: 2, fx: 2, ground: 2 },
-  ultra: { res: 2, dist: 3, grass: 4, plants: 4, trees: 3, models: 3, fx: 2, ground: 2 }
+  bajo: { res: GFX_TOUCH ? 0.6 : 0.7, dist: 0, grass: 0, plants: 1, trees: 0, models: 0, fx: 0, ground: 0, aa: 1, sharp: 0, aniso: 1, tex: 0, ss: 0 },
+  medio: { res: GFX_TOUCH ? 0.85 : 1, dist: 1, grass: 1, plants: 2, trees: 1, models: 1, fx: 1, ground: 1, aa: 1, sharp: 0, aniso: GFX_TOUCH ? 1 : 2, tex: GFX_TOUCH ? 1 : 2, ss: 0 },
+  alto: { res: GFX_TOUCH ? 1.25 : 1.5, dist: 2, grass: 2, plants: 3, trees: 2, models: 2, fx: 2, ground: 2, aa: 1, sharp: 0, aniso: GFX_TOUCH ? 2 : 3, tex: GFX_TOUCH ? 1 : 2, ss: 0 },
+  ultra: { res: 2, dist: 3, grass: 4, plants: 4, trees: 3, models: 3, fx: 2, ground: 2, aa: 1, sharp: 0, aniso: 3, tex: GFX_TOUCH ? 1 : 3, ss: 0 }
 };
-const GFX_KEYS = ['res', 'dist', 'grass', 'plants', 'trees', 'models', 'fx', 'ground'];
+const GFX_KEYS = ['res', 'dist', 'grass', 'plants', 'trees', 'models', 'fx', 'ground', 'aa', 'sharp', 'aniso', 'tex', 'ss'];
 const GFX = { q: 'auto', lvl: 'medio', guess: 'medio', autoLvl: '', dyn: 1, fps: false, gpu: '', ver: 0, ...GFX_PRE.medio };
 let FOG_N = 120, FOG_F = 1150, FXK = 1;
 function gfxGuess() {
@@ -1879,6 +1918,13 @@ function gfxGuess() {
 function gfxPreset(lvl) { GFX.lvl = lvl; Object.assign(GFX, GFX_PRE[lvl]); }
 function gfxApply() {
   const d = GFX_OPT.dist[GFX.dist]; FOG_N = d.n; FOG_F = d.f; FXK = GFX_OPT.fx[GFX.fx].k; GFX.ver++;
+  try { anisoApply(); } catch (e) { }       // al arrancar aún no existe: se aplica al crearlo
+  /* texturas de la Lewis: al cambiar la calidad se vuelve a cargar con la nueva */
+  try {
+    const tl = gfxTexLevel();
+    if (gfxApply.tl !== undefined && gfxApply.tl !== tl) { FPV.lewis.M = null; FPV.lewis.err = ''; LEWIS_TP.M = null; LEWIS_TP.err = ''; }
+    gfxApply.tl = tl;
+  } catch (e) { }
   const f = document.getElementById('fps'); if (f) f.hidden = !GFX.fps;
 }
 function gfxSave() {
@@ -1900,8 +1946,31 @@ function gfxSave() {
   }
   gfxApply();
 })();
+/* modelos de Blender que se cargan cuando hacen falta (declarados aquí arriba: los usan los ajustes y el dibujo) */
+const FPV = {
+  naranjero: { file: 'naranjero_fpv.json', M: null, P: null, Q: null, err: '', busy: false },
+  lewis: { file: 'lewis_fpv.json', M: null, P: null, Q: null, err: '', busy: false, tex: 'lewis', pan: 47 }
+};
+const LEWIS_TP = { M: null, P: null, busy: false, err: '' };
+const POST = { fb: null, tex: null, rb: null, w: 0, h: 0, prog: null, buf: null, U: {} };
 /* resolución de dibujo: píxeles por cada píxel de la página, nunca más de los que tiene la pantalla */
-function gfxDpr() { return clamp(GFX.res * GFX.dyn, 0.35, Math.min(devicePixelRatio || 1, 2)); }
+function gfxDpr() { return clamp(GFX.res * GFX.dyn, 0.35, Math.min(devicePixelRatio || 1, 2)) * (GFX_OPT.ss[GFX.ss] || GFX_OPT.ss[0]).k; }
+/* calidad de las texturas grandes (Lewis, carros, avión): nivel 0..3 y tamaño máximo; 8192 solo si la tarjeta lo admite */
+function gfxTexLevel() { let l = clamp(GFX.tex | 0, 0, 3); const mx = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096; while (l > 0 && GFX_OPT.tex[l].s > mx) l--; return l; }
+function gfxTexCap() { const l = gfxTexLevel(); return l >= 3 ? 0 : GFX_OPT.tex[l].s; }
+/* filtrado anisótropo: las texturas con mipmaps se apuntan aquí y se ajustan al cambiar la opción */
+const ANISO = { ext: gl.getExtension('EXT_texture_filter_anisotropic') || gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic') || gl.getExtension('MOZ_EXT_texture_filter_anisotropic'), list: [], cur: 1 };
+ANISO.max = ANISO.ext ? gl.getParameter(ANISO.ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) || 1 : 1;
+function anisoSet(t) { if (ANISO.ext && t) gl.texParameterf(gl.TEXTURE_2D, ANISO.ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(ANISO.cur, ANISO.max)); }
+{ const gm = gl.generateMipmap.bind(gl); gl.generateMipmap = target => { gm(target); if (target === gl.TEXTURE_2D) { const t = gl.getParameter(gl.TEXTURE_BINDING_2D); if (t) { ANISO.list.push(t); anisoSet(t); } } }; }
+function anisoApply() {
+  const a = (GFX_OPT.aniso[GFX.aniso] || GFX_OPT.aniso[0]).a; if (a === ANISO.cur || !ANISO.ext) { ANISO.cur = a; return; }
+  ANISO.cur = a; const prev = gl.getParameter(gl.TEXTURE_BINDING_2D);
+  ANISO.list = ANISO.list.filter(t => gl.isTexture(t));
+  for (const t of ANISO.list) { gl.bindTexture(gl.TEXTURE_2D, t); anisoSet(t); }
+  gl.bindTexture(gl.TEXTURE_2D, prev);
+}
+anisoApply(); gfxApply.tl = gfxTexLevel();
 /* medida de fluidez y, en automático, ajuste sobre la marcha */
 const gfxPerf = { t: 0, n: 0, slow: 0, fast: 0, fps: 0, ft: 0, fn: 0 };
 function gfxTick(dt, playing) {
@@ -2134,6 +2203,8 @@ const WEAPONS = {
     origin: 'Estados Unidos', cal: '.45 ACP', feed: 'Tambor de 50 cartuchos, fuego automático', note: 'El subfusil de los gánsteres de Chicago, pesado y de tambor. A España llegaron pocos, por compras sueltas en el extranjero, y los que se capturaban cambiaban de bando.' },
   dp27: { name: 'Fusil ametrallador DP-27', kind: 'lmg', mag: 47, reserve: 141, dmg: 40, rate: 0.109, reload: 4.4, auto: true, hip: 0.06, ads: 0.011, kick: 0.012, zoom: 0.72, len: 1.05, botAcc: 0.34, botRange: 85,
     origin: 'URSS', cal: '7,62 × 54 mm R', feed: 'Plato de 47 cartuchos, unos 550 disparos/min', note: 'Ametralladora ligera soviética Degtiariov. Su cargador plano y circular le valió apodos como «tocadiscos».' },
+  lewis: { name: 'Fusil ametrallador Lewis', kind: 'lmg', mag: 47, reserve: 141, dmg: 40, rate: 0.109, reload: 4.0, auto: true, hip: 0.065, ads: 0.0095, kick: 0.013, zoom: 0.7, len: 1.28, botAcc: 0.34, botRange: 90,
+    origin: 'Reino Unido y Estados Unidos', cal: '.303 British (7,7 mm)', feed: 'Plato giratorio de 47 cartuchos encima del cajón, unos 550 disparos/min', note: 'Ametralladora ligera de la Gran Guerra, reconocible por el plato que gira encima del cajón a cada disparo. A España llegaron por compras sueltas en el extranjero y la usaron los dos bandos. Pesada para llevar a la cadera, pero muy precisa apuntando.' },
   breda30: { name: 'Fusil ametrallador Breda 30', kind: 'lmg', mag: 20, reserve: 160, dmg: 36, rate: 0.12, reload: 3.1, auto: true, hip: 0.055, ads: 0.011, kick: 0.011, zoom: 0.72, len: 0.95, botAcc: 0.34, botRange: 85,
     origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Cargador fijo de 20, unos 500 disparos/min', note: 'Ametralladora ligera italiana. Su cargador fijo se rellenaba con peines y su mecanismo, que engrasaba cada cartucho, se encasquillaba con el polvo.' },
   astra: { name: 'Pistola Astra 400', kind: 'pistol', mag: 8, reserve: 32, dmg: 30, rate: 0.2, reload: 1.7, auto: false, hip: 0.03, ads: 0.012, kick: 0.02, zoom: 0.85, len: 0.2, botAcc: 0.3, botRange: 25,
@@ -2142,7 +2213,7 @@ const WEAPONS = {
 const GRENADE = { name: 'Granada Lafitte M1921', note: 'Granada española de impacto: una cinta se desenrolla en vuelo y libera el seguro, de modo que estalla al chocar. La usaron los dos bandos.' };
 
 const CLASSES = [
-  [ { id: 'fus', name: 'Fusilero', w: 'mosin' }, { id: 'asa', name: 'Asalto', w: 'naranjero' }, { id: 'ame', name: 'Ametrallador', w: 'dp27' }, { id: 'tir', name: 'Tirador', w: 'mauser93' } ],
+  [ { id: 'fus', name: 'Fusilero', w: 'mosin' }, { id: 'asa', name: 'Asalto', w: 'naranjero' }, { id: 'ame', name: 'Ametrallador', w: 'lewis', alt: ['lewis', 'dp27'] }, { id: 'tir', name: 'Tirador', w: 'mauser93' } ],
   [ { id: 'fus', name: 'Fusilero', w: 'tigre' }, { id: 'asa', name: 'Asalto', w: 'thompson' }, { id: 'ame', name: 'Ametrallador', w: 'breda30' }, { id: 'tir', name: 'Tirador', w: 'carcano' } ]
 ];
 
@@ -2388,8 +2459,12 @@ function roadDist(x, z) {
 /* ============ construcción del mundo ============ */
 const world = { houses: [] };
 (function buildWorld() {
-  const R = seeded(1938), g = new Geo();
+  const R = seeded(1938); let g = new Geo();
   const rr = (a, b) => a + R() * (b - a);
+  /* muros de piedra: van aparte, en cuatro mallas (una por textura de mampostería) que se pintan con su textura proyectada */
+  const GS = [new Geo(), new Geo(), new Geo(), new Geo()];
+  const stone = (v, f) => { const k = g; g = GS[v & 3]; try { return f(); } finally { g = k; } };
+  const sv = () => (R() * 4) | 0;
   const WALLS = [0xcbb994, 0xbfa780, 0xd6c7a4, 0xb89f7a, 0xc9b08a].map(hex), ROOF = [0xa5573a, 0x9a4f36, 0xb0623f].map(hex);
   const STONE = hex(0x9c917c), WOOD = hex(0x6a4b2e), DARK = hex(0x2a241d), BURLAP = hex(0xa8996f);
   const trees = [], shadeMap = new Float32Array(W.NX * W.NZ).fill(1);
@@ -2411,8 +2486,9 @@ const world = { houses: [] };
     o = o || {};
     const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
     world.houses.push([x, z, w, d, o.open ? 1 : 0]);
-    if (o.open) openHouse(x, z, w, d, h, o, wall, roof);
-    else if (o.ruin) {
+    const V = sv();
+    if (o.open) openHouse(x, z, w, d, h, o, wall, roof, V);
+    else if (o.ruin) stone(V, () => {
       const t = 0.55, hs = [rr(0.35, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.25, 0.8), rr(0.3, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.2, 0.7)];
       const seg = (cx, cz, sx, sz, k) => g.box(cx, y + h * k / 2 - 2, cz, sx, h * k + 4, sz, shade(wall, 0.86 + R() * 0.14));
       seg(x - w / 4, z - d / 2 + t / 2, w / 2, t, hs[0]); seg(x + w / 4, z - d / 2 + t / 2, w / 2, t, hs[1]);
@@ -2422,23 +2498,24 @@ const world = { houses: [] };
       for (let i = 0; i < 6; i++) { const s = rr(0.4, 1.1); g.box(x + rr(-w / 2 - 1.5, w / 2 + 1.5), terrainH(x, z) + s * 0.2, z + rr(-d / 2 - 1.5, d / 2 + 1.5), s, s * 0.6, s, shade(wall, rr(0.7, 0.95))); }
       g.box(x, y + 0.25, z, w - 1.2, 0.5, d - 1.2, shade(wall, 0.72));
       addAABB(x - w / 2, x + w / 2, y - 4, y + h * 0.8, z - d / 2, z + d / 2);
-    } else {
-      g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall);
+    });
+    else {
+      stone(V, () => g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall));
       const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-      g.gable(x - w / 2 - 0.35, x + w / 2 + 0.35, z - d / 2 - 0.35, z + d / 2 + 0.35, y + h, rh, roof, alongX, shade(wall, 0.92));
+      stone(V, () => g.gable(x - w / 2 - 0.35, x + w / 2 + 0.35, z - d / 2 - 0.35, z + d / 2 + 0.35, y + h, rh, roof, alongX, shade(wall, 0.92)));
       const dz = (o.door === 'n' ? -1 : 1) * (d / 2 + 0.03);
       g.box(x + rr(-w / 4, w / 4), y + 1.05, z + dz, 1.1, 2.1, 0.08, WOOD);
       for (const sx of [-1, 1]) {
         if (h > 5) g.box(x + sx * w * 0.27, y + h * 0.68, z + dz, 0.8, 1.0, 0.08, DARK);
         g.box(x + sx * (w / 2 + 0.03), y + h * 0.66, z + rr(-d / 4, d / 4), 0.08, 1.0, 0.8, DARK);
       }
-      if (o.chimney !== false && R() < 0.6) g.box(x + rr(-w / 3, w / 3), y + h + rh * 0.9, z + rr(-d / 4, d / 4), 0.6, 1.4, 0.6, shade(wall, 0.85));
+      if (o.chimney !== false && R() < 0.6) { const cx = x + rr(-w / 3, w / 3), cz = z + rr(-d / 4, d / 4); stone(V, () => g.box(cx, y + h + rh * 0.9, cz, 0.6, 1.4, 0.6, shade(wall, 0.85))); }
       addAABB(x - w / 2, x + w / 2, y - 4, y + h + rh * 0.6, z - d / 2, z + d / 2);
     }
     noGo.push([x, z, Math.max(w, d) * 0.5 + 4]);
   }
   /* casa hueca: muros con puerta y ventanas, suelo propio y tejado; el jugador puede ocuparla */
-  function openHouse(x, z, w, d, h, o, wall, roof) {
+  function openHouse(x, z, w, d, h, o, wall, roof, V) {
     const t = 0.4, hw = w / 2, hd = d / 2, FLOORC = hex(0x86583c), inner = shade(wall, 0.9), lining = shade(wall, 0.6);
     /* allana el solar para que la puerta quede a ras de calle */
     const y0 = terrainH(x, z);
@@ -2455,7 +2532,7 @@ const world = { houses: [] };
       const seg = (c0, c1, y0, y1) => {
         if (c1 - c0 < 0.05 || y1 - y0 < 0.05) return;
         const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
-        g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, wall); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
+        stone(V, () => g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, wall)); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
         const iy = Math.max(y0, yf), off = ins * (t / 2 + 0.012);     // cara interior en penumbra
         if (y1 > iy) g.box(alongX ? px : px + off, (iy + y1) / 2, alongX ? pz + off : pz, alongX ? l : 0.024, y1 - iy, alongX ? 0.024 : l, lining);
       };
@@ -2488,11 +2565,11 @@ const world = { houses: [] };
     bx(mx, mz, 1.5, 0.8, yf + 0.74, 0.08, WOOD, false); bx(mx, mz, 1.3, 0.6, yf + 0.36, 0.72, shade(WOOD, 0.8), true);
     /* tejado y vigas */
     const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-    g.gable(x - hw - 0.35, x + hw + 0.35, z - hd - 0.35, z + hd + 0.35, yf + h, rh, roof, alongX, shade(wall, 0.92));
+    stone(V, () => g.gable(x - hw - 0.35, x + hw + 0.35, z - hd - 0.35, z + hd + 0.35, yf + h, rh, roof, alongX, shade(wall, 0.92)));
     addAABB(x - hw, x + hw, yf + h, yf + h + rh * 0.7, z - hd, z + hd);
     const span = alongX ? w : d, nb = Math.max(2, Math.round(span / 3));
     for (let i = 1; i < nb; i++) { const q = -span / 2 + i * span / nb; if (alongX) g.box(x + q, yf + h - 0.43, z, 0.18, 0.2, d - 2 * t, shade(WOOD, 0.8)); else g.box(x, yf + h - 0.43, z + q, w - 2 * t, 0.2, 0.18, shade(WOOD, 0.8)); }
-    if (o.chimney !== false) g.box(x + (alongX ? w * 0.3 : 0), yf + h + rh * 0.9, z + (alongX ? 0 : d * 0.3), 0.6, 1.4, 0.6, shade(wall, 0.85));
+    if (o.chimney !== false) stone(V, () => g.box(x + (alongX ? w * 0.3 : 0), yf + h + rh * 0.9, z + (alongX ? 0 : d * 0.3), 0.6, 1.4, 0.6, shade(wall, 0.85)));
     addBotBox(x - hw, x + hw, z - hd, z + hd);
   }
   function parapet(x, z, len, alongX) {
@@ -2506,7 +2583,7 @@ const world = { houses: [] };
     for (let i = 0; i < n; i++) {
       const cx = lerp(x0, x1, (i + 0.5) / n), cz = lerp(z0, z1, (i + 0.5) / n), L = len / n + 0.05, y = terrainH(cx, cz), hh = rr(0.85, 1.1);
       const sx = alongX ? L : 0.7, sz = alongX ? 0.7 : L;
-      g.box(cx, y + hh / 2 - 0.6, cz, sx, hh + 1.2, sz, shade(STONE, rr(0.88, 1.06)));
+      const col = shade(STONE, rr(0.88, 1.06)); stone(i + (cx * 7 | 0), () => g.box(cx, y + hh / 2 - 0.6, cz, sx, hh + 1.2, sz, col));
       addAABB(cx - sx / 2, cx + sx / 2, y - 1.5, y + hh, cz - sz / 2, cz + sz / 2);
     }
   }
@@ -2529,7 +2606,7 @@ const world = { houses: [] };
       if (out < 7) hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(2, 7, out));
     }
     const yf = y0 + 0.08;
-    const piece = (cx, cz, sx, sz, yb, yt, col, noHit) => { g.box(cx, (yb + yt) / 2, cz, sx, yt - yb, sz, col); if (!noHit) addAABB(cx - sx / 2, cx + sx / 2, yb, yt, cz - sz / 2, cz + sz / 2); };
+    const piece = (cx, cz, sx, sz, yb, yt, col, noHit) => { stone(2, () => g.box(cx, (yb + yt) / 2, cz, sx, yt - yb, sz, col)); if (!noHit) addAABB(cx - sx / 2, cx + sx / 2, yb, yt, cz - sz / 2, cz + sz / 2); };
     /* muros largos de la nave, con ventanales altos y la coronación rota */
     for (const sd of [-1, 1]) {
       const wx = x + sd * (W2 - t / 2), tops = sd < 0 ? [9, 7.9, 9.5, 7.4] : [9, 9.2, 8.6, 9], cuts = [-10, -5.65, -4.35, -0.65, 0.65, 4.35, 5.65, 10];
@@ -2548,7 +2625,7 @@ const world = { houses: [] };
     piece(x - 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x + 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x, fz, 2.2, t, yf + 3.7, yf + H + 1.2, cw);
     { const li = fz - t / 2 - 0.012, wl = W2 - t - 1.1;       // forro interior de la fachada, en tres paños que dejan libre el hueco de la puerta
       g.box(x - 1.1 - wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x + 1.1 + wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x, yf + (3.7 + H) / 2, li, 2.2, H - 3.7, 0.024, lin); }
-    g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
+    stone(2, () => { g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); }); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
     g.box(x, yf + H + 1.25, fz + 0.1, 2 * W2 + 0.3, 0.3, t + 0.3, STN);
     for (const sd of [-1, 1]) { g.box(x + sd * 1.55, yf + 2.2, fz + t / 2 + 0.12, 0.55, 4.4, 0.3, STN); g.box(x + sd * 4.9, yf + (H + 1.2) / 2, fz + t / 2 + 0.1, 0.8, H + 1.2, 0.25, shade(cw, 0.94)); }
     g.box(x, yf + 4.6, fz + t / 2 + 0.14, 4, 0.45, 0.36, STN); g.gable(x - 1.9, x + 1.9, fz + t / 2, fz + t / 2 + 0.32, yf + 4.82, 0.9, STN, true, STN);
@@ -2729,7 +2806,7 @@ const world = { houses: [] };
   /* ---- Serra de Pàndols: ermita de Santa Magdalena ---- */
   (function ermita() {
     const x = -74, z = 212, y = terrainH(x, z), c = hex(0xd9d0b8);
-    g.box(x, y + 2.2 - 2, z, 6, 4.4 + 4, 9, c); g.gable(x - 3.3, x + 3.3, z - 4.8, z + 4.8, y + 4.4, 1.6, ROOF[0], false, c);
+    stone(1, () => { g.box(x, y + 2.2 - 2, z, 6, 4.4 + 4, 9, c); g.gable(x - 3.3, x + 3.3, z - 4.8, z + 4.8, y + 4.4, 1.6, ROOF[0], false, c); });
     g.box(x, y + 6.6, z - 4.5, 1.4, 1.6, 0.5, c); g.box(x, y + 1, z - 4.55, 1.2, 2, 0.1, WOOD);
     addAABB(x - 3, x + 3, y - 4, y + 5.2, z - 4.5, z + 4.5); noGo.push([x, z, 8]); world.houses.push([x, z, 6, 9]);
   })();
@@ -2740,7 +2817,7 @@ const world = { houses: [] };
    [-322, 52, 8, 8, 6], [-306, 48, 8, 7, 6], [-290, 44, 7, 7, 5.5], [-284, -2, 7, 8, 6]]
     .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: (a[0] === -298 && a[1] === -14) ? 's' : (a[0] === -296) ? 'n' : (a[0] === -284) ? 'e' : 0 }));
   house(-304, -46, 22, 12, 8, { wall: hex(0xe6dfcc), chimney: false, open: 's' });        // bodega cooperativa
-  (function tower() { const x = -340, z = 12, y = terrainH(x, z); g.box(x, y + 7, z, 5, 18, 5, cw); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
+  (function tower() { const x = -340, z = 12, y = terrainH(x, z); stone(3, () => g.box(x, y + 7, z, 5, 18, 5, cw)); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
   parapet(-286, 22, 5, false); parapet(-288, 0, 4, false); parapet(-300, 16, 4.5, true); crate(-308, 14, 0.9); crate(-316, 4, 0.8); crate(-314, 5, 0.7);
 
   /* ---- Ribera izquierda: campamento y barcas ---- */
@@ -2831,6 +2908,7 @@ const world = { houses: [] };
     }
   }
   world.staticMesh = makeMesh(g.a);
+  world.stone = GS.map(q => q.a.length ? makeMesh(q.a) : null);
 
   /* ---- puentes ---- */
   function bridgeGeo(b, boats) {
@@ -3540,10 +3618,11 @@ function vegDrawAll(vp, ex, ey, ez, newFrame, vr) {
     gl.uniformMatrix4fv(ULF.uVP, false, vp); gl.uniform3f(ULF.uCam, ex, ey, ez); gl.uniform3f(ULF.uSun, SUN[0], SUN[1], SUN[2]);
     gl.uniform3f(ULF.uFogC, fg[0], fg[1], fg[2]); gl.uniform2f(ULF.uFog, FOG_N, FOG_F); gl.uniform4f(ULF.uWind, t * 1.7, ws, 0.6, 0.8);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, REAL.tex); gl.uniform1i(ULF.uTex, 1); gl.activeTexture(gl.TEXTURE0);
-    gl.uniform1f(ULF.uA2C, REAL.a2c ? 1 : 0); if (REAL.a2c) gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+    const a2c = REAL.a2c && !POST.active;       // pintando en la textura del FXAA no hay muestras: las hojas recortan como sin MSAA
+    gl.uniform1f(ULF.uA2C, a2c ? 1 : 0); if (a2c) gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
     gl.enableVertexAttribArray(6);
   };
-  const leafOff = () => { gl.disableVertexAttribArray(6); if (REAL.a2c) gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE); gl.useProgram(progVeg); };
+  const leafOff = () => { gl.disableVertexAttribArray(6); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE); gl.useProgram(progVeg); };
   if (REAL.built && REAL.tex) {
     let any = false; for (const t_ of VEG.tpl) if (t_.real && (t_.real.N.n || t_.real.F.n)) { any = true; break; }
     if (any) {
@@ -4346,8 +4425,15 @@ function makeSoldier(team, idx, isPlayer) {
   s.torsoM = torsoMesh(team, ui, skin); s.legM = legMesh(team, ui);
   return s;
 }
+/* arma de la clase: si tiene varias, el jugador lleva la que eligió en el despliegue y los demás una cualquiera */
+function classWeapon(s, ci) {
+  const cl = CLASSES[s.team][ci];
+  if (!cl.alt) return cl.w;
+  if (s === P) { const k = (game.altSel || {})[s.team + ':' + ci]; return cl.alt.includes(k) ? k : cl.w; }
+  return cl.alt[Math.random() < 0.5 ? 0 : 1];
+}
 function setClass(s, ci) {
-  s.ci = ci; s.cls = CLASSES[s.team][ci]; s.wid = s.cls.w; s.wpn = WEAPONS[s.wid]; s.prim = null;
+  s.ci = ci; s.cls = CLASSES[s.team][ci]; s.wid = classWeapon(s, ci); s.wpn = WEAPONS[s.wid]; s.prim = null;
   s.armsM = armsMesh(s.team, s.ui, s.skin, s.wid);
 }
 function placeAt(s, f) {
@@ -5911,8 +5997,15 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   }
   skEnd(); matState(1, 1, 0);
   /* armas por código de los soldados y las caídas en el suelo */
-  for (const s of vis) { const st = s.sk; if (st.gun) drawModel(st.gun.model, st.wmat); }
-  if (newFrame) gunDropsDraw(ex, ez);
+  let lw = 0; const lwD = Math.min(GFX_OPT.models[GFX.models].d1 + 6, 45) ** 2;
+  for (const s of vis) {
+    const st = s.sk; if (!st.gun) continue;
+    if (st.gun.id === 'lewis' && LEWIS_TP.M && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) { lw++; continue; }       // de cerca, la texturada (abajo)
+    drawModel(st.gun.model, st.wmat);
+  }
+  if (lw) { for (const s of vis) { const st = s.sk; if (st.gun && st.gun.id === 'lewis' && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) lewisTpDraw(st.wmat, vp, ex, ey, ez); } matState(1, 1, 0); }
+  else if (!LEWIS_TP.M && !LEWIS_TP.busy && vis.some(s => s.sk.gun && s.sk.gun.id === 'lewis')) lewisTpLoad();
+  if (newFrame) gunDropsDraw(ex, ez, vp, ey);
   matState(1, 1, 0.05);
   return true;
 }
@@ -5972,7 +6065,9 @@ function gunFp(w, team) {
 const _gfM = M4.create();
 function gunFpDraw(vp, G, w, team, ex, ey, ez, sides) {
   const f = gunFp(w, team); if (!f) return false;
-  matState(1, 1, 0); drawModel(f.g.model, M4.mul(_gfM, G, f.G));
+  M4.mul(_gfM, G, f.G);
+  if (!(f.g.id === 'lewis' && lewisTpDraw(_gfM, vp, ex, ey, ez))) { matState(1, 1, 0); drawModel(f.g.model, _gfM); }
+  M4.mul(_gfM, G, f.G);
   M4.mul(_gfM, G, f.arms);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
   gl.uniform4fv(SK.U.uB, f.bones); gl.uniformMatrix4fv(SK.U.uM, false, _gfM);
@@ -6041,11 +6136,13 @@ function gunPick(p) {
   return true;
 }
 let _gdLast = 0;
-function gunDropsDraw(ex, ez) {
+function gunDropsDraw(ex, ez, vp, ey) {
   if (!gunDrops.length) return;
   const dt = clamp(game.time - _gdLast, 0, 0.05); _gdLast = game.time; if (dt > 0) gunDropsTick(dt);
   matState(1, 1, 0);
-  for (const d of gunDrops) if ((d.p[0] - ex) * (d.p[0] - ex) + (d.p[2] - ez) * (d.p[2] - ez) < 120 * 120) drawModel(d.g.model, d.M);
+  let lwd = false;
+  for (const d of gunDrops) if ((d.p[0] - ex) * (d.p[0] - ex) + (d.p[2] - ez) * (d.p[2] - ez) < 120 * 120) { if (d.g.id === 'lewis' && LEWIS_TP.M && (d.p[0] - ex) ** 2 + (d.p[2] - ez) ** 2 < 900) { lwd = true; continue; } drawModel(d.g.model, d.M); }
+  if (lwd) { for (const d of gunDrops) if (d.g.id === 'lewis' && (d.p[0] - ex) ** 2 + (d.p[2] - ez) ** 2 < 900) lewisTpDraw(d.M, vp || VP, ex, ey || 0, ez); matState(1, 1, 0); }
 }
 /* ---------- muerte: tres caídas distintas, por fases ----------
    De espaldas (el impacto lo echa atrás, se le doblan las rodillas y cae con los brazos abiertos), de bruces (cae de rodillas y
@@ -6182,6 +6279,26 @@ function skSetupLeg(C, J) {
     C.fpFix = C.fpFix || {}; C.fpFix[k] = { q, t: [-R1[0], -R1[1], SK_LEG_RELIEF[k] ? -SK_LEG_RELIEF[k] - R1[2] : 0] };
     const mz = cam([st.gp[m * 3], st.gp[m * 3 + 1], st.gp[m * 3 + 2]]), mz1 = v3add(qRot(q, mz), C.fpFix[k].t);
     C.fpMuz[k] = mz1;
+  }
+  /* a la cadera: un giro alrededor del ojo para que el cañón apunte al centro de la pantalla (a unos 12 m) */
+  C.hipFix = {};
+  for (const k in SK_LEGPRE) {
+    const S = C.clips[SK_LEGPRE[k] + 'Sujetar'], A = C.clips[SK_LEGPRE[k] + 'Apuntar'], r = C.wroot[k], m = C.wmuz[k] >= 0 ? C.wmuz[k] : r;
+    if (!S || !A) continue;
+    const hb = SK_LEG_HIP[k], ta = A.dur * SK_LEG_HOLD;
+    skBlend(C, st, S, 0, 1, null); _lfp.t = [0, 0, 0]; _lfp.q = [0, 0, 0, 1]; skLegDispBlend(S, 0, 1);
+    skBlend(C, st, A, ta, hb, null); skLegDispBlend(A, ta, hb); skGlobals(C, st);
+    m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
+    const cam = v => { const q = M4.tp(_lfp.D, v); return [-q[0], q[1], -q[2]]; };
+    const W = M4.mul(M4.create(), C.base, m4joint(M4.create(), st.gq, st.gp, r)), sg = SK_LEGSIGHT[k];
+    const d0 = v3nrm(v3sub(cam(M4.tp(W, sg[1])), cam(M4.tp(W, sg[0])))), m0 = cam([st.gp[m * 3], st.gp[m * 3 + 1], st.gp[m * 3 + 2]]), T = [0, 0, -12];
+    let q = [0, 0, 0, 1];
+    for (let it = 0; it < 8; it++) {
+      const d = qRot(q, d0), mz = qRot(q, m0), w = v3nrm(v3sub(T, mz)), ax = v3cross(d, w), sn = v3len(ax);
+      if (sn < 1e-7) break;
+      q = qMul(qAxis(v3mul(ax, 1 / sn), Math.atan2(sn, v3dot(d, w))), q);
+    }
+    C.hipFix[k] = q;
   }
 }
 /* la palanca: en el clip se abre de 0,17 a 0,55 s, espera abierta hasta 0,8 y se cierra hasta 1,17. Aquí se recorre entera en el tiempo
@@ -6382,6 +6499,8 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
   const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
   M4.copy(_lfp.M, K);
+  const hf = C.hipFix && C.hipFix[key], hh = hf ? (1 - a) * (1 - lev) : 0;       // a la cadera, el cañón hacia el centro de la pantalla
+  if (hh > 0.001) { const ang = 2 * Math.acos(clamp(hf[3], -1, 1)), sv = Math.hypot(hf[0], hf[1], hf[2]); if (sv > 1e-9) M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.H || (_lfp.H = M4.create()), [0, 0, 0], qAxis([hf[0] / sv, hf[1] / sv, hf[2] / sv], ang * hh), 1)); }
   if (lev > 0.001) {      // al accionar la palanca, la carabina se ladea a la derecha (la parte de arriba hacia la derecha) y sube un poco:
                           // se ve la acción abierta y, por debajo, la palanca con la mano derecha detrás
     const pv = [0.0, -0.12, -0.32];
@@ -7062,6 +7181,7 @@ function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
   if (ws.id === 'breda30' && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
   if (ws.id === 'naranjero' && p.team === REP && nfpDraw(camWorld, p, w)) return;       // el de Blender: brazos y subfusil animados
+  if (ws.id === 'lewis' && p.team === REP && fpvDraw('lewis', camWorld, p, w, ws)) return;       // la Lewis de Blender, con su plato que gira
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
@@ -8047,10 +8167,10 @@ async function vmLoad() {
       if ((key === 'pz1' || key === 't26n' || key === 't26') && world.vm && world.vm[key]) { world.vm[key].pivot = X.pivot; world.vm[key].muzzle = X.muzzle; }
     } catch (e) { VM3D.err += key + ': ' + (e && e.message || e) + ' '; console.warn('[' + key + ' 3D] se usa el modelo por código:', e && e.message || e); }
   };
-  await one('mosca', vmSetupMosca, 0);
-  await one('pz1', vmSetupPz1, GFX_TOUCH ? 2048 : 0);
-  await one('t26n', vmSetupT26, GFX_TOUCH ? 2048 : 0);
-  await one('t26', vmSetupT26, GFX_TOUCH ? 2048 : 0);
+  await one('mosca', vmSetupMosca, gfxTexCap());       // texturas según «Calidad de las texturas»
+  await one('pz1', vmSetupPz1, gfxTexCap());
+  await one('t26n', vmSetupT26, gfxTexCap());
+  await one('t26', vmSetupT26, gfxTexCap());
 }
 
 /* ============ el «Naranjero» en primera persona (modelo de Blender) ============
@@ -8058,16 +8178,25 @@ async function vmLoad() {
    camisa del cañón, apoyada en la palma, con el pulgar a lo largo del costado izquierdo y los demás dedos rodeándola por la derecha.
    Clips: Cadera (respiración), Apuntar (miras alineadas con el centro de la pantalla), Disparo (la manilla del cerrojo) y Recarga
    (la mano saca el cargador por la izquierda y mete otro). El ojo de la cámara de Blender está en (0; 1,50; -0,19) del glTF, mirando a +Z. */
-const NFP = { M: null, P: null, Q: null, err: '', eye: [0, 1.5, -0.19] };
-async function nfpLoad() {
+/* armas de primera persona hechas en Blender: cada una con sus brazos y sus clips. pan: el plato gira un paso por disparo (Lewis) */
+const FPV_EYE = [0, 1.5, -0.19];
+const NFP = FPV.naranjero;       // nombre antiguo
+/* textura del modelo según la calidad elegida: lewis_1k / 2k / 4k / 8k */
+function gfxTexName(base) { return base + '_' + ['1k', '2k', '4k', '8k'][gfxTexLevel()] + '.jpg'; }
+async function fpvLoad(id) {
+  const F = FPV[id]; if (!F || F.M || F.busy || F.err) return;
+  F.busy = true;
   try {
-    const r = await fetch('naranjero_fpv.json'); if (!r.ok) throw new Error('naranjero_fpv.json: ' + r.status);
-    const g = glbParse(await r.arrayBuffer()); g.url = new URL('naranjero_fpv.json', location.href).href;
-    const M = await vmBuild(g, GFX_TOUCH ? 1024 : 0);
+    const r = await fetch(F.file); if (!r.ok) throw new Error(F.file + ': ' + r.status);
+    const g = glbParse(await r.arrayBuffer()); g.url = new URL(F.file, location.href).href;
+    if (F.tex) for (const im of g.j.images || []) if (/^lewis_\dk\.jpg$/.test(im.uri || '')) im.uri = gfxTexName(F.tex);
+    const M = await vmBuild(g, gfxTexCap());
     for (const k of ['Cadera', 'Apuntar', 'Recarga']) if (!M.clips[k]) throw new Error('falta el clip ' + k);
-    NFP.P = vmState(M); NFP.Q = vmState(M); NFP.P.fid = 0; NFP.M = M;
-  } catch (e) { NFP.err = String(e && e.message || e); console.warn('[naranjero 1P] se usa el de código:', NFP.err); }
+    F.P = vmState(M); F.Q = vmState(M); F.P.fid = 0; F.M = M;
+  } catch (e) { F.err = String(e && e.message || e); console.warn('[' + id + ' 1P] se usa el de código:', F.err); }
+  F.busy = false;
 }
+function nfpLoad() { fpvLoad('naranjero'); }
 /* mezcla la postura Q sobre P con peso w (posiciones en línea recta, giros por el camino corto) */
 function nfpMix(M, P, Q, w) {
   if (w <= 0) return; if (w >= 1) { P.t.set(Q.t); P.r.set(Q.r); P.s.set(Q.s); return; }
@@ -8078,10 +8207,17 @@ function nfpMix(M, P, Q, w) {
     qNorm(P.r, o);
   }
 }
+/* gira el nodo i sobre su eje Y local (q · giro) */
+function vmSpinY(P, i, a) {
+  const o = i * 4, x = P.r[o], y = P.r[o + 1], z = P.r[o + 2], w = P.r[o + 3], s = Math.sin(a / 2), c = Math.cos(a / 2);
+  P.r[o] = x * c - z * s; P.r[o + 1] = y * c + w * s; P.r[o + 2] = z * c + x * s; P.r[o + 3] = w * c - y * s;
+}
 const _nfpB = M4.create();
-function nfpDraw(camWorld, p, w) {
-  const M = NFP.M; if (!M || !SK.ready || glLost) return false;
-  const P = NFP.P, Q = NFP.Q, a = clamp(p.aimT || 0, 0, 1), C = M.clips;
+function fpvDraw(id, camWorld, p, w, ws) {
+  const F = FPV[id]; if (!F) return false;
+  if (!F.M) { if (!F.busy && !F.err && SK.ready) fpvLoad(id); return false; }
+  const M = F.M; if (!SK.ready || glLost) return false;
+  const P = F.P, Q = F.Q, a = clamp(p.aimT || 0, 0, 1), C = M.clips;
   vmRest(M, P); vmClip(M, P, 'Cadera', game.time % (C.Cadera.dur || 1));
   if (a > 0) { vmRest(M, Q); vmClip(M, Q, 'Apuntar', 0); nfpMix(M, P, Q, a * a * (3 - 2 * a)); }
   let rel = 0;
@@ -8092,15 +8228,39 @@ function nfpDraw(camWorld, p, w) {
   }
   const since = game.time - (p.lastShot ?? -99), cj = M.ix.Cerrojo;
   if (C.Disparo && since >= 0 && since < C.Disparo.dur) vmClip(M, P, 'Disparo', since, i => i === cj);
+  /* plato de la Lewis: un paso por cartucho gastado, con un giro corto tras cada disparo; al cambiarlo, el nuevo llega lleno */
+  if (F.pan && M.ix.Tambor !== undefined && ws) {
+    const used = rel > 0.5 ? 0 : (w.mag - ws.ammo) - (since >= 0 && since < 0.06 ? 1 - since / 0.06 : 0);
+    vmSpinY(P, M.ix.Tambor, -used * Math.PI * 2 / F.pan);
+  }
   vmWorld(M, P); P.fid++;
   /* vaivén al andar, retroceso y cambio de arma, en el espacio de la cámara; luego del glTF (ojo en el origen, +Z delante) a la cámara (-Z delante) */
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5, kk = p.kick * (1 - a * 0.6);
   M4.copy(_nfpB, camWorld);
   M4.translate(_nfpB, Math.sin(ph) * 0.008 * mv, Math.abs(Math.cos(ph)) * 0.008 * mv - p.switchT * 0.5, kk * 0.03 - pt * 0.03 * (1 - a));
   M4.rotX(_nfpB, kk * 0.02 - p.switchT * 0.8);
-  M4.rotY(_nfpB, Math.PI); M4.translate(_nfpB, -NFP.eye[0], -NFP.eye[1], -NFP.eye[2]);
+  M4.rotY(_nfpB, Math.PI); M4.translate(_nfpB, -FPV_EYE[0], -FPV_EYE[1], -FPV_EYE[2]);
   vmDraw(M, P, _nfpB, 0, null, FPVP, cam.x, cam.y, cam.z);
   return true;
+}
+function nfpDraw(camWorld, p, w) { return fpvDraw('naranjero', camWorld, p, w, p.weps[p.cur]); }
+/* ---------- la Lewis en manos de los soldados y en el suelo (modelo texturado; de lejos, la de código) ---------- */
+async function lewisTpLoad() {
+  if (LEWIS_TP.M || LEWIS_TP.busy || LEWIS_TP.err) return; LEWIS_TP.busy = true;
+  try {
+    const r = await fetch('lewis.json'); if (!r.ok) throw new Error('lewis.json: ' + r.status);
+    const g = glbParse(await r.arrayBuffer()); g.url = new URL('lewis.json', location.href).href;
+    for (const im of g.j.images || []) im.uri = 'lewis_' + (gfxTexLevel() >= 1 ? '2k' : '1k') + '.jpg';
+    const M = await vmBuild(g, gfxTexCap());
+    LEWIS_TP.P = vmState(M); vmWorld(M, LEWIS_TP.P); LEWIS_TP.P.fid = 1; LEWIS_TP.M = M;
+  } catch (e) { LEWIS_TP.err = String(e && e.message || e); console.warn('[Lewis] se usa la de código:', LEWIS_TP.err); }
+  LEWIS_TP.busy = false;
+}
+/* dibuja la Lewis con la matriz de un arma por código (boca a -Z, arriba +Y); false si aún no está */
+function lewisTpDraw(m, vp, ex, ey, ez) {
+  const L = LEWIS_TP; if (!L.M) { if (!L.busy && !L.err && SK.ready) lewisTpLoad(); return false; }
+  if (!SK.ready || glLost) return false;
+  vmDraw(L.M, L.P, m, 0, null, vp, ex, ey, ez); return true;
 }
 
 /* ============ ametralladoras antiaéreas fijas ============ */
@@ -8990,6 +9150,68 @@ function camSetup(dt) {
   listener.x = cam.x; listener.y = cam.y; listener.z = cam.z; listener.yaw = cam.yaw;
   return fp;
 }
+/* ---- paso final sobre la imagen: FXAA (suaviza los bordes buscando su dirección) y nitidez. La escena se pinta en una textura del
+   tamaño de la pantalla y luego se copia filtrada; sin ninguno de los dos, se pinta directamente en la pantalla como siempre ---- */
+function postOn() { return !xr.session && (GFX.aa === 2 || (GFX_OPT.sharp[GFX.sharp] || GFX_OPT.sharp[0]).k > 0); }
+function postEnsure() {
+  if (!POST.prog || !gl.isProgram(POST.prog)) {
+    POST.prog = compile('attribute vec2 aP; varying vec2 vU; void main(){ vU = aP*0.5+0.5; gl_Position = vec4(aP,0.0,1.0); }',
+      PREC + `uniform sampler2D uT; uniform vec2 uR; uniform float uFx; uniform float uSh; varying vec2 vU;
+      float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+      vec3 fxaa(vec2 uv){
+        vec3 nw = texture2D(uT, uv + vec2(-1.0,-1.0)*uR).rgb, ne = texture2D(uT, uv + vec2(1.0,-1.0)*uR).rgb;
+        vec3 sw = texture2D(uT, uv + vec2(-1.0,1.0)*uR).rgb, se = texture2D(uT, uv + vec2(1.0,1.0)*uR).rgb, m = texture2D(uT, uv).rgb;
+        float lNW = lum(nw), lNE = lum(ne), lSW = lum(sw), lSE = lum(se), lM = lum(m);
+        float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE))), lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+        if (lMax - lMin < max(0.0312, lMax * 0.125)) return m;
+        vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));
+        float red = max((lNW + lNE + lSW + lSE) * 0.03125, 0.0078125), rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + red);
+        dir = clamp(dir * rcp, vec2(-8.0), vec2(8.0)) * uR;
+        vec3 a = 0.5 * (texture2D(uT, uv + dir * (1.0/3.0 - 0.5)).rgb + texture2D(uT, uv + dir * (2.0/3.0 - 0.5)).rgb);
+        vec3 b = a * 0.5 + 0.25 * (texture2D(uT, uv - dir * 0.5).rgb + texture2D(uT, uv + dir * 0.5).rgb);
+        float lB = lum(b); return (lB < lMin || lB > lMax) ? a : b;
+      }
+      void main(){
+        vec3 c = uFx > 0.5 ? fxaa(vU) : texture2D(uT, vU).rgb;
+        if (uSh > 0.0) {
+          vec3 n = texture2D(uT, vU + vec2(uR.x, 0.0)).rgb + texture2D(uT, vU - vec2(uR.x, 0.0)).rgb + texture2D(uT, vU + vec2(0.0, uR.y)).rgb + texture2D(uT, vU - vec2(0.0, uR.y)).rgb;
+          c = clamp(c + (c - n * 0.25) * uSh * 1.6, 0.0, 1.0);
+        }
+        gl_FragColor = vec4(c, 1.0);
+      }`, ['aP']);
+    for (const k of ['uT', 'uR', 'uFx', 'uSh']) POST.U[k] = gl.getUniformLocation(POST.prog, k);
+    POST.buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, POST.buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    POST.fb = null;
+  }
+  const w = canvas.width, h = canvas.height;
+  if (POST.fb && gl.isFramebuffer(POST.fb) && POST.w === w && POST.h === h) return true;
+  if (POST.fb) { gl.deleteFramebuffer(POST.fb); gl.deleteTexture(POST.tex); gl.deleteRenderbuffer(POST.rb); }
+  POST.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, POST.tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  POST.rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, POST.rb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+  POST.fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, POST.fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, POST.tex, 0);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, POST.rb);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  POST.w = w; POST.h = h; if (!ok) { POST.fb = null; POST.bad = true; }
+  return ok;
+}
+function postFinish() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+  gl.useProgram(POST.prog); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, POST.tex);
+  gl.uniform1i(POST.U.uT, 0); gl.uniform2f(POST.U.uR, 1 / canvas.width, 1 / canvas.height);
+  gl.uniform1f(POST.U.uFx, GFX.aa === 2 ? 1 : 0); gl.uniform1f(POST.U.uSh, (GFX_OPT.sharp[GFX.sharp] || GFX_OPT.sharp[0]).k);
+  gl.bindBuffer(gl.ARRAY_BUFFER, POST.buf); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disableVertexAttribArray(1); gl.disableVertexAttribArray(2);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);       // el resto del juego cuenta con 0, 1 y 2 siempre activos
+  gl.bindTexture(gl.TEXTURE_2D, null);       // que la textura de la escena no quede puesta mientras se pinta en ella el fotograma siguiente
+  gl.enable(gl.DEPTH_TEST); POST.active = false;
+}
 function render(dt) {
   resize();
   const fp = camSetup(dt), fov = game.fov;
@@ -9001,8 +9223,8 @@ function render(dt) {
   if (cockpit) m4inv(VIEW, _moscaEye);
   else { M4.identity(VIEW); M4.rotZ(VIEW, -cam.roll); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z); }
   M4.mul(VP, PROJ, VIEW);
-  const fg = world.fog;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const fg = world.fog, post = postOn() && !POST.bad && postEnsure();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, post ? POST.fb : null); POST.active = !!post;
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fg[0], fg[1], fg[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   drawWorld(VP, cam.x, cam.y, cam.z, canvas.height / (2 * Math.tan(fov / 2)), dt, fp, null);
@@ -9014,6 +9236,7 @@ function render(dt) {
     M4.identity(CAMW); M4.translate(CAMW, cam.x, cam.y, cam.z); M4.rotY(CAMW, cam.yaw); M4.rotX(CAMW, cam.pitch); M4.rotZ(CAMW, cam.roll);
     drawFpWeapon(CAMW);
   }
+  if (post) postFinish();
   drawOverlay(dt);
 }
 /* Dibuja el mundo desde un ojo: vp (proyección por vista), posición del ojo (niebla y cielo), escala de las partículas en píxeles,
@@ -9031,6 +9254,7 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   gl.enable(gl.DEPTH_TEST); gl.uniform2f(U.uFog, FOG_N, FOG_F);
   matState(1, 1, 0.5); gl.uniform1f(U.uTer, GFX.ground); drawMesh(world.terrain); gl.uniform1f(U.uTer, 0);
   matState(1, 1, 0.1); drawMesh(world.staticMesh); drawMesh(pontoon.mesh); if (pasarela.on) drawMesh(pasarela.mesh);
+  matState(1, 1, 0.02); drawStone(); matState(1, 1, 0.1);
   vegDrawAll(vp, ex, ey, ez, dt > 0, cull ? xr.headFw : null);
   matState(1, 1, 0.05);
   drawVehicles(vp, ex, ey, ez); drawAA(); matState(1, 1, 0.05);
@@ -9207,9 +9431,14 @@ function paintDeployMap(c, rw, k, blue, ink, paper) {
   }
   c.textAlign = 'left';
 }
+function classSelWeapon(team, ci) {
+  const cl = CLASSES[team][ci]; if (!cl.alt) return cl.w;
+  const k = (game.altSel || {})[team + ':' + ci]; return cl.alt.includes(k) ? k : cl.w;
+}
 function renderClassCard() {
-  const cl = CLASSES[game.team][game.selClass], w = WEAPONS[cl.w];
-  $('wCard').innerHTML = '<h3>' + w.name + '</h3><dl><dt>Origen</dt><dd>' + w.origin + '</dd><dt>Calibre</dt><dd>' + w.cal + '</dd><dt>Alimentación</dt><dd>' + w.feed + '</dd></dl><p>' + w.note + '</p><p class="quiet">Llevas además la pistola Astra 400 y dos granadas Lafitte de impacto.</p>';
+  const cl = CLASSES[game.team][game.selClass], w = WEAPONS[classSelWeapon(game.team, game.selClass)];
+  const alt = cl.alt ? '<div class="altw" role="group" aria-label="Arma del ' + cl.name.toLowerCase() + '">' + cl.alt.map(id => '<button type="button" data-alt="' + id + '" aria-pressed="' + (WEAPONS[id] === w) + '">' + WEAPONS[id].name.replace(/^(Fusil ametrallador|Subfusil) /, '') + '</button>').join('') + '</div>' : '';
+  $('wCard').innerHTML = alt + '<h3>' + w.name + '</h3><dl><dt>Origen</dt><dd>' + w.origin + '</dd><dt>Calibre</dt><dd>' + w.cal + '</dd><dt>Alimentación</dt><dd>' + w.feed + '</dd></dl><p>' + w.note + '</p><p class="quiet">Llevas además la pistola Astra 400 y dos granadas Lafitte de impacto.</p>';
   document.querySelectorAll('#classes button').forEach((b, i) => b.setAttribute('aria-pressed', i === game.selClass ? 'true' : 'false'));
 }
 function uiShowDeploy() {
@@ -9218,7 +9447,7 @@ function uiShowDeploy() {
   document.body.classList.remove('fly'); $('flyHud').hidden = true; input.thr = 0; input.brake = false;
   if (game.firstDeploy) { $('depTitle').textContent = T.army; $('depSub').textContent = T.unit + '. ' + T.brief; }
   else { $('depTitle').textContent = 'Has caído'; $('depSub').textContent = (game.killer ? 'Te alcanzó ' + game.killer.name + (game.killCause ? ' (' + game.killCause.charAt(0).toLowerCase() + game.killCause.slice(1) + ')' : '') + '. ' : game.killCause ? game.killCause + '. ' : '') + 'Elige posición y vuelve al frente.'; }
-  $('classes').innerHTML = CLASSES[game.team].map((c, i) => '<button type="button" data-i="' + i + '"><strong>' + c.name + '</strong><span>' + WEAPONS[c.w].name + '</span></button>').join('');
+  $('classes').innerHTML = CLASSES[game.team].map((c, i) => '<button type="button" data-i="' + i + '"><strong>' + c.name + '</strong><span>' + WEAPONS[classSelWeapon(game.team, i)].name + '</span></button>').join('');
   const u = UNIFORMS[game.team][0]; $('uniNote').textContent = 'Tu uniforme. ' + u.label + ': ' + u.desc.charAt(0).toLowerCase() + u.desc.slice(1);
   $('fact').textContent = pick(FACTS);
   renderVehPick.sig = ''; renderClassCard(); drawDeployMap(); uiDeployTick();
@@ -10208,7 +10437,7 @@ function vrPaintMenu(mode) {
     vrM.regions.push({ x: mx, y: my, w: mw, h: mh, act: 'map' });
     const rx = 776, rw = 464, bw = (rw - 12) / 2;
     c.fillStyle = VRC.ink; c.font = '600 27px ' + VRF.disp; c.fillText('Clase', rx, 190);
-    CLASSES[T].forEach((cl, i) => mBtn(c, rx + (i % 2) * (bw + 12), 202 + Math.floor(i / 2) * 82, bw, 72, 'cls:' + i, cl.name, WEAPONS[cl.w].name.replace(/^(Fusil ametrallador|Subfusil|Fusil|Mosquetón|Carabina|Pistola) /, ''), i === game.selClass ? 'on' : ''));
+    CLASSES[T].forEach((cl, i) => mBtn(c, rx + (i % 2) * (bw + 12), 202 + Math.floor(i / 2) * 82, bw, 72, 'cls:' + i, cl.name, WEAPONS[classSelWeapon(T, i)].name.replace(/^(Fusil ametrallador|Subfusil|Fusil|Mosquetón|Carabina|Pistola) /, ''), i === game.selClass ? 'on' : ''));
     c.fillStyle = VRC.ink; c.font = '600 27px ' + VRF.disp; c.fillText('O sal ya dentro de un vehículo', rx, 396);
     vehicles.filter(v => v.team === T && v.kind !== 'truck').slice(0, 4).forEach((v, i) => {
       const ok = vehDeployable(v), stt = v.dead ? 'destruido' : v.falling || (v.air && v.driver) ? 'en el aire' : v.driver ? 'lo lleva ' + v.driver.name : 'libre en la base';
@@ -10359,6 +10588,11 @@ function renderGfxSheet() {
   const r = $('gRes'); r.max = Math.max(1, Math.min(2, devicePixelRatio || 1)); r.value = Math.min(GFX.res, +r.max);
   const d = gfxDpr(); $('gResOut').textContent = Math.round(innerWidth * d) + ' × ' + Math.round(innerHeight * d);
   document.querySelectorAll('[data-gk]').forEach(s => { s.value = String(GFX[s.dataset.gk]); });
+  const an = $('gAaNote'), msaaWant = GFX.aa === 1;
+  an.hidden = msaaWant === GL_MSAA && !(GFX.tex === 3 && gfxTexLevel() < 3) && !(GFX.aniso > 0 && !ANISO.ext);
+  an.textContent = [msaaWant !== GL_MSAA ? (msaaWant ? 'El MSAA se activará al volver a cargar la página.' : 'El MSAA dejará de gastar memoria al volver a cargar la página.') : '',
+    GFX.tex === 3 && gfxTexLevel() < 3 ? 'Esta tarjeta no admite texturas de 8192: se usan de ' + GFX_OPT.tex[gfxTexLevel()].s + '.' : '',
+    GFX.aniso > 0 && !ANISO.ext ? 'Este navegador no ofrece filtrado anisótropo.' : ''].filter(Boolean).join(' ');
   $('gFps').checked = GFX.fps; gfxNowText();
 }
 function gfxUiBoot() {
@@ -10376,6 +10610,7 @@ function gfxUiBoot() {
 
 /* ---- arranque ---- */
 (function boot() {
+  stoneTexLoad();       // fotos de muro de piedra para las casas
   topo = buildTopo(); buildArchive();
   document.querySelectorAll('.side').forEach(b => b.addEventListener('click', () => startMatch(+b.dataset.team)));
   const open = id => () => { $(id).hidden = false; if (id === 'padcfg') renderPadCfg(); if (id === 'scoreSheet') renderScoreSheet(); if (id === 'vrsheet') { xr.err = ''; renderVrSheet(); } if (id === 'gfxsheet') renderGfxSheet(); if (id === 'duosheet') { duoListen(); renderDuoSheet(); } $(id).querySelector('.close').focus(); };
@@ -10393,6 +10628,14 @@ function gfxUiBoot() {
   document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', open(b.dataset.open)));
   document.querySelectorAll('.close').forEach(b => b.addEventListener('click', () => { b.closest('.sheet').hidden = true; }));
   $('classes').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; game.selClass = +b.dataset.i; renderClassCard(); });
+  $('wCard').addEventListener('click', e => {
+    const b = e.target.closest('button[data-alt]'); if (!b) return;
+    game.altSel = game.altSel || {}; game.altSel[game.team + ':' + game.selClass] = b.dataset.alt;
+    try { localStorage.setItem('ebro1938alt', JSON.stringify(game.altSel)); } catch (er) { }
+    const sp = document.querySelector('#classes button[data-i="' + game.selClass + '"] span'); if (sp) sp.textContent = WEAPONS[b.dataset.alt].name;
+    renderClassCard(); SFX.click();
+  });
+  try { game.altSel = JSON.parse(localStorage.getItem('ebro1938alt') || '{}') || {}; } catch (er) { game.altSel = {}; }
   $('deployMap').addEventListener('click', e => {
     const r = e.currentTarget.getBoundingClientRect(), s = r.width / 720, x = (e.clientX - r.left) / s + W.X0, z = (e.clientY - r.top) / s + W.Z0;
     let best = null, bd = 40 / Math.max(s, 0.3), bv = null, vd = 11 / Math.max(s, 0.3);
