@@ -5544,7 +5544,7 @@ async function skLoad() {
     SK.nj = nj; skProgram();
     SK.chars = chars; SK.ready = true;
   } catch (e) { SK.failed = true; SK.err = String(e && e.message || e); console.warn('[soldados 3D] se usan los de cajas:', SK.err); }
-  if (SK.ready) vmLoad();       // el Mosca y el Panzer de Blender, sin esperar por ellos
+  if (SK.ready) { vmLoad(); nfpLoad(); }       // el Mosca, los carros y el Naranjero de primera persona de Blender, sin esperar por ellos
 }
 
 /* ---------- animación ---------- */
@@ -7061,6 +7061,7 @@ const _fp = M4.create();
 function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
   if (ws.id === 'breda30' && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
+  if (ws.id === 'naranjero' && p.team === REP && nfpDraw(camWorld, p, w)) return;       // el de Blender: brazos y subfusil animados
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
@@ -8050,6 +8051,56 @@ async function vmLoad() {
   await one('pz1', vmSetupPz1, GFX_TOUCH ? 2048 : 0);
   await one('t26n', vmSetupT26, GFX_TOUCH ? 2048 : 0);
   await one('t26', vmSetupT26, GFX_TOUCH ? 2048 : 0);
+}
+
+/* ============ el «Naranjero» en primera persona (modelo de Blender) ============
+   Brazos del republicano y subfusil hechos y animados en Blender (naranjero_fpv.json): la mano izquierda sostiene el arma bajo la
+   camisa del cañón, apoyada en la palma, con el pulgar a lo largo del costado izquierdo y los demás dedos rodeándola por la derecha.
+   Clips: Cadera (respiración), Apuntar (miras alineadas con el centro de la pantalla), Disparo (la manilla del cerrojo) y Recarga
+   (la mano saca el cargador por la izquierda y mete otro). El ojo de la cámara de Blender está en (0; 1,50; -0,19) del glTF, mirando a +Z. */
+const NFP = { M: null, P: null, Q: null, err: '', eye: [0, 1.5, -0.19] };
+async function nfpLoad() {
+  try {
+    const r = await fetch('naranjero_fpv.json'); if (!r.ok) throw new Error('naranjero_fpv.json: ' + r.status);
+    const g = glbParse(await r.arrayBuffer()); g.url = new URL('naranjero_fpv.json', location.href).href;
+    const M = await vmBuild(g, GFX_TOUCH ? 1024 : 0);
+    for (const k of ['Cadera', 'Apuntar', 'Recarga']) if (!M.clips[k]) throw new Error('falta el clip ' + k);
+    NFP.P = vmState(M); NFP.Q = vmState(M); NFP.P.fid = 0; NFP.M = M;
+  } catch (e) { NFP.err = String(e && e.message || e); console.warn('[naranjero 1P] se usa el de código:', NFP.err); }
+}
+/* mezcla la postura Q sobre P con peso w (posiciones en línea recta, giros por el camino corto) */
+function nfpMix(M, P, Q, w) {
+  if (w <= 0) return; if (w >= 1) { P.t.set(Q.t); P.r.set(Q.r); P.s.set(Q.s); return; }
+  for (let i = 0; i < M.n * 3; i++) { P.t[i] += (Q.t[i] - P.t[i]) * w; P.s[i] += (Q.s[i] - P.s[i]) * w; }
+  for (let i = 0; i < M.n; i++) {
+    const o = i * 4; let d = 0; for (let k = 0; k < 4; k++) d += P.r[o + k] * Q.r[o + k];
+    const sg = d < 0 ? -1 : 1; for (let k = 0; k < 4; k++) P.r[o + k] += (Q.r[o + k] * sg - P.r[o + k]) * w;
+    qNorm(P.r, o);
+  }
+}
+const _nfpB = M4.create();
+function nfpDraw(camWorld, p, w) {
+  const M = NFP.M; if (!M || !SK.ready || glLost) return false;
+  const P = NFP.P, Q = NFP.Q, a = clamp(p.aimT || 0, 0, 1), C = M.clips;
+  vmRest(M, P); vmClip(M, P, 'Cadera', game.time % (C.Cadera.dur || 1));
+  if (a > 0) { vmRest(M, Q); vmClip(M, Q, 'Apuntar', 0); nfpMix(M, P, Q, a * a * (3 - 2 * a)); }
+  let rel = 0;
+  if (p.reloadT > 0 && w.reload > 0) {
+    rel = clamp(1 - p.reloadT / w.reload, 0, 1);
+    vmRest(M, Q); vmClip(M, Q, 'Recarga', rel * C.Recarga.dur);
+    nfpMix(M, P, Q, Math.min(1, rel / 0.06, (1 - rel) / 0.04));
+  }
+  const since = game.time - (p.lastShot ?? -99), cj = M.ix.Cerrojo;
+  if (C.Disparo && since >= 0 && since < C.Disparo.dur) vmClip(M, P, 'Disparo', since, i => i === cj);
+  vmWorld(M, P); P.fid++;
+  /* vaivén al andar, retroceso y cambio de arma, en el espacio de la cámara; luego del glTF (ojo en el origen, +Z delante) a la cámara (-Z delante) */
+  const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5, kk = p.kick * (1 - a * 0.6);
+  M4.copy(_nfpB, camWorld);
+  M4.translate(_nfpB, Math.sin(ph) * 0.008 * mv, Math.abs(Math.cos(ph)) * 0.008 * mv - p.switchT * 0.5, kk * 0.03 - pt * 0.03 * (1 - a));
+  M4.rotX(_nfpB, kk * 0.02 - p.switchT * 0.8);
+  M4.rotY(_nfpB, Math.PI); M4.translate(_nfpB, -NFP.eye[0], -NFP.eye[1], -NFP.eye[2]);
+  vmDraw(M, P, _nfpB, 0, null, FPVP, cam.x, cam.y, cam.z);
+  return true;
 }
 
 /* ============ ametralladoras antiaéreas fijas ============ */
