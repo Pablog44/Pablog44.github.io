@@ -145,6 +145,7 @@ body.hx-quick #quick,body.hx-nav #navbar,body.hx-nav #legtime,body.hx-map #map,b
 body.hx-sight #reticle,body.hx-sight #leadPip,body.hx-sight #tgtBox,body.hx-sight #tgtArrow,body.hx-msg #msg,body.hx-tbtns #tbtns,body.hx-ttop #ttop{display:none!important}
 body.tg-ghost #touch .zone,body.tg-tap #touch .zone{opacity:0;transition:opacity .7s}
 body.tg-tap.tshow #touch .zone{opacity:1;transition:opacity .12s}
+#walkHint{position:fixed;left:50%;bottom:24%;transform:translateX(-50%);z-index:6;pointer-events:none;padding:7px 14px;border-radius:999px;background:rgba(6,12,20,.78);border:1px solid rgba(255,255,255,.22);color:#fff;font:600 14px/1.2 var(--sans,system-ui);white-space:nowrap}
 #hudMini{position:fixed;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));z-index:30;display:flex;gap:6px;opacity:.6}
 #hudMini:hover,#hudMini:focus-within{opacity:1}
 #hudMini button{font:600 12px/1 var(--sans,system-ui);padding:8px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(8,14,24,.55);color:#fff;backdrop-filter:blur(6px);cursor:pointer}
@@ -307,6 +308,7 @@ body.touch .pc-only{display:none!important}
     <button class="qbtn" id="qShader" title="Activar o desactivar el shader de estilo (P)"><i class="dot"></i>Shader <span class="sub" id="qShaderName">Anime</span></button>
     <button class="qbtn" id="qStyle" title="Siguiente estilo (O)">Estilo ▸</button>
     <button class="qbtn" id="qCam" title="Cambiar cámara (C)">Cámara <span class="sub" id="qCamName">Persecución</span></button>
+    <button class="qbtn" id="qView" title="Vistas por todo el jet (Tab) · caminando: usar (E)" hidden>Vistas <span class="sub" id="qViewSub">del jet</span></button>
     <button class="qbtn" id="qMenu" title="Menú (Esc)">☰ Menú</button>
   </div>
   <div id="navbar" class="hud-panel" title="Cambiar destino (N)">
@@ -362,6 +364,7 @@ body.touch .pc-only{display:none!important}
   </div>
 </div>
 
+<div id="walkHint" hidden></div>
 <div id="touch" hidden>
   <div id="rudder" class="zone">
     <button class="tbtn" id="tRudL" style="width:66px">◀ Timón</button>
@@ -376,11 +379,13 @@ body.touch .pc-only{display:none!important}
     <button class="tbtn" id="tBrake">FRENO</button>
     <button class="tbtn" id="tCam">CÁMARA</button>
     <button class="tbtn" id="tLights">LUCES</button>
+    <button class="tbtn" id="tSpoil" hidden>AEROFR.</button>
   </div>
   <button id="tFire" class="zone" hidden>FUEGO</button>
   <div id="ttop" class="zone">
     <button class="tbtn" id="tShader" style="width:96px">SHADER</button>
     <button class="tbtn" id="tStyle" style="width:96px">ESTILO ▸</button>
+    <button class="tbtn" id="tView" style="width:96px" hidden>VISTAS</button>
     <button class="tbtn" id="tMenu" style="width:96px">☰ MENÚ</button>
   </div>
 </div>
@@ -390,7 +395,7 @@ body.touch .pc-only{display:none!important}
     <div class="brand">
       <div class="eyebrow">Simulador de vuelo en el archipiélago</div>
       <h1>Tres<span>Islas</span></h1>
-      <p>Elige el hidroavión, la avioneta acrobática o el Fokker Dr.I del Barón Rojo. Con el Fokker aparece otro Fokker pilotado por la IA para batirte en duelo con las ametralladoras. En Isla Faro te espera un circuito de aros contra el crono.</p>
+      <p>Elige el hidroavión, la avioneta acrobática, el Fokker Dr.I del Barón Rojo o el jet privado bimotor. Con el Fokker aparece otro Fokker pilotado por la IA para batirte en duelo con las ametralladoras. En Isla Faro te espera un circuito de aros contra el crono.</p>
     </div>
     <div>
       <div class="sect-t">Isla de salida</div>
@@ -402,6 +407,7 @@ body.touch .pc-only{display:none!important}
         <button data-v="seaplane" aria-pressed="true">Hidroavión</button>
         <button data-v="acro" aria-pressed="false">Avioneta acrobática</button>
         <button data-v="fokker" aria-pressed="false">Fokker · Barón Rojo</button>
+        <button data-v="jet" aria-pressed="false">Jet privado</button>
         <button data-v="boat" aria-pressed="false">Velero</button>
       </div>
     </div>
@@ -1277,6 +1283,10 @@ function waterH(x, z, t) {
 // Body axes: +X right wing, +Y up, -Z nose.
 // ============================================================================
 const RHO = 1.225, G = 9.81;
+// ISA standard atmosphere (used by the jet, which climbs high enough for it to matter)
+const isaT = h => 288.15 - 0.0065 * clamp(h, 0, 11000);
+const isaRho = h => { h = clamp(h, -500, 20000); return h <= 11000 ? 1.225 * Math.pow(isaT(h) / 288.15, 4.2559) : 0.3639 * Math.exp(-(h - 11000) / 6341.6); };
+const isaSos = h => 20.0468 * Math.sqrt(isaT(h));
 const AC = {
   mass: 2600, S: 28, b: 15.9, c: 1.85,
   I: new V3(9200, 15500, 7600),          // about body x (pitch), y (yaw), z (roll)
@@ -1338,11 +1348,23 @@ class Aircraft {
     this.sw = { batt: 1, gen: 1, avion: 1, ign: 1, pump: 1, pitot: 0, cabin: 0, beacon: 1, nav: 0, strobe: 0, land: 0, taxi: 0, deice: 0 };
     this.propLever = 1; this.condLever = 1;
     this.lights = false;
+    // jet systems: speed brakes / ground spoilers, thrust reversers, airstair door, Mach
+    this.spoiler = 0; this.spoilerSet = 0; this.rev = 0; this.revSet = 0; this.door = 0; this.doorSet = 0;
+    this.mach = 0; this.tas = speed; this.fanAngle = 0; this.gearBlocked = 0;
+    Object.assign(this.sw, { gen2: 1, pump2: 1, xfeed: 0, belt: airborne ? 0 : 1 });
+    if (AC.jet) { this.rpm = 0.25 + (airborne ? 0.75 * this.throttle : 0); this.sw.pitot = airborne ? 1 : 0; }
+    // jet: two engines (N1 each, running / starting), one thrust lever each, fire handles, autopilot, cabin systems
+    this.eng = [0, 1].map(() => ({ n1: this.rpm, run: AC.jet ? 1 : 0, start: 0, frac: 0, fan: 0 }));
+    this.lev = [this.throttle, this.throttle]; this._thr = this.throttle; this.fireH = [0, 0]; this.ignWas = this.sw.ign;
+    this.ap = { on: 0, hdgOn: 0, altOn: 0, hdg: heading, alt: pos.y, vs: 0, base: 0, disc: 0 };
+    this.cabAlt = airborne ? Math.min(8000, pos.y * 3.28084 * 0.2) : 0; this.hyd = AC.jet ? 3 : 0;
+    this.lavDoor = 0; this.lavDoorSet = 0; this.lid = 0; this.lidSet = 0; this.press = {};
+    this.mw = 0; this.mc = 0; this.mwAck = []; this.mcAck = []; this.lampTest = 0; this.masterT = 0;
   }
   // exterior lights master (L key): nav, strobes, landing and taxi together
   get lights() { return !!(this.sw && (this.sw.nav || this.sw.land)); }
   set lights(v) { if (!this.sw) return; const k = v ? 1 : 0; this.sw.nav = k; this.sw.strobe = k; this.sw.land = k; this.sw.taxi = k; }
-  get engineOn() { return !!(this.sw.ign && this.sw.batt && this.condLever > 0.08); }
+  get engineOn() { return AC.jet ? !!(this.eng && (this.eng[0].run || this.eng[1].run)) : !!(this.sw.ign && this.sw.batt && this.condLever > 0.08); }
   fwd() { return this.q.rot(new V3(0, 0, -1)); }
   up() { return this.q.rot(new V3(0, 1, 0)); }
   right() { return this.q.rot(new V3(1, 0, 0)); }
@@ -1350,15 +1372,53 @@ class Aircraft {
   pitchAng() { return Math.asin(clamp(this.fwd().y, -1, 1)); }
   bankAng() { const r = this.right(), u = this.up(); return Math.atan2(-r.y, u.y); }
   setFlaps(d) { this.flapsSet = clamp(this.flapsSet + d, 0, AC.flapDetents.length - 1); }
-  toggleGear() { if (AC.fixedGear) return false; this.gearSet = this.gearSet > 0.5 ? 0 : 1; return true; }
+  toggleGear() {
+    if (AC.fixedGear) return false;
+    // the jet has a squat switch: the gear will not retract with weight on the wheels
+    if (AC.jet && this.gearSet > 0.5 && this.wheelsOnGround > 0) { this.gearBlocked = 1; return true; }
+    this.gearBlocked = 0; this.gearSet = this.gearSet > 0.5 ? 0 : 1; return true;
+  }
 
   step(dt, env, input) {
     if (this.crashed) return;
     const q = this.q, m = AC.mass;
     // ---------------- systems ----------------
     this.throttle = clamp(this.throttle, 0, 1);
-    const rpmTarget = this.engineOn ? (0.18 + 0.82 * this.throttle) * lerp(0.86, 1, this.propLever) : 0;
-    this.rpm += (rpmTarget - this.rpm) * (1 - Math.exp(-dt / 0.9));
+    if (AC.jet) {
+      // turbofan spool (rpm = N1): slow to accelerate from idle, quicker near the top; ~6 s light-off from 0
+      // one thrust lever per engine: keyboard / touch / gamepad move both together, the cockpit levers one by one
+      const dl = this.throttle - this._thr;
+      if (dl) for (let i = 0; i < 2; i++) this.lev[i] = this.throttle <= 0 ? 0 : this.throttle >= 1 ? 1 : clamp(this.lev[i] + dl, 0, 1);
+      this.throttle = this._thr = (this.lev[0] + this.lev[1]) / 2;
+      // two turbofans: IGN is the engine master (switching it on lights both), START spins one up (~6 s to idle),
+      // the fire handle or running dry cuts it; a dead engine windmills in the airflow
+      const idle = 0.25, ignOn = !!this.sw.ign && this.condLever > 0.08;
+      if (ignOn && !this.ignWas && !this.eng[0].run && !this.eng[1].run) for (let i = 0; i < 2; i++) if (!this.fireH[i]) this.eng[i].start = 1;
+      this.ignWas = ignOn;
+      const windmill = clamp(this.ias / 140, 0, 1) * 0.09;
+      let sum = 0;
+      for (let i = 0; i < 2; i++) {
+        const E = this.eng[i];
+        if (!ignOn || this.fireH[i] || this.fuel <= 0.031) { E.run = 0; E.start = 0; }
+        if (E.start && E.n1 > idle - 0.015) { E.run = 1; E.start = 0; }
+        const tgt = E.run ? idle + (1 - idle) * this.lev[i] : E.start ? idle : windmill, d = tgt - E.n1;
+        const tau = d > 0 ? (E.n1 < idle - 0.01 ? 2.2 : lerp(3.2, 1.1, clamp((E.n1 - idle) / (1 - idle), 0, 1))) : E.run ? 1.8 : 3.2;
+        E.n1 += d * (1 - Math.exp(-dt / tau)); sum += E.n1;
+        E.fan = (E.fan + E.n1 * 38 * dt) % TAU;
+      }
+      this.rpm = sum / 2;
+      const gnd = this.wheelsOnGround > 0;
+      // ground spoilers deploy by themselves on the runway with the thrust levers at idle
+      const auto = gnd && this.throttle < 0.08 && this.groundSpeed > 18 ? 1 : 0;
+      this.spoiler += clamp(Math.max(this.spoilerSet, auto) - this.spoiler, -dt * 1.2, dt * 1.6);
+      if (!gnd || this.groundSpeed < 1.5) this.revSet = 0;
+      this.rev += clamp(this.revSet - this.rev, -dt / 1.2, dt / 1.2);
+      this.door += clamp(this.doorSet - this.door, -dt / 4, dt / 4);
+      this.fanAngle = (this.fanAngle + this.rpm * 38 * dt) % TAU;
+    } else {
+      const rpmTarget = this.engineOn ? (0.18 + 0.82 * this.throttle) * lerp(0.86, 1, this.propLever) : 0;
+      this.rpm += (rpmTarget - this.rpm) * (1 - Math.exp(-dt / 0.9));
+    }
     const flapTarget = AC.flapDetents[this.flapsSet];
     this.flaps += clamp(flapTarget - this.flaps, -5 * dt, 5 * dt);
     this.gear += clamp(this.gearSet - this.gear, -dt / AC.gearTime, dt / AC.gearTime);
@@ -1382,13 +1442,15 @@ class Aircraft {
     const air = vsub(this.vel, windCG);
     const vb = q.invRot(air);
     const V = vb.len();
-    this.ias = V;
+    const rho = AC.jet ? isaRho(this.pos.y) : RHO;
+    this.tas = V; this.ias = AC.jet ? V * Math.sqrt(rho / RHO) : V;
+    this.mach = V / isaSos(this.pos.y);
     const flapF = this.flaps / 30;
     let alpha = 0, beta = 0;
     if (V > 0.3) {
       alpha = Math.atan2(-vb.y, -vb.z);
       beta = Math.asin(clamp(vb.x / V, -1, 1));
-      const qd = 0.5 * RHO * V * V, S = AC.S;
+      const qd = 0.5 * rho * V * V, S = AC.S;
       const aS = AC.aStall + AC.aStallFlap * flapF;
       const CL0 = AC.CL0 + AC.CLflap * flapF;
       let CLlin = CL0 + AC.CLa * alpha;
@@ -1396,9 +1458,11 @@ class Aircraft {
       const flat = 1.15 * Math.sin(2 * alpha);
       const st = sstep(aS, aS + 0.12, alpha) + sstep(-0.22, -0.34, alpha);
       CLlin = clamp(CLlin, AC.CLmin, CLmax);
-      const CL = lerp(CLlin, flat, clamp(st, 0, 1));
+      let CL = lerp(CLlin, flat, clamp(st, 0, 1));
+      if (AC.jet) CL -= 0.5 * this.spoiler * Math.max(CL, 0);   // spoilers dump lift
       this.stall = clamp((alpha - (aS - 0.05)) / 0.05, 0, 1);
-      const CD = AC.CD0 + AC.CDflap * flapF + AC.CDgear * this.gear + AC.k * CL * CL + 1.1 * st * Math.sin(alpha) ** 2;
+      let CD = AC.CD0 + AC.CDflap * flapF + AC.CDgear * this.gear + AC.k * CL * CL + 1.1 * st * Math.sin(alpha) ** 2;
+      if (AC.jet) CD += 0.045 * this.spoiler + 0.02 * this.door + 10 * Math.max(0, this.mach - 0.76) ** 2;   // speed brakes, open door, drag rise
       const CY = AC.CYb * beta + AC.CYdr * this.surf.r;
       const vh = vscale(vb, 1 / V);
       let liftDir = new V3(1, 0, 0).cross(vh);
@@ -1409,7 +1473,7 @@ class Aircraft {
       const Vd = Math.max(V, 8);
       const p = -this.w.z, qq = this.w.x, r = -this.w.y;
       const slip = AC.wash * Math.sqrt(this.rpm) * this.throttle;  // propwash over tail
-      const qt = 0.5 * RHO * (V * V + slip * slip);
+      const qt = 0.5 * rho * (V * V + slip * slip);
       const eDefl = this.surf.e > 0 ? this.surf.e : this.surf.e * 0.75;
       const Cm = AC.Cm0 + AC.Cma * clamp(alpha, -0.5, 0.5) + AC.Cmq * (qq * AC.c / (2 * Vd)) + AC.Cmflap * flapF;
       const Mpitch = qd * S * AC.c * Cm + qt * S * AC.c * AC.Cmde * eDefl;
@@ -1432,8 +1496,25 @@ class Aircraft {
     this.alpha = alpha; this.beta = beta;
     // thrust
     const u = Math.max(0, -vb.z);
-    const thrustFrac = this.engineOn ? 0.035 + 0.965 * clamp((this.rpm - 0.18) / 0.82, 0, 1) : 0;
-    const T = AC.Tstatic * thrustFrac * Math.max(0.05, 1 - u / AC.Vprop) * (this.thrustK || 1);
+    let T;
+    if (AC.jet) {
+      // turbofan: thrust from N1, lapse with density (sigma^0.8) and with Mach (ram drag); reversers turn ~55 % forward
+      const M = this.mach;
+      const km = lerp(1.0, 0.45, clamp(this.pos.y / 11000, 0, 1));   // ram recovery offsets the Mach lapse higher up
+      const k = AC.Tstatic / 2 * Math.pow(rho / RHO, 0.75) * Math.max(0.3, 1 - km * M + 0.55 * M * M) * (this.thrustK || 1) * (1 - 1.55 * this.rev);
+      const Ts = [0, 0]; let fs = 0;
+      for (let i = 0; i < 2; i++) {
+        const E = this.eng[i], n = clamp((E.n1 - 0.25) / 0.75, 0, 1);
+        E.frac = E.run || E.start ? (E.n1 > 0.2 ? 0.055 + 0.945 * Math.pow(n, 1.7) : E.n1 * 0.1) : -0.15 * E.n1;   // a windmilling engine drags
+        Ts[i] = k * E.frac; fs += Math.max(0, E.frac) / 2;
+      }
+      T = Ts[0] + Ts[1]; this.thrustFrac = fs;
+      // the engines sit 1.98 m either side of the centreline: with one out the jet yaws towards the dead engine
+      Mb.y += 1.98 * (Ts[1] - Ts[0]);
+    } else {
+      const thrustFrac = this.engineOn ? 0.035 + 0.965 * clamp((this.rpm - 0.18) / 0.82, 0, 1) : 0;
+      T = AC.Tstatic * thrustFrac * Math.max(0.05, 1 - u / AC.Vprop) * (this.thrustK || 1);
+    }
     this.thrust = T;
     F.add(q.rot(new V3(0, 0, -T)));
 
@@ -1491,7 +1572,7 @@ class Aircraft {
       const steerMax = lerp(32, 5, sstep(2, 25, gs)) * DEG;
       const mk = m / 2600;
       for (const wh of AC.wheels) {
-        const rb = AC.fixedGear ? wh.p : new V3(wh.p.x, lerp(-2.4, wh.p.y, g), wh.p.z);
+        const rb = AC.fixedGear ? wh.p : new V3(wh.p.x, lerp(AC.gearUpY ?? -2.4, wh.p.y, g), wh.p.z);
         const { P, v } = pointState(rb);
         const gh = env.terrainH(P.x, P.z), whh = env.waterH(P.x, P.z);
         if (whh > gh && P.y < whh) {
@@ -5738,7 +5819,7 @@ const DEFAULTS = {
   shaderOn: false, style: 'anime', styleMix: 1.0, showFps: false,
   seaState: 0.35, windSpeed: 5, turbulence: 1, cloudCover: 0.45, timeScale: 1, eruption: 1.0,
   hudQuick: true, hudNav: true, hudMap: true, hudSpeed: true, hudPfd: true, hudSys: true, hudCombat: true, hudSight: true, hudMsg: true, hudTBtns: true, hudTTop: true, touchMode: 'show', touchHide: 4,
-  assist: 2, invertY: false, sensitivity: 1.0, yawRoll: 1.0, gpMap: null, gpMap2: null, kbMap: null, volume: 0.8, hud: true, units: 'kt',
+  jetModel: 'auto', assist: 2, invertY: false, sensitivity: 1.0, yawRoll: 1.0, gpMap: null, gpMap2: null, kbMap: null, volume: 0.8, hud: true, units: 'kt',
 };
 const PRESETS = {
   muybajo: { vegNear: 120, vegFar: 2500, worldShadows: 0, grass: 0, renderScale: 0.55, waterWaves: 4, waterDetail: 0, waterGrid: 0, reflections: 0, foam: true, wake: false, terrainRes: 128, vegetation: 0.25, shadows: 0, clouds: 1, particles: 0.3, post: false, bloom: 0, fxaa: false, msaa: 0, targetFps: 30 },
@@ -5979,7 +6060,7 @@ function hingeMat(out, h, ang) {
   return M4.axisRotAt(out, ax, ang, h.a);
 }
 const _pm = M4.create(), _hm = M4.create(), _rm = M4.create();
-const INSIDE_MODES = { cockpit: 1, passenger: 1 };
+const INSIDE_MODES = { cockpit: 1, passenger: 1, walk: 1, get vistas() { return jetViewInside() ? 1 : 0; } };
 function cabinOpts() {
   const shadowOn = RENDER.shadowActive ? 1 : 0;
   const night = ENV.night, sw = AIR.ac.sw, k = sw.batt ? (sw.cabin ? 1 : 0.35 * night) : 0;
@@ -6069,7 +6150,12 @@ function drawCabinControls(co, withPanel) {
 }
 // the cabin seen from inside (drawn after a depth clear with a close near plane); no crew figures
 function drawCabin(mode) {
-  if (AC.type !== 'seaplane') { drawGLBPlane(AIR.ac, RENDER.planeM); return; }
+  if (AC.type !== 'seaplane') {
+    // jet: the cabin lights fill the interior (more noticeable at night)
+    const sw = AIR.ac.sw, bus = sw.batt || sw.gen || sw.gen2, k = AC.jet && bus ? (sw.cabin ? 1 : 0.12) * (0.2 + 0.8 * (ENV.night || 0)) : 0;
+    RENDER.cabinFill = k ? [0.13 * k, 0.10 * k, 0.068 * k] : null;
+    drawGLBPlane(AIR.ac, RENDER.planeM); RENDER.cabinFill = null; return;
+  }
   const P = PLANE.parts, M = RENDER.planeM;
   const co = cabinOpts();
   drawObj(P.fuselage, M, 1, null, { lightK: [1, 1], interior: 1, cabin: co.cabin, livery: 1 });
@@ -6241,7 +6327,8 @@ function renderShadow() {
   const c = isBoat() ? vadd(ac.pos, new V3(0, 3, 0)) : ac.pos, eye = vadd(c, vscale(L, 120));
   const up = Math.abs(L.y) > 0.95 ? new V3(0, 0, 1) : new V3(0, 1, 0);
   const view = M4.lookAt(M4.create(), eye, c, up);
-  const proj = M4.ortho(M4.create(), -10.5, 10.5, -10.5, 10.5, 1, 400);
+  const sr = isBoat() ? 10.5 : AC.shadowR || 10.5;
+  const proj = M4.ortho(M4.create(), -sr, sr, -sr, sr, 1, 400);
   M4.mul(RENDER.lightVP, proj, view);
   bindRT(RENDER.shadowRT);
   gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -6388,7 +6475,7 @@ function renderFrame(rect) {
   drawWorld({ showPlane, cockpit, vw: W, vh: H, pixel });
   if (cockpit) {
     gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
-    const pn = M4.setNearFar(RENDER.tmpM2, c.proj, 0.06, 14);
+    const pn = M4.setNearFar(RENDER.tmpM2, c.proj, 0.06, AC.cabinFar || 14);
     setGlobals(c.view, pn, c.pos, { direct });
     drawCabin(CAM.mode);
   }
@@ -6521,17 +6608,45 @@ function updateFX(dt) {
 const CAM_MODES = [
   { id: 'chase', name: 'Persecución' }, { id: 'cockpit', name: 'FPV piloto' }, { id: 'passenger', name: 'Pasajero' },
   { id: 'wingcam', name: 'FPV ala' }, { id: 'orbit', name: 'Órbita libre' }, { id: 'flyby', name: 'Pasada' }, { id: 'cinematic', name: 'Cinemática' },
+  { id: 'vistas', name: 'Vistas del jet', jet: true }, { id: 'walk', name: 'Caminar por la cabina', jet: true },
 ];
-const CAM_INSIDE = m => (m === 'cockpit' || m === 'passenger') && GAME.vehicle !== 'boat';
+// ---- private jet: fixed views all over the aircraft (model coordinates: x aft from the nose, y right, z up) ----
+const JB = (x, y, z) => new V3(y, z - 0.04, x - 9.5);
+const JET_VIEWS = [
+  { n: 'Copiloto', e: [3.12, 0.40, 0.55], yaw: 0, pitch: -0.18 },
+  { n: 'Asiento plegable, detrás de los pilotos', e: [3.50, 0, 0.62], yaw: 0, pitch: -0.24 },
+  { n: 'Panel de instrumentos', e: [2.72, -0.22, 0.30], yaw: 0, pitch: -0.28 },
+  { n: 'Pedestal y palancas de gases', e: [3.02, 0, 0.30], yaw: 0, pitch: -1.05 },
+  { n: 'Panel del techo', e: [3.30, 0, 0.42], yaw: 0, pitch: 1.2 },
+  { n: 'Cabina de pasaje hacia delante', e: [10.6, 0, 0.62], yaw: 0, pitch: -0.12 },
+  { n: 'Cabina de pasaje hacia atrás', e: [3.85, 0, 0.62], yaw: PI, pitch: -0.14 },
+  { n: 'Butaca club', e: [5.72, 0.56, 0.32], yaw: PI, pitch: -0.14 },
+  { n: 'Diván', e: [9.4, 0.62, 0.30], yaw: PI / 2, pitch: -0.1 },
+  { n: 'Ventanilla sobre el ala', e: [9.95, -0.62, 0.40], yaw: PI / 2 + 0.45, pitch: -0.42 },
+  { n: 'Baño', e: [11.02, 0, 0.60], yaw: PI, pitch: -0.32 },
+  { n: 'Puerta y escalerilla', e: [6.2, -4.6, 0.2], t: [4.75, -0.9, -0.5] },
+  { n: 'Morro', e: [-2.2, 1.3, 0.7], t: [3.0, 0, 0.1] },
+  { n: 'Tren de morro', e: [0.4, 1.3, -1.45], t: [2.25, 0, -1.65] },
+  { n: 'Punta del ala izquierda', e: [11.8, -9.3, 0.25], t: [7.0, 0, 0.0] },
+  { n: 'Motor derecho', e: [12.0, 3.5, 1.5], t: [14.5, 1.98, 0.5] },
+  { n: 'Tren principal', e: [12.7, -3.3, -1.45], t: [10.1, -1.4, -1.65] },
+  { n: 'Cola', e: [21.6, 2.4, 5.3], t: [12.0, 0, 1.2] },
+  { n: 'Desde arriba', e: [6.0, 0, 11.5], t: [9.5, 0, 0] },
+  { n: 'Bajo el fuselaje', e: [9.0, 0, -1.55], t: [1.5, 0, -1.0] },
+];
+JET_VIEWS.forEach(v => { v.inside = !v.t; v.E = JB(...v.e); if (v.t) v.T = JB(...v.t); });
+const JET_CAM = m => (m === 'walk' || m === 'vistas') && AC.jet && GAME.vehicle !== 'boat';
+function jetViewInside() { return AC.jet && JET_VIEWS[CAM.jv || 0].inside; }
+const CAM_INSIDE = m => (m === 'cockpit' || m === 'passenger' || m === 'walk' || (m === 'vistas' && jetViewInside())) && GAME.vehicle !== 'boat';
 const BOAT_CAM_NAMES = { cockpit: 'Timonel', passenger: 'Proa', wingcam: 'Tope de palo' };
-const camName = id => (GAME.vehicle === 'boat' && BOAT_CAM_NAMES[id]) || (CAM_MODES.find(m => m.id === id) || CAM_MODES[0]).name;
+const camName = id => (GAME.vehicle === 'boat' && BOAT_CAM_NAMES[id]) || (id === 'vistas' && AC.jet ? 'Vista · ' + JET_VIEWS[CAM.jv || 0].n : (CAM_MODES.find(m => m.id === id) || CAM_MODES[0]).name);
 const BOAT_VIEW = m => GAME.vehicle === 'boat' && (m === 'cockpit' || m === 'passenger' || m === 'wingcam');
 const PASSENGER_EYE = new V3(-0.42, 0.6, -0.18);
 const WINGCAM = { pos: new V3(7.3, 1.72, -1.25), target: new V3(0.1, 0.62, -1.75) };
 const CAM = {
   mode: 'chase', yaw: 0, pitch: 0, dist: 24, lookYaw: 0, lookPitch: 0, idle: 0, dragging: false,
   pos: new V3(0, 50, 0), dirSm: null, fly: null, menuT: 0, shake: 0, upSm: new V3(0, 1, 0),
-  fpvFov: 0, head: new V3(), headLook: 0, prevMode: 'chase',
+  fpvFov: 0, head: new V3(), headLook: 0, prevMode: 'chase', jv: 0,
 };
 function setCamMode(m) {
   if (m !== CAM.mode && CAM_INSIDE(m) && !CAM_INSIDE(CAM.mode)) CAM.prevMode = CAM.mode;
@@ -6539,23 +6654,118 @@ function setCamMode(m) {
   CAM.yaw = 0; CAM.pitch = 0; CAM.lookYaw = 0; CAM.lookPitch = 0; CAM.fly = null; CAM.fpvFov = 0;
   if (m === 'orbit') { CAM.yaw = 0.6; CAM.pitch = 0.25; }
   if (m === 'passenger') { CAM.lookYaw = AC.passRest[0]; CAM.lookPitch = AC.passRest[1]; }
-  if (m === 'cockpit') CAM.lookPitch = GAME.vehicle === 'boat' ? -0.12 : -0.06;
+  if (m === 'cockpit') CAM.lookPitch = GAME.vehicle === 'boat' ? -0.12 : AC.eyePitch ?? -0.06;
   if (m === 'passenger' && GAME.vehicle === 'boat') { CAM.lookYaw = PI; CAM.lookPitch = 0.12; }
   if (m === 'wingcam' && GAME.vehicle === 'boat') { CAM.lookYaw = 0; CAM.lookPitch = -1.0; }
+  if (m === 'walk') walkBegin();
+  if (m === 'vistas') UI.toast && UI.toast('Vista: ' + JET_VIEWS[CAM.jv || 0].n + ' · Tab o el botón Vista ▸ para la siguiente');
+  if (m !== 'walk') { const h = document.getElementById('walkHint'); if (h) h.hidden = true; }
   UI.updateQuick && UI.updateQuick();
+}
+function nextJetView(d = 1) {
+  if (!AC.jet || GAME.vehicle === 'boat') return;
+  if (CAM.mode !== 'vistas') { setCamMode('vistas'); return; }
+  CAM.jv = ((CAM.jv || 0) + d + JET_VIEWS.length) % JET_VIEWS.length;
+  CAM.lookYaw = 0; CAM.lookPitch = 0; CAM.fpvFov = 0;
+  UI.toast('Vista: ' + JET_VIEWS[CAM.jv].n); UI.updateQuick();
+}
+// ---- walking inside the jet: areas free to stand in (model coordinates, for the centre of the body) ----
+const WALK = { x: 3.48, y: 0, z: 0.62, bob: 0, inLav: false, act: null };
+const WALK_BOXES = [
+  [3.36, 3.62, -0.26, 0.26],    // behind the pilots' seats
+  [3.55, 5.25, -0.22, 0.22],    // cockpit doorway, wardrobe and galley
+  [4.42, 5.08, -0.46, 0.22],    // entry, in front of the airstair door
+  [5.20, 8.10, -0.17, 0.17],    // aisle between the club seats
+  [6.05, 7.25, -0.30, 0.30],    // between the tables
+  [8.00, 10.78, -0.22, 0.20],   // divan and credenza
+  [11.00, 11.88, -0.18, 0.18],  // lavatory
+];
+function walkFree(x, y) {
+  for (const b of WALK_BOXES) if (x >= b[0] && x <= b[1] && y >= b[2] && y <= b[3]) return true;
+  return AIR.ac.lavDoor > 0.85 && x >= 10.76 && x <= 11.02 && Math.abs(y) <= 0.18;   // the lavatory door only when it is open
+}
+function walkBegin() {
+  const ac = AIR.ac;
+  WALK.x = 3.48; WALK.y = 0; WALK.bob = 0; WALK.inLav = false;
+  CAM.lookYaw = PI; CAM.lookPitch = -0.1;
+  if (!ac.onGround && !ac.onWater && ac.ap && !ac.ap.on) {
+    if (apEngage(ac)) { ac.ap.hdgOn = 1; ac.ap.hdg = ac.heading(); ac.ap.altOn = 1; ac.ap.alt = ac.pos.y; }
+  }
+  UI.toast && UI.toast('Caminando: W/S/A/D (o el joystick) para andar, arrastra para mirar, E para abrir y usar · V vuelve al asiento' + (ac.ap && ac.ap.on ? ' · el piloto automático lleva el avión' : ''));
+}
+function toggleLavDoor() {
+  const ac = AIR.ac; ac.lavDoorSet = ac.lavDoorSet ? 0 : 1;
+  if (!ac.lavDoorSet && WALK.x > 10.76 && WALK.x < 11.0) WALK.x = WALK.x > 10.89 ? 11.0 : 10.76;   // step out of the doorway
+  beep(ac.lavDoorSet ? 300 : 210, 0.07, 0.06, 'triangle');
+  UI.toast(ac.lavDoorSet ? 'Puerta del baño abierta' : 'Puerta del baño cerrada' + (CAM.mode === 'walk' && WALK.x > 10.9 ? ' · OCUPADO' : ''));
+}
+function toggleLid() { const ac = AIR.ac; ac.lidSet = ac.lidSet ? 0 : 1; beep(ac.lidSet ? 420 : 260, 0.05, 0.05, 'triangle'); UI.toast(ac.lidSet ? 'Tapa levantada' : 'Tapa bajada'); }
+function walkCandidates() {
+  const ac = AIR.ac, W = WALK, c = [];
+  if (W.x > 9.9 && W.x < 11.7) c.push([Math.abs(W.x - 10.9), () => (ac.lavDoorSet ? 'Cerrar' : 'Abrir') + ' la puerta del baño', toggleLavDoor]);
+  if (W.x > 11.25) c.push([Math.abs(W.x - 11.9) * 0.8, () => (ac.lidSet ? 'Bajar' : 'Levantar') + ' la tapa del inodoro', toggleLid]);
+  if (W.x < 3.75) c.push([0, () => 'Sentarte a los mandos', () => setCamMode('cockpit')]);
+  if (W.x > 4.3 && W.x < 5.2 && W.y < -0.12) c.push([0.05, () => ac.door > 0.95 ? 'Bajar por la escalerilla' : (ac.doorSet ? 'Cerrar' : 'Abrir') + ' la puerta principal',
+    () => { if (ac.door > 0.95) { CAM.jv = JET_VIEWS.findIndex(v => v.n.startsWith('Puerta')); setCamMode('vistas'); UI.toast('Has bajado por la escalerilla · Tab para dar la vuelta al avión'); } else toggleDoor(); }]);
+  c.sort((a, b) => a[0] - b[0]);
+  return c;
+}
+function walkInteract() { const c = walkCandidates()[0]; if (c) c[2](); }
+function walkStep(dt, gp) {
+  const K = INPUT.keys, T = INPUT.touch, W = WALK;
+  let f = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0), s = (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0);
+  let turn = (K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0);
+  if (T.active) { f = -T.y; s = T.x; }
+  if (T.rudder) turn = T.rudder;
+  if (gp) { if (Math.abs(gp.pitch) > 0.15) f = -gp.pitch; if (Math.abs(gp.roll) > 0.15) s = gp.roll; if (Math.abs(gp.yaw) > 0.15) turn = gp.yaw; }
+  CAM.lookYaw -= turn * 1.9 * dt;
+  const m = Math.hypot(f, s); if (m > 1) { f /= m; s /= m; }
+  const y = CAM.lookYaw, v = 1.15 * dt;
+  const dx = (-Math.cos(y) * f - Math.sin(y) * s) * v, dy = (-Math.sin(y) * f + Math.cos(y) * s) * v;
+  if (walkFree(W.x + dx, W.y)) W.x += dx;
+  if (walkFree(W.x, W.y + dy)) W.y += dy;
+  W.bob += Math.hypot(dx, dy) * 8.5;
+  W.inLav = W.x > 10.92;
+  const c = walkCandidates()[0], el = document.getElementById('walkHint');
+  if (el) { const txt = c ? 'E · ' + c[1]() : ''; el.hidden = !txt; if (el.textContent !== txt) el.textContent = txt; }
+}
+function jetCamera(c, ac, dt) {
+  let off, q;
+  if (CAM.mode === 'walk') {
+    const W = WALK, bob = Math.sin(W.bob) * 0.012;
+    off = JB(W.x, W.y, W.z + bob);
+    q = Quat.mul(ac.q, Quat.mul(Quat.axis(0, 1, 0, CAM.lookYaw), Quat.axis(1, 0, 0, CAM.lookPitch)));
+  } else {
+    const V = JET_VIEWS[CAM.jv || 0];
+    off = V.E;
+    if (V.inside) q = Quat.mul(ac.q, Quat.mul(Quat.axis(0, 1, 0, V.yaw + CAM.lookYaw), Quat.axis(1, 0, 0, V.pitch + CAM.lookPitch)));
+    else {
+      const d = vsub(V.T, V.E).norm();
+      const baseQ = Quat.mul(Quat.axis(0, 1, 0, Math.atan2(-d.x, -d.z)), Quat.axis(1, 0, 0, Math.asin(d.y)));
+      q = Quat.mul(ac.q, Quat.mul(Quat.axis(0, 1, 0, CAM.lookYaw), Quat.mul(Quat.axis(1, 0, 0, CAM.lookPitch), baseQ)));
+    }
+  }
+  const vib = (ac.onGround ? Math.min(0.004, ac.groundSpeed * 0.00014) : 0) + CAM.shake * 0.006, tt = SIM.t;
+  const e = vadd(ac.pos, ac.q.rot(vadd(off, new V3(0, Math.sin(tt * 29.3) * vib, 0))));
+  if (!JET_VIEWS[CAM.jv || 0].inside && CAM.mode === 'vistas') { const s = surfaceAt(e.x, e.z) + 0.15; if (e.y < s) e.y = s; }
+  M4.invert(c.view, M4.fromQT(M4.create(), q, e));
+  c.pos = e;
 }
 function toggleFPV() { setCamMode(CAM.mode === 'cockpit' ? (CAM.prevMode || 'chase') : 'cockpit'); }
 function cycleCamera(d = 1) {
-  const i = CAM_MODES.findIndex(m => m.id === CAM.mode);
-  setCamMode(CAM_MODES[(i + d + CAM_MODES.length) % CAM_MODES.length].id);
+  const list = CAM_MODES.filter(m => !m.jet || (AC.jet && GAME.vehicle !== 'boat'));
+  const i = list.findIndex(m => m.id === CAM.mode);
+  setCamMode(list[(i + d + list.length) % list.length].id);
 }
 function camLook(dx, dy) { // user drag (radians)
+  if (CAM.mode === 'walk') { CAM.lookYaw -= dx; CAM.lookPitch = clamp(CAM.lookPitch - dy, -1.3, 1.3); CAM.idle = 0; return; }
+  if (CAM.mode === 'vistas') { CAM.lookYaw = clamp(CAM.lookYaw - dx, -PI, PI); CAM.lookPitch = clamp(CAM.lookPitch - dy, -1.3, 1.3); CAM.idle = 0; return; }
   if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) { CAM.lookYaw = clamp(CAM.lookYaw - dx, -2.8, 2.8); CAM.lookPitch = clamp(CAM.lookPitch - dy, -1.2, 1.2); }
   else { CAM.yaw -= dx; CAM.pitch = clamp(CAM.pitch + dy, -0.6, 1.35); }
   CAM.idle = 0;
 }
 function camZoom(f) {
-  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) { const base = CAM.fpvFov || (SETTINGS.fov + 10); CAM.fpvFov = clamp(base * (f > 1 ? 1.06 : 0.94), 35, 110); }
+  if (CAM_INSIDE(CAM.mode) || CAM.mode === 'wingcam' || CAM.mode === 'vistas' || BOAT_VIEW(CAM.mode)) { const base = CAM.fpvFov || (SETTINGS.fov + 10); CAM.fpvFov = clamp(base * (f > 1 ? 1.06 : 0.94), 35, 110); }
   else CAM.dist = clamp(CAM.dist * f, 9, 160);
 }
 function surfaceAt(x, z) { return Math.max(terrainH(x, z), waterH(x, z, SIM.t)); }
@@ -6563,8 +6773,9 @@ function updateCamera(dt) {
   const c = RENDER.cam, ac = VEH();
   c.aspect = (MP.splitView() ? canvas.width / 2 : canvas.width) / Math.max(1, canvas.height);
   const menuCam = GAME.state === 'menu';
-  c.fov = (menuCam ? SETTINGS.fov : CAM_INSIDE(CAM.mode) || BOAT_VIEW(CAM.mode) ? (CAM.fpvFov || SETTINGS.fov + 10) : CAM.mode === 'wingcam' ? (CAM.fpvFov || 92) : SETTINGS.fov) * DEG;
-  c.near = !menuCam && (CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode)) ? 0.12 : 0.5; c.far = 42000;
+  if ((CAM.mode === 'walk' || CAM.mode === 'vistas') && (!AC.jet || GAME.vehicle === 'boat')) setCamMode('chase');
+  c.fov = (menuCam ? SETTINGS.fov : CAM_INSIDE(CAM.mode) || BOAT_VIEW(CAM.mode) || CAM.mode === 'vistas' ? (CAM.fpvFov || SETTINGS.fov + 10) : CAM.mode === 'wingcam' ? (CAM.fpvFov || 92) : SETTINGS.fov) * DEG;
+  c.near = !menuCam && (CAM.mode === 'wingcam' || BOAT_VIEW(CAM.mode) || (CAM.mode === 'vistas' && !jetViewInside())) ? 0.12 : 0.5; c.far = 42000;
   CAM.idle += dt;
   let eye, target, up = new V3(0, 1, 0);
   if (GAME.state === 'menu') {
@@ -6575,9 +6786,11 @@ function updateCamera(dt) {
     target = new V3(CRATER_W.x, CRATER_W.y + 80, CRATER_W.z);
     M4.lookAt(c.view, eye, target, up);
     c.pos = eye;
+  } else if (JET_CAM(CAM.mode)) {
+    jetCamera(c, ac, dt);
   } else if (CAM_INSIDE(CAM.mode)) {
     const pass = CAM.mode === 'passenger';
-    const restYaw = pass ? AC.passRest[0] : 0, restPitch = pass ? AC.passRest[1] : -0.06;
+    const restYaw = pass ? AC.passRest[0] : 0, restPitch = pass ? AC.passRest[1] : AC.eyePitch ?? -0.06;
     // head looks into turns a little (pilot only), returns to rest when the user lets go
     const turnLook = pass ? 0 : clamp(ac.bankAng() * 0.22 + ac.ctl.yaw * 0.12, -0.35, 0.35);
     CAM.headLook = damp(CAM.headLook, turnLook, 1.5, dt);
@@ -6706,6 +6919,13 @@ function initAudio() {
   const o3 = ctx.createOscillator(); o3.type = 'sine'; o3.frequency.value = 25; const g3 = ctx.createGain(); g3.gain.value = 0.5; o3.connect(g3).connect(eF); o3.start();
   const en = noise(noiseBuf); const enF = ctx.createBiquadFilter(); enF.type = 'bandpass'; enF.frequency.value = 900; enF.Q.value = 0.8; const enG = ctx.createGain(); enG.gain.value = 0.1; en.connect(enF).connect(enG).connect(eF);
   AUDIO.engine = { eG, eF, o1, o2, o3, enG };
+  // turbofans: fan / compressor whine, exhaust roar, intake hiss
+  const jG = ctx.createGain(); jG.gain.value = 0; jG.connect(master);
+  const wh1 = ctx.createOscillator(); wh1.type = 'sine'; wh1.frequency.value = 1500; const wh1G = ctx.createGain(); wh1G.gain.value = 0.05; wh1.connect(wh1G).connect(jG); wh1.start();
+  const wh2 = ctx.createOscillator(); wh2.type = 'triangle'; wh2.frequency.value = 2300; const wh2G = ctx.createGain(); wh2G.gain.value = 0.018; wh2.connect(wh2G).connect(jG); wh2.start();
+  const jr = noise(brownBuf); const jrF = ctx.createBiquadFilter(); jrF.type = 'lowpass'; jrF.frequency.value = 500; const jrG = ctx.createGain(); jrG.gain.value = 0.4; jr.connect(jrF).connect(jrG).connect(jG);
+  const jh = noise(noiseBuf); const jhF = ctx.createBiquadFilter(); jhF.type = 'bandpass'; jhF.frequency.value = 3200; jhF.Q.value = 0.9; const jhG = ctx.createGain(); jhG.gain.value = 0.05; jh.connect(jhF).connect(jhG).connect(jG);
+  AUDIO.jet = { jG, wh1, wh2, wh1G, jrF, jrG, jhG };
   // wind
   const wn = noise(noiseBuf); const wF = ctx.createBiquadFilter(); wF.type = 'bandpass'; wF.Q.value = 0.6; const wG = ctx.createGain(); wG.gain.value = 0; wn.connect(wF).connect(wG).connect(master);
   AUDIO.wind = { wF, wG };
@@ -6762,7 +6982,19 @@ function updateAudio(dt) {
   const bp = AC.snd[0] + rpm * AC.snd[1];
   E.o1.frequency.setTargetAtTime(bp, t, k); E.o2.frequency.setTargetAtTime(bp * 2.01, t, k); E.o3.frequency.setTargetAtTime(bp * 0.5, t, k);
   E.eF.frequency.setTargetAtTime((CAM_INSIDE(CAM.mode) ? 260 : 380) + rpm * 1500, t, k);
-  E.eG.gain.setTargetAtTime(flying ? (0.05 + rpm * 0.2) * near : 0, t, k);
+  E.eG.gain.setTargetAtTime(flying && !AC.jet ? (0.05 + rpm * 0.2) * near : 0, t, k);
+  if (AUDIO.jet) {
+    const J = AUDIO.jet, jet = AC.jet && flying, n1 = jet ? rpm : 0, n2 = n1 < 0.25 ? n1 * 2.4 : 0.6 + 0.4 * (n1 - 0.25) / 0.75;
+    const inside = CAM_INSIDE(CAM.mode), behind = jet ? clamp(vsub(RENDER.cam.pos, ac.pos).norm().dot(ac.fwd()) * -1, 0, 1) : 0;
+    J.wh1.frequency.setTargetAtTime(700 + n2 * 3400, t, 0.15); J.wh2.frequency.setTargetAtTime(1100 + n2 * 5200, t, 0.15);
+    J.wh1G.gain.setTargetAtTime(inside ? 0.035 : 0.06 * (1 - 0.6 * behind), t, 0.1);
+    J.jrF.frequency.setTargetAtTime(220 + n1 * 900 + (ac.rev || 0) * 500, t, 0.15);
+    J.jrG.gain.setTargetAtTime((0.12 + 0.6 * (ac.thrustFrac || 0) + 0.3 * (ac.rev || 0)) * (inside ? 0.45 : 0.6 + 0.6 * behind), t, 0.15);
+    J.jhG.gain.setTargetAtTime(0.02 + 0.06 * n1, t, 0.15);
+    J.jG.gain.setTargetAtTime(jet && n1 > 0.02 ? Math.min(1, n1 * 3) * (inside ? 0.55 : 1) * near : 0, t, 0.12);
+    // overspeed clacker
+    if (jet && (ac.ias * KT > 322 || ac.mach > 0.785)) { AUDIO.clack = (AUDIO.clack || 0) - dt; if (AUDIO.clack <= 0) { AUDIO.clack = 0.11; beep(2400, 0.04, 0.07, 'square'); } }
+  }
   E.enG.gain.setTargetAtTime(0.05 + rpm * 0.12, t, k);
   const v = flying ? ac.ias : 0;
   AUDIO.wind.wF.frequency.setTargetAtTime(250 + v * 14, t, k);
@@ -6788,6 +7020,7 @@ function updateBoatAudio(dt) {
   const onboard = CAM.mode === 'cockpit' || CAM.mode === 'passenger' || CAM.mode === 'wingcam';
   const nk = onboard ? 1 : near * 1.4;
   AUDIO.engine.eG.gain.setTargetAtTime(0, t, k);
+  if (AUDIO.jet) AUDIO.jet.jG.gain.setTargetAtTime(0, t, k);
   AUDIO.stall.shG.gain.setTargetAtTime(0, t, k);
   AUDIO.gear.gmG.gain.setTargetAtTime(0, t, k);
   // wind in the rigging grows with apparent wind; water rush with boat speed
@@ -6823,7 +7056,8 @@ const KEYMAP = {
   yawL: ['KeyQ'], yawR: ['KeyE'], thrUp: ['KeyR', 'ShiftLeft', 'ShiftRight', 'Equal', 'NumpadAdd'], thrDown: ['KeyF', 'Minus', 'NumpadSubtract'],
   brake: ['Space', 'KeyB'], trimDn: ['KeyT'], trimUp: ['KeyY'],
   fire: ['Space'], reload: ['KeyX'], gear: ['KeyG'], flapsDn: ['KeyX', 'BracketRight'], flapsUp: ['KeyZ', 'BracketLeft'],
-  camera: ['KeyC'], fpv: ['KeyV'], lights: ['KeyL'], parking: ['KeyK'], canopy: ['KeyJ'], target: ['KeyN'],
+  camera: ['KeyC'], fpv: ['KeyV'], lights: ['KeyL'], parking: ['KeyK'], canopy: ['KeyJ'], target: ['KeyN'], spoilers: ['KeyM'],
+  autopilot: ['Semicolon'], jetView: ['Tab'],
 };
 const KEYMAP_DEFAULT = JSON.parse(JSON.stringify(KEYMAP));
 function applyKeymap() { for (const k in KEYMAP_DEFAULT) KEYMAP[k] = (SETTINGS.kbMap && SETTINGS.kbMap[k]) ? SETTINGS.kbMap[k].slice() : KEYMAP_DEFAULT[k].slice(); }
@@ -6849,7 +7083,8 @@ const KB_ACTIONS = [
   ['yawL', 'Timón izquierda'], ['yawR', 'Timón derecha'], ['thrUp', 'Más potencia'], ['thrDown', 'Menos potencia'],
   ['fire', 'Disparar (Fokker)'], ['reload', 'Recargar (Fokker)'], ['brake', 'Frenos'], ['gear', 'Tren / humo'], ['flapsDn', 'Flaps abajo'], ['flapsUp', 'Flaps arriba'],
   ['trimDn', 'Compensador morro abajo'], ['trimUp', 'Compensador morro arriba'], ['camera', 'Cambiar vista'], ['fpv', 'Vista de cabina'],
-  ['lights', 'Luces'], ['parking', 'Freno de estacionamiento'], ['canopy', 'Cúpula (acrobática)'], ['target', 'Cambiar destino'],
+  ['lights', 'Luces'], ['parking', 'Freno de estacionamiento'], ['canopy', 'Cúpula (acrobática) / puerta (jet)'], ['target', 'Cambiar destino'],
+  ['spoilers', 'Aerofrenos (jet)'], ['autopilot', 'Piloto automático (jet)'], ['jetView', 'Siguiente vista del jet'],
 ];
 const gpBind = k => (SETTINGS.gpMap && SETTINGS.gpMap[k]) || GP_DEFAULT[k];
 const gpBind2 = k => (SETTINGS.gpMap2 && SETTINGS.gpMap2[k]) || null;
@@ -6937,6 +7172,8 @@ function onKey(e, isDown) {
     case 'KeyH': UI.toggleHelp(); return;
     case 'KeyU': SETTINGS.hud = !SETTINGS.hud; UI.applyHud(); return;
   }
+  if (playing && is('jetView') && AC.jet && !isBoat()) { e.preventDefault(); nextJetView(e.shiftKey ? -1 : 1); return; }
+  if (playing && CAM.mode === 'walk' && AC.jet && !isBoat() && (e.code === 'KeyE' || e.code === 'Enter')) { walkInteract(); return; }
   if (playing && is('camera')) { cycleCamera(e.shiftKey ? -1 : 1); return; }
   if (playing && is('fpv')) { toggleFPV(); return; }
   if (!playing) { if (e.code === 'Enter' && GAME.state === 'crashed') respawn(); return; }
@@ -6952,9 +7189,14 @@ function onKey(e, isDown) {
   if (AC.guns && is('reload')) { if (ac.gun.ammo < GUN.mag) startReload(ac, 'player'); return; }
   if (AC.guns && is('fire')) return;   // held: read every frame in updateInput
   if (AC.smoke && is('canopy')) { toggleCanopy(); return; }
+  if (AC.jet && is('canopy')) { toggleDoor(); return; }
+  if (AC.jet && is('spoilers')) { cycleSpoilers(ac); return; }
+  if (AC.jet && is('autopilot')) { apButton(ac, 'ap'); return; }
+  // thrust reversers: with the levers at idle on the ground, a fresh press of "less power" deploys / stows them
+  if (AC.jet && CAM.mode !== 'walk' && is('thrDown') && ac.throttle < 0.02 && ac.wheelsOnGround > 0) { ac.revSet = ac.revSet ? 0 : 1; ac.lev[0] = ac.lev[1] = ac.throttle = ac._thr = 0; UI.toast(ac.revSet ? 'Reversas desplegadas · R = más empuje inverso · F otra vez para plegarlas' : 'Reversas plegadas'); }
   if (is('gear')) {
     if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo acrobático ON' : 'Humo acrobático OFF'); }
-    else if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } else UI.toast('Tren fijo');
+    else if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(ac)); } else UI.toast('Tren fijo');
   }
   if (is('flapsDn') && !(AC.guns && is('reload'))) { if (AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); } else UI.toast('Este avión no tiene flaps'); }
   if (is('flapsUp')) { if (AC.flapDetents.length > 1) { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); } else UI.toast('Este avión no tiene flaps'); }
@@ -7032,11 +7274,13 @@ function setupTouchControls() {
   hold('tRudL', () => { T.rudder = -1; }, () => { T.rudder = 0; });
   hold('tRudR', () => { T.rudder = 1; }, () => { T.rudder = 0; });
   hold('tBrake', () => { if (isBoat()) { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático' : 'Velas en manual'); UI.setVehicleUI(); } else T.brake = true; }, () => { T.brake = false; });
-  hold('tGear', () => { if (isBoat()) T.hike = 1; else if (AC.guns) T.fire = true; else if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo ON' : 'Humo OFF'); } else { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(AIR.ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } }, () => { T.hike = 0; T.fire = false; });
+  hold('tGear', () => { if (isBoat()) T.hike = 1; else if (AC.guns) T.fire = true; else if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo ON' : 'Humo OFF'); } else { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(AIR.ac)); } }, () => { T.hike = 0; T.fire = false; });
+  hold('tSpoil', () => { if (AC.jet && GAME.state === 'flying') cycleSpoilers(AIR.ac); });
   hold('tFlapsUp', () => { if (isBoat()) T.jib = 1; else if (AC.guns) startReload(AIR.ac, 'player'); else if (AC.flapDetents.length > 1) { AIR.ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } else toggleFPV(); }, () => { T.jib = 0; });
   hold('tFlapsDn', () => { if (isBoat()) T.jib = -1; else if (AC.flapDetents.length > 1) { AIR.ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } else toggleFPV(); }, () => { T.jib = 0; });
   hold('tFire', () => { T.fire = true; }, () => { T.fire = false; });
   hold('tCam', () => cycleCamera(1));
+  hold('tView', () => { if (CAM.mode === 'walk') walkInteract(); else nextJetView(1); });
   hold('tLights', () => { const v = VEH(); v.lights = !v.lights; UI.toast(v.lights ? 'Luces encendidas' : 'Luces apagadas'); });
   hold('tShader', () => toggleShader());
   hold('tStyle', () => nextStyle(1));
@@ -7101,7 +7345,7 @@ function pollGamepad(dt) {
   if (edge(15)) nextStyle(1);
   if (isBoat()) { out.hike = act('gear') ? 1 : act('flapsDn') ? -1 : 0; return out; }
   if (AC.guns) { out.fire = act('fire'); if (edgeA('reload') && GAME.state === 'flying') startReload(ac, 'player'); }
-  else if (edgeA('gear') && GAME.state === 'flying') { if (AC.smoke) COMBAT.smokeOn = !COMBAT.smokeOn; else if (ac.toggleGear()) UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); else UI.toast('Tren fijo'); }
+  else if (edgeA('gear') && GAME.state === 'flying') { if (AC.smoke) COMBAT.smokeOn = !COMBAT.smokeOn; else if (ac.toggleGear()) UI.toast(gearMsg(ac)); else UI.toast('Tren fijo'); }
   if (!AC.guns && edgeA('flapsDn') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
   if (!AC.guns && edgeA('flapsUp') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
   if (act('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
@@ -7148,6 +7392,7 @@ function updateInput(dt) {
   INPUT.axes = { pitch: shape(pitch), roll: shape(roll), yaw: clamp(yaw, -1, 1) };
   if (isBoat()) { updateBoatInput(dt, gp); return; }
   if (GAME.state !== 'flying') return;
+  if (CAM.mode === 'walk' && AC.jet) { walkStep(dt, gp); INPUT.axes = { pitch: 0, roll: 0, yaw: 0 }; thrRate = 0; }
   ac.throttle = clamp(ac.throttle + thrRate * 0.5 * dt, 0, 1);
   if (gp && gp.thrAbs !== null && gp.thrAbs !== undefined) ac.throttle = gp.thrAbs;
   if (down('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
@@ -7189,7 +7434,7 @@ function updateBoatInput(dt, gp) {
 // ============================================================================
 const CPIT = { hover: null, drag: null, tip: null, last: { x: 0, y: 0 } };
 const HL = [0.05, 0.16, 0.22];
-function cockpitActive() { return GAME.state === 'flying' && !isBoat() && CAM.mode === 'cockpit' && !XR.session && !MP.splitView() && (AC.type === 'seaplane' || !!MODELS[AC.model]); }
+function cockpitActive() { return GAME.state === 'flying' && !isBoat() && (CAM.mode === 'cockpit' || (AC.jet && (CAM.mode === 'walk' || (CAM.mode === 'vistas' && jetViewInside())))) && !XR.session && !MP.splitView() && (AC.type === 'seaplane' || !!MODELS[AC.model]); }
 const leverKnob = (pivot, ang) => new V3(pivot.x, pivot.y + 0.17 * Math.cos(ang), pivot.z + 0.17 * Math.sin(ang));
 const LEVERS = {
   power: { pivot: new V3(-0.05, 0.05, -1.9), a0: 0.45, a1: -0.55 },
@@ -7214,7 +7459,7 @@ function cockpitTargets() {
   L.switches.forEach(([name, key], i) => T.push({ id: 'sw_' + key, kind: 'toggle', key, p: panelPt(L.switchX0 + i * L.switchDX, L.switchesY, 0.02), r: 0.017, label: () => name + ' · ' + (ac.sw[key] ? 'ON' : 'OFF') }));
   L.master.forEach(([name, key], i) => T.push({ id: 'sw_' + key, kind: 'toggle', key, p: panelPt(L.masterX, L.masterY0 + i * L.masterDY, 0.012), r: 0.022, label: () => name + ' · ' + (ac.sw[key] ? 'ON' : 'OFF') }));
   T.push({ id: 'gear', kind: 'button', p: panelPt(L.gear[0], L.gear[1] + (ac.gearSet ? -0.018 : 0.018), 0.05), r: 0.032, label: () => 'Tren · ' + (ac.gearSet ? 'ABAJO (pista)' : 'ARRIBA (agua)'),
-    act: () => { ac.toggleGear(); beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)'); } });
+    act: () => { ac.toggleGear(); beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(ac)); } });
   T.push({ id: 'park', kind: 'button', p: panelPt(L.park[0], L.park[1], 0.04), r: 0.03, label: () => 'Freno de estacionamiento · ' + (ac.parking ? 'PUESTO' : 'QUITADO'),
     act: () => { ac.parking = !ac.parking; UI.toast(ac.parking ? 'Freno de estacionamiento puesto' : 'Freno de estacionamiento quitado'); } });
   const m = L.mfd; T.push({ id: 'mfd', kind: 'button', p: panelPt((m[0] + m[2]) / 2 + 0.07, (m[1] + m[3]) / 2, 0.02), r: 0.12, label: () => 'Mapa · ' + (HUD.mapZoom ? 'zoom 4,5 km' : 'archipiélago'), act: () => { HUD.mapZoom = !HUD.mapZoom; } });
@@ -7237,6 +7482,7 @@ function pickCockpit(cx, cy) {
     const oc = vsub(t.p, o), tc = oc.dot(d); if (tc < 0) continue;
     const d2 = oc.dot(oc) - tc * tc; if (d2 > t.r * t.r) continue;
     const th = tc - Math.sqrt(t.r * t.r - d2);
+    if (CAM.mode === 'walk' && th > 1.8) continue;   // on foot: only what is within reach
     if (th < bt) { bt = th; best = t; }
   }
   return best;
@@ -7276,7 +7522,7 @@ function setupCockpitUI() {
       const dx = e.clientX - D.x0, dy = e.clientY - D.y0, t = D.t;
       const ddy = e.clientY - D.ly; D.ly = e.clientY;
       if (t.kind === 'lever') { D.acc = clamp(D.acc - ddy * 0.005, 0, 1); t.set(D.acc); }
-      else if (t.kind === 'wheel') AIR.ac.trim = clamp(AIR.ac.trim - ddy * 0.0025, -0.6, 0.6);
+      else if (t.kind === 'wheel') { if (t.turn) t.turn(-ddy * 0.6); else AIR.ac.trim = clamp(AIR.ac.trim - ddy * 0.0025, -0.6, 0.6); }
       else if (t.kind === 'yoke') INPUT.mouseYoke = { pitch: clamp(dy / 160, -1, 1), roll: clamp(dx / 160, -1, 1) };
       else if (t.kind === 'pedals') INPUT.mouseRudder = clamp(dx / 140, -1, 1);
       cockpitTip(t.label(), e.clientX, e.clientY);
@@ -7304,7 +7550,7 @@ function setupCockpitUI() {
     if (!cockpitActive()) return;
     const t = pickCockpit(e.clientX, e.clientY); if (!t) return;
     if (t.kind === 'lever') { e.stopImmediatePropagation(); e.preventDefault(); t.set(clamp(t.get() + (e.deltaY < 0 ? 1 : -1) * (t.detents ? 0.34 : 0.05), 0, 1)); cockpitTip(t.label(), e.clientX, e.clientY); }
-    else if (t.kind === 'wheel') { e.stopImmediatePropagation(); e.preventDefault(); AIR.ac.trim = clamp(AIR.ac.trim + (e.deltaY < 0 ? -0.03 : 0.03), -0.6, 0.6); cockpitTip(t.label(), e.clientX, e.clientY); }
+    else if (t.kind === 'wheel') { e.stopImmediatePropagation(); e.preventDefault(); if (t.turn) t.turn(e.deltaY < 0 ? 5 : -5); else AIR.ac.trim = clamp(AIR.ac.trim + (e.deltaY < 0 ? -0.03 : 0.03), -0.6, 0.6); cockpitTip(t.label(), e.clientX, e.clientY); }
   }, { capture: true, passive: false });
 }
 
@@ -7420,7 +7666,8 @@ function drawPFD(g, W, H, ac, target) {
     const bh = fs * 1.6; g.fillRect(x - (align === 'l' ? 0 : 6), cy - bh / 2, tW + 6, bh); g.strokeRect(x - (align === 'l' ? 0 : 6), cy - bh / 2, tW + 6, bh);
     g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = `bold ${Math.round(fs * 1.15)}px "B612 Mono", monospace`; g.fillText(fmt(Math.round(val)), x + tW / 2, cy + 1);
   };
-  tape(W * 0.02, Math.max(0, ias), 10, H / 140, v => v.toFixed(0), 'l', [[50, 100, '#e8e8e8'], [60, 160, '#3fcf5a'], [160, 175, '#f2c230'], [175, 230, '#e23b3b']]);
+  tape(W * 0.02, Math.max(0, ias), 10, H / 140, v => v.toFixed(0), 'l', AC.pfdBands || [[50, 100, '#e8e8e8'], [60, 160, '#3fcf5a'], [160, 175, '#f2c230'], [175, 230, '#e23b3b']]);
+  if (AC.jet && ac.mach > 0.3) { g.fillStyle = '#fff'; g.font = `${Math.round(fs * 0.85)}px "B612 Mono", monospace`; g.textAlign = 'left'; g.fillText('M ' + ac.mach.toFixed(2).slice(1), W * 0.03, tY + tapeH + fs * 0.7); }
   tape(W * 0.79, alt, 100, H / 1300, v => v.toFixed(0), 'r', null);
   // vsi
   const vy = clamp(vs / 2000, -1, 1) * tapeH * 0.45;
@@ -7763,7 +8010,7 @@ function updateHUD(dt) {
   drawMap(HUD.map, E.map.width, ac, GAME.target);
   E.sThr.textContent = Math.round(ac.throttle * 100) + '%';
   E.sThrBar.style.width = (ac.throttle * 100).toFixed(0) + '%';
-  E.sRpm.textContent = String(Math.round(700 + ac.rpm * 2000));
+  E.sRpm.textContent = AC.jet ? Math.round(ac.rpm * 100) + '%' : String(Math.round(700 + ac.rpm * 2000));
   E.sFlaps.textContent = ac.flaps.toFixed(0) + '°';
   E.sTrim.textContent = (ac.trim >= 0 ? '+' : '') + (ac.trim * 100).toFixed(0);
   E.sGear.className = 'gear-lights ' + (ac.gear > 0.98 ? 'down' : ac.gear < 0.02 ? 'up' : 'transit');
@@ -7809,6 +8056,28 @@ function computeAlerts(ac, gh) {
   if (ac.parking && !airborne) al.push(['cyan', 'FRENO ESTACIONAMIENTO']);
   if (COMBAT.smokeOn && AC.smoke) al.push(['green', 'HUMO']);
   if (ac.gear > 0.02 && ac.gear < 0.98) al.push(['cyan', ac.gearSet ? 'BAJANDO TREN' : 'SUBIENDO TREN']);
+  if (AC.jet) {
+    const kt = ac.ias * KT;
+    if (kt > 322 || ac.mach > 0.785) al.push(['red', 'SOBREVELOCIDAD · VMO ' + (ac.mach > 0.785 ? 'M .78' : '320 KT')]);
+    if (ac.flaps > 1 && kt > (ac.flaps > 15 ? 175 : 200)) al.push(['amber', 'VELOCIDAD FLAPS']);
+    if (ac.gear > 0.5 && airborne && kt > 250) al.push(['amber', 'VELOCIDAD TREN']);
+    const EN = ac.eng || [], off = [0, 1].filter(i => EN[i] && !EN[i].run && !EN[i].start);
+    if (off.length === 2) al.push(['amber', !ac.sw.ign ? 'MOTORES APAGADOS · IGN' : ac.fuel <= 0.031 ? 'SIN COMBUSTIBLE' : 'MOTORES PARADOS · START 1 / 2']);
+    else if (off.length === 1) { const i = off[0]; al.push(['amber', 'MOTOR ' + (i + 1) + ' PARADO · ' + (ac.fireH[i] ? 'MANETA DE FUEGO' : 'START ' + (i + 1))]); }
+    EN.forEach((E, i) => { if (E.start) al.push(['cyan', 'ARRANCANDO MOTOR ' + (i + 1) + ' · N1 ' + Math.round(E.n1 * 100) + '%']); });
+    if (ac.ap) {
+      const A = ac.ap;
+      if (A.on) al.push(['green', 'AP ' + (A.hdgOn ? 'HDG ' + String(Math.round(A.hdg * RAD + 360) % 360).padStart(3, '0') : 'NIV') + ' · ' + (A.altOn ? 'ALT ' + Math.round(A.alt * FT / 100) * 100 : 'VS ' + Math.round(A.vs * FT * 0.6) * 100)]);
+      else if (A.disc > 0) al.push(['red', 'AP DESCONECTADO']);
+    }
+    if ((ac.cabAlt || 0) > 10000) al.push(['red', 'ALTITUD DE CABINA ' + Math.round(ac.cabAlt / 1000) + '000 FT']);
+    if (ac.fuel < 0.12) al.push(['amber', 'COMBUSTIBLE BAJO']);
+    if (ac.spoiler > 0.05) al.push(['cyan', airborne ? 'AEROFRENOS' : 'SPOILERS']);
+    if (ac.rev > 0.05) al.push(['green', 'REVERSAS']);
+    if (ac.door > 0.02) al.push([ac.groundSpeed > 8 || airborne ? 'red' : 'amber', 'PUERTA ABIERTA']);
+    if (!airborne && ac.pitchAng() * RAD > 11) al.push(['red', 'ÁNGULO · COLA']);
+    if (airborne && ac.flaps < 1 && ac.gear > 0.5 && ac.agl < 150 && ac.vs < -1) al.push(['amber', 'FLAPS · ATERRIZAJE']);
+  }
   return al;
 }
 
@@ -7968,13 +8237,14 @@ const UI = {
   // labels that change between the aircraft and the sailboat
   setVehicleUI() {
     const boat = isBoat();
-    const L = boat ? ['Escota mayor', 'Velocidad', 'Escota foque', 'Escora', 'Viento real', 'Trimado', 'Luces'] : ['Potencia', 'RPM', 'Flaps', 'Compensador', 'Tren', 'Frenos', 'Luces'];
+    const L = boat ? ['Escota mayor', 'Velocidad', 'Escota foque', 'Escora', 'Viento real', 'Trimado', 'Luces'] : ['Potencia', AC.jet ? 'N1' : 'RPM', 'Flaps', 'Compensador', 'Tren', 'Frenos', 'Luces'];
     document.querySelectorAll('#sys .l').forEach((el, i) => { if (L[i]) el.textContent = L[i]; });
     $('sGear').hidden = boat; $('sGearV') && ($('sGearV').hidden = !boat);
     $('pSwitch').textContent = boat ? 'Volver al avión' : 'Cambiar a velero';
     const flaps = !boat && AC.flapDetents.length > 1;
     const tl = { tGear: boat ? 'BANDA' : AC.guns ? 'FUEGO' : AC.smoke ? 'HUMO' : 'TREN', tFlapsUp: boat ? 'FOQUE −' : AC.guns ? 'RECARGA' : flaps ? 'FLAPS −' : 'CABINA', tFlapsDn: boat ? 'FOQUE +' : flaps ? 'FLAPS +' : 'CABINA', tBrake: boat ? (SETTINGS.assist >= 2 ? 'AUTO ✓' : 'AUTO') : 'FRENO' };
     $('tFire').hidden = boat || !AC.guns;
+    $('tSpoil').hidden = boat || !AC.jet;
     for (const k in tl) $(k).textContent = tl[k];
     $('tRudL').textContent = boat ? '◀ Caña' : '◀ Timón'; $('tRudR').textContent = boat ? 'Caña ▶' : 'Timón ▶';
     UI.updateQuick();
@@ -8000,7 +8270,11 @@ const UI = {
     $('qCamName').textContent = camName(CAM.mode);
     $('pfd').style.visibility = CAM_INSIDE(CAM.mode) && AC.type === 'seaplane' ? 'hidden' : 'visible';
     { const sy = $('sys'); if (sy) sy.style.visibility = CAM.mode === 'cockpit' && !isBoat() && AC.type === 'seaplane' ? 'hidden' : 'visible'; }
-    if (CAM.mode !== 'cockpit' || isBoat()) { CPIT.hover = null; cockpitTip(null); }
+    if (!['cockpit', 'walk', 'vistas'].includes(CAM.mode) || isBoat()) { CPIT.hover = null; cockpitTip(null); }
+    { const jv = AC.jet && !isBoat(), q = $('qView'), t = $('tView');
+      const txt = CAM.mode === 'walk' ? 'Usar (E)' : CAM.mode === 'vistas' ? 'Vista ▸' : 'Vistas';
+      if (q) { q.hidden = !jv; q.firstChild.textContent = txt + ' '; $('qViewSub').textContent = CAM.mode === 'vistas' ? JET_VIEWS[CAM.jv || 0].n : CAM.mode === 'walk' ? 'puertas' : 'del jet'; }
+      if (t) { t.hidden = !jv; t.textContent = CAM.mode === 'walk' ? 'USAR' : CAM.mode === 'vistas' ? 'VISTA ▸' : 'VISTAS'; } }
     $('tShader').classList.toggle('on', SETTINGS.shaderOn);
     $('tShader').textContent = SETTINGS.shaderOn ? 'SHADER ON' : 'SHADER OFF';
     $('tStyle').textContent = st.name.toUpperCase() + ' ▸';
@@ -8134,6 +8408,13 @@ function buildMenu() {
   const vp = $('vehPick');
   [...vp.children].forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.v;
+    if (v === 'jet' && !MODELS.jet) {
+      if (b.dataset.loading) return;
+      b.dataset.loading = '1'; const txt = b.textContent; b.textContent = 'Jet privado · cargando…';
+      UI.toast('Cargando el jet privado (' + (jetVariant() === 'movil' ? 'versión móvil' : 'versión PC, máximo detalle') + ')…');
+      loadJet().then(ok => { delete b.dataset.loading; b.textContent = txt; if (ok) b.click(); else UI.toast('El jet no se ha podido cargar'); });
+      return;
+    }
     if (v !== 'boat' && v !== 'seaplane' && !MODELS[PLANE_TYPES[v].model]) { UI.toast('Este modelo no se ha podido cargar'); return; }
     GAME.vehicle = v === 'boat' ? 'boat' : 'plane'; if (v !== 'boat') GAME.plane = v;
     [...vp.children].forEach(c => c.setAttribute('aria-pressed', c === b ? 'true' : 'false'));
@@ -8175,6 +8456,7 @@ function buildMenu() {
   $('qShader').addEventListener('click', () => toggleShader());
   $('qStyle').addEventListener('click', () => nextStyle(1));
   $('qCam').addEventListener('click', () => cycleCamera(1));
+  $('qView').addEventListener('click', () => { if (CAM.mode === 'walk') walkInteract(); else nextJetView(1); });
   $('qMenu').addEventListener('click', () => UI.pause());
   for (const id of ['btnVR', 'pVR']) $(id).addEventListener('click', () => enterVR());
   for (const id of ['btnFull', 'pFull']) $(id).addEventListener('click', () => toggleFullscreen());
@@ -8189,6 +8471,7 @@ function updateMenuNote() {
     : boat ? '<kbd>A</kbd><kbd>D</kbd> timón · <kbd>W</kbd><kbd>S</kbd> cazar / largar mayor · <kbd>E</kbd><kbd>Q</kbd> foque · <kbd>X</kbd><kbd>Z</kbd> sacar banda · <kbd>K</kbd> trimado automático'
       : GAME.plane === 'fokker' && !GAME.combat ? 'Vuelo libre con el Fokker: sin Barón Rojo, pero puedes disparar (<kbd>Espacio</kbd>, <kbd>X</kbd> recarga) · <kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>V</kbd> cabina'
       : GAME.plane === 'fokker' ? '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>Espacio</kbd> ametralladoras · <kbd>X</kbd> recargar · <kbd>B</kbd> frenos · <kbd>V</kbd> cabina'
+      : GAME.plane === 'jet' ? 'Jet privado: <kbd>R</kbd><kbd>F</kbd> gases · <kbd>X</kbd><kbd>Z</kbd> flaps · <kbd>G</kbd> tren · <kbd>M</kbd> aerofrenos · <kbd>F</kbd> en ralentí: reversas · <kbd>J</kbd> puerta · <kbd>Ñ</kbd> piloto automático · <kbd>Tab</kbd> vistas · <kbd>C</kbd> hasta «Caminar» para pasear por la cabina y entrar al baño · <kbd>V</kbd> cabina (todo se toca)'
       : GAME.plane === 'acro' ? 'Circuito de aros en Isla Faro: cruza el aro verde · <kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>Q</kbd><kbd>E</kbd> timón · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> humo · <kbd>V</kbd> cabina'
       : '<kbd>W</kbd><kbd>S</kbd> morro · <kbd>A</kbd><kbd>D</kbd> alabeo · <kbd>R</kbd><kbd>F</kbd> potencia · <kbd>G</kbd> tren · <kbd>V</kbd> cabina (clic en los mandos) · <kbd>H</kbd> ayuda';
 }
@@ -8250,6 +8533,8 @@ function buildSettings(tab) {
     auto.addEventListener('click', () => { const p = detectPreset(); applyPreset(p); saveSettings(); applyGraphics(true); buildSettings('graficos'); UI.toast('Detectado: ' + PRESET_NAMES[p]); });
     pr.appendChild(auto);
     body.appendChild(row('Calidad general', 'Elige un perfil y ajusta lo que quieras debajo', pr));
+    rows.appendChild(row('Modelo del jet privado', 'PC: 155 000 triángulos y texturas completas · Móvil: 109 000 triángulos y texturas 10 veces más ligeras · ahora: ' + (MODELS.jet ? (MODELS.jet.variant === 'movil' ? 'móvil' : 'PC') : 'sin cargar'),
+      select('jetModel', [['auto', 'Automático'], ['pc', 'PC potente · máximo detalle'], ['movil', 'Móvil · ligero']], () => { if (MODELS.jet || JET.promise) loadJet().then(ok => { if (ok) UI.toast('Jet: versión ' + (MODELS.jet.variant === 'movil' ? 'móvil' : 'PC') + ' cargada'); if (!$('settings').hidden && UI.tab === 'graficos') buildSettings('graficos'); }); })));
     rows.appendChild(row('Escala de resolución', 'Píxeles renderizados respecto a la pantalla', slider('renderScale', 0.4, 1.5, 0.05, v => Math.round(v * 100) + '%', soft)));
     rows.appendChild(row('Resolución dinámica', 'Baja la resolución si caen los FPS', toggle('dynRes')));
     rows.appendChild(row('FPS objetivo', null, select('targetFps', [[30, '30'], [45, '45'], [60, '60'], [90, '90'], [120, '120']])));
@@ -8400,7 +8685,20 @@ function buildHelp(target) {
   if (AC.guns) K.unshift(['Espacio', 'Disparar las ametralladoras'], ['X', 'Recargar (300 balas por cinta)'], ['B', 'Frenos']);
   if (AC.smoke) K.unshift(['G', 'Humo acrobático ON / OFF'], ['J', 'Abrir / cerrar la cúpula'], ['Clic en cabina (V)', 'Gases, paso de hélice, mezcla, palanca, pedales y cúpula se mueven con el ratón']);
   if (AC.guns) K.unshift(['Clic en cabina (V)', 'Gas, mezcla, magnetos, palanca, pedales y gatillos se accionan con el ratón']);
-  const tips = AC.guns ? [
+  if (AC.jet) K.unshift(['M', 'Aerofrenos 0 / 50 / 100 %'], ['F (gases en ralentí, en tierra)', 'Desplegar / plegar reversas · R da empuje inverso'], ['J', 'Puerta y escalerilla (parado en tierra)'],
+    ['G', 'Tren (no sube con peso en las ruedas)'], ['Ñ', 'Piloto automático (y en el panel: AP, HDG con su perilla, ALT)'], ['Tab / Mayús+Tab', 'Vistas por todo el jet: cabina, pasaje, baño, motores, cola, tren…'],
+    ['C hasta «Caminar»', 'Pasear por la cabina: W/S/A/D, arrastra para mirar, E abre la puerta del baño, la tapa, la puerta principal o te sienta a los mandos'],
+    ['Clic en cabina (V)', 'Gases (una palanca por motor), reversas, flaps, aerofrenos, tren, freno de estacionamiento, cuernos, pedales, compensador, START 1/2, manetas de fuego, MASTER WARNING / CAUTION, piloto automático y los 16 interruptores del techo']);
+  const tips = AC.jet ? [
+    'Motores: cada palanca de gases mueve su motor. Si tiras de una maneta de fuego el motor se para y el avión guiña hacia ese lado: pisa el pedal contrario. Para volver a arrancarlo empuja la maneta y pulsa START.',
+    'Piloto automático: AP lo conecta (alas niveladas y la velocidad vertical que llevabas), HDG sigue el rumbo de la perilla y ALT mantiene la altitud. Tocar los mandos con fuerza lo desconecta.',
+    'Despegue: flaps 10° (X), gases al 100 % y espera a que el N1 suba (los reactores tardan unos segundos). Rota a unos 115 nudos sin pasar de 10–12° de morro: la cola toca el suelo a 16°.',
+    'Tras despegar: tren arriba (G) y flaps a 0° antes de 200 nudos. Por debajo de 10 000 pies no pases de 250 nudos; el límite (VMO) es 320 nudos o Mach 0,78: suena la alarma.',
+    'Los reactores responden despacio: anticipa la potencia. En aproximación usa flaps 35°, tren abajo y unos 125 nudos; corta gases al cruzar el umbral.',
+    'Al tocar con los gases en ralentí salen solos los spoilers de tierra. Frena (Espacio) y, si hace falta, pulsa F para las reversas: las pistas tienen 1 km justo.',
+    'El aire es más fino con la altura: el jet sube a más de 4000 pies/min y en crucero vuela mejor alto. La caja PFD muestra el Mach.',
+    'Este avión no flota: evita el agua.',
+  ] : AC.guns ? [
     'El Fokker Dr.I es lento pero gira muy cerrado: no tires a tope o entrarás en pérdida.',
     'Apunta con la cruz roja (punto de anticipación), no al avión: las balas tardan en llegar.',
     'Las cintas tienen 300 balas; al vaciarse se recargan solas en unos segundos. Dispara ráfagas cortas.',
@@ -8609,13 +8907,43 @@ const PLANE_TYPES = {
     lightsLocal: null,
     muzzles: [new V3(-0.11, 0.72, -0.9), new V3(0.11, 0.72, -0.9)], engineP: new V3(0, 0.15, -1.1),
   }),
+  // light twin-engine business jet (Phenom 300 / Learjet 75 class): 7.4 t, 2 x 15.2 kN turbofans, swept wing with
+  // winglets, Fowler flaps, speed brakes / ground spoilers, thrust reversers, retractable tricycle gear
+  jet: Object.assign({}, AC_SEAPLANE, {
+    type: 'jet', name: 'Jet privado', model: 'jet', jet: true,
+    mass: 7400, S: 28.2, b: 16.2, c: 1.9, I: new V3(95000, 90000, 35000), Tstatic: 30400, Vprop: 1e9,
+    CL0: 0.15, CLa: 4.8, aStall: 0.26, CLflap: 0.6, aStallFlap: -0.03, CLmin: -0.7,
+    k: 0.043, CD0: 0.026, CDflap: 0.06, CDgear: 0.02, Cm0: 0.0, Cma: -1.0, Cmde: 0.6, Cmq: -32, Cmflap: -0.07,
+    Clb: -0.08, Clp: -0.45, Clr: 0.1, Clda: 0.042, Cnb: 0.12, Cnr: -0.18, Cnp: -0.03, Cndr: 0.065, Cnda: -0.005,
+    CYb: -0.8, CYdr: 0.12, flapDetents: [0, 10, 20, 35], gearTime: 6,
+    vmax: 165, wash: 0, fixedGear: false, floats: false, guns: false, smoke: false, gearUpY: -1.1,
+    gLim: 2.5, gWarn: 3.2, crashV: 4.2, aglOff: 2.0, vSpawn: 115, camScale: 1.55, snd: [40, 100], shadowR: 13, cabinFar: 34,
+    kGear: 7400 * 85, cGear: 7400 * 6,
+    wheels: [{ p: new V3(-1.53, -2.0, 0.6) }, { p: new V3(1.53, -2.0, 0.6) }, { p: new V3(0, -2.0, -7.25), nose: true }],
+    crashPts: [
+      { p: new V3(-8.4, -0.5, 2.6), name: 'ala izquierda', v: 8 }, { p: new V3(8.4, -0.5, 2.6), name: 'ala derecha', v: 8 },
+      { p: new V3(0, -0.2, 6.8), name: 'cola (golpe de cola: demasiado ángulo al rotar o en la toma)', v: 4 },
+      { p: new V3(0, 4.4, 9.5), name: 'deriva', v: 3 }, { p: new V3(0, -0.35, -9.45), name: 'morro', v: 5 },
+      { p: new V3(-1.98, -0.16, 4.4), name: 'motor izquierdo', v: 6 }, { p: new V3(1.98, -0.16, 4.4), name: 'motor derecho', v: 6 },
+      { p: new V3(0, 1.0, -2.0), name: 'techo', v: 2 },
+      { p: new V3(0, -1.09, -3.0), name: 'fuselaje', v: 8, groundOnly: true }, { p: new V3(0, -1.09, 2.0), name: 'fuselaje', v: 8, groundOnly: true },
+      { p: new V3(0, -0.9, -7.5), name: 'morro', v: 8, groundOnly: true },
+    ],
+    eye: new V3(-0.40, 0.47, -6.36), eyePitch: -0.17, passEye: new V3(-0.42, 0.40, -1.9), passRest: [1.2, -0.1],
+    wingcam: { pos: new V3(6.2, -0.15, 2.0), target: new V3(0, 0.5, -4.1) },
+    lightsLocal: { navL: new V3(-8.21, -0.5, 1.77), navR: new V3(8.21, -0.5, 1.77), tail: new V3(0, 0.52, 8.9), beacon: new V3(0, 4.45, 9.1), landing: new V3(0, -1.2, -7.3) },
+    engineP: new V3(-1.98, 0.46, 6.2),
+    pfdBands: [[90, 160, '#e8e8e8'], [115, 320, '#3fcf5a'], [320, 420, '#e23b3b']],
+  }),
 };
 function applyPlaneType(type) {
   const T = PLANE_TYPES[type] || PLANE_TYPES.seaplane;
   Object.assign(AC, T);
+  // keys only some types carry: reset them so they never leak from the previous aircraft
+  AC.jet = !!T.jet; AC.gearUpY = T.gearUpY; AC.shadowR = T.shadowR; AC.cabinFar = T.cabinFar; AC.pfdBands = T.pfdBands; AC.eyePitch = T.eyePitch;
   if (T.type === 'seaplane') AC.lightsLocal = PLANE.lightsLocal;
 
-  if (T.type !== 'seaplane') {
+  if (T.type !== 'seaplane' && !T.jet) {
     // top speed calibration: thrust = drag in level flight at vmax with the fixed gear
     const q = 0.5 * RHO * AC.vmax * AC.vmax, W = AC.mass * G, CL = W / (q * AC.S);
     const Tv = AC.Tstatic * (1 - AC.vmax / AC.Vprop);
@@ -8644,6 +8972,8 @@ uniform sampler2D uBase;
 uniform vec4 uColor;
 uniform vec3 uMR;       // metallic, roughness, has texture
 uniform vec3 uHit;      // soot, fire glow, hit flash
+uniform vec4 uEmis;     // emissive colour (HDR), w = use the base texture as emission map
+uniform vec3 uCabinL;   // warm fill from the cabin lights (interior pass only)
 uniform float uAlpha;
 void main(){
   if (vWP.y < uClipY) discard;
@@ -8664,6 +8994,8 @@ void main(){
   float g = 1.0 - rough;
   c += env * mix(vec3(F), alb, metal) * g * g * (uToon > 0.5 ? 0.35 : 1.0);
   c += vec3(1.0, 0.42, 0.12) * uHit.y * smoothstep(0.45, 0.8, n) * 6.0 + vec3(1.0, 0.85, 0.6) * uHit.z;
+  c += alb * uCabinL;
+  if (uEmis.x + uEmis.y + uEmis.z > 0.0) c += uEmis.rgb * (uEmis.w > 0.5 && uMR.z > 0.5 ? pow(texture(uBase, vUV).rgb, vec3(2.2)) : vec3(1.0));
   c = applyFog(c, vWP);
   float a = b.a * uAlpha;
   outC(c * a, a);
@@ -8686,7 +9018,52 @@ const GLB_SPECS = {
       'PIVOT_Pedals', 'PIVOT_Gauge_Altitude', 'PIVOT_Gauge_Fuel', 'PIVOT_Gauge_RPM'],
     extra: m => addFokkerControls(m),
   },
+  // the private jet: loaded on demand in one of two builds (PC: full detail, 155k triangles and full-size textures;
+  // mobile: interior and small parts decimated in Blender, 109k triangles, textures ~10x lighter in memory). Moving parts are nested (wheel on fork on leg,
+  // yoke on column), so its pose is evaluated through the hierarchy.
+  jet: {
+    lazy: true, hier: true, emissive: true,
+    url: () => jetVariant() === 'movil' ? 'jet_movil.glb.txt' : 'jet_pc.glb.txt',
+    fix: M4.mul(M4.create(), _ry(PI), M4.translation(M4.create(), 0, -2.0, 0)),
+    anim: ['Aleron_L', 'Aleron_R', 'Elevador_L', 'Elevador_R', 'TimonDireccion', 'Flap_Ext_L', 'Flap_Ext_R', 'Flap_Int_L', 'Flap_Int_R',
+      'Spoiler1_L', 'Spoiler1_R', 'Spoiler2_L', 'Spoiler2_R', 'PataMorro', 'HorquillaMorro', 'RuedaMorro1', 'RuedaMorro2',
+      'PataPrincipal_L', 'PataPrincipal_R', 'RuedaPrincipal1_L', 'RuedaPrincipal2_L', 'RuedaPrincipal1_R', 'RuedaPrincipal2_R',
+      'CompuertaMorro_L', 'CompuertaMorro_R', 'Fan_L', 'Fan_R', 'Puerta', 'ColumnaMando_Piloto', 'ColumnaMando_Copiloto', 'Volante_Piloto', 'Volante_Copiloto',
+      'Pedal_Piloto_1', 'Pedal_Piloto_2', 'Pedal_Copiloto_1', 'Pedal_Copiloto_2', 'PalancaGases_1', 'PalancaGases_2', 'PalancaFlaps', 'PalancaAerofrenos',
+      'PalancaTren', 'RuedaTrim', 'ADI_Piloto', 'ADI_Copiloto', 'HSI_Piloto', 'HSI_Copiloto',
+      ...Array.from({ length: 16 }, (_, i) => 'Interruptor_' + String(i + 1).padStart(2, '0')),
+      ...['ALT100', 'ALT1000', 'ASI', 'RadAlt', 'RelojHoras', 'RelojMin', 'RMI', 'TC', 'VSI'].flatMap(k => ['Aguja_' + k + '_Piloto', 'Aguja_' + k + '_Copiloto']),
+      ...['FF', 'ITT', 'N1', 'N2'].flatMap(k => ['Aguja_' + k + '_1', 'Aguja_' + k + '_2']),
+      // 80s cockpit refit and the rear lavatory
+      'Aguja_Cabina', 'Aguja_O2', 'Aguja_Hidraulica', 'Aguja_Combustible', 'Aguja_Aceite', 'Aguja_Flaps', 'BarridoRadar', 'BrujulaCarta',
+      'FrenoParking', 'BotonMasterWarn_L', 'BotonMasterWarn_R', 'BotonMasterCaut_L', 'BotonMasterCaut_R', 'ManijaFuego_1', 'ManijaFuego_2',
+      'BotonAP', 'BotonHDG', 'BotonALT', 'PerillaRumbo', 'BotonArranque_1', 'BotonArranque_2', 'PalancaReversa_1', 'PalancaReversa_2',
+      'PuertaBano', 'TapaInodoro'],
+  },
 };
+// which build of the jet to use: the setting, or automatically the light one on phones, tablets and low presets
+function jetVariant() {
+  const s = SETTINGS.jetModel || 'auto';
+  if (s === 'pc' || s === 'movil') return s;
+  return GAME.touchUI || matchMedia('(pointer: coarse)').matches || ['muybajo', 'bajo'].includes(SETTINGS.preset) ? 'movil' : 'pc';
+}
+const JET = { promise: null, variant: null };
+function freeGLBModel(m) { if (!m) return; for (const G of m.groups) deleteMesh(G.mesh); for (const t of m.texs || []) gl.deleteTexture(t); }
+function loadJet(force) {
+  const v = jetVariant();
+  if (!force && JET.promise && JET.variant === v) return JET.promise;
+  JET.variant = v;
+  const pr = (async () => {
+    try {
+      const m = await buildGLBModel(await fetchGLB(v === 'movil' ? 'jet_movil.glb.txt' : 'jet_pc.glb.txt'), GLB_SPECS.jet);
+      if (JET.variant !== v) { freeGLBModel(m); return !!MODELS.jet; }
+      const old = MODELS.jet; m.variant = v; MODELS.jet = m; if (old) freeGLBModel(old);
+      return true;
+    } catch (e) { console.warn('Jet no disponible', e); if (JET.promise === pr) JET.promise = null; return false; }
+  })();
+  JET.promise = pr;
+  return pr;
+}
 async function fetchGLB(url) {
   // never let a stalled download freeze the loading screen: give up after 40 s and fly without that model
   const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -8695,6 +9072,7 @@ async function fetchGLB(url) {
   try { r = await fetch(url, ac ? { signal: ac.signal } : undefined); } finally { clearTimeout(to); }
   if (!r.ok) throw new Error(url + ': HTTP ' + r.status);
   let buf;
+  if (typeof url === 'function') url = url();
   if (url.endsWith('.txt')) { // GLB shipped as base64 text (the artifact host serves only standard web types)
     let b64 = (await r.text()).replace(/[^A-Za-z0-9+/=]/g, '');
     const k = b64.indexOf('Z2xURg'); if (k > 0) b64 = b64.slice(k);   // tolerate stray characters before the data (a copy-paste slip)
@@ -8752,8 +9130,10 @@ async function buildGLBModel(g, spec) {
   }
   const mats = (J.materials || []).map(m => {
     const p = m.pbrMetallicRoughness || {};
+    const es = Math.min((m.extras && m.extras.emisStrength) || 1, 8);
     return { color: p.baseColorFactor || [1, 1, 1, 1], metal: p.metallicFactor ?? 1, rough: p.roughnessFactor ?? 1,
-      tex: p.baseColorTexture ? texs[p.baseColorTexture.index] : null, blend: m.alphaMode === 'BLEND' };
+      tex: p.baseColorTexture ? texs[p.baseColorTexture.index] : null, blend: m.alphaMode === 'BLEND', name: m.name || '',
+      emis: spec.emissive && m.emissiveFactor ? m.emissiveFactor.map(v => v * es) : null, emisTex: !!m.emissiveTexture };
   });
   const parent = []; J.nodes.forEach((n, i) => (n.children || []).forEach(c => { parent[c] = i; }));
   const W = [];
@@ -8798,7 +9178,7 @@ async function buildGLBModel(g, spec) {
   for (const G of groups.values()) {
     const m = mats[G.mat] || { color: [0.6, 0.6, 0.6, 1], metal: 0, rough: 0.6, tex: null, blend: false };
     const mesh = makeMesh({ aPos: { data: new Float32Array(G.p), size: 3 }, aNormal: { data: new Float32Array(G.n), size: 3 }, aUV: { data: new Float32Array(G.uv), size: 2 } }, new Uint32Array(G.i));
-    model.groups.push({ mesh, anim: G.anim, color: m.color, mr: [m.metal, m.rough, m.tex ? 1 : 0], tex: m.tex, blend: m.blend });
+    model.groups.push({ mesh, anim: G.anim, color: m.color, mr: [m.metal, m.rough, m.tex ? 1 : 0], tex: m.tex, blend: m.blend, name: m.name, emis: m.emis, emisTex: m.emisTex });
     model.tris += G.i.length / 3;
   }
   model.info = {};
@@ -8814,11 +9194,23 @@ async function buildGLBModel(g, spec) {
   for (const k in model.info) { const I = model.info[k]; I.center = new V3((I.mn[0] + I.mx[0]) / 2, (I.mn[1] + I.mx[1]) / 2, (I.mn[2] + I.mx[2]) / 2); I.tipV = new V3(...I.tip); }
   model.groups.sort((a, b) => (a.blend ? 1 : 0) - (b.blend ? 1 : 0));
   J.nodes.forEach((n, i) => { if (animSet.has(n.name) && W[i]) model.rest[n.name] = W[i]; });
+  model.texs = texs;
+  if (spec.hier) {
+    // nested moving parts: each one rides on its nearest moving ancestor
+    model.hier = true; model.animParent = {}; model.relRest = {}; model.pool = {}; model.needle = {};
+    J.nodes.forEach((n, i) => {
+      if (n.extras && n.extras.ang_min !== undefined) model.needle[n.name] = n.extras.ang_min;
+      if (!animSet.has(n.name) || !W[i]) return;
+      let k = parent[i]; while (k !== undefined && !animSet.has(J.nodes[k].name)) k = parent[k];
+      if (k !== undefined) { model.animParent[n.name] = J.nodes[k].name; model.relRest[n.name] = M4.mul(M4.create(), M4.invert(M4.create(), W[k]), W[i]); }
+    });
+  }
   if (spec.extra) spec.extra(model);
   return model;
 }
 async function loadGLBModels(onStep) {
   for (const id of Object.keys(GLB_SPECS)) {
+    if (GLB_SPECS[id].lazy) continue;
     try {
       onStep && onStep(id);
       MODELS[id] = await buildGLBModel(await fetchGLB(GLB_SPECS[id].url), GLB_SPECS[id]);
@@ -8890,10 +9282,231 @@ function planePose(type, ac) {
     P.X_Magneto = _rz(ac.sw.ign ? 0.7 : -0.7);
     const trig = _rx(ac.gun && ac.gun.trigger ? 0.45 : 0);
     for (const k of ['X_Gatillo_L', 'X_Gatillo_R']) { const o = FOKKER_TRIG[k]; P[k] = M4.mul(M4.create(), M4.mul(M4.create(), M4.translation(M4.create(), -o.x, -o.y, -o.z), M4.mul(M4.create(), stick, M4.translation(M4.create(), o.x, o.y, o.z))), trig); }
-  }
+  } else if (type === 'jet') jetPose(P, ac);
   const t = CPIT.drag ? CPIT.drag.t : CPIT.hover;
   if (t && t.nodes && ac === AIR.ac) { P.hl = {}; for (const n of t.nodes) P.hl[n] = 1; }
   return P;
+}
+// ---------------- private jet: moving parts and instruments ----------------
+// every hinge of the model turns about its local X axis (wheels about Z); angles and senses taken from the
+// animations made in Blender (Alabeo, Cabeceo, Guiñada, Tren, Flaps, Aerofrenos, Gases, Interruptores, Puerta)
+const JET_SW = [ // overhead panel, Interruptor_01…16 → [system, label] (labels read from the pilot's seat)
+  ['avion', 'AVION · aviónica'], ['ign', 'IGN · encendido de motores (con los dos parados los arranca)'], ['land', 'LAND · faros de aterrizaje'], ['cabin', 'CABIN · luces de cabina'],
+  ['gen2', 'GEN 2 · generador'], ['xfeed', 'XFEED · alimentación cruzada'], ['strobe', 'STROBE · destellos'], ['belt', 'SEAT BELT · cartel de cinturones'],
+  ['gen', 'GEN 1 · generador'], ['pump2', 'PUMP 2 · bomba de combustible'], ['beacon', 'BCN · anticolisión'], ['deice', 'ANTI-ICE'],
+  ['batt', 'BATT · batería'], ['pump', 'PUMP 1 · bomba de combustible'], ['nav', 'NAV · luces de navegación'], ['pitot', 'PITOT'],
+];
+const JET_ANUN = ['L_GEAR', 'N_GEAR', 'R_GEAR', 'DOOR', 'HYD', 'BATT', 'ANTI_ICE', 'AP', 'FIRE_1', 'FIRE_2', 'OIL_1', 'OIL_2', 'FUEL_1', 'FUEL_2',
+  'GEN_1', 'GEN_2', 'REV_1', 'REV_2', 'SPOILER', 'PARK_BRK', 'START_1', 'START_2'];
+const JET_LIGHT_MATS = ['LuzRoja', 'LuzVerde', 'LuzBlanca'];
+function jetEngine(ac, i = 0) {   // N1, N2, ITT (°C), fuel flow (pph), oil pressure (psi) of one engine
+  const E = ac.eng && ac.eng[i];
+  const n1 = clamp(E ? E.n1 : ac.rpm || 0, 0, 1.02), on = E ? !!(E.run || E.start) : ac.engineOn, lit = E ? !!E.run || (on && n1 > 0.12) : on || n1 > 0.2;
+  const n2 = n1 < 0.25 ? n1 * 2.4 : 0.6 + 0.4 * (n1 - 0.25) / 0.75;
+  const itt = lit ? 430 + 390 * Math.pow(clamp((n1 - 0.25) / 0.75, 0, 1), 1.3) + (n1 < 0.24 && on ? 180 * n1 / 0.24 : 0) : 25 + 380 * n1;
+  const frac = E ? Math.max(0, E.frac) : ac.thrustFrac || 0;
+  const ff = lit && n1 > 0.2 ? 160 + 0.06 * AC.Tstatic * frac * Math.pow(isaRho(ac.pos.y) / RHO, 0.8) / 2 : 0;
+  const oil = lit ? 38 + 50 * clamp(n2, 0, 1) : 60 * n2;
+  return { n1, n2, itt, ff, oil, run: E ? !!E.run : on };
+}
+function jetPose(P, ac) {
+  const s = ac.surf, m = MODELS.jet, nd = (m && m.needle) || {};
+  const dial = (name, ang) => { const a0 = nd[name]; if (a0 !== undefined) P[name] = _rx((ang - a0) * DEG); };
+  const both = (k, ang) => { dial('Aguja_' + k + '_Piloto', ang); dial('Aguja_' + k + '_Copiloto', ang); };
+  // flight controls
+  P.Aleron_L = P.Aleron_R = _rx(-20 * DEG * s.a);
+  const e = s.e * (s.e > 0 ? 22 : 16) * DEG; P.Elevador_L = _rx(e); P.Elevador_R = _rx(-e);
+  P.TimonDireccion = _rx(22 * DEG * s.r);
+  const fl = 35 * DEG * clamp(ac.flaps / 35, 0, 1); P.Flap_Ext_L = P.Flap_Int_L = _rx(-fl); P.Flap_Ext_R = P.Flap_Int_R = _rx(fl);
+  const sp = 45 * DEG * (ac.spoiler || 0); P.Spoiler1_L = P.Spoiler2_L = _rx(sp); P.Spoiler1_R = P.Spoiler2_R = _rx(-sp);
+  // landing gear: legs swing up in the first two thirds of the cycle, the nose doors close in the last third
+  const tg = 3 * (1 - clamp(ac.gear, 0, 1)), leg = clamp(tg / 2, 0, 1), dr = clamp(tg - 2, 0, 1);
+  P.PataMorro = _rx(-(PI / 2) * leg); P.PataPrincipal_L = _rx((PI / 2) * leg); P.PataPrincipal_R = _rx(-(PI / 2) * leg);
+  P.CompuertaMorro_L = _rx(88 * DEG * dr); P.CompuertaMorro_R = _rx(-88 * DEG * dr);
+  const steer = ac.wheelsOnGround > 0 ? clamp(ac.ctl.yaw, -1, 1) * lerp(32, 5, sstep(2, 25, ac.groundSpeed || 0)) : 0;
+  P.HorquillaMorro = _rx(-steer * DEG);
+  const wa = ac.wheelAng || 0; P.RuedaPrincipal1_L = P.RuedaPrincipal2_L = P.RuedaPrincipal1_R = P.RuedaPrincipal2_R = _rz(wa);
+  P.RuedaMorro1 = P.RuedaMorro2 = _rz(wa * 1.94);
+  P.Fan_L = _rx(ac.eng ? ac.eng[0].fan : ac.fanAngle || 0); P.Fan_R = _rx(-(ac.eng ? ac.eng[1].fan : ac.fanAngle || 0));
+  P.Puerta = _rx(135 * DEG * (ac.door || 0));
+  // cockpit: yokes, pedals, levers, trim wheel, switches
+  P.ColumnaMando_Piloto = P.ColumnaMando_Copiloto = _rx(7 * DEG * ac.ctl.pitch);
+  P.Volante_Piloto = P.Volante_Copiloto = _rx(70 * DEG * ac.ctl.roll);
+  P.Pedal_Piloto_1 = P.Pedal_Copiloto_1 = _rx(12 * DEG * s.r); P.Pedal_Piloto_2 = P.Pedal_Copiloto_2 = _rx(-12 * DEG * s.r);
+  const lev = ac.lev || [ac.throttle, ac.throttle];
+  P.PalancaGases_1 = _rx(-50 * DEG * lev[0]); P.PalancaGases_2 = _rx(-50 * DEG * lev[1]);
+  P.PalancaReversa_1 = P.PalancaReversa_2 = _rx(55 * DEG * (ac.rev || 0));   // piggy-back reverser levers lift up and back
+  P.PalancaFlaps = _rx(36 * DEG * (ac.flapsSet || 0) / 3);
+  P.PalancaAerofrenos = _rx(36 * DEG * (ac.spoilerSet || 0));
+  P.PalancaTren = _rx(-40 * DEG * (1 - (ac.gearSet ?? 1)));
+  P.RuedaTrim = _rx((ac.trim || 0) * 6);
+  const sw = ac.sw || {}, ON = _rx(-44 * DEG);
+  JET_SW.forEach(([k], i) => { if (sw[k]) P['Interruptor_' + String(i + 1).padStart(2, '0')] = ON; });
+  // instruments (needles turn clockwise from 12 o'clock, as seen by the pilot)
+  const kt = (ac.ias || 0) * KT, ft = Math.max(0, ac.pos.y) * FT, fpm = (ac.vs || 0) * FT * 60;
+  const powered = sw.batt || sw.gen || sw.gen2;
+  both('ASI', 30 + 300 * clamp(kt, 0, 400) / 400);
+  both('ALT100', 360 * (ft % 1000) / 1000); both('ALT1000', 360 * (ft % 10000) / 10000);
+  both('VSI', 270 + 172 * clamp(fpm / 6000, -1, 1));
+  both('RadAlt', powered ? -150 + 300 * clamp((ac.agl || 0) * FT / 2500, 0, 1) : -150);
+  both('TC', powered ? 20 * clamp(-(ac.w ? ac.w.y : 0) * RAD / 3, -1.4, 1.4) : 0);
+  const hdg = ac.heading();
+  let rel = 0; if (ac === AIR.ac && GAME.state !== 'menu') { const t = targetInfo(); rel = t.brg - hdg * RAD; }
+  both('RMI', ((rel % 360) + 360) % 360);
+  const h = ENV.time || 0; both('RelojHoras', 30 * (h % 12)); both('RelojMin', 360 * (h % 1));
+  const EE = [jetEngine(ac, 0), jetEngine(ac, 1)];
+  for (const n of [1, 2]) {
+    const E = EE[n - 1];
+    dial('Aguja_N1_' + n, -135 + 270 * clamp(E.n1, 0, 1)); dial('Aguja_N2_' + n, -135 + 270 * clamp(E.n2, 0, 1));
+    dial('Aguja_ITT_' + n, -135 + 270 * clamp(E.itt / 1000, 0, 1)); dial('Aguja_FF_' + n, -135 + 270 * clamp(E.ff / 2500, 0, 1));
+  }
+  // systems gauges of the 80s panel (scales as painted on the dials)
+  const sc = (name, v, v0, v1, a0, a1) => dial(name, a0 + (a1 - a0) * clamp((v - v0) / (v1 - v0), 0, 1));
+  sc('Aguja_Cabina', (ac.cabAlt || 0) / 1000, 0, 30, -135, 135); sc('Aguja_O2', 18.5, 0, 20, -135, 135);
+  sc('Aguja_Hidraulica', ac.hyd || 0, 0, 4, -135, 135); sc('Aguja_Combustible', (ac.fuel || 0) * 6, 0, 6, -135, 135);
+  sc('Aguja_Aceite', (EE[0].oil + EE[1].oil) / 2, 0, 100, -135, 135); sc('Aguja_Flaps', ac.flaps || 0, 0, 40, -120, 120);
+  // push / pull controls slide along their own X axis, knobs and cards turn about it
+  const tx = d => M4.translation(M4.create(), d, 0, 0), pr = ac.press || {}, held = k => (pr[k] || 0) > SIM.t;
+  const fh = ac.fireH || [0, 0], eng = ac.eng || [{}, {}], ap = ac.ap || {};
+  P.FrenoParking = tx(ac.parking ? 0.035 : 0);
+  P.ManijaFuego_1 = tx(fh[0] ? 0.045 : 0); P.ManijaFuego_2 = tx(fh[1] ? 0.045 : 0);
+  for (const k of ['BotonMasterWarn_L', 'BotonMasterWarn_R', 'BotonMasterCaut_L', 'BotonMasterCaut_R', 'BotonAP', 'BotonHDG', 'BotonALT']) if (held(k)) P[k] = tx(0.0035);
+  for (const n of [1, 2]) if (held('BotonArranque_' + n) || eng[n - 1].start) P['BotonArranque_' + n] = tx(0.004);
+  P.PerillaRumbo = _rx(-(ap.hdg || 0));
+  P.BrujulaCarta = _rx(hdg);
+  P.PuertaBano = _rx(95 * DEG * (ac.lavDoor || 0)); P.TapaInodoro = _rx(88 * DEG * (ac.lid || 0));
+  // attitude (ball rolls with the bank, pitch slides the horizon strip) and heading card
+  const pitch = clamp(ac.pitchAng() * RAD, -85, 85), adi = powered ? _rx(-ac.bankAng()) : null;
+  P.ADI_Piloto = P.ADI_Copiloto = adi; P.HSI_Piloto = P.HSI_Copiloto = _rx(-hdg);
+  const uvOff = [0, powered ? -pitch * 9 / 2048 : 0]; P.uv = { ADI_Piloto: uvOff, ADI_Copiloto: uvOff };
+  // what glows: navigation / beacon / landing lights, cabin lights, the panel backlight
+  const bus = !!powered, night = ENV.night || 0, flash = Math.sin(SIM.t * TAU * 1.1) > 0.6 ? 1 : 0;
+  // weather radar: the sweep runs back and forth with the avionics on
+  const radar = bus && !!sw.avion, ph = (SIM.t / 2.2) % 2;
+  P.BarridoRadar = _rx(55 * DEG * ((ph < 1 ? ph : 2 - ph) * 2 - 1)); P.hide = { BarridoRadar: !radar };
+  P.glow = {
+    LuzRoja: bus && (sw.nav || (sw.beacon && flash)) ? 1 : 0, LuzVerde: bus && sw.nav ? 1 : 0, LuzBlanca: bus && (sw.nav || sw.land) ? 1 : 0,
+    LuzCalida: bus && sw.cabin ? 1 : bus ? 0.12 : 0, Pantalla: bus && sw.cabin ? 1 : 0, PantallaTV: bus ? 1 : 0,
+    Instrumentos: bus && sw.avion ? lerp(0.9, 0.55, night) : 0.04, ADI: bus && sw.avion ? lerp(0.9, 0.55, night) : 0.04,
+    Instrumentos80: bus && sw.avion ? lerp(0.9, 1.2, night) : 0.04, Radar80: radar ? 1 : 0, LuzRadar: radar ? 1 : 0,
+  };
+  // annunciator panel, master warning / caution, autopilot and start lights (the lamp test lights them all)
+  const G = P.glow, lt = (ac.lampTest || 0) > 0, lk = bus ? lerp(1, 0.6, night) : 0, gen = [sw.gen && EE[0].run, sw.gen2 && EE[1].run];
+  const A = {
+    L_GEAR: ac.gear > 0.99, N_GEAR: ac.gear > 0.99, R_GEAR: ac.gear > 0.99, DOOR: (ac.door || 0) > 0.01, HYD: (ac.hyd || 0) < 1.5,
+    BATT: !sw.batt || !(gen[0] || gen[1]), ANTI_ICE: !!sw.deice, AP: !!ap.on, FIRE_1: 0, FIRE_2: 0,
+    OIL_1: EE[0].oil < 25, OIL_2: EE[1].oil < 25, FUEL_1: ac.fuel < 0.12 || (!sw.pump && EE[0].run && !sw.xfeed), FUEL_2: ac.fuel < 0.12 || (!sw.pump2 && EE[1].run && !sw.xfeed),
+    GEN_1: !gen[0], GEN_2: !gen[1], REV_1: (ac.rev || 0) > 0.05, REV_2: (ac.rev || 0) > 0.05, SPOILER: (ac.spoiler || 0) > 0.05,
+    PARK_BRK: !!ac.parking, START_1: !!eng[0].start, START_2: !!eng[1].start,
+  };
+  for (const k of JET_ANUN) G['Anun_' + k] = (A[k] || lt) ? lk : 0;
+  const fl2 = Math.sin(SIM.t * TAU * 1.6) > -0.2;
+  G.LuzMasterWarn = (ac.mw && fl2) || lt ? lk : 0; G.LuzMasterCaut = ac.mc || lt ? lk : 0;
+  G.LuzFuego_1 = G.LuzFuego_2 = lt ? lk : 0;
+  G.LuzAP = ap.on || lt ? lk : 0; G.LuzHDG = ap.hdgOn || lt ? lk : 0; G.LuzALT = ap.altOn || lt ? lk : 0;
+  G.LuzArranque_1 = eng[0].start || lt ? lk : 0; G.LuzArranque_2 = eng[1].start || lt ? lk : 0;
+  G.LetreroCinturon = bus && sw.belt ? 1 : 0;
+  G.LuzOcupado = bus && ac === AIR.ac && CAM.mode === 'walk' && WALK.inLav && (ac.lavDoor || 0) < 0.05 ? 1 : 0;
+}
+// ---------------- jet systems that run every frame: pressurisation, hydraulics, master caution, lavatory ----------------
+function jetSystems(ac, dt) {
+  const ft = Math.max(0, ac.pos.y) * FT, run = ac.eng.some(e => e.run);
+  // the cabin climbs at 600 fpm to a schedule that tops out at 8000 ft; unpressurised it follows the outside air
+  const tgt = run && (ac.door || 0) < 0.01 ? Math.min(8000, ft * 0.2) : ft, rate = (run ? 600 : 2500) / 60 * dt;
+  ac.cabAlt += clamp(tgt - ac.cabAlt, -rate, rate);
+  ac.hyd = damp(ac.hyd ?? 3, 3.0 * clamp(Math.max(jetEngine(ac, 0).n2, jetEngine(ac, 1).n2) / 0.55, 0, 1), 1.2, dt);
+  ac.lavDoor += clamp(ac.lavDoorSet - ac.lavDoor, -dt * 1.5, dt * 1.5); ac.lid += clamp(ac.lidSet - ac.lid, -dt * 1.8, dt * 1.8);
+  ac.lampTest = Math.max(0, ac.lampTest - dt); ac.ap.disc = Math.max(0, ac.ap.disc - dt);
+  // master warning (red) / caution (amber): any new message lights it until the pilot pushes it
+  ac.masterT -= dt; if (ac.masterT > 0) return;
+  ac.masterT = 0.25;
+  const al = computeAlerts(ac, terrainH(ac.pos.x, ac.pos.z));
+  const keys = c => al.filter(a => a[0] === c).map(a => a[1].split(' ').slice(0, 2).join(' '));
+  const R = keys('red'), Y = keys('amber');
+  ac.mwAck = ac.mwAck.filter(k => R.includes(k)); ac.mcAck = ac.mcAck.filter(k => Y.includes(k));
+  if (R.some(k => !ac.mwAck.includes(k))) ac.mw = 1; else if (!R.length) ac.mw = 0;
+  if (Y.some(k => !ac.mcAck.includes(k))) ac.mc = 1; else if (!Y.length) ac.mc = 0;
+  ac._R = R; ac._Y = Y;
+}
+function masterPress(ac, which, node) {
+  ac.press[node] = SIM.t + 0.2;
+  const on = which === 'w' ? ac.mw : ac.mc;
+  if (on) { if (which === 'w') { ac.mw = 0; ac.mwAck = (ac._R || []).slice(); } else { ac.mc = 0; ac.mcAck = (ac._Y || []).slice(); } UI.toast(which === 'w' ? 'Master warning silenciado' : 'Master caution reconocido'); }
+  else { ac.lampTest = 2.5; UI.toast('Prueba de luces de aviso'); }
+}
+function jetStart(ac, i) {
+  const E = ac.eng[i], n = i + 1; ac.press['BotonArranque_' + n] = SIM.t + 0.25;
+  if (E.run || E.start) { UI.toast('El motor ' + n + ' ya está ' + (E.run ? 'en marcha' : 'arrancando')); return; }
+  if (ac.fireH[i]) { UI.toast('La maneta de fuego ' + n + ' está tirada: empújala antes de arrancar'); return; }
+  if (!ac.sw.ign) { UI.toast('Primero IGN (encendido) en el panel del techo'); return; }
+  if (!ac.sw.batt && !ac.eng[1 - i].run) { UI.toast('Sin batería ni el otro motor no hay arranque: enciende BATT'); return; }
+  if (ac.fuel <= 0.031) { UI.toast('Sin combustible'); return; }
+  E.start = 1; UI.toast('Arrancando el motor ' + n + '…');
+}
+function toggleFireHandle(ac, i) {
+  ac.fireH[i] = ac.fireH[i] ? 0 : 1;
+  UI.toast(ac.fireH[i] ? 'Maneta de fuego ' + (i + 1) + ' tirada: motor ' + (i + 1) + ' cortado' : 'Maneta de fuego ' + (i + 1) + ' en su sitio · START ' + (i + 1) + ' para arrancar');
+}
+function toggleReversers(ac) {
+  if (!ac.revSet && !(ac.throttle < 0.05 && ac.wheelsOnGround > 0)) { UI.toast('Las reversas solo con los gases en ralentí y las ruedas en el suelo'); return; }
+  ac.revSet = ac.revSet ? 0 : 1; ac.lev[0] = ac.lev[1] = ac.throttle = ac._thr = 0;
+  UI.toast(ac.revSet ? 'Reversas desplegadas · más gases = más empuje inverso' : 'Reversas plegadas');
+}
+// ---------------- autopilot (80s style): wing leveller / heading select, vertical speed or altitude hold ----------------
+function apEngage(ac) {
+  const A = ac.ap;
+  if (ac.onGround || ac.onWater || ac.ias * KT < 90) { UI.toast('El piloto automático solo se conecta en vuelo (más de 90 nudos)'); return false; }
+  if (A.on) return true;
+  const V = Math.max(ac.tas, 40);
+  A.on = 1; A.vs = clamp(ac.vs, -8, 8); A.base = ac.pitchAng() - Math.asin(clamp(A.vs / V, -0.3, 0.3)); A.disc = 0;
+  beep(880, 0.08, 0.06); UI.toast('Piloto automático conectado · alas niveladas y velocidad vertical');
+  return true;
+}
+function apDisconnect(ac, msg) {
+  const A = ac.ap; if (!A.on) return;
+  A.on = 0; A.hdgOn = 0; A.altOn = 0; A.disc = 3;
+  beep(660, 0.12, 0.08); setTimeout(() => beep(520, 0.16, 0.08), 160);
+  UI.toast(msg || 'Piloto automático desconectado');
+}
+function apButton(ac, which) {
+  const A = ac.ap; ac.press['Boton' + which.toUpperCase()] = SIM.t + 0.2;
+  if (which === 'ap') { if (A.on) apDisconnect(ac); else apEngage(ac); return; }
+  if (!A.on && !apEngage(ac)) return;
+  if (which === 'hdg') { A.hdgOn = A.hdgOn ? 0 : 1; UI.toast(A.hdgOn ? 'HDG · vira al rumbo ' + String(Math.round(A.hdg * RAD + 360) % 360).padStart(3, '0') + '° (perilla HDG)' : 'HDG desconectado · alas niveladas'); }
+  if (which === 'alt') {
+    A.altOn = A.altOn ? 0 : 1; A.alt = Math.round(ac.pos.y * FT / 100) * 100 / FT;
+    if (!A.altOn) A.vs = 0;
+    UI.toast(A.altOn ? 'ALT · mantiene ' + Math.round(A.alt * FT) + ' ft' : 'ALT desconectado · mantiene vuelo nivelado');
+  }
+}
+function apSetHeading(ac, deg) { ac.ap.hdg = ((ac.ap.hdg + deg * DEG) % TAU + TAU) % TAU; }
+function jetAutopilot(ac, raw, out, dt) {
+  const A = ac.ap;
+  if (ac.onGround || ac.onWater || ac.crashed || ac.stall > 0.6) { apDisconnect(ac, 'Piloto automático desconectado'); return out; }
+  if (CAM.mode !== 'walk' && (Math.abs(raw.pitch) > 0.35 || Math.abs(raw.roll) > 0.35)) { apDisconnect(ac, 'Piloto automático desconectado: has tomado los mandos'); return out; }
+  const V = Math.max(ac.tas, 40), bank = ac.bankAng(), pitch = ac.pitchAng();
+  let tb = 0;
+  if (A.hdgOn) { let e = A.hdg - ac.heading(); e = ((e + PI) % TAU + TAU) % TAU - PI; tb = clamp(e * 2.0, -25 * DEG, 25 * DEG); }
+  const vsT = A.altOn ? clamp((A.alt - ac.pos.y) * 0.08, -10, 10) : A.vs;
+  A.base = clamp(A.base + (vsT - ac.vs) / V * 0.35 * dt, -0.25, 0.35);
+  const tp = clamp(A.base + Math.asin(clamp(vsT / V, -0.3, 0.3)), -12 * DEG, 18 * DEG);
+  const o = { pitch: clamp((tp - pitch) * 2.6 - ac.w.x * 1.3, -0.45, 0.45), roll: clamp((tb - bank) * 1.8 + ac.w.z * 0.6, -0.5, 0.5), yaw: clamp(raw.yaw + ac.beta * 4 + ac.w.y * 0.6, -1, 1) };
+  ac.trim = clamp(ac.trim + o.pitch * 0.25 * dt, -0.6, 0.6);   // auto-trim offloads the elevator servo
+  return o;
+}
+function toggleDoor() {
+  const ac = AIR.ac; if (!AC.jet) return;
+  if (!ac.doorSet && !(ac.wheelsOnGround > 0 && ac.groundSpeed < 1)) { UI.toast('La puerta solo se abre con el avión parado en tierra'); return; }
+  ac.doorSet = ac.doorSet ? 0 : 1;
+  UI.toast(ac.doorSet ? 'Abriendo la puerta y la escalerilla' : 'Cerrando la puerta');
+}
+function gearMsg(ac) {
+  if (ac.gearBlocked) { ac.gearBlocked = 0; return 'Tren bloqueado: hay peso sobre las ruedas'; }
+  return AC.jet ? (ac.gearSet ? 'Tren abajo' : 'Tren arriba') : (ac.gearSet ? 'Tren abajo (pista)' : 'Tren arriba (agua)');
+}
+function cycleSpoilers(ac) {
+  ac.spoilerSet = ac.spoilerSet >= 0.99 ? 0 : ac.spoilerSet > 0.4 ? 1 : 0.5;
+  UI.toast(ac.spoilerSet ? 'Aerofrenos ' + Math.round(ac.spoilerSet * 100) + ' %' : 'Aerofrenos recogidos');
 }
 // ---------------- controls added to the Fokker (built here, parented to the model's pivots) ----------------
 const FOKKER_PIV = { gas: [0.245, 1.53, -0.47], magneto: [0, 1.632, -0.252], stick: [0, 1.205, -0.55] };
@@ -8928,10 +9541,13 @@ function addFokkerControls(model) {
   }
 }
 // ---------------- clickable cockpit for the GLB aircraft ----------------
+const _gpW = M4.create();
 function glbPoint(name, which) {
   const m = MODELS[AC.model]; if (!m || !m.info[name]) return null;
   const pose = planePose(AC.type, AIR.ac), L = pose[name];
-  let M = M4.mul(M4.create(), m.fix, m.rest[name]); if (L) M = M4.mul(M4.create(), M, L);
+  let M;
+  if (m.hier) M = M4.copy(M4.create(), glbAnimMat(m, M4.identity(_gpW), name, pose));
+  else { M = M4.mul(M4.create(), m.fix, m.rest[name]); if (L) M = M4.mul(M4.create(), M, L); }
   return M4.point(M, which === 'tip' ? m.info[name].tipV : m.info[name].center);
 }
 function glbCockpitTargets() {
@@ -8953,6 +9569,39 @@ function glbCockpitTargets() {
     add({ id: 'yoke', kind: 'yoke', nodes: ['PIVOT_Stick'], at: 'center', r: 0.05, label: () => 'Palanca · arrastra para volar' });
     add({ id: 'trigger', kind: 'trigger', nodes: ['X_Gatillo_L', 'X_Gatillo_R'], at: 'center', r: 0.035, label: () => 'Gatillos · mantén pulsado para disparar' });
     add({ id: 'pedals', kind: 'pedals', nodes: ['PIVOT_Pedals'], at: 'center', r: 0.12, label: () => 'Pedales · arrastra a los lados' });
+  } else if (AC.type === 'jet') {
+    for (const i of [0, 1]) lever('power' + (i + 1), 'PalancaGases_' + (i + 1), ['PalancaGases_' + (i + 1)], () => ac.lev[i],
+      v => { ac.lev[i] = v; ac.throttle = ac._thr = (ac.lev[0] + ac.lev[1]) / 2; },
+      () => 'Gases motor ' + (i + 1) + ' · ' + Math.round(ac.lev[i] * 100) + ' % · N1 ' + Math.round(ac.eng[i].n1 * 100) + ' %' + (ac.revSet ? ' · REVERSA' : '') + ' (R / F mueven las dos)');
+    for (const n of [1, 2]) add({ id: 'rev' + n, kind: 'button', nodes: ['PalancaReversa_' + n], at: 'center', r: 0.018, label: () => 'Reversa ' + n + ' · ' + (ac.revSet ? 'DESPLEGADA' : 'plegada') + ' (en tierra, gases en ralentí)', act: () => toggleReversers(ac) });
+    add({ id: 'park', kind: 'button', nodes: ['FrenoParking'], at: 'center', r: 0.03, label: () => 'Freno de estacionamiento · ' + (ac.parking ? 'PUESTO' : 'QUITADO') + ' (K)',
+      act: () => { ac.parking = !ac.parking; UI.toast(ac.parking ? 'Freno de estacionamiento puesto' : 'Freno de estacionamiento quitado'); } });
+    for (const s of ['L', 'R']) {
+      add({ id: 'mw' + s, kind: 'button', nodes: ['BotonMasterWarn_' + s], at: 'center', r: 0.019, label: () => 'MASTER WARNING · ' + (ac.mw ? 'pulsa para silenciar' : 'pulsa para probar las luces'), act: () => masterPress(ac, 'w', 'BotonMasterWarn_' + s) });
+      add({ id: 'mc' + s, kind: 'button', nodes: ['BotonMasterCaut_' + s], at: 'center', r: 0.019, label: () => 'MASTER CAUTION · ' + (ac.mc ? 'pulsa para reconocer' : 'sin avisos nuevos'), act: () => masterPress(ac, 'c', 'BotonMasterCaut_' + s) });
+    }
+    for (const i of [0, 1]) {
+      add({ id: 'fire' + (i + 1), kind: 'button', nodes: ['ManijaFuego_' + (i + 1)], at: 'center', r: 0.026, label: () => 'Maneta de fuego motor ' + (i + 1) + ' · ' + (ac.fireH[i] ? 'TIRADA (motor cortado)' : 'normal'), act: () => toggleFireHandle(ac, i) });
+      add({ id: 'start' + (i + 1), kind: 'button', nodes: ['BotonArranque_' + (i + 1)], at: 'center', r: 0.02, label: () => 'START ' + (i + 1) + ' · motor ' + (ac.eng[i].run ? 'en marcha' : ac.eng[i].start ? 'arrancando' : 'parado'), act: () => jetStart(ac, i) });
+    }
+    add({ id: 'ap', kind: 'button', nodes: ['BotonAP'], at: 'center', r: 0.016, label: () => 'Piloto automático · ' + (ac.ap.on ? 'CONECTADO' : 'desconectado') + ' (Ñ)', act: () => apButton(ac, 'ap') });
+    add({ id: 'hdg', kind: 'button', nodes: ['BotonHDG'], at: 'center', r: 0.016, label: () => 'HDG · seguir el rumbo seleccionado · ' + (ac.ap.hdgOn ? 'ON' : 'OFF'), act: () => apButton(ac, 'hdg') });
+    add({ id: 'alt', kind: 'button', nodes: ['BotonALT'], at: 'center', r: 0.016, label: () => 'ALT · mantener altitud · ' + (ac.ap.altOn ? 'ON ' + Math.round(ac.ap.alt * FT) + ' ft' : 'OFF'), act: () => apButton(ac, 'alt') });
+    add({ id: 'hdgknob', kind: 'wheel', nodes: ['PerillaRumbo'], at: 'center', r: 0.016, turn: d => apSetHeading(ac, d),
+      label: () => 'Rumbo seleccionado · ' + String(Math.round(ac.ap.hdg * RAD + 360) % 360).padStart(3, '0') + '° · arrastra o rueda' });
+    add({ id: 'lavdoor', kind: 'button', nodes: ['PuertaBano'], at: 'center', r: 0.32, label: () => 'Puerta del baño · ' + (ac.lavDoorSet ? 'ABIERTA' : 'CERRADA'), act: () => toggleLavDoor() });
+    add({ id: 'lid', kind: 'button', nodes: ['TapaInodoro'], at: 'center', r: 0.18, label: () => 'Tapa del inodoro · ' + (ac.lidSet ? 'levantada' : 'bajada'), act: () => toggleLid() });
+    add({ id: 'flap', kind: 'lever', detents: true, nodes: ['PalancaFlaps'], r: 0.04, get: () => ac.flapsSet / 3,
+      set: v => { const n = Math.round(clamp(v, 0, 1) * 3); if (n !== ac.flapsSet) { ac.flapsSet = n; UI.toast('Flaps ' + AC.flapDetents[n] + '°'); } }, label: () => 'Flaps · ' + AC.flapDetents[ac.flapsSet] + '°' });
+    add({ id: 'spoil', kind: 'lever', nodes: ['PalancaAerofrenos'], r: 0.04, get: () => ac.spoilerSet, set: v => { ac.spoilerSet = v < 0.06 ? 0 : v; },
+      label: () => 'Aerofrenos · ' + (ac.spoilerSet ? Math.round(ac.spoilerSet * 100) + ' %' : 'RECOGIDOS') + (ac.spoiler > ac.spoilerSet + 0.1 ? ' · spoilers de tierra' : '') });
+    add({ id: 'gear', kind: 'button', nodes: ['PalancaTren'], r: 0.045, label: () => 'Tren · ' + (ac.gearSet ? 'ABAJO' : 'ARRIBA'),
+      act: () => { ac.toggleGear(); beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(ac)); } });
+    for (const w of ['Piloto', 'Copiloto']) add({ id: 'yoke', kind: 'yoke', nodes: ['Volante_' + w], at: 'center', r: 0.15, label: () => 'Cuernos · arrastra para volar' });
+    for (const w of ['Piloto_1', 'Piloto_2', 'Copiloto_1', 'Copiloto_2']) add({ id: 'pedals', kind: 'pedals', nodes: ['Pedal_' + w], at: 'center', r: 0.07, label: () => 'Pedales · arrastra a los lados' });
+    add({ id: 'trim', kind: 'wheel', nodes: ['RuedaTrim'], at: 'center', r: 0.07, label: () => 'Compensador · ' + (ac.trim >= 0 ? '+' : '') + Math.round(ac.trim * 100) });
+    JET_SW.forEach(([key, name], i) => add({ id: 'sw_' + key, kind: 'toggle', key, nodes: ['Interruptor_' + String(i + 1).padStart(2, '0')], r: 0.024, label: () => name + ' · ' + (ac.sw[key] ? 'ON' : 'OFF') }));
+    add({ id: 'door', kind: 'button', nodes: ['Puerta'], at: 'center', r: 0.45, label: () => 'Puerta · ' + (ac.doorSet ? 'ABIERTA' : 'CERRADA') + ' (J)', act: () => toggleDoor() });
   }
   return T;
 }
@@ -8962,7 +9611,22 @@ function toggleCanopy() {
   UI.toast(ac.canopySet ? 'Cúpula abierta' : 'Cúpula cerrada');
 }
 const _gm = M4.create(), _gm2 = M4.create();
+// world matrix of a moving part of a hierarchical model: parent part's matrix x rest offset x own pose
+// (matrices pooled per part and recomputed once per pose / world pair)
+function glbAnimMat(model, world, name, pose) {
+  const tok = pose || model;
+  if (model._tok !== tok || model._w !== world) { model._tok = tok; model._w = world; model._gen = (model._gen || 0) + 1; }
+  const E = model.pool[name] || (model.pool[name] = { m: M4.create(), g: -1 });
+  if (E.g === model._gen) return E.m;
+  const par = model.animParent[name];
+  if (par) M4.mul(E.m, glbAnimMat(model, world, par, pose), model.relRest[name]);
+  else { M4.mul(E.m, world, model.fix); M4.mul(E.m, E.m, model.rest[name]); }
+  const L = pose && pose[name]; if (L) M4.mul(E.m, E.m, L);
+  E.g = model._gen;
+  return E.m;
+}
 function glbMatrix(model, world, G, pose) {
+  if (model.hier && G.anim) return glbAnimMat(model, world, G.anim, pose);
   M4.mul(_gm, world, model.fix);
   if (!G.anim) return _gm;
   M4.mul(_gm2, _gm, model.rest[G.anim]);
@@ -8970,10 +9634,11 @@ function glbMatrix(model, world, G, pose) {
   if (L) M4.mul(_gm2, _gm2, L);
   return _gm2;
 }
+const _noEmis = [0, 0, 0, 0], _noFill = [0, 0, 0];
 function drawGLB(model, world, pose, hit) {
   if (!model) return;
   const p = RENDER.P.glb; useProg(p);
-  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]);
+  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]); setU(p, 'uCabinL', RENDER.cabinFill || _noFill);
   let blend = false;
   for (const G of model.groups) {
     if (G.anim && pose && pose.hide && pose.hide[G.anim]) continue;
@@ -8983,6 +9648,8 @@ function drawGLB(model, world, pose, hit) {
     const hl = G.anim && pose && pose.hl && pose.hl[G.anim];
     setU(p, 'uHit', hl ? [0, 0, 0.25] : (hit || [0, 0, 0]));
     setU(p, 'uColor', G.color); setU(p, 'uMR', G.mr);
+    if (G.emis) { const k = pose && pose.glow && pose.glow[G.name] !== undefined ? pose.glow[G.name] : 1; setU(p, 'uEmis', [G.emis[0] * k, G.emis[1] * k, G.emis[2] * k, G.emisTex ? 1 : 0]); }
+    else setU(p, 'uEmis', _noEmis);
     setTex(p, 'uBase', G.tex || RENDER.whiteTex);
     drawMesh(G.mesh);
   }
@@ -9003,10 +9670,11 @@ function planeHit(ac) {
 function drawGLBPlane(ac, M) { drawGLB(MODELS[AC.model], M, planePose(AC.type, ac), planeHit(ac)); }
 function updatePlaneAnim(ac, dt) {
   if (GAME.state === 'flying') {
-    ac.fuel = Math.max(0.03, (ac.fuel ?? 0.85) - (ac.engineOn ? (0.15 + 0.85 * ac.throttle) * ac.rpm : 0) * dt / 2400);
+    ac.fuel = Math.max(0.03, (ac.fuel ?? 0.85) - (ac.engineOn ? (0.15 + 0.85 * ac.throttle) * ac.rpm : 0) * dt / (AC.jet ? 9000 : 2400));
     const oilT = ac.engineOn ? 62 + 38 * ac.rpm * (0.6 + 0.4 * ac.throttle) : 40;
     ac.oilT = (ac.oilT ?? 40) + (oilT - (ac.oilT ?? 40)) * (1 - Math.exp(-dt / 25));
     ac.gMax = Math.max(ac.gMax ?? 1, ac.gload); ac.gMin = Math.min(ac.gMin ?? 1, ac.gload);
+    if (AC.jet && ac.eng && ac === AIR.ac) jetSystems(ac, dt);
   }
   ac.canopy = (ac.canopy || 0) + clamp((ac.canopySet || 0) - (ac.canopy || 0), -dt * 0.8, dt * 0.8);
   if (ac.onGround) ac.wheelAng = ((ac.wheelAng || 0) + ac.groundSpeed / 0.33 * dt) % TAU;
@@ -10132,7 +10800,7 @@ function startFlight() {
   UI.show('menu', false); UI.show('crash', false);
   if (CAM_INSIDE(CAM.mode) && !XR.session) CAM.mode = 'chase';
   UI.applyHud(); UI.updateQuick();
-  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo' : AC.type === 'fokker' ? 'Fokker Dr.I · vuelo libre: potencia a tope, levanta la cola y despega a unos 50 nudos' : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
+  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo' : AC.type === 'fokker' ? 'Fokker Dr.I · vuelo libre: potencia a tope, levanta la cola y despega a unos 50 nudos' : AC.jet ? (GAME.spawnKind === 'air' ? 'Jet privado en vuelo hacia ' + ISLANDS[GAME.target].name + ' · máximo 320 nudos' : 'Jet privado: flaps 10° (X), gases a tope (R) y rota a 115 nudos sin pasar de 10° de morro') : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
   GAME.lastT = performance.now();
 }
 function respawn() {
@@ -10153,7 +10821,7 @@ function switchVehicle() {
   CAM.dist = isBoat() ? 15 : 24 * AC.camScale;
   if (CAM.mode === 'flyby' || CAM.mode === 'cinematic') setCamMode('chase');
   respawn(); UI.resume && UI.resume(); UI.applyHud(); UI.updateQuick(); UI.setVehicleUI && UI.setVehicleUI();
-  UI.toast(isBoat() ? 'Ahora navegas en el velero' : 'De vuelta al ' + (AC.type === 'seaplane' ? 'hidroavión' : AC.type === 'fokker' ? 'Fokker' : 'avión'));
+  UI.toast(isBoat() ? 'Ahora navegas en el velero' : 'De vuelta al ' + (AC.type === 'seaplane' ? 'hidroavión' : AC.type === 'fokker' ? 'Fokker' : AC.jet ? 'jet' : 'avión'));
 }
 function onCrash() {
   if (MP.splitView()) { MP.crashP1(); return; }
@@ -10194,7 +10862,8 @@ function stepGame(dt) {
     SIM.acc += dt;
     let n = 0;
     while (SIM.acc >= h && n < 32) {
-      const ctl = applyAssist(ac, INPUT.axes, SETTINGS.assist, h, AIR.assist);
+      let ctl = applyAssist(ac, INPUT.axes, SETTINGS.assist, h, AIR.assist);
+      if (AC.jet && ac.ap && ac.ap.on) ctl = jetAutopilot(ac, INPUT.axes, ctl, h);
       ac.ctl.pitch = ctl.pitch; ac.ctl.roll = ctl.roll; ac.ctl.yaw = ctl.yaw;
       ENVQ.t = SIM.t; ENVQ.wind = WIND_NOW.base;
       ac.step(h, ENVQ);
@@ -10299,6 +10968,7 @@ async function boot() {
   $('loading').hidden = true;
   GAME.lastT = performance.now();
   requestAnimationFrame(loop);
+  setTimeout(() => loadJet(), 2500);   // the jet streams in while the menu is open
 }
 // ---------------- QR code encoder (byte mode, ECC M or L, versions 1-40) ----------------
 // Compact port of the reference algorithm (Project Nayuki, MIT): Reed-Solomon over GF(256),
@@ -10803,6 +11473,7 @@ MP.drawOthers = o => {
     if (e.kind === 'b') { MP.drawBoatFor(e.obj, e.M); continue; }
     if (e.type === 'seaplane') { MP.drawSeaplaneFor(e.obj, e.M, false); continue; }
     const T = PLANE_TYPES[e.type];
+    if (T && T.model === 'jet' && !MODELS.jet && !JET.promise) loadJet();
     if (T && MODELS[T.model]) drawGLB(MODELS[T.model], e.M, planePose(e.type, e.obj), planeHit(e.obj));
   }
 };
