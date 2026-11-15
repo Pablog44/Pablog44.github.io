@@ -7142,6 +7142,8 @@ function updatePlayer(dt) {
     if (plane && !p.veh.air) { p.yaw += angDiff(p.veh.yaw, p.yaw) * Math.min(1, dt * 3); }
     p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; return;
   }
+  /* muerto, el ratón, el mando, las flechas o el giroscopio ya no giran nada: ni la cámara de muerte ni el cuerpo caído */
+  if (!p.alive) { input.lookX = input.lookY = 0; p.fall = Math.min(1, p.fall + dt * 2.6); return; }
   const sens = 0.0023 * (1 - 0.5 * (p.aimT || 0) * (1 - (p.weps ? p.weps[p.cur].def.zoom : 1)) * 2);
   if (!gyroLook(p, dt, -1.45, 1.45, sens)) { p.yaw -= input.lookX * sens; p.pitch = clamp(p.pitch - input.lookY * sens, -1.45, 1.45); }
   input.lookX = input.lookY = 0;
@@ -9167,8 +9169,9 @@ function deathCamera(dt) {
   const f = hip && Math.hypot(hip[0] - P.x, hip[2] - P.z) < 3 ? hip : [P.x, P.y + 0.3, P.z];
   if (!d.f) d.f = f.slice(); else for (let i = 0; i < 3; i++) d.f[i] = lerp(d.f[i], f[i], Math.min(1, dt * 6));
   const H = game.dcamH || 8.5, gx = d.f[0], gz = d.f[2], gy = d.f[1];
-  /* desde arriba, casi en vertical (un poco inclinada para que se lea el suelo), girando despacio alrededor del cuerpo */
-  const oy = d.yaw + k * 0.55 + d.t * 0.1, hd = H * 0.22;
+  /* desde arriba, casi en vertical (un poco inclinada para que se lea el suelo); al subir da un cuarto de vuelta y luego se queda quieta:
+     ni gira sola ni con el ratón o el mando (muerto, updatePlayer ya no mueve la vista ni el cuerpo) */
+  const oy = d.yaw + k * 0.55, hd = H * 0.22;
   const tx = gx + Math.sin(oy) * hd, tz = gz + Math.cos(oy) * hd, ty = gy + H;
   cam.x = lerp(d.x, tx, k); cam.z = lerp(d.z, tz, k);
   cam.y = Math.max(lerp(d.y, ty, k) + Math.sin(Math.PI * k) * H * 0.15, Math.max(groundAt(cam.x, cam.z), waterY) + 1.2);
