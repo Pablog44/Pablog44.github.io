@@ -1004,6 +1004,27 @@ class Mdl {
 Mdl._ccw = false;
 const mdl = (fn, mat) => { const q = new Mdl(); if (mat) q.mat(mat); fn(q); return q.mesh(); };
 
+/* ============ medidas reales ============
+   Los soldados miden 1,74 m (SK_H) y cada vehículo se lleva al largo del de verdad. Medidas reales: [ancho o envergadura, alto, largo] en metros.
+   Panzer I Ausf. A 2,06 × 1,72 × 4,02 · T-26 modelo 1933 2,44 × 2,24 × 4,65 · I-16 tipo 10 «Mosca» 9,00 de envergadura y 6,13 de largo
+   (3,25 de alto con la cola en el suelo) · camión ZiS-5 2,235 × 2,16 × 6,06. El I-15, el Fiat CR.32, el Bf 109 y el Ford ya estaban a su
+   medida (9,75 × 6,10; 9,50 × 7,45; 9,87 × 8,6; unos 5,8 de largo) y no se tocan.
+   VREAL.mod: lo que mide cada modelo tal y como viene (Blender o código). Los modelos no se deforman: se escalan por igual en los tres
+   ejes, con el factor del largo (largo real / largo del modelo), así que conservan sus proporciones; ancho y alto quedan como salgan. */
+const VREAL = {
+  pz1: { real: [2.06, 1.72, 4.02], mod: [1.938, 1.818, 3.993] },       // el glTF del Panzer ya escalado con su extras.panzer.scale (2,1)
+  t26: { real: [2.44, 2.24, 4.65], mod: [2.396, 2.387, 4.618] },       // los dos T-26 de Blender (el republicano y el capturado)
+  mosca: { real: [9.0, 9.0 * 3.975 / 9.6, 6.13], mod: [9.6, 3.975, 7.309] },       // Mosca de Blender: alto como el ancho (hélice redonda), cola abajo da 3,24
+  code: {       // los de código, cuando no cargan los de Blender
+    zis: { real: [2.235, 2.18, 6.06], mod: [2.2, 2.18, 5.745] },
+    pz1: { real: [2.06, 1.72, 4.02], mod: [2.1, 1.855, 4.0] },       // alto hasta el techo de la torre (la antena sobresale)
+    t26: { real: [2.44, 2.24, 4.65], mod: [2.48, 2.28, 4.642] },
+    mosca: { real: [9.0, 2.946, 6.13], mod: [9.0, 2.946, 6.466] }
+  }
+};
+const vReal = d => { const k = d ? d.real[2] / d.mod[2] : 1; return [k, k, k]; };       // misma escala en los tres ejes: la del largo
+const VSC = { zis: vReal(VREAL.code.zis), pz1: vReal(VREAL.code.pz1), t26: vReal(VREAL.code.t26), t26n: vReal(VREAL.code.t26), mosca: vReal(VREAL.code.mosca) };
+
 /* ============ vehículos por código ============ */
 const VC = { dk: hex(0x1c1c1b), tire: hex(0x161617), wd: hex(0x7d6040), glass: hex(0x27333a), steel: hex(0x3b3e3b), lamp: hex(0xe8e0be), red: hex(0xc8281e), yel: hex(0xf2c21e), pur: hex(0x5f2d7a), wht: hex(0xe8e6dc), canvas: hex(0xb5aa88), rust: hex(0x4a3524) };
 /* camiones: ZiS-5 soviético (capó anguloso, cabina de madera y chapa) y Ford V8 con toldo */
@@ -4909,7 +4930,7 @@ function drawSoldier(s) {
 const SK = { ready: false, failed: false, chars: [null, null], leg: null, W: null, prog: null, U: {}, nj: 0, fid: 0, tex: [], bufs: [], err: '', u32: null, white: null, ident: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]) };
 /* por bando (REP, NAT), y las armas. Se aceptan GLB o glTF con el búfer incrustado (.json, que es lo que sirve la web del juego) */
 const SK_FILES = ['soldado_republicano.json', 'soldado_nacional.json'], SK_ARMAS = 'armas.json';
-const SK_H = 1.78;       // altura a la que se escalan los dos soldados (la de los soldados de cajas)
+const SK_H = 1.74;       // altura a la que se escalan los dos soldados: 1,74 m (los vehículos van a su medida real, ver «medidas reales»)
 const SK_FPS = 30;
 /* los clips de apuntar suben el arma, la mantienen y la bajan: se usa el momento en que está arriba */
 const SK_HOLD = { rifle_apuntar: 0.6, pistola_apuntar: 0.75, Breda30__Apuntar: 0.97 };
@@ -7007,7 +7028,7 @@ function rayWorld(ox, oy, oz, dx, dy, dz, maxT, team) {
     const sx = ox - s.x, sz = oz - s.z, b = sx * dx + sz * dz, c = sx * sx + sz * sz - 0.1;
     const disc = b * b - a * c; if (disc < 0) continue;
     const t = (-b - Math.sqrt(disc)) / a; if (t < 0 || t >= res.t) continue;
-    const y = oy + dy * t - s.y, top = s.swim ? 1.75 : lerp(lerp(1.75, 1.22, s.crouchT), 0.55, s.proneT || 0);
+    const y = oy + dy * t - s.y, top = s.swim ? 1.74 : lerp(lerp(1.74, 1.2, s.crouchT), 0.55, s.proneT || 0);
     if (y < (s.swim ? 1.2 : 0) || y > top) continue;
     res.t = t; res.s = s; res.head = y > top - 0.28; res.kind = 'soldier';
   }
@@ -7219,13 +7240,13 @@ const VDEF = {
   pz1: { kind: 'tank', team: NAT, name: 'Panzer I', art: 'el Panzer I', verb: 'tripular', hp: 480, vmax: 9.5, cannon: false, mgRate: 0.055, mgName: 'Ametralladoras MG 13',
     mg: { name: 'Ametralladoras MG 13', kind: 'lmg', dmg: 32, rate: 0.08, auto: true, botAcc: 0.3, botRange: 90, mag: 1e9, reload: 0 },
     hist: 'Carro ligero alemán de la Legión Cóndor, armado solo con dos ametralladoras; en España lo llamaron «negrillo». Frente al cañón del T-26 estaba indefenso, lo que llevó a los alemanes a replantear sus carros antes de la guerra mundial.' },
-  mosca: { kind: 'plane', team: REP, name: 'Polikarpov I-16 «Mosca»', art: 'el I-16 «Mosca»', verb: 'pilotar', hp: 225, vmax: 50, turn: 0.95, fl: { roll: 2.7, turn: 1.2, pitch: 1.0, vs: [15, 29] }, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras ShKAS',
+  mosca: { kind: 'plane', team: REP, name: 'Polikarpov I-16 «Mosca»', art: 'el I-16 «Mosca»', verb: 'pilotar', hp: 225, vmax: 50, turn: 0.95, fl: { roll: 2.7, turn: 1.2, pitch: 1.0, vs: [15, 29], gmax: 6.5 }, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras ShKAS',
     hist: 'Caza soviético y primer monoplano de tren retráctil que entró en servicio en el mundo. Los republicanos lo llamaron «Mosca» y sus enemigos, «Rata». Rápido y nervioso, era un caza puro: no llevaba bombas.' },
-  chato: { kind: 'plane', team: REP, name: 'Polikarpov I-15 «Chato»', art: 'el I-15 «Chato»', verb: 'pilotar', hp: 225, vmax: 42, turn: 1.2, fl: { roll: 2.1, turn: 1.5, pitch: 1.05, vs: [12, 24] }, bombs: 4, mgRate: 0.075, mgDmg: 40, mgPlane: 12, spread: 0.014, mgName: 'Ametralladoras PV-1',
+  chato: { kind: 'plane', team: REP, name: 'Polikarpov I-15 «Chato»', art: 'el I-15 «Chato»', verb: 'pilotar', hp: 225, vmax: 42, turn: 1.2, fl: { roll: 2.1, turn: 1.5, pitch: 1.05, vs: [12, 24], gmax: 5.5 }, bombs: 4, mgRate: 0.075, mgDmg: 40, mgPlane: 12, spread: 0.014, mgName: 'Ametralladoras PV-1',
     hist: 'Caza biplano soviético, lento pero muy maniobrero, que también se fabricó bajo licencia en Cataluña. Podía llevar bombas ligeras bajo las alas para atacar a las tropas en tierra.' },
   bf109: { kind: 'plane', team: NAT, name: 'Messerschmitt Bf 109', art: 'el Bf 109', verb: 'pilotar', hp: 225, vmax: 52, turn: 0.92, fl: { roll: 2.0, turn: 1.1, pitch: 0.9, vs: [15, 30] }, bombs: 0, mgRate: 0.06, mgDmg: 42, mgPlane: 14, spread: 0.012, mgName: 'Ametralladoras MG 17',
     hist: 'Caza alemán de la Legión Cóndor, que lo estrenó en España. Sobre el Ebro, pilotos como Werner Mölders ensayaron con él las formaciones abiertas que la Luftwaffe usaría en la guerra mundial. Era un caza puro, sin bombas.' },
-  fiat: { kind: 'plane', team: NAT, name: 'Fiat CR.32 «Chirri»', art: 'el Fiat CR.32', verb: 'pilotar', hp: 225, vmax: 43, turn: 1.15, fl: { roll: 1.9, turn: 1.4, pitch: 1.0, vs: [12, 24] }, bombs: 4, mgRate: 0.085, mgDmg: 48, mgPlane: 15, spread: 0.014, mgName: 'Ametralladoras Breda de 12,7 mm',
+  fiat: { kind: 'plane', team: NAT, name: 'Fiat CR.32 «Chirri»', art: 'el Fiat CR.32', verb: 'pilotar', hp: 225, vmax: 43, turn: 1.15, fl: { roll: 1.9, turn: 1.4, pitch: 1.0, vs: [12, 24], gmax: 5.5 }, bombs: 4, mgRate: 0.085, mgDmg: 48, mgPlane: 15, spread: 0.014, mgName: 'Ametralladoras Breda de 12,7 mm',
     hist: 'Caza biplano italiano, el más numeroso de la aviación sublevada. Robusto, maniobrero y armado con dos ametralladoras pesadas de 12,7 mm; admitía además bombas ligeras.' }
 };
 const VEH = [
@@ -7320,9 +7341,9 @@ function takeVehicle(p, v) {
     : 'La cruz del centro es el punto al que apuntas. El círculo marca dónde caería el disparo: cuando alcanza la cruz y se pone amarillo, ' + (v.def.cannon ? 'el cañonazo cae justo ahí.' : 'las ametralladoras dan justo ahí.'));
   if (v.kind === 'plane') { const kmh = Math.round((v.def.fl.vs[0] + 0.8 * (v.def.fl.vs[1] - v.def.fl.vs[0])) * 3.6 / 5) * 5, back = opts.invY ? 'hacia atrás' : 'hacia delante';
     showHint(xr.on ? 'Stick derecho arriba, motor. A unos ' + kmh + ' km/h tira del stick izquierdo ' + back + ' para despegar. A los lados, el stick izquierdo inclina las alas para girar; el derecho es el timón. Gatillo: ametralladoras. A: bomba. B: frenos.'
-    : input.touch ? 'Mantén «Motor +». A unos ' + kmh + ' km/h tira de la palanca ' + back + ' para despegar. La palanca inclina las alas para girar y mueve el morro; si lo subes demasiado entrarás en pérdida.'
+    : input.touch ? 'Mantén «Motor +». A unos ' + kmh + ' km/h tira de la palanca ' + back + ' para despegar. La palanca inclina las alas para girar y mueve el morro; si lo subes demasiado entrarás en pérdida. Al virar inclinado, tira un poco para no perder altura; a fondo a un lado, el avión da toneles.'
     : input.pad ? 'R2 y L2, motor. Palanca izquierda: a los lados, alabeo para girar; ' + back + ', sube el morro. L1 y R1, timón. Despega a unos ' + kmh + ' km/h tirando de la palanca.'
-    : 'W y S, motor. A y D o el ratón, alabeo para girar. Flechas ↓ ↑ o el ratón, morro (' + back + ' sube). Z y C, timón. Espacio, frenos. Despega a unos ' + kmh + ' km/h tirando ' + back + '; si subes demasiado el morro entrarás en pérdida.'); }
+    : 'W y S, motor. A y D o el ratón, alabeo para girar. Flechas ↓ ↑ o el ratón, morro (' + back + ' sube). Z y C, timón. Espacio, frenos. Despega a unos ' + kmh + ' km/h tirando ' + back + '; si subes demasiado el morro entrarás en pérdida. Al virar inclinado, tira un poco para no perder altura; con el alabeo a fondo puedes hacer toneles y, con velocidad, rizos.'); }
   SFX.click();
 }
 function exitVehicle(p) {
@@ -7621,12 +7642,27 @@ function planeArms(v, dt, ctl, op, fx, fy, fz) {
 }
 /* ============ pilotaje del jugador ============
    Modelo de vuelo de la avioneta del «Gran Timo Escurialense», con sus mismas sensibilidades, adaptado a cada caza:
-   - El motor (0 a 100 %) empuja contra una resistencia que crece con el cuadrado de la velocidad; subir el morro frena y bajarlo acelera.
-   - La sustentación depende de la velocidad: por debajo de la de pérdida el morro cae y el avión se hunde.
-   - La palanca da cabeceo y alabeo; el avión vira por tener las alas inclinadas (viraje coordinado) y el timón solo lo desliza.
+   - El motor (0 a 100 %) empuja contra una resistencia que crece con el cuadrado de la velocidad; subir el morro frena y bajarlo acelera,
+     y tirar de la palanca (más «g») también frena.
+   - En el aire el avión lleva su propia orientación (tres ejes: derecha, arriba y morro), sin límites de ángulo: puede alabear del todo
+     (toneles con los alerones), volar invertido y rizar el rizo. El I-16 alabeaba muy deprisa y aguantaba unas 6 g.
+   - Las alas sustentan a lo largo del eje «arriba» del avión: la palanca pide más o menos carga (g), con el límite de lo que dé la velocidad
+     (despacio, poca; por debajo de la de pérdida, ninguna). Esa fuerza y la gravedad doblan la trayectoria: con las alas inclinadas el
+     avión vira, pero si no se tira de la palanca va perdiendo altura (cuanto más inclinado, más); invertido, el morro cae hacia el suelo.
+   - La palanca da cabeceo y alabeo; el timón solo desliza el morro.
    - Para despegar hay que ganar velocidad y tirar de la palanca; para aterrizar, llegar despacio, nivelado y sin hundirse.
-   Lo que cambia de un caza a otro (def.fl): viveza del alabeo, lo cerrado que vira, mando de cabeceo y velocidades de pérdida; el
+   Lo que cambia de un caza a otro (def.fl): viveza del alabeo, mando de cabeceo, carga máxima (gmax) y velocidades de pérdida; el
    empuje sale de la velocidad máxima de cada uno. */
+/* ejes del avión a partir de rumbo, cabeceo y alabeo (el mismo orden con que se dibuja: rotY · rotX · rotZ) */
+function eulerAxes(y, p, r) {
+  const sy = Math.sin(y), cy = Math.cos(y), sp = Math.sin(p), cp = Math.cos(p), sr = Math.sin(r), cr = Math.cos(r);
+  return { r: [cr * cy + sr * sp * sy, sr * cp, -cr * sy + sr * sp * cy], u: [-sr * cy + cr * sp * sy, cr * cp, sr * sy + cr * sp * cy], f: [-sy * cp, sp, -cy * cp] };
+}
+const v3rot = (a, k, t) => {       // gira el vector a alrededor del eje unitario k un ángulo t (Rodrigues)
+  const c = Math.cos(t), s = Math.sin(t), d = (k[0] * a[0] + k[1] * a[1] + k[2] * a[2]) * (1 - c);
+  return [a[0] * c + (k[1] * a[2] - k[2] * a[1]) * s + k[0] * d, a[1] * c + (k[2] * a[0] - k[0] * a[2]) * s + k[1] * d, a[2] * c + (k[0] * a[1] - k[1] * a[0]) * s + k[2] * d];
+};
+function oriTurn(o, k, t) { if (t) { o.r = v3rot(o.r, k, t); o.u = v3rot(o.u, k, t); o.f = v3rot(o.f, k, t); } }
 const flyIn = { thr: 0, thrAbs: -1, pitch: 0, roll: 0, yaw: 0, pm: 0, rm: 0, brake: false };
 function flyPlayer(v, dt, ctl, op) {
   const D = v.def, F = D.fl, I = flyIn, thrust = 0.0048 * D.vmax * D.vmax + 0.12;
@@ -7645,15 +7681,34 @@ function flyPlayer(v, dt, ctl, op) {
     if (v.speed > 2 && Math.random() < dt * 9) addPart(v.x + rnd(-1, 1), v.y + 0.3, v.z + rnd(-1, 1), 0, 0.6, 0, 0.8, 2, 0.9, 0.74, 0.65, 0.48, 0.25, 0, 1.2);
     if (lift > 0.8 && v.pitch > 0.1) { v.air = true; v.sink = 0; v.y += 0.3; v.graceT = 0.6; v.gp = 0; v.landTold = false; $('hint').hidden = true; }
   } else {
-    const au = clamp(v.speed / 28, 0.35, 1.2);       // con poca velocidad los mandos responden menos
-    v.pitch = clamp(v.pitch + (I.pitch * 0.95 * F.pitch * dt + I.pm) * au, -1.05, 1.05);
-    R = clamp(R + (I.roll * F.roll * dt + I.rm) * au, -1.35, 1.35);
-    if (Math.abs(I.roll) < 0.05 && Math.abs(I.rm) < 0.0005) R = lerp(R, 0, Math.min(1, dt * 0.9));       // sin tocar el alabeo, las alas se van nivelando solas
-    v.yaw -= (9.8 * Math.tan(R) / Math.max(v.speed, 12)) * dt * F.turn + I.yaw * 0.45 * dt;
-    if (lift < 1) v.pitch -= (1 - lift) * 0.9 * dt;
+    /* orientación libre: si algo de fuera ha tocado rumbo, cabeceo o alabeo (despegue, límite del campo, techo), se rehace desde ellos */
+    const E = v.oriE;
+    if (!v.ori || !E || E[0] !== v.yaw || E[1] !== v.pitch || E[2] !== v.roll) v.ori = eulerAxes(v.yaw, v.pitch, v.roll);
+    const o = v.ori, g = 9.8, sp = Math.max(v.speed, 12), au = clamp(v.speed / 28, 0.35, 1.2);       // con poca velocidad los mandos responden menos
+    /* alabeo: los alerones giran el avión sobre su eje (sin tope: toneles) */
+    oriTurn(o, o.f, (I.roll * F.roll * 1.15 * dt + I.rm) * au);
+    /* sin tocar el alabeo, y si no va muy inclinado ni invertido, las alas tienden a nivelarse solas (diedro), despacio */
+    const bank = Math.atan2(-o.r[1], o.u[1]);
+    if (Math.abs(I.roll) < 0.05 && Math.abs(I.rm) < 0.0005 && o.u[1] > 0.45 && Math.abs(o.f[1]) < 0.8) oriTurn(o, o.f, -bank * 0.55 * dt);
+    /* carga (g): con la palanca suelta sostiene el avión (y, algo inclinado, ayuda un poco en el viraje); la palanca pide más o menos */
+    const nN = o.u[1] > 0.3 ? lerp(1, 1 / Math.max(0.5, o.u[1]), 0.6) : 1;
+    const nMax = lift < 1 ? lift : Math.min(F.gmax || 6, 1 + (v.speed - F.vs[1]) * 0.25), nMin = -Math.max(0.3 * lift, Math.min(3, nMax * 0.5));
+    const n = clamp(nN + (I.pitch * 1.05 * F.pitch + I.pm / Math.max(dt, 1 / 240)) * sp / g, nMin, nMax); v.gLoad = n;
+    /* la sustentación (por el eje «arriba» del avión) y la gravedad doblan la trayectoria; el morro la sigue */
+    const gd = -g * o.f[1], ax = n * g * o.u[0] - gd * o.f[0], ay = n * g * o.u[1] - g - gd * o.f[1], az = n * g * o.u[2] - gd * o.f[2];
+    const am = Math.hypot(ax, ay, az);
+    if (am > 1e-4) { const k = [o.f[1] * az - o.f[2] * ay, o.f[2] * ax - o.f[0] * az, o.f[0] * ay - o.f[1] * ax], kl = Math.hypot(k[0], k[1], k[2]); if (kl > 1e-6) oriTurn(o, [k[0] / kl, k[1] / kl, k[2] / kl], am / sp * dt); }
+    oriTurn(o, o.u, -I.yaw * 0.45 * dt);       // timón: desliza el morro
+    /* tirar de la palanca cuesta velocidad (resistencia inducida) */
+    v.speed = Math.max(0, v.speed - 0.1 * Math.max(0, n * n - 1) * dt);
+    /* se reortogonalizan los ejes y se sacan rumbo, cabeceo y alabeo para todo lo demás (dibujo, cámara, disparos, aterrizaje) */
+    const f = o.f, fl = Math.hypot(f[0], f[1], f[2]); f[0] /= fl; f[1] /= fl; f[2] /= fl;
+    const ud = o.u[0] * f[0] + o.u[1] * f[1] + o.u[2] * f[2]; let u = [o.u[0] - ud * f[0], o.u[1] - ud * f[1], o.u[2] - ud * f[2]]; const ul = Math.hypot(u[0], u[1], u[2]); u = [u[0] / ul, u[1] / ul, u[2] / ul];
+    o.u = u; o.r = [f[1] * u[2] - f[2] * u[1], f[2] * u[0] - f[0] * u[2], f[0] * u[1] - f[1] * u[0]];
+    v.pitch = Math.asin(clamp(f[1], -1, 1)); v.yaw = Math.atan2(-f[0], -f[2]); R = -Math.atan2(o.r[1], o.u[1]);
     v.sink = lerp(v.sink || 0, -(1 - lift) * 14, Math.min(1, dt * 1.2));
   }
-  v.roll = -R;
+  v.roll = -R; v.oriE = v.air ? [v.yaw, v.pitch, v.roll] : null; if (!v.air) v.ori = null;
   const cp = Math.cos(v.pitch), fx = -Math.sin(v.yaw) * cp, fy = Math.sin(v.pitch), fz = -Math.cos(v.yaw) * cp;
   const vyv = v.air ? fy * v.speed + (v.sink || 0) : 0; v.vyv = vyv;
   v.x += fx * v.speed * dt; v.z += fz * v.speed * dt; v.y += vyv * dt;
@@ -7780,7 +7835,7 @@ function updateVehicles(dt) {
 }
 /* CM-249 republicano: construido por código (mkMosca), con sus piezas móviles: hélice, tren que se recoge, alerones, timones,
    palanca, mando de gases y las agujas del tablero. */
-const _moscaPlane = M4.create(), _moscaEye = M4.create(), _moscaLocal = M4.create(), _moscaT = M4.create();
+const _moscaPlane = M4.create(), _moscaEye = M4.create(), _moscaLocal = M4.create(), _moscaT = M4.create(), _moscaSc = M4.create();
 function moscaTick(v, dt, ctl) {
   const s = v.moscaViz || (v.moscaViz = { pitch: 0, roll: 0, yaw: 0, prop: 0, gear: v.air ? 1 : 0 });
   const pilot = v.driver?.isPlayer, gain = Math.min(1, dt * 12);
@@ -7817,7 +7872,7 @@ function planeBase(v, o, wz, gk) {
   return o;
 }
 function moscaBase(v, o) {
-  if (!vmReady('mosca')) return planeBase(v, o, mosca.wheelZ, mosca.gk);
+  if (!vmReady('mosca')) return planeBase(v, o, mosca.wheelZ * VSC.mosca[2], mosca.gk);
   /* modelo de Blender en tierra: la cola descansa en el patín (el morro sube lo justo) salvo que el piloto levante más el morro al despegar */
   const X = VM3D.mosca; if (v.air) return planeBase(v, o, X.wheelZ, 0);
   M4.identity(o); M4.translate(o, v.x, v.y, v.z); M4.rotY(o, v.yaw);
@@ -7827,11 +7882,11 @@ function moscaBase(v, o) {
 }
 function moscaCamera(v) {
   moscaBase(v, _moscaPlane);
-  const eye = vmReady('mosca') ? VM3D.mosca.eye : mosca.eye;       // el ojo del piloto: el que marca el modelo de Blender (Pilot_View) o el del de código
+  const eye = vmReady('mosca') ? VM3D.mosca.eye : mosca.eye.map((e, i) => e * VSC.mosca[i]);       // el ojo del piloto: el que marca el modelo de Blender (Pilot_View) o el del de código
   M4.copy(_moscaEye, _moscaPlane); M4.translate(_moscaEye, eye[0], eye[1], eye[2]); M4.rotX(_moscaEye, -0.2);
 }
 function drawMosca(v) {
-  const s = v.moscaViz, base = moscaBase(v, _moscaPlane), pitch = s?.pitch || 0, roll = s?.roll || 0, yaw = s?.yaw || 0, thr = v.thr || 0, gear = s?.gear ?? (v.air ? 1 : 0), rpm = s?.rpm || 0;
+  const s = v.moscaViz, base = M4.scale(M4.copy(_moscaSc, moscaBase(v, _moscaPlane)), ...VSC.mosca), pitch = s?.pitch || 0, roll = s?.roll || 0, yaw = s?.yaw || 0, thr = v.thr || 0, gear = s?.gear ?? (v.air ? 1 : 0), rpm = s?.rpm || 0;
   const D = Math.PI / 180, now = new Date();
   const dial = { kmh: (-150 + 300 * clamp(Math.abs(v.speed) * 3.6 / 600, 0, 1)) * D, alt: Math.max(0, v.y) / 1000 * 36 * D, rpm: (-150 + 300 * clamp(rpm / 3000, 0, 1)) * D, vs: (-150 + 300 * (clamp(v.vyv || 0, -20, 20) + 20) / 40) * D, hdg: -v.yaw,
     clock: (now.getHours() % 12 + now.getMinutes() / 60) * 30 * D, fix7: 66 * D, fix5: 24 * D, fix6: 0 };
@@ -7876,14 +7931,14 @@ function drawVehicles(vp, ex, ey, ez) {
   for (const v of vehicles) {
     M4.identity(_vm); M4.translate(_vm, v.x, v.y, v.z); M4.rotY(_vm, v.yaw); M4.rotX(_vm, v.pitch + (v.kind === 'plane' && !v.air ? (v.gp || 0) : 0)); M4.rotZ(_vm, v.roll);
     matState(1, 1, 0.08, v.dead ? [0.22, 0.2, 0.18] : null);
-    if (v.kind === 'truck') drawModel(world.truck[v.team], _vm);
+    if (v.kind === 'truck') { if (v.team === REP) M4.scale(_vm, ...VSC.zis); drawModel(world.truck[v.team], _vm); }
     else if (v.kind === 'plane') {
       if (v.type === 'mosca') { if (vmReady('mosca')) vmDrawMosca(v, vp, ex, ey, ez); else drawMosca(v); } else drawPlane(v, _vm);
     }
     else if (v.type === 'pz1' && vmReady('pz1')) vmDrawPz1(v, _vm, vp, ex, ey, ez);
     else if ((v.type === 't26n' || v.type === 't26') && vmReady(v.type)) vmDrawT26(v, _vm, vp, ex, ey, ez);
     else {
-      const m = world.vm[v.type]; drawModel(m.hull, _vm);
+      const m = world.vm[v.type]; M4.scale(_vm, ...(VSC[v.type] || [1, 1, 1])); drawModel(m.hull, _vm);
       M4.translate(_vm, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(_vm, v.tyaw - v.yaw); M4.rotX(_vm, v.tpitch * 0.5); M4.translate(_vm, 0, 0, v.kick * 0.12);
       drawModel(m.turret, _vm);
     }
@@ -8022,12 +8077,14 @@ function vmSetupMosca(M) {
   const prop = M.J.meshes[M.J.nodes[M.ix.Propeller].mesh].primitives.map(p => M.J.accessors[p.attributes.POSITION]);
   const propR = Math.max(...prop.map(a => Math.max(Math.abs(a.min[0]), Math.abs(a.max[0]), Math.abs(a.min[1]), Math.abs(a.max[1]))));
   /* el patín de cola: con el morro levantado alrededor de las ruedas hasta que la cola toca el suelo (0,248 rad en este modelo) */
-  const tailDown = 0.2476;
-  const base = M4.create(); M4.translate(base, 0, ground, 0);
+  /* a su largo real (ver «medidas reales»), con la misma escala en los tres ejes para no deformarlo */
+  const K = vReal(VREAL.mosca), tailDown = Math.atan(Math.tan(0.2476) * K[1] / K[2]);
+  const base = M4.create(); M4.translate(base, 0, ground * K[1], 0); M4.scale(base, K[0], K[1], K[2]);
+  const at = i => [P0.W[i * 16 + 12] * K[0], (P0.W[i * 16 + 13] + ground) * K[1], P0.W[i * 16 + 14] * K[2]];
   const tgt = arr => (arr || []).map(t => ({ i: M.ix[t.node], axis: t.axis, k: t.degrees_per_unit * DEG, rest: t.rest_quaternion }));
   const ins = Object.entries(ex.FPV_Rig && rig.instruments || {}).map(([name, b]) => ({ i: M.ix[name], ...b }));
-  return { M, P: vmState(M), base, wheelZ: wz, gk: tailDown / 0.15, wheelR: wr, eye: [P0.W[eyeN * 16 + 12], P0.W[eyeN * 16 + 13] + ground, P0.W[eyeN * 16 + 14]],
-    prop: { i: M.ix.Propeller, at: [P0.W[M.ix.Propeller * 16 + 12], P0.W[M.ix.Propeller * 16 + 13] + ground, P0.W[M.ix.Propeller * 16 + 14]], R: propR },
+  return { M, P: vmState(M), base, K, wheelZ: wz * K[2], gk: tailDown / 0.15, wheelR: wr * K[1], eye: at(eyeN),
+    prop: { i: M.ix.Propeller, at: at(M.ix.Propeller), R: propR * K[0] },
     pitch: tgt(ctl.pitch && ctl.pitch.targets), roll: tgt(ctl.roll && ctl.roll.targets), yaw: tgt(ctl.yaw && ctl.yaw.targets),
     thr: ctl.throttle ? [{ i: M.ix[ctl.throttle.node], axis: ctl.throttle.axis, k: ctl.throttle.degrees_per_unit * DEG }] : [],
     wheels: (ctl.wheels && ctl.wheels.nodes || []).map(nm => M.ix[nm]), ins };
@@ -8088,13 +8145,15 @@ function vmSetupPz1(M) {
   const ex = M.J.asset.extras.panzer, S = ex.scale, P0 = vmState(M); vmWorld(M, P0);
   /* el carro mira a -X en el glTF: se gira para que mire a -Z (su izquierda, +Z, queda a la izquierda del juego) y se escala a su tamaño real */
   let low = 1e9; for (const m of M.meshes) for (const p of M.J.meshes[M.J.nodes[m.node].mesh].primitives) { const a = M.J.accessors[p.attributes.POSITION], W = P0.W.subarray(m.node * 16); if (m.skin !== undefined) low = Math.min(low, a.min[1]); else low = Math.min(low, a.min[1] + W[13]); }
-  const base = new Float32Array([0, 0, S, 0, 0, S, 0, 0, -S, 0, 0, 0, 0, -low * S, 0, 1]);
+  /* largo real (ver «medidas reales»), con la misma escala en los tres ejes para no deformarlo */
+  const R = vReal(VREAL.pz1), Sx = S * R[2], Sy = S * R[1], Sz = S * R[0];
+  const base = new Float32Array([0, 0, Sx, 0, 0, Sy, 0, 0, -Sz, 0, 0, 0, 0, -low * Sy, 0, 1]);
   const tur = M.ix[ex.turret], gun = M.ix[ex.gun], tw = P0.W.subarray(tur * 16, tur * 16 + 16), gw = P0.W.subarray(gun * 16, gun * 16 + 16);
   const piv = M4.tp(base, [tw[12], tw[13], tw[14]]), mz = M4.tp(base, M4.tp(gw, ex.muzzle));
   const clipNodes = nm => new Set((M.clips[nm] ? M.clips[nm].ch : []).map(c => c.node));
   /* separación de las orugas (para repartir el giro entre los dos lados) */
   const half = Math.abs(M4.tp(base, [0, 0, 0.365])[0]);
-  return { M, S, base, tur, gun, gunAxis: ex.gunAxis || [0, 0, -1], pivot: piv, muzzle: mz[1] - piv[1], loop: ex.trackLoop * S, cycle: ex.trackCycle,
+  return { M, S, base, tur, gun, gunAxis: ex.gunAxis || [0, 0, -1], pivot: piv, muzzle: mz[1] - piv[1], loop: ex.trackLoop * Sx, cycle: ex.trackCycle,
     clipL: ex.tracks.left, clipR: ex.tracks.right, nodesL: clipNodes(ex.tracks.left), nodesR: clipNodes(ex.tracks.right), half, states: new Map() };
 }
 /* las orugas avanzan lo que haya avanzado cada lado: en recto las dos igual; al girar, una más que la otra (o en sentidos contrarios) */
@@ -8130,11 +8189,12 @@ function vmDrawPz1(v, m, vp, ex, ey, ez) {
    esqueleto. Las orugas usan el clip de marcha (1,6 s por ciclo, 3,91 m de oruga) a la fase de cada lado. */
 function vmSetupT26(M) {
   const P0 = vmState(M); vmWorld(M, P0);
-  const base = new Float32Array([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1]);       // media vuelta: el frente a -Z
+  const R = vReal(VREAL.t26);       // a su medida real (ver «medidas reales»)
+  const base = new Float32Array([-R[0], 0, 0, 0, 0, R[1], 0, 0, 0, 0, -R[2], 0, 0, 0, 0, 1]);       // media vuelta: el frente a -Z
   const at = n => { const i = M.ix[n]; return M4.tp(base, [P0.W[i * 16 + 12], P0.W[i * 16 + 13], P0.W[i * 16 + 14]]); };
   const piv = at('Turret'), mz = at('Socket_Muzzle'), rig = M.J.nodes[M.ix.T26_Rig] && M.J.nodes[M.ix.T26_Rig].extras || {};
   const drive = M.clips.Drive_Forward, side = c => new Set(drive ? drive.ch.filter(x => new RegExp('_' + c + '\\d*$').test(M.names[x.node])).map(x => x.node) : []);
-  return { M, base, tur: M.ix.Turret, gun: M.ix.Gun_Pitch, pivot: piv, muzzle: mz[1] - piv[1], loop: rig['Avance por ciclo (m)'] || 3.9129, cycle: drive ? drive.dur : 1.6,
+  return { M, base, tur: M.ix.Turret, gun: M.ix.Gun_Pitch, pivot: piv, muzzle: mz[1] - piv[1], loop: (rig['Avance por ciclo (m)'] || 3.9129) * R[2], cycle: drive ? drive.dur : 1.6,
     nodesL: side('L'), nodesR: side('R'), half: Math.abs(at('Sprocket_L')[0]), states: new Map() };
 }
 function vmDrawT26(v, m, vp, ex, ey, ez) {
@@ -9127,12 +9187,22 @@ function camSetup(dt) {
         cam.yaw = Math.atan2(_moscaEye[8], _moscaEye[10]); cam.pitch = Math.asin(clamp(-_moscaEye[9], -1, 1));
         fov = mosca.fov;
       } else if (plane) {
-        const cpv = Math.cos(v.pitch), yc = v.yaw + (game.planeOrb || 0), dist = 13 + v.speed * 0.07;
-        const tx = v.x + Math.sin(yc) * cpv * dist, tz = v.z + Math.cos(yc) * cpv * dist, ty = Math.max(v.y + 4.2 - Math.sin(v.pitch) * dist * 0.7, Math.max(groundAt(tx, tz), waterY) + 1.6);
+        /* cámara de persecución: detrás y encima del avión según sus propios ejes, que sigue con algo de retraso (también al alabear:
+           en un tonel el avión gira primero y la cámara lo acompaña después; en un rizo pasa por arriba con él) */
+        const o = eulerAxes(v.yaw, v.pitch, v.roll), dist = 13 + v.speed * 0.07;
+        if (!game.pcam) game.pcamA = null;
+        const A = game.pcamA || (game.pcamA = { f: o.f.slice(), u: o.u.slice() }), kf = Math.min(1, dt * 5), ku = Math.min(1, dt * 3);
+        for (let i = 0; i < 3; i++) { A.f[i] = lerp(A.f[i], o.f[i], kf); A.u[i] = lerp(A.u[i], o.u[i], ku); }
+        const nz = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; a[0] /= l; a[1] /= l; a[2] /= l; return a; };
+        nz(A.f); { const d = A.u[0] * A.f[0] + A.u[1] * A.f[1] + A.u[2] * A.f[2]; for (let i = 0; i < 3; i++) A.u[i] -= d * A.f[i]; nz(A.u); }
+        const b = v3rot([-A.f[0], -A.f[1], -A.f[2]], A.u, -(game.planeOrb || 0));       // arrastrar gira la cámara alrededor del avión
+        const tx = v.x + b[0] * dist + A.u[0] * 3.6, tz = v.z + b[2] * dist + A.u[2] * 3.6, ty = Math.max(v.y + 0.6 + b[1] * dist + A.u[1] * 3.6, Math.max(groundAt(tx, tz), waterY) + 1.6);
         const pc = game.pcam || (game.pcam = { x: tx, y: ty, z: tz }), kc = Math.min(1, dt * 4.5);
         pc.x = lerp(pc.x, tx, kc); pc.y = lerp(pc.y, ty, kc); pc.z = lerp(pc.z, tz, kc);
-        const lx = v.x - Math.sin(v.yaw) * cpv * 14 - pc.x, ly = v.y + 1.8 + Math.sin(v.pitch) * 14 - pc.y, lz = v.z - Math.cos(v.yaw) * cpv * 14 - pc.z;
-        cam.x = pc.x; cam.y = pc.y; cam.z = pc.z; cam.yaw = Math.atan2(-lx, -lz); cam.pitch = Math.atan2(ly, Math.hypot(lx, lz));
+        const fw = nz([v.x + A.f[0] * 14 + A.u[0] * 1.8 - pc.x, v.y + 1.2 + A.f[1] * 14 + A.u[1] * 1.8 - pc.y, v.z + A.f[2] * 14 + A.u[2] * 1.8 - pc.z]);
+        const d = A.u[0] * fw[0] + A.u[1] * fw[1] + A.u[2] * fw[2], up = nz([A.u[0] - d * fw[0], A.u[1] - d * fw[1], A.u[2] - d * fw[2]]);
+        const rt = [fw[1] * up[2] - fw[2] * up[1], fw[2] * up[0] - fw[0] * up[2], fw[0] * up[1] - fw[1] * up[0]];
+        cam.x = pc.x; cam.y = pc.y; cam.z = pc.z; cam.yaw = Math.atan2(-fw[0], -fw[2]); cam.pitch = Math.asin(clamp(fw[1], -1, 1)); game.pcamRoll = Math.atan2(rt[1], up[1]);
         game.planeFov = lerp(game.planeFov || 1.2, (64 + Math.min(16, v.speed * 0.14)) * Math.PI / 180, Math.min(1, dt * 3)); fov = game.planeFov;       // el campo de visión se abre con la velocidad
       }
       else if (v.kind === 'tank') { const c = tankView(v, P); cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = P.yaw; cam.pitch = P.pitch; }       // el centro de la pantalla es exactamente donde apuntas
@@ -9228,7 +9298,7 @@ function render(dt) {
   const cockpit = moscaCockpit();
   M4.perspective(PROJ, fov, asp, cockpit ? .055 : 0.15, 3200);
   /* con el giroscopio, la cámara también se ladea con el teléfono para que el horizonte del juego siga nivelado con el real */
-  cam.roll = P && P.alive && (game.state === 'play' || game.state === 'pause') && !(P.veh && P.veh.kind !== 'tank') ? (P.roll || 0) : 0;
+  cam.roll = P && P.alive && (game.state === 'play' || game.state === 'pause') ? (!P.veh || P.veh.kind === 'tank' ? (P.roll || 0) : P.veh.kind === 'plane' && !cockpit ? (game.pcamRoll || 0) : 0) : 0;
   if (cockpit) m4inv(VIEW, _moscaEye);
   else { M4.identity(VIEW); M4.rotZ(VIEW, -cam.roll); M4.rotX(VIEW, -cam.pitch); M4.rotY(VIEW, -cam.yaw); M4.translate(VIEW, -cam.x, -cam.y, -cam.z); }
   M4.mul(VP, PROJ, VIEW);
