@@ -1717,7 +1717,7 @@ progMesh = compile(
    varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
    void main(){ vec4 w = uM*vec4(aPos,1.0); vW = w.xyz; vNor = (uM*vec4(aNor,0.0)).xyz; vCol = aCol; vO = aPos; vNO = aNor; gl_Position = uVP*w; }`,
   PREC + `varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
-   uniform sampler2D uTx; uniform float uTxMode; uniform vec4 uTxA; uniform vec4 uTxB; uniform float uSpec;
+   uniform sampler2D uTx; uniform sampler2D uTxN; uniform float uTxMode; uniform vec4 uTxA; uniform vec4 uTxB; uniform float uSpec;
    uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uFogC; uniform vec2 uFog;
    uniform float uLit; uniform float uAlpha; uniform float uDetail; uniform vec3 uTint; uniform vec2 uScroll; uniform float uTer;
    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -1727,9 +1727,22 @@ progMesh = compile(
    float vnw(vec2 p){ p = mod(p, 256.0); vec2 i = floor(p), f = fract(p), j = mod(i + 1.0, 256.0); f = f*f*(3.0-2.0*f);
      return mix(mix(hash(i), hash(vec2(j.x, i.y)), f.x), mix(hash(vec2(i.x, j.y)), hash(j), f.x), f.y); }
    void main(){
-     vec3 c = vCol*uTint;
+     vec3 c = vCol*uTint, nP = normalize(vNor); float rgh = -1.0;
+     /* materiales PBR (4): color, normal y rugosidad de un solo material por muro, proyectado en la cara dominante (sin mezclar
+        proyecciones); los tejados, a lo largo de su pendiente. uTxA: x escala (1/m), y tejado, z fuerza del relieve; uTxB: color de referencia */
+     if(uTxMode>3.5){
+       vec3 nn = normalize(vNO), aw = abs(nn), T, B; vec2 uv; float ts = uTxA.x;
+       if(uTxA.y > 0.5 && aw.y > 0.25 && aw.y < 0.985){ T = normalize(vec3(-nn.z, 0.0, nn.x)); B = cross(T, nn); }
+       else if(aw.x >= aw.y && aw.x >= aw.z){ T = vec3(0.0,0.0,1.0); B = vec3(0.0,1.0,0.0); }
+       else if(aw.z >= aw.y){ T = vec3(1.0,0.0,0.0); B = vec3(0.0,1.0,0.0); }
+       else { T = vec3(1.0,0.0,0.0); B = vec3(0.0,0.0,1.0); }
+       uv = vec2(dot(vO,T), dot(vO,B))*ts;
+       vec3 tn = texture2D(uTxN, uv).rgb; vec2 nxy = (tn.xy*2.0-1.0)*uTxA.z; rgh = tn.b;
+       nP = normalize(T*nxy.x + B*nxy.y + nn*sqrt(max(0.0, 1.0-dot(nxy,nxy))));
+       c = texture2D(uTx, uv).rgb*clamp(vCol/uTxB.rgb, 0.7, 1.2)*uTint;
+     }
      /* modelos por código: textura de detalle por los tres ejes del objeto (1) o calca plana (2) */
-     if(uTxMode>0.5){ if(uTxMode<1.5){ vec3 tw = abs(normalize(vNO)); tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
+     else if(uTxMode>0.5){ if(uTxMode<1.5){ vec3 tw = abs(normalize(vNO)); tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
        c *= (texture2D(uTx, vO.zy*ts).rgb*tw.x + texture2D(uTx, vO.zx*ts).rgb*tw.y + texture2D(uTx, vO.xy*ts).rgb*tw.z)*2.0; }
      else if(uTxMode>2.5){       /* mampostería (3): foto de piedra proyectada por los tres ejes del mundo; los tejados (inclinados) se quedan con su color */
        vec3 nn = normalize(vNO), tw = abs(nn);
@@ -1738,7 +1751,7 @@ progMesh = compile(
          c = st*clamp(vCol/vec3(0.74,0.66,0.52), 0.55, 1.25)*uTint; } }
      else { vec4 tc = texture2D(uTx, vec2(dot(uTxA.xyz,vO)+uTxA.w, dot(uTxB.xyz,vO)+uTxB.w)); if(tc.a<0.5) discard; c = tc.rgb*uTint; } }
      if(uLit>0.5){
-       vec3 n = normalize(vNor);
+       vec3 n = nP;
        vec2 q = vW.xz+uScroll; float fade = 0.0;
        if(uTer>0.5){
          fade = 1.0 - smoothstep(22.0, 105.0, length(vW-uCam));
@@ -1754,6 +1767,9 @@ progMesh = compile(
        if(uTer>0.5){ c *= 0.92 + 0.16*vnw(q*0.043); float gr = vnw(q*23.0)*0.6 + vnw(q*53.0)*0.4; c *= 1.0 + (gr-0.5)*0.32*fade; }
        c *= light;
        if(uSpec>0.0){ vec3 sv = normalize(uCam-vW); float sp = pow(max(dot(n, normalize(uSun+sv)),0.0), 26.0); c += vec3(1.0,0.96,0.88)*sp*uSpec*uTint; }
+       if(rgh >= 0.0){       /* brillo según la rugosidad del material (la teja vidriada por el uso brilla algo; la arpillera, nada) */
+         float gs = (1.0-rgh)*(1.0-rgh); vec3 sv = normalize(uCam-vW);
+         c += vec3(1.0,0.95,0.85)*pow(max(dot(n, normalize(uSun+sv)),0.0), mix(8.0, 96.0, gs))*gs*0.9*d; }
      }
      float f = clamp((length(vW-uCam)-uFog.x)/(uFog.y-uFog.x),0.0,1.0);
      c = mix(c,uFogC,f*(2.0-f)*0.92);
@@ -1766,11 +1782,11 @@ progPart = compile(
   `precision mediump float; varying vec4 vCol;
    void main(){ float r = length(gl_PointCoord-0.5)*2.0; float a = smoothstep(1.0,0.3,r); gl_FragColor = vec4(vCol.rgb, vCol.a*a); }`,
   ['aPos', 'aSize', 'aCol']);
-for (const n of ['uVP', 'uM', 'uSun', 'uCam', 'uFogC', 'uFog', 'uLit', 'uAlpha', 'uDetail', 'uTint', 'uScroll', 'uTer', 'uTx', 'uTxMode', 'uTxA', 'uTxB', 'uSpec']) U[n] = gl.getUniformLocation(progMesh, n);
+for (const n of ['uVP', 'uM', 'uSun', 'uCam', 'uFogC', 'uFog', 'uLit', 'uAlpha', 'uDetail', 'uTint', 'uScroll', 'uTer', 'uTx', 'uTxN', 'uTxMode', 'uTxA', 'uTxB', 'uSpec']) U[n] = gl.getUniformLocation(progMesh, n);
 UP.uVP = gl.getUniformLocation(progPart, 'uVP'); UP.uScale = gl.getUniformLocation(progPart, 'uScale');
 gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
 gl.useProgram(progMesh);
-gl.uniform1i(U.uTx, 0); gl.uniform1f(U.uTxMode, 0); gl.uniform1f(U.uSpec, 0);
+gl.uniform1i(U.uTx, 0); gl.uniform1i(U.uTxN, 1); gl.uniform1f(U.uTxMode, 0); gl.uniform1f(U.uSpec, 0);
 }
 initPrograms();
 /* ============ texturas hechas por código ============
@@ -1791,22 +1807,42 @@ function txUpload(t) {
   const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, 4);
 }
 function txRestore() { for (const k in TX) txUpload(TX[k]); }
-/* fotos de muro de piedra seca (cuatro variantes) para casas, iglesia y márgenes; en el móvil, la mitad de grandes */
+/* ============ materiales PBR de la zona ============
+   Lo que se veía en la Terra Alta y la ribera del Ebro en 1938, cada uno con su color (con la oclusión ya metida) y su mapa de normal
+   y rugosidad (R, G: normal; B: rugosidad), hechos con pbr/gen.py:
+   - seca: piedra seca de los márgenes de los bancales y de las casas en ruinas (foto piedra_0);
+   - mamp: mampostería irregular de piedra caliza con mortero de cal de casas, iglesia, torre y ermita (foto piedra_1);
+   - teja: teja árabe de barro cocido, en canal y cobija, de todos los tejados;
+   - sacos: sacos terreros de arpillera de parapetos y nidos antiaéreos;
+   - hormigon: hormigón de encofrado de tablas de los fortines.
+   Cada muro lleva un único material (nada de mezclar texturas en una misma pared). En el móvil o con texturas bajas, a la mitad. */
+const PBR = {
+  seca: { ts: 1 / 2.4, ref: [0.54, 0.5, 0.43], k: 1.0 },
+  mamp: { ts: 1 / 3.0, ref: [0.7, 0.64, 0.51], k: 1.0 },
+  teja: { ts: 1 / 2.0, ref: [0.65, 0.34, 0.23], k: 1.0, roof: 1 },
+  sacos: { ts: 1 / 1.6, ref: [0.66, 0.6, 0.44], k: 1.0 },
+  hormigon: { ts: 1 / 3.0, ref: [0.6, 0.59, 0.54], k: 1.0 }
+};
 function stoneTexLoad() {
-  for (let i = 0; i < 4; i++) {
-    const im = new Image();
-    im.onload = () => { TX['piedra' + i] = { cv: im, tex: null, clamp: false }; txUpload(TX['piedra' + i]); };
-    im.src = 'piedra_' + i + (GFX_TOUCH || gfxTexLevel() === 0 ? '_m' : '') + '.jpg';
+  const m = GFX_TOUCH || gfxTexLevel() === 0 ? '_m' : '';
+  for (const k in PBR) for (const t of ['c', 'n']) {
+    const im = new Image(), key = 'mat_' + k + '_' + t;
+    im.onload = () => { TX[key] = { cv: im, tex: null, clamp: false }; txUpload(TX[key]); };
+    im.src = k + '_' + t + m + '.jpg';
   }
 }
-/* las mallas de piedra: cada una con su foto, un paño de 2,3 m */
+/* cada material es una malla: con sus dos texturas (color en la unidad 0, normal y rugosidad en la 1); mientras cargan, con su color */
 function drawStone() {
-  if (!world.stone) return;
-  for (let i = 0; i < 4; i++) {
-    const m = world.stone[i]; if (!m) continue; const t = TX['piedra' + i];
-    if (t && t.tex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.uniform1f(U.uTxMode, 3); gl.uniform4f(U.uTxA, 1 / 2.3, 0, 0, 0); }
-    drawMesh(m);
-    if (t && t.tex) gl.uniform1f(U.uTxMode, 0);
+  if (!world.mat) return;
+  for (const k in world.mat) {
+    const mesh = world.mat[k], M = PBR[k], tc = TX['mat_' + k + '_c'], tn = TX['mat_' + k + '_n'];
+    const on = !!(tc && tc.tex && tn && tn.tex);
+    if (on) {
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tn.tex); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tc.tex);
+      gl.uniform1f(U.uTxMode, 4); gl.uniform4f(U.uTxA, M.ts, M.roof || 0, M.k, 0); gl.uniform4f(U.uTxB, M.ref[0], M.ref[1], M.ref[2], 0);
+    }
+    drawMesh(mesh);
+    if (on) gl.uniform1f(U.uTxMode, 0);
   }
 }
 function txInit() {
@@ -2482,10 +2518,10 @@ const world = { houses: [] };
 (function buildWorld() {
   const R = seeded(1938); let g = new Geo();
   const rr = (a, b) => a + R() * (b - a);
-  /* muros de piedra: van aparte, en cuatro mallas (una por textura de mampostería) que se pintan con su textura proyectada */
-  const GS = [new Geo(), new Geo(), new Geo(), new Geo()];
-  const stone = (v, f) => { const k = g; g = GS[v & 3]; try { return f(); } finally { g = k; } };
-  const sv = () => (R() * 4) | 0;
+  /* muros, tejados, sacos y hormigón van aparte, una malla por material PBR (ver «materiales PBR de la zona»); los tejados se separan
+     de los muros al final, por su inclinación */
+  const GS = { seca: new Geo(), mamp: new Geo(), sacos: new Geo(), hormigon: new Geo() };
+  const stone = (k, f) => { const o = g; g = GS[k]; try { return f(); } finally { g = o; } };
   const WALLS = [0xcbb994, 0xbfa780, 0xd6c7a4, 0xb89f7a, 0xc9b08a].map(hex), ROOF = [0xa5573a, 0x9a4f36, 0xb0623f].map(hex);
   const STONE = hex(0x9c917c), WOOD = hex(0x6a4b2e), DARK = hex(0x2a241d), BURLAP = hex(0xa8996f);
   const trees = [], shadeMap = new Float32Array(W.NX * W.NZ).fill(1);
@@ -2507,7 +2543,7 @@ const world = { houses: [] };
     o = o || {};
     const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
     world.houses.push([x, z, w, d, o.open ? 1 : 0]);
-    const V = sv();
+    const V = o.ruin ? 'seca' : 'mamp';       // un solo material por casa
     if (o.open) openHouse(x, z, w, d, h, o, wall, roof, V);
     else if (o.ruin) stone(V, () => {
       const t = 0.55, hs = [rr(0.35, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.25, 0.8), rr(0.3, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.2, 0.7)];
@@ -2595,8 +2631,7 @@ const world = { houses: [] };
   }
   function parapet(x, z, len, alongX) {
     const sx = alongX ? len : 0.8, sz = alongX ? 0.8 : len, y = Math.max(terrainH(x - sx / 2, z - sz / 2), terrainH(x + sx / 2, z + sz / 2), terrainH(x, z));
-    g.box(x, y + 0.05, z, sx, 1.3, sz, BURLAP, shade(BURLAP, 1.08));
-    g.box(x, y + 0.82, z, sx * 0.94, 0.3, sz * 0.7, shade(BURLAP, 0.9));
+    stone('sacos', () => { g.box(x, y + 0.05, z, sx, 1.3, sz, BURLAP, shade(BURLAP, 1.08)); g.box(x, y + 0.82, z, sx * 0.94, 0.3, sz * 0.7, shade(BURLAP, 0.9)); });
     addAABB(x - sx / 2, x + sx / 2, y - 1, y + 0.97, z - sz / 2, z + sz / 2);
   }
   function stoneWall(x0, z0, x1, z1) {
@@ -2604,7 +2639,7 @@ const world = { houses: [] };
     for (let i = 0; i < n; i++) {
       const cx = lerp(x0, x1, (i + 0.5) / n), cz = lerp(z0, z1, (i + 0.5) / n), L = len / n + 0.05, y = terrainH(cx, cz), hh = rr(0.85, 1.1);
       const sx = alongX ? L : 0.7, sz = alongX ? 0.7 : L;
-      const col = shade(STONE, rr(0.88, 1.06)); stone(i + (cx * 7 | 0), () => g.box(cx, y + hh / 2 - 0.6, cz, sx, hh + 1.2, sz, col));
+      const col = shade(STONE, rr(0.88, 1.06)); stone('seca', () => g.box(cx, y + hh / 2 - 0.6, cz, sx, hh + 1.2, sz, col));       // todo el muro, de piedra seca
       addAABB(cx - sx / 2, cx + sx / 2, y - 1.5, y + hh, cz - sz / 2, cz + sz / 2);
     }
   }
@@ -2627,7 +2662,7 @@ const world = { houses: [] };
       if (out < 7) hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(2, 7, out));
     }
     const yf = y0 + 0.08;
-    const piece = (cx, cz, sx, sz, yb, yt, col, noHit) => { stone(2, () => g.box(cx, (yb + yt) / 2, cz, sx, yt - yb, sz, col)); if (!noHit) addAABB(cx - sx / 2, cx + sx / 2, yb, yt, cz - sz / 2, cz + sz / 2); };
+    const piece = (cx, cz, sx, sz, yb, yt, col, noHit) => { stone('mamp', () => g.box(cx, (yb + yt) / 2, cz, sx, yt - yb, sz, col)); if (!noHit) addAABB(cx - sx / 2, cx + sx / 2, yb, yt, cz - sz / 2, cz + sz / 2); };
     /* muros largos de la nave, con ventanales altos y la coronación rota */
     for (const sd of [-1, 1]) {
       const wx = x + sd * (W2 - t / 2), tops = sd < 0 ? [9, 7.9, 9.5, 7.4] : [9, 9.2, 8.6, 9], cuts = [-10, -5.65, -4.35, -0.65, 0.65, 4.35, 5.65, 10];
@@ -2646,7 +2681,7 @@ const world = { houses: [] };
     piece(x - 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x + 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x, fz, 2.2, t, yf + 3.7, yf + H + 1.2, cw);
     { const li = fz - t / 2 - 0.012, wl = W2 - t - 1.1;       // forro interior de la fachada, en tres paños que dejan libre el hueco de la puerta
       g.box(x - 1.1 - wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x + 1.1 + wl / 2, yf + H / 2, li, wl, H, 0.024, lin); g.box(x, yf + (3.7 + H) / 2, li, 2.2, H - 3.7, 0.024, lin); }
-    stone(2, () => { g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); }); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
+    stone('mamp', () => { g.box(x, yf + H + 2, fz, 7.6, 1.6, t, cw); g.box(x, yf + H + 3.3, fz, 4.2, 1.1, t, cw); g.box(x, yf + H + 4.2, fz, 1.6, 0.7, t, cw); }); g.box(x, yf + H + 5, fz, 0.16, 1, 0.16, DARK); g.box(x, yf + H + 5.15, fz, 0.6, 0.16, 0.16, DARK);
     g.box(x, yf + H + 1.25, fz + 0.1, 2 * W2 + 0.3, 0.3, t + 0.3, STN);
     for (const sd of [-1, 1]) { g.box(x + sd * 1.55, yf + 2.2, fz + t / 2 + 0.12, 0.55, 4.4, 0.3, STN); g.box(x + sd * 4.9, yf + (H + 1.2) / 2, fz + t / 2 + 0.1, 0.8, H + 1.2, 0.25, shade(cw, 0.94)); }
     g.box(x, yf + 4.6, fz + t / 2 + 0.14, 4, 0.45, 0.36, STN); g.gable(x - 1.9, x + 1.9, fz + t / 2, fz + t / 2 + 0.32, yf + 4.82, 0.9, STN, true, STN);
@@ -2814,7 +2849,7 @@ const world = { houses: [] };
   /* ---- Cota 481 ---- */
   (function fortin() {
     const x = -194, z = -26, y = terrainH(x, z), c = hex(0x9a968a);
-    g.box(x, y + 0.6, z, 6, 2.6 + 2, 5, c); g.box(x + 3.02, y + 1.35, z, 0.1, 0.35, 2.4, DARK); g.box(x, y + 1.35, z + 2.52, 3, 0.35, 0.1, DARK);
+    stone('hormigon', () => g.box(x, y + 0.6, z, 6, 2.6 + 2, 5, c)); g.box(x + 3.02, y + 1.35, z, 0.1, 0.35, 2.4, DARK); g.box(x, y + 1.35, z + 2.52, 3, 0.35, 0.1, DARK);
     addAABB(x - 3, x + 3, y - 2, y + 1.9, z - 2.5, z + 2.5); noGo.push([x, z, 6]); world.houses.push([x, z, 6, 5]);
   })();
   parapet(-178, -24, 6, false); parapet(-180, -12, 5, false); parapet(-186, -6, 5, true); parapet(-198, -8, 5, true); parapet(-182, -34, 5, true);
@@ -2827,7 +2862,7 @@ const world = { houses: [] };
   /* ---- Serra de Pàndols: ermita de Santa Magdalena ---- */
   (function ermita() {
     const x = -74, z = 212, y = terrainH(x, z), c = hex(0xd9d0b8);
-    stone(1, () => { g.box(x, y + 2.2 - 2, z, 6, 4.4 + 4, 9, c); g.gable(x - 3.3, x + 3.3, z - 4.8, z + 4.8, y + 4.4, 1.6, ROOF[0], false, c); });
+    stone('mamp', () => { g.box(x, y + 2.2 - 2, z, 6, 4.4 + 4, 9, c); g.gable(x - 3.3, x + 3.3, z - 4.8, z + 4.8, y + 4.4, 1.6, ROOF[0], false, c); });
     g.box(x, y + 6.6, z - 4.5, 1.4, 1.6, 0.5, c); g.box(x, y + 1, z - 4.55, 1.2, 2, 0.1, WOOD);
     addAABB(x - 3, x + 3, y - 4, y + 5.2, z - 4.5, z + 4.5); noGo.push([x, z, 8]); world.houses.push([x, z, 6, 9]);
   })();
@@ -2838,7 +2873,7 @@ const world = { houses: [] };
    [-322, 52, 8, 8, 6], [-306, 48, 8, 7, 6], [-290, 44, 7, 7, 5.5], [-284, -2, 7, 8, 6]]
     .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: (a[0] === -298 && a[1] === -14) ? 's' : (a[0] === -296) ? 'n' : (a[0] === -284) ? 'e' : 0 }));
   house(-304, -46, 22, 12, 8, { wall: hex(0xe6dfcc), chimney: false, open: 's' });        // bodega cooperativa
-  (function tower() { const x = -340, z = 12, y = terrainH(x, z); stone(3, () => g.box(x, y + 7, z, 5, 18, 5, cw)); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
+  (function tower() { const x = -340, z = 12, y = terrainH(x, z); stone('mamp', () => g.box(x, y + 7, z, 5, 18, 5, cw)); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
   parapet(-286, 22, 5, false); parapet(-288, 0, 4, false); parapet(-300, 16, 4.5, true); crate(-308, 14, 0.9); crate(-316, 4, 0.8); crate(-314, 5, 0.7);
 
   /* ---- Ribera izquierda: campamento y barcas ---- */
@@ -2914,7 +2949,7 @@ const world = { houses: [] };
     const y = terrainH(a.x, a.z), dk = hex(0x2a2a28);
     for (let i = 0; i < 9; i++) {
       const an = i / 9 * Math.PI * 2, m = M4.create(); M4.translate(m, a.x + Math.cos(an) * 1.75, terrainH(a.x + Math.cos(an) * 1.75, a.z + Math.sin(an) * 1.75), a.z + Math.sin(an) * 1.75); M4.rotY(m, -an);
-      g.with(m, () => { g.box(0, 0.2, 0, 0.5, 0.9, 1.3, BURLAP, shade(BURLAP, 1.08)); g.box(0, 0.68, 0, 0.42, 0.26, 1.1, shade(BURLAP, 0.9)); });
+      stone('sacos', () => g.with(m, () => { g.box(0, 0.2, 0, 0.5, 0.9, 1.3, BURLAP, shade(BURLAP, 1.08)); g.box(0, 0.68, 0, 0.42, 0.26, 1.1, shade(BURLAP, 0.9)); }));
     }
     for (let i = 0; i < 3; i++) { const an = i / 3 * Math.PI * 2 + 0.5; g.limb([a.x, y + 1.3, a.z], [a.x + Math.cos(an) * 0.75, y, a.z + Math.sin(an) * 0.75], 0.07, 0.07, dk); }
     g.box(a.x, y + 1.32, a.z, 0.16, 0.14, 0.16, dk); g.box(a.x + 0.9, y + 0.2, a.z + 0.5, 0.5, 0.35, 0.3, hex(0x5a5d48));
@@ -2929,7 +2964,16 @@ const world = { houses: [] };
     }
   }
   world.staticMesh = makeMesh(g.a);
-  world.stone = GS.map(q => q.a.length ? makeMesh(q.a) : null);
+  /* los tejados (caras inclinadas) de casas, iglesia y ermita pasan a la malla de teja árabe */
+  const TEJA = [];
+  for (const k of ['seca', 'mamp']) {
+    const a = GS[k].a, keep = [];
+    for (let i = 0; i < a.length; i += 27) { const ny = Math.abs(a[i + 4]); (ny > 0.25 && ny < 0.985 ? TEJA : keep).push(...a.slice(i, i + 27)); }
+    GS[k].a = keep;
+  }
+  world.mat = {};
+  for (const k of ['seca', 'mamp', 'sacos', 'hormigon']) if (GS[k].a.length) world.mat[k] = makeMesh(GS[k].a);
+  if (TEJA.length) world.mat.teja = makeMesh(TEJA);
 
   /* ---- puentes ---- */
   function bridgeGeo(b, boats) {
@@ -7099,6 +7143,8 @@ function edgeLook(p, dt, lo, hi) {
 }
 function updatePlayer(dt) {
   const p = P, k = input.keys;
+  /* la marca de impacto (blanca) o de baja (roja) dura solo un momento, vayas a pie, en un vehículo o hayas caído */
+  p.hitT = Math.max(0, (p.hitT || 0) - dt); if (p.hitT <= 0) p.hitKill = false;
   if (!isFinite(p.yaw)) p.yaw = 0; if (!isFinite(p.pitch)) p.pitch = 0;       // la vista nunca puede quedar en un valor imposible
   if (p.yaw > 50 || p.yaw < -50) { const w = Math.round(p.yaw / 6.283185307) * 6.283185307; p.yaw -= w; if (gyro.ok) gyro.yawOff -= w; }
   if (!isFinite(input.lookX) || !isFinite(input.lookY)) input.lookX = input.lookY = 0;
@@ -7189,7 +7235,7 @@ function updatePlayer(dt) {
   }
   /* armas */
   const ws = p.weps[p.cur], w = ws.def;
-  p.fireT -= dt; input.fireQ -= dt; p.nadeT -= dt; p.hitT -= dt;
+  p.fireT -= dt; input.fireQ -= dt; p.nadeT -= dt;
   p.switchT = Math.max(0, p.switchT - dt); p.kick = Math.max(0, p.kick - dt * 6); p.recoil *= Math.max(0, 1 - dt * 8); p.spreadAdd = Math.max(0, p.spreadAdd - dt * 0.07);
   if (p.boltT > 0) p.boltT -= dt;
   if (p.reloadT > 0) { p.reloadT -= dt; if (p.reloadT <= 0) { const n = Math.min(w.mag - ws.ammo, ws.reserve); ws.ammo += n; ws.reserve -= n; SFX.click(); } }
@@ -7452,6 +7498,17 @@ function tankAim(v, p, ctl) {
   ctl.aimYaw = p.yaw + clamp(angDiff(Math.atan2(-ax, -az), p.yaw), -0.22, 0.22);       // la corrección por la posición de la cámara es pequeña; jamás un giro brusco
   ctl.aimPitch = clamp(Math.atan2(ay, d), p.pitch - 0.35, p.pitch + 0.5) + (v.def.cannon ? Math.atan(0.5 * SHELL_G * d / (SHELL_V * SHELL_V)) : 0);
 }
+/* boca del arma tal y como se dibuja: el carro con su cabeceo y alabeo, la torre girada y el arma elevada sobre su propio eje.
+   mg: la ametralladora (en el T-26 la coaxial; en el Panzer I es su única arma) */
+const _tmz = M4.create();
+function tankTip(v, mg) {
+  const m = world.vm[v.type], T = _tmz;
+  M4.identity(T); M4.translate(T, v.x, v.y, v.z); M4.rotY(T, v.yaw); M4.rotX(T, v.pitch || 0); M4.rotZ(T, v.roll || 0);
+  if (!m.vm3d) M4.scale(T, ...(VSC[v.type] || [1, 1, 1]));       // el de código se dibuja escalado
+  M4.translate(T, m.pivot[0], m.pivot[1], m.pivot[2]); M4.rotY(T, angDiff(v.tyaw, v.yaw));
+  const g = m.gunAt || [0, m.muzzle, 0]; M4.translate(T, g[0], g[1], g[2]); M4.rotX(T, m.vm3d ? (v.tpitch || 0) : (v.tpitch || 0) * 0.5);
+  return M4.tp(T, (mg && m.mgOff) || m.tipOff || [0, 0, v.def.cannon && !mg ? -2.4 : -1.3]);
+}
 function tankMuzzle(v) {
   const m = world.vm[v.type], c = Math.cos(v.yaw), s = Math.sin(v.yaw), px = m.pivot[0], pz = m.pivot[2];
   return [v.x + px * c + pz * s, v.y + m.pivot[1] + m.muzzle, v.z - px * s + pz * c];
@@ -7592,7 +7649,7 @@ function updateGround(v, dt, ctl) {
       const cp = Math.cos(v.tpitch), dx = -Math.sin(v.tyaw) * cp, dy = Math.sin(v.tpitch), dz = -Math.cos(v.tyaw) * cp, m = tankMuzzle(v);
       if (D.cannon && ctl.fire && v.fireT <= 0) {
         v.fireT = 3.6; v.kick = 1;
-        const mx = m[0] + dx * 2.4, my = m[1] + dy * 2.4, mz = m[2] + dz * 2.4;
+        const [mx, my, mz] = tankTip(v, false);       // sale de la boca del cañón, tal y como se ve
         projectiles.push({ kind: 'shell', x: mx, y: my, z: mz, vx: dx * 170, vy: dy * 170, vz: dz * 170, owner: op, team: v.team, fromV: v, spin: 0 });
         addPart(mx, my, mz, 0, 0, 0, 2.2, 6, 0.1, 1, 0.86, 0.5, 0.95);
         for (let i = 0; i < 4; i++) addPart(mx, my, mz, dx * 4 + rnd(-1, 1), dy * 4 + rnd(0, 1.5), dz * 4 + rnd(-1, 1), 1, 2.5, rnd(0.8, 1.5), 0.7, 0.68, 0.62, 0.4, 0, 1.5);
@@ -7602,10 +7659,11 @@ function updateGround(v, dt, ctl) {
       if ((D.cannon ? ctl.fire2 : (ctl.fire || ctl.fire2)) && v.mgT <= 0 && op.isPlayer) {
         v.mgT = D.mgRate;
         let mx = dx, my = dy, mz = dz;       // la ametralladora no tiene caída: con la torre ya encarada, dispara recta al punto de la mirilla
+        const tp = tankTip(v, true);       // desde la boca de la ametralladora, tal y como se ve
         if (v.aimD && Math.abs(angDiff(ctl.aimYaw, v.tyaw)) < 0.05 && Math.abs(clamp(ctl.aimPitch, GUN_LO, GUN_HI) - v.tpitch) < 0.05) {
-          const ax = v.aimX - m[0], ay = v.aimY - m[1], az = v.aimZ - m[2], l = Math.hypot(ax, ay, az) || 1; mx = ax / l; my = ay / l; mz = az / l;
+          const ax = v.aimX - tp[0], ay = v.aimY - tp[1], az = v.aimZ - tp[2], l = Math.hypot(ax, ay, az) || 1; mx = ax / l; my = ay / l; mz = az / l;
         }
-        vehShot(v, op, m[0] + mx * 1.3, m[1] + my * 1.3, m[2] + mz * 1.3, mx, my, mz, 0.008, 34, 10, D.mgName);
+        vehShot(v, op, tp[0], tp[1], tp[2], mx, my, mz, 0.008, 34, 10, D.mgName);
       }
     }
   }
@@ -8155,7 +8213,9 @@ function vmSetupPz1(M) {
   const clipNodes = nm => new Set((M.clips[nm] ? M.clips[nm].ch : []).map(c => c.node));
   /* separación de las orugas (para repartir el giro entre los dos lados) */
   const half = Math.abs(M4.tp(base, [0, 0, 0.365])[0]);
+  const gp = M4.tp(base, [gw[12], gw[13], gw[14]]);       // eje de elevación del arma
   return { M, S, base, tur, gun, gunAxis: ex.gunAxis || [0, 0, -1], pivot: piv, muzzle: mz[1] - piv[1], loop: ex.trackLoop * Sx, cycle: ex.trackCycle,
+    gunAt: [gp[0] - piv[0], gp[1] - piv[1], gp[2] - piv[2]], tipOff: [mz[0] - gp[0], mz[1] - gp[1], mz[2] - gp[2]],
     clipL: ex.tracks.left, clipR: ex.tracks.right, nodesL: clipNodes(ex.tracks.left), nodesR: clipNodes(ex.tracks.right), half, states: new Map() };
 }
 /* las orugas avanzan lo que haya avanzado cada lado: en recto las dos igual; al girar, una más que la otra (o en sentidos contrarios) */
@@ -8196,7 +8256,9 @@ function vmSetupT26(M) {
   const at = n => { const i = M.ix[n]; return M4.tp(base, [P0.W[i * 16 + 12], P0.W[i * 16 + 13], P0.W[i * 16 + 14]]); };
   const piv = at('Turret'), mz = at('Socket_Muzzle'), rig = M.J.nodes[M.ix.T26_Rig] && M.J.nodes[M.ix.T26_Rig].extras || {};
   const drive = M.clips.Drive_Forward, side = c => new Set(drive ? drive.ch.filter(x => new RegExp('_' + c + '\\d*$').test(M.names[x.node])).map(x => x.node) : []);
+  const gp = at('Gun_Pitch'), to = [mz[0] - gp[0], mz[1] - gp[1], mz[2] - gp[2]];
   return { M, base, tur: M.ix.Turret, gun: M.ix.Gun_Pitch, pivot: piv, muzzle: mz[1] - piv[1], loop: (rig['Avance por ciclo (m)'] || 3.9129) * R[2], cycle: drive ? drive.dur : 1.6,
+    gunAt: [gp[0] - piv[0], gp[1] - piv[1], gp[2] - piv[2]], tipOff: to, mgOff: [to[0] + 0.17, to[1] - 0.02, to[2] + 1.05],       // la DT coaxial, a la derecha del cañón
     nodesL: side('L'), nodesR: side('R'), half: Math.abs(at('Sprocket_L')[0]), states: new Map() };
 }
 function vmDrawT26(v, m, vp, ex, ey, ez) {
@@ -8230,7 +8292,7 @@ async function vmLoad() {
       const M = await vmBuild(g, texMax), X = setup(M);
       if (nj > SK.nj) { SK.nj = nj; skProgram(); }       // el programa de los soldados se rehace con sitio para ellos
       VM3D[key] = X;
-      if ((key === 'pz1' || key === 't26n' || key === 't26') && world.vm && world.vm[key]) { world.vm[key].pivot = X.pivot; world.vm[key].muzzle = X.muzzle; }
+      if ((key === 'pz1' || key === 't26n' || key === 't26') && world.vm && world.vm[key]) Object.assign(world.vm[key], { pivot: X.pivot, muzzle: X.muzzle, gunAt: X.gunAt, tipOff: X.tipOff, mgOff: X.mgOff, vm3d: true });
       X.file = files[fi]; return;
     } catch (e) {
       const last = fi === files.length - 1;
@@ -9724,7 +9786,7 @@ function uiTick(dt) {
   if (scoreOn) renderScore();
   tagT -= 0.12;
   if (p.alive && !uiTick.towerTold && !p.veh) { const T = world.tower; if (Math.abs(p.x - T.x) < T.h && Math.abs(p.z - T.z) < T.h && p.y < T.yf + 1) { uiTick.towerTold = true; showHint('Campanario de Sant Pere: sube por la rampa que rodea el pilar hasta las campanas. Desde arriba se domina la plaza.'); } }
-  if (p.veh || p.aa) tag = null;
+  if (p.veh || p.aa || !p.alive) tag = null;
   else if (p.alive && tagT <= 0) { tagT = 0.12; const c = camBasis(), h = rayWorld(c.ex, c.ey, c.ez, c.fx, c.fy, c.fz, 140, p.team); tag = h.s ? h.s.name : null; }
 }
 function project(x, y, z) {
