@@ -6444,6 +6444,11 @@ const skLegKey = s => s.wpn.kind === 'pistol' ? 'revolver' : (s.wpn.leg || 'rifl
 const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, mp: 0.42, revolver: 0.62 };
 /* al apuntar, el alza queda a esta distancia del ojo (la cámara del modelo iba casi sobre la cantonera) */
 const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0 };
+/* a la cadera y al recargar, la cámara va este tanto más adelante (hacia las manos) que la del modelo: el hombro izquierdo, que con el
+   cuerpo de perfil queda delante del ojo, y el corte de la manga pasan a quedar a un lado y detrás, también en pantallas muy anchas.
+   Al apuntar no se toca (la mira la coloca fpFix) */
+const SK_LEG_FWD = { rifle: 0.12, thompson: 0.06, mp: 0.12, revolver: 0 };       // (la Thompson sube mucho para cambiar el tambor: con 6 cm basta)
+function skLegFwdNow(p) { const lk = skLegFpKey(p); return lk ? (SK_LEG_FWD[lk] || 0) * (1 - (p.aimT || 0)) : 0; }
 /* medidas en la malla: la carabina, del borde de arriba de la muesca del alza (la que se le pone, ver skLegSights) a la punta del punto de
    mira; la Thompson, de lo alto de las orejas del alza Lyman a la punta de su hoja; el revólver, de la ranura del puente a la punta del
    guion. Así la punta del punto de mira queda justo en el centro de la vista, que es por donde sale la bala */
@@ -6791,6 +6796,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
   const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : key === 'mp' ? a * (1 - ow) : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
   M4.copy(_lfp.M, K);
+  const fw = (SK_LEG_FWD[key] || 0) * (1 - a); if (fw > 0.001) M4.translate(_lfp.M, 0, 0, fw);       // la cámara, más cerca de las manos
   const hf = C.hipFix && C.hipFix[key], hh = hf ? (1 - a) * (1 - lev) : 0;       // a la cadera, el cañón hacia el centro de la pantalla
   if (hh > 0.001) { const ang = 2 * Math.acos(clamp(hf[3], -1, 1)), sv = Math.hypot(hf[0], hf[1], hf[2]); if (sv > 1e-9) M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.H || (_lfp.H = M4.create()), [0, 0, 0], qAxis([hf[0] / sv, hf[1] / sv, hf[2] / sv], ang * hh), 1)); }
   if (lev > 0.001) {      // al accionar la palanca, la carabina se ladea a la derecha (la parte de arriba hacia la derecha) y sube un poco:
@@ -7342,7 +7348,7 @@ function playerFire(ws) {
     const fk = Math.tan(game.fov / 2) / Math.tan(fpFov / 2), ar = m[0] * fk, ad = m[1] * fk, af = -m[2];
     mx = c.ex + c.rx * ar + c.ux * ad + c.fx * af; my = c.ey + c.ry * ar + c.uy * ad + c.fy * af; mz = c.ez + c.rz * ar + c.uz * ad + c.fz * af;
   } else {
-    const fk = Math.tan(game.fov / 2) / Math.tan(fpFov / 2), ar = lerp(0.19, 0, p.aimT) * fk, ad = lerp(-0.2, -0.036, p.aimT) * fk, af = lerp(0.48, 0.32, p.aimT) - fpZm(ws);
+    const fk = Math.tan(game.fov / 2) / Math.tan(fpFov / 2), ar = lerp(0.19, 0, p.aimT) * fk, ad = lerp(-0.2, -0.036, p.aimT) * fk, af = lerp(0.48, 0.32, p.aimT) - fpZm(ws) - skLegFwdNow(p);
     mx = c.ex + c.rx * ar + c.ux * ad + c.fx * af; my = c.ey + c.uy * ad + c.fy * af; mz = c.ez + c.rz * ar + c.uz * ad + c.fz * af;
   }
   addTracer(mx, my, mz, hx, hy, hz);
@@ -11052,7 +11058,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
 })();
 
 </script>
