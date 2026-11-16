@@ -653,7 +653,7 @@ body.nogl #fatal{max-width:none}
     </dl>
     <p class="quiet">Todos los pasos para jugar con gafas, también con el PC por Link, están en «Jugar en realidad virtual», en la portada.</p>
     <p>Junto a una bandera de tu bando repones munición y granadas y recuperas salud poco a poco.</p>
-    <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: la rampa desemboca en el piso de campanas por un hueco con barandilla, y arriba hay cuatro vanos con pretil para disparar. Saltar desde allí es casi siempre mortal. De vez en cuando sube también algún soldado del bando que tiene el pueblo, uno o como mucho dos: conviene mirar al campanario antes de cruzar la plaza.</p>
+    <p>En Corbera se puede entrar en la iglesia en ruinas y subir andando al campanario por la puerta que da a la plaza: la rampa desemboca en el piso de campanas por un hueco con barandilla, y arriba hay cuatro vanos con pretil para disparar. Saltar desde allí es casi siempre mortal. En el piso de campanas, sobre una caja de munición, hay una Thompson escondida: la pueden coger los legionarios (el fusilero y el de asalto sublevados), y si quien la lleva cae, al rato vuelve a la caja. De vez en cuando sube también algún soldado del bando que tiene el pueblo, uno o como mucho dos: conviene mirar al campanario antes de cruzar la plaza.</p>
     <p>Los soldados, sobre todo los ametralladores, se echan a veces cuerpo a tierra en mitad de un tiroteo: ofrecen menos blanco y apuntan mejor, pero no se mueven hasta levantarse.</p>
     <p>Las casas que el mapa dibuja en hueco se pueden ocupar: entra por la puerta y dispara desde las ventanas. Las balas no dañan a los carros: hacen falta granadas, cañón o bombas.</p>
     <p class="quiet">En el móvil, arrastra en la mitad izquierda para moverte (hasta el tope, corres) y en la derecha para mirar; los botones hacen el resto. En el menú de pausa puedes activar el giroscopio: entonces miras hacia donde apuntes el teléfono, en cualquier dirección, como en una foto de 360°; el dedo sirve para ajustar y el botón «Centrar» fija el horizonte en la postura en que tengas el móvil.</p>
@@ -2255,8 +2255,8 @@ const WEAPONS = {
     origin: 'España (Éibar)', cal: '.44-40 (11 mm)', feed: 'Depósito tubular bajo el cañón, de palanca', note: 'Copia española del Winchester 1892 que fabricaban en Éibar Garate, Anitua y Cía. Era el arma de la Guardia Civil y de los Carabineros, y en la guerra la usaron los dos bandos. La palanca deja disparar más deprisa que un cerrojo.' },
   naranjero: { name: 'Subfusil «Naranjero»', kind: 'smg', mag: 32, reserve: 128, dmg: 27, rate: 0.105, reload: 2.5, auto: true, hip: 0.04, ads: 0.014, kick: 0.011, zoom: 0.8, len: 0.62, botAcc: 0.55, botRange: 46,
     origin: 'España (Valencia)', cal: '9 mm Largo', feed: 'Cargador lateral, fuego automático', note: 'Copia del MP28 alemán fabricada en Valencia. El apodo alude a las naranjas de la región. Demoledor de cerca, inútil de lejos.' },
-  mp28: { name: 'Subfusil MP28/II', kind: 'smg', mag: 32, reserve: 128, dmg: 27, rate: 0.108, reload: 2.5, auto: true, hip: 0.04, ads: 0.014, kick: 0.011, zoom: 0.8, len: 0.62, botAcc: 0.55, botRange: 46,
-    origin: 'Alemania', cal: '9 mm', feed: 'Cargador lateral de 32, fuego automático', note: 'Subfusil alemán de cargador lateral. Sirvió de modelo a varias copias españolas, entre ellas el «Naranjero» republicano.' },
+  mp28: { name: 'Subfusil MP 28/II', kind: 'smg', leg: 'mp', mag: 32, reserve: 128, dmg: 28, rate: 0.108, reload: 3.0, auto: true, hip: 0.04, ads: 0.009, kick: 0.011, zoom: 0.7, len: 0.81, botAcc: 0.55, botRange: 46,
+    origin: 'Alemania (Bergmann)', cal: '9 mm', feed: 'Cargador lateral de 32, fuego automático', note: 'El subfusil de Hugo Schmeisser para Bergmann, con camisa perforada sobre el cañón y el cargador clavado en el costado izquierdo. Llegaron a España por compras en el extranjero y lo usaron los dos bandos; en la zona republicana se copió en Valencia como «Naranjero».' },
   thompson: { name: 'Subfusil Thompson M1928', kind: 'smg', leg: 'thompson', mag: 50, reserve: 150, dmg: 30, rate: 0.09, reload: 3.6, auto: true, hip: 0.042, ads: 0.0095, kick: 0.012, zoom: 0.8, len: 0.86, botAcc: 0.55, botRange: 48,
     origin: 'Estados Unidos', cal: '.45 ACP', feed: 'Tambor de 50 cartuchos, fuego automático', note: 'El subfusil de los gánsteres de Chicago, pesado y de tambor. A España llegaron pocos, por compras sueltas en el extranjero, y los que se capturaban cambiaban de bando.' },
   dp27: { name: 'Fusil ametrallador DP-27', kind: 'lmg', mag: 47, reserve: 141, dmg: 40, rate: 0.109, reload: 4.4, auto: true, hip: 0.06, ads: 0.011, kick: 0.012, zoom: 0.72, len: 1.05, botAcc: 0.34, botRange: 85,
@@ -2272,7 +2272,7 @@ const GRENADE = { name: 'Granada Lafitte M1921', note: 'Granada española de imp
 
 const CLASSES = [
   [ { id: 'fus', name: 'Fusilero', w: 'mosin' }, { id: 'asa', name: 'Asalto', w: 'naranjero' }, { id: 'ame', name: 'Ametrallador', w: 'lewis', alt: ['lewis', 'dp27'] }, { id: 'tir', name: 'Tirador', w: 'mauser93' } ],
-  [ { id: 'fus', name: 'Fusilero', w: 'tigre' }, { id: 'asa', name: 'Asalto', w: 'thompson' }, { id: 'ame', name: 'Ametrallador', w: 'breda30' }, { id: 'tir', name: 'Tirador', w: 'carcano' } ]
+  [ { id: 'fus', name: 'Fusilero', w: 'tigre' }, { id: 'asa', name: 'Asalto', w: 'mp28' }, { id: 'ame', name: 'Ametrallador', w: 'breda30' }, { id: 'tir', name: 'Tirador', w: 'carcano' } ]
 ];
 
 const UNIFORMS = [
@@ -2777,6 +2777,11 @@ const world = { houses: [] };
       addAABB(Math.min(x0, x1) - 0.05, Math.max(x0, x1) + 0.05, by, by + 0.95, Math.min(z0, z1) - 0.05, Math.max(z0, z1) + 0.05);
     };
     rail(tx - pa, tz - pa, tx - pa, tz + pa); rail(tx - pa, tz + pa, tx + pa, tz + pa); rail(tx - ih, tz - pa, tx - pa, tz - pa);
+    /* la Thompson escondida: encima de una caja de munición, en el lado norte del piso de campanas, entre el pilar de la esquina y el vano */
+    { const kx = tx - 1.25, kz = tz - 1.75, KW = shade(WOOD, 0.82);
+      g.box(kx, by + 0.15, kz, 0.72, 0.3, 0.38, KW); g.box(kx, by + 0.304, kz, 0.76, 0.014, 0.42, shade(WOOD, 0.62));
+      g.box(kx - 0.37, by + 0.17, kz, 0.03, 0.06, 0.16, shade(WOOD, 0.5)); g.box(kx + 0.37, by + 0.17, kz, 0.03, 0.06, 0.16, shade(WOOD, 0.5));       // asas
+      world.tommy = { x: kx, z: kz, y: by + 0.311, floor: by, yaw: 0.28 }; }
     band(by - 0.2, 0.34, 0.18);
     /* cuerpo de campanas: pilares de esquina, pretiles con albardilla y vanos rematados en arco */
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { piece(tx + sx * (h - 0.45), tz + sz * (h - 0.45), 0.9, 0.9, by, yf + TOP, tw); g.box(tx + sx * (h - 0.45), yf + TOP - 0.95, tz + sz * (h - 0.45), 1.02, 0.16, 1.02, STN); }
@@ -5011,6 +5016,35 @@ function updateBot(s, dt) {
   s.crouchT = clamp(s.crouchT + (s.crouch ? 1 : -1) * dt * 6, 0, 1);
   s.proneT = clamp((s.proneT || 0) + (s.prone ? 1 : -1) * dt * 2.4, 0, 1);
 }
+/* ============ la Thompson del campanario ============
+   Escondida en una caja de munición del piso de campanas de Sant Pere. La puede coger un legionario (el fusilero o el de asalto
+   sublevados, que llevan el modelo con sus animaciones): el jugador, con la tecla de usar, o un centinela legionario que suba. Si quien
+   la lleva cae (o vuelve a desplegar con otra arma), al rato vuelve a aparecer en la caja. */
+const TOMMY = { state: 'tower', carrier: null, t: 0 };
+function tommyReset() { TOMMY.state = 'tower'; TOMMY.carrier = null; TOMMY.t = 0; }
+function tommyCan(s) { const w = s.isPlayer ? (s.weps && s.weps[0] && s.weps[0].def) : WEAPONS[s.prim || s.wid]; return s.team === NAT && !!(w && w.leg) && !(w === WEAPONS.thompson); }
+function tommyNear(s) {
+  const k = world.tommy;
+  return !!k && TOMMY.state === 'tower' && duo.role !== 'guest' && s.alive && !s.veh && !s.aa && Math.hypot(s.x - k.x, s.z - k.z) < 1.5 && Math.abs(s.y - k.floor) < 1.2;
+}
+function takeTommy(s) {
+  const w = WEAPONS.thompson;
+  TOMMY.state = 'carried'; TOMMY.carrier = s;
+  if (s.isPlayer) {
+    s.weps[0] = { id: 'thompson', def: w, ammo: w.mag, reserve: w.reserve, mesh: fpMesh('thompson', s.team) };
+    s.cur = 0; s.switchT = 0.4; s.reloadT = 0; s.boltT = 0; s.fireT = 0.35; s.aimT = 0; s.wid = 'thompson'; s.wpn = w;
+    SFX.click(); feedText('Has cogido la Thompson del campanario', 'ally');
+  } else {
+    if (s.prim) { s.prim = 'thompson'; } else { s.wid = 'thompson'; s.wpn = w; s.ammo = w.mag; s.reloadT = 0; s.burst = 0; }
+    if (P && P.alive && Math.hypot(P.x - s.x, P.z - s.z) < 60) feedText(s.name + ' coge la Thompson del campanario', s.team === game.team ? 'ally' : 'foe');
+  }
+}
+function tommyUpdate(dt) {
+  if (TOMMY.state === 'carried') {
+    const c = TOMMY.carrier, has = c && c.alive && (c.isPlayer ? !!(c.weps && c.weps[0] && c.weps[0].id === 'thompson') : (c.wid === 'thompson' || c.prim === 'thompson'));
+    if (!has) { TOMMY.state = 'wait'; TOMMY.t = 45; TOMMY.carrier = null; }
+  } else if (TOMMY.state === 'wait' && (TOMMY.t -= dt) <= 0) TOMMY.state = 'tower';
+}
 /* ============ centinelas del campanario ============
    De vez en cuando, uno o como mucho dos soldados del bando que tiene Corbera suben al campanario de Sant Pere: van andando hasta
    la puerta de la torre, suben la rampa, se apostan un rato en un vano y luego bajan. Arriba se comportan como cualquier otro
@@ -5056,7 +5090,7 @@ function towerBot(s, dt) {
   s.enemy = null; s.crouch = false; s.prone = false; s.aimPitch = 0;
   if (d <= stepLen + 0.05) {
     s.x = tgt[0]; s.z = tgt[1];
-    if (up) { if (tw.i >= T.path.length) { tw.phase = 'top'; s.yaw = tw.yaw; } else tw.i++; }
+    if (up) { if (tw.i >= T.path.length) { tw.phase = 'top'; s.yaw = tw.yaw; if (TOMMY.state === 'tower' && tommyCan(s)) takeTommy(s); } else tw.i++; }
     else if (--tw.i < 0) { s.tower = null; s.retargetT = 0; return false; }
   } else { s.x += dx / d * stepLen; s.z += dz / d * stepLen; s.yaw += clamp(angDiff(Math.atan2(-dx, -dz), s.yaw), -8 * dt, 8 * dt); }
   s.y = groundAt(s.x, s.z, s.y); s.swim = false;
@@ -5809,7 +5843,13 @@ async function skLoad() {
     if (location.protocol === 'file:') throw new Error('abierto como fichero suelto: los modelos solo se cargan desde la web');
     SK.u32 = gl.getExtension('OES_element_index_uint');
     const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
-    const legP = get(SK_LEG).catch(e => { console.warn('[legionario] no se carga:', e && e.message || e); return null; });
+    /* el legionario: en el móvil, la versión ligera (el MP con menos triángulos); en el ordenador, la completa. Si una no carga, la otra */
+    const legP = (async () => {
+      for (const f of GFX_TOUCH ? [SK_LEG_M, SK_LEG] : [SK_LEG, SK_LEG_M]) {
+        try { const g = await get(f); skLegTexHD(g); return g; } catch (e) { console.warn('[legionario] ' + f + ' no se carga:', e && e.message || e); }
+      }
+      return null;
+    })();
     const [g0, g1, ga] = await Promise.all([get(SK_FILES[0]), get(SK_FILES[1]), get(SK_ARMAS)]);
     SK.white = { img: null, tex: null }; skTexUpload(SK.white); SK.tex.push(SK.white);
     SK.W = await skBuildWeapons(ga);
@@ -6082,7 +6122,7 @@ function skBonesTo(C, st, B) {
 function skBones(s, C, st) {
   if (C.leg) {      // la mano izquierda del legionario agarra el arma (menos al cambiar el tambor de la Thompson)
     const k = skLegKey(s);
-    if (k !== 'revolver' && s.alive) { const r = k === 'thompson' && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
+    if (k !== 'revolver' && s.alive) { const r = (k === 'thompson' || k === 'mp') && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
   }
   st.gun = null;
   if (C.leg) { st.weapon = null; st.wpk = s.alive ? skLegKey(s) : null; }       // el arma del legionario va cosida a sus huesos: se dibuja con ellos (muerto, la suelta)
@@ -6176,6 +6216,16 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
     gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, st.model);
     skParts(C.lod[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
     if (C.leg && st.wpk && C.wp[st.wpk]) skParts(d2 < dw ? C.wp[st.wpk].near : C.wp[st.wpk].far);
+  }
+  /* la Thompson escondida en el campanario, tumbada sobre su lado izquierdo encima de la caja */
+  const tk = world.tommy, L = SK.leg;
+  if (tk && L && L.tommyB && TOMMY.state === 'tower') {
+    const d2 = (tk.x - ex) * (tk.x - ex) + (tk.z - ez) * (tk.z - ez);
+    if (d2 < 80 * 80 && skInView(vp, tk.x, tk.y, tk.z, 0.6)) {
+      if (!L.tommyM) { const M = L.tommyM = M4.create(); M4.translate(M, tk.x, tk.y + 0.024, tk.z); M4.rotY(M, tk.yaw); M4.rotX(M, Math.PI); M4.scale ? M4.scale(M, L.tommyS, L.tommyS, L.tommyS) : 0; }
+      gl.uniform4fv(SK.U.uB, L.tommyB); gl.uniformMatrix4fv(SK.U.uM, false, L.tommyM);
+      skParts(d2 < 12 * 12 ? L.wp.thompson.near : L.wp.thompson.far);
+    }
   }
   /* armas: piezas rígidas (un solo hueso, el identidad) */
   gl.uniform4fv(SK.U.uB, SK.ident);
@@ -6374,19 +6424,30 @@ function skDeath(s, C, st, dt) {
    Trae su esqueleto con huesos de ayuda en los codos, sus armas cosidas a la mano derecha (con la palanca, el martillo, el gatillo,
    el cerrojo y el tambor como huesos que se mueven en las animaciones), un juego de clips por arma y los brazos de primera persona
    con la cámara que se usó para animarlos. El tirador y el ametrallador siguen con el soldado nacional de siempre. */
-const SK_LEG = 'legionario.json';
-const SK_LEGPRE = { rifle: 'Rifle_Palanca__', thompson: 'Thompson__', revolver: 'Revolver__' };
+const SK_LEG = 'legionario.json', SK_LEG_M = 'legionario_m.json';
+/* texturas del legionario según «Calidad de las texturas»: asset.extras.hd da, para cada imagen, sus versiones [lado, fichero]. Se usa la
+   mayor que quepa (con «Máxima», las originales: la del MP 28 tal como sale de Meshy, de 8192). Las de 2048 y 1024 son las de siempre */
+function skLegTexHD(g) {
+  const hd = g.j.asset && g.j.asset.extras && g.j.asset.extras.hd; if (!hd) return;
+  const cap = gfxTexCap() || 1e9;
+  for (const im of g.j.images || []) {
+    const v = hd[im.uri]; if (!v) continue;
+    let best = null; for (const [sz, f] of v) if (sz <= cap && (!best || sz > best[0])) best = [sz, f];
+    if (best) im.uri = best[1];
+  }
+}
+const SK_LEGPRE = { rifle: 'Rifle_Palanca__', thompson: 'Thompson__', mp: 'MP__', revolver: 'Revolver__' };
 const skLegKey = s => s.wpn.kind === 'pistol' ? 'revolver' : (s.wpn.leg || 'rifle');
 /* miras de cada arma en el espacio de su hueso raíz (alza y punto de mira): al apuntar, la línea que las une se lleva al centro de la vista */
 /* los clips «Apuntar» suben el arma en dos segundos y la mantienen al final; «Sujetar» es el arma bajada. En primera persona, a la cadera se
    usa una mezcla de las dos (cuánto de «Apuntar» en cada arma) para que el arma se vea */
-const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, revolver: 0.62 };
+const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, mp: 0.42, revolver: 0.62 };
 /* al apuntar, el alza queda a esta distancia del ojo (la cámara del modelo iba casi sobre la cantonera) */
-const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, revolver: 0 };
+const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0 };
 /* medidas en la malla: la carabina, del borde de arriba de la muesca del alza (la que se le pone, ver skLegSights) a la punta del punto de
    mira; la Thompson, de lo alto de las orejas del alza Lyman a la punta de su hoja; el revólver, de la ranura del puente a la punta del
    guion. Así la punta del punto de mira queda justo en el centro de la vista, que es por donde sale la bala */
-const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], revolver: [[0.058, 0.1202, 0], [0.322, 0.1199, 0]] };       // (en el revólver, el guion asoma un pelo por encima del puente, que si no se pierde en lo negro)
+const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], mp: [[0.00775, 0, 0.104], [0.3815, 0, 0.106]], revolver: [[0.058, 0.1202, 0], [0.322, 0.1199, 0]] };       // (en el revólver, el guion asoma un pelo por encima del puente, que si no se pierde en lo negro)
 /* puntos de mira más finos (eran hojas de 6 mm): se estrechan hacia su centro */
 const SK_LEGTHIN = { rifle: { x: [0.455, 0.477], z: 0.0838, y: -0.0008, w: 0.0055, k: 0.36 }, thompson: { x: [0.408, 0.434], z: 0.1295, y: 0, w: 0.0072, k: 0.38 } };
 function skLegSights(C) {
@@ -6419,9 +6480,13 @@ function skLegSights(C) {
       if (ch && part.buf.vbo) { gl.bindBuffer(gl.ARRAY_BUFFER, part.buf.vbo); gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW); }
     } }
   /* la carabina tenía el alza plana: se le pone delante una chapa de acero con muesca, un poco más alta, para centrar la punta */
-  const r = C.wroot.rifle, slot = Array.prototype.indexOf.call(C.pal, r); if (slot < 0) return;
-  const IBi = m4inv(M4.create(), C.ibm.subarray(r * 16, r * 16 + 16)), yc = SK_LEGSIGHT.rifle[0][1], zt = SK_LEGSIGHT.rifle[0][2], nw = 0.0013, nd = 0.0036;
-  const boxes = [[-0.0012, 0.0018, yc + nw, yc + 0.0094, 0.0848, zt], [-0.0012, 0.0018, yc - 0.0094, yc - nw, 0.0848, zt], [-0.0012, 0.0018, yc - nw, yc + nw, 0.0848, zt - nd]];
+  { const yc = SK_LEGSIGHT.rifle[0][1], zt = SK_LEGSIGHT.rifle[0][2], nw = 0.0013, nd = 0.0036;
+    skLegBoxes(C, 'rifle', [[-0.0012, 0.0018, yc + nw, yc + 0.0094, 0.0848, zt], [-0.0012, 0.0018, yc - 0.0094, yc - nw, 0.0848, zt], [-0.0012, 0.0018, yc - nw, yc + nw, 0.0848, zt - nd]]); }
+}
+/* piezas de acero pavonado (cajas en el marco del arma: x hacia la boca, y a la izquierda, z arriba) pegadas al hueso raíz del arma */
+function skLegBoxes(C, key, boxes) {
+  const r = C.wroot[key], slot = Array.prototype.indexOf.call(C.pal, r); if (slot < 0 || !C.wp[key]) return;
+  const IBi = m4inv(M4.create(), C.ibm.subarray(r * 16, r * 16 + 16));
   const V = [], I = [];
   const tp = (p) => [IBi[0] * p[0] + IBi[4] * p[1] + IBi[8] * p[2] + IBi[12], IBi[1] * p[0] + IBi[5] * p[1] + IBi[9] * p[2] + IBi[13], IBi[2] * p[0] + IBi[6] * p[1] + IBi[10] * p[2] + IBi[14]];
   const tn = (n) => v3nrm([IBi[0] * n[0] + IBi[4] * n[1] + IBi[8] * n[2], IBi[1] * n[0] + IBi[5] * n[1] + IBi[9] * n[2], IBi[2] * n[0] + IBi[6] * n[1] + IBi[10] * n[2]]);
@@ -6435,7 +6500,7 @@ function skLegSights(C) {
   }
   const b = { src: new Float32Array(V), isrc: new Uint16Array(I), n: I.length, vbo: null, ibo: null }; skBufUpload(b); SK.bufs.push(b);
   const part = { buf: b, tex: null, col: [enc(0.06), enc(0.064), enc(0.078)], u32: false };      // acero pavonado
-  for (const lod of ['near', 'far']) if (C.wp.rifle[lod]) C.wp.rifle[lod].push(part);
+  for (const lod of ['near', 'far']) if (C.wp[key][lod]) C.wp[key][lod].push(part);
 }
 function skLegW(s) { const w = WEAPONS[s.wid]; return !!(w && w.leg) || !!(s.prim && WEAPONS[s.prim] && WEAPONS[s.prim].leg); }
 /* modelo de cada soldado: el legionario para los nacionales que llevan sus armas (y la pistola que sacan de cerca) */
@@ -6495,6 +6560,17 @@ function skSetupLeg(C, J) {
     }
     C.hipFix[k] = q;
   }
+  /* la Thompson del campanario se dibuja suelta: sus piezas (cuerpo, cerrojo y tambor) en el marco de su hueso raíz */
+  { const s2 = { lr: new Float32Array(C.NJ * 4), lt: new Float32Array(C.NJ * 3), gq: new Float32Array(C.NJ * 4), gp: new Float32Array(C.NJ * 3), adjQ: null }, cl = C.clips.Thompson__Sujetar, r = C.wroot.thompson;
+    skBlend(C, s2, cl, 0, 1, null); skGlobals(C, s2);
+    const Ri = m4inv(M4.create(), M4.mul(M4.create(), C.base, m4joint(M4.create(), s2.gq, s2.gp, r))), B = new Float32Array(C.pal.length * 12), M = M4.create(), T = M4.create();
+    for (let p = 0; p < C.pal.length; p++) {
+      const j = C.pal[p], o = p * 12;
+      if (j === r || C.parent[j] === r) { M4.mul(T, C.base, m4joint(M4.create(), s2.gq, s2.gp, j)); M4.mul(M, Ri, T); M4.mul(M, M, C.ibmJ[j]); }
+      else M4.copy(M, M4.create());
+      B[o] = M[0]; B[o + 1] = M[4]; B[o + 2] = M[8]; B[o + 3] = M[12]; B[o + 4] = M[1]; B[o + 5] = M[5]; B[o + 6] = M[9]; B[o + 7] = M[13]; B[o + 8] = M[2]; B[o + 9] = M[6]; B[o + 10] = M[10]; B[o + 11] = M[14];
+    }
+    C.tommyB = B; C.tommyS = Math.hypot(C.base[0], C.base[1], C.base[2]) || 1; }
 }
 /* la palanca: en el clip se abre de 0,17 a 0,55 s, espera abierta hasta 0,8 y se cierra hasta 1,17. Aquí se recorre entera en el tiempo
    que haya entre disparo y disparo, casi sin espera, para poder tirar deprisa (u de 0 a 1) */
@@ -6515,6 +6591,10 @@ function skLegOverlays(s, C, st, pre, since) {
     const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1), k = r < 0.62 ? cl.Thompson__Recargar_Tambor : cl.Thompson__Montar_Cerrojo, u = r < 0.62 ? r / 0.62 : (r - 0.62) / 0.38;
     if (k) skBlend(C, st, k, u * k.dur, Math.min(1, r * 10, (1 - r) * 10), C.upper, hq);
   }
+  if (pre === 'MP__' && s.reloadT > 0) {       // MP 28: saca el cargador por la izquierda, coge otro del correaje y monta el cerrojo
+    const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1), k = cl.MP__Recargar_Cargador;
+    if (k) skBlend(C, st, k, r * k.dur, Math.min(1, r * 10, (1 - r) * 10), C.upper, hq);
+  }
 }
 /* la mano izquierda agarra el arma de verdad: en los clips del modelo queda abierta al lado del guardamanos. Aquí se gira la mano
    hasta su sitio (en el espacio del arma: x hacia la boca, y a la izquierda, z arriba), el brazo llega con el mismo cálculo de brazo y
@@ -6531,7 +6611,11 @@ const SK_LEGGRIP = {
   thompson: { pc: [0.186, 0.05, -0.018], n: [0.15, -1, 0], f: [1, 0.25, -0.12], pole: [-0.3, 0.6, -1], clav: 0.49, hs: 0.92, fs: 0.95, fr: [0.0135, 0.0122, 0.011, 0.017],
     flex: [[4, 95], [8, 105], [5, 75]], thumb: [[-0.1, -1, 0.1], [1, 0.15, 0.05], [0.6, 0.8, 0.05]],
     body: [{ o: [0.226, 0, -0.01], ax: [0.2577, 0, 0.9662], u: [0, 1, 0], v: [0.9662, 0, -0.2577], h: [[-0.0228, -0.0232], [-0.0156, -0.0336], [-0.0092, -0.0374], [-0.0002, -0.039], [0.0077, -0.0377], [0.0194, -0.029], [0.0227, -0.0179], [0.0196, 0.0272], [0.0158, 0.035], [0.0013, 0.0417], [-0.0097, 0.0399], [-0.0192, 0.0296], [-0.0208, 0.0239]] },
-      { o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.022, 0.025], [0.022, 0.025], [0.022, 0.124], [-0.022, 0.124]] }] }
+      { o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.022, 0.025], [0.022, 0.025], [0.022, 0.124], [-0.022, 0.124]] }] },
+  /* MP 28: por debajo de la camisa perforada del cañón, delante del alojamiento del cargador, como la carabina por el guardamanos */
+  mp: { pc: [0.24, 0.012, -0.004], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
+    flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
+    body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0199, 0.0425], [-0.0097, 0.0326], [0.0077, 0.032], [0.0211, 0.0454], [0.0195, 0.0645], [0.01, 0.0732], [-0.001, 0.0753], [-0.0107, 0.0729], [-0.0221, 0.0576], [-0.0226, 0.054]] }] }
 };
 /* distancia con signo de un punto (2D) a un polígono convexo en sentido antihorario */
 function skPolyDist(h, a, b) {
@@ -6692,18 +6776,20 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   } else if (key === 'thompson' && p.reloadT > 0) {
     const r = clamp(1 - p.reloadT / w.reload, 0, 1); o = r < 0.62 ? cl.Thompson__Recargar_Tambor : cl.Thompson__Montar_Cerrojo;
     ot = (r < 0.62 ? r / 0.62 : (r - 0.62) / 0.38) * (o ? o.dur : 0); ow = Math.min(1, r * 10, (1 - r) * 10);
+  } else if (key === 'mp' && p.reloadT > 0) {
+    const r = clamp(1 - p.reloadT / w.reload, 0, 1); o = cl.MP__Recargar_Cargador; ot = r * (o ? o.dur : 0); ow = Math.min(1, r * 12, (1 - r) * 12);
   }
   if (o && ow > 0) { skBlend(C, st, o, ot, ow, null); skLegDispBlend(o, ot, ow); }
   const since = now - (p.lastShot || -99), capa = cl[pre + 'Disparo_Capa'];
   if (capa && since < capa.dur && ow < 0.5) skBlend(C, st, capa, since, 0.6 * Math.min(1, (capa.dur - since) * 8, since * 30 + 0.3), C.capa[pre]);
   skGlobals(C, st);
-  if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
+  if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' || key === 'mp' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
   if (lev < 0.05) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
   if (key === 'rifle') skHideFinger(C, st, 'Right', 'Index');       // con la carabina, el índice derecho atravesaba el cajón del arma: no se ve
   skBonesTo(C, st, _lfp.B);
   m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
-  const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
+  const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : key === 'mp' ? a * (1 - ow) : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
   M4.copy(_lfp.M, K);
   const hf = C.hipFix && C.hipFix[key], hh = hf ? (1 - a) * (1 - lev) : 0;       // a la cadera, el cañón hacia el centro de la pantalla
   if (hh > 0.001) { const ang = 2 * Math.acos(clamp(hf[3], -1, 1)), sv = Math.hypot(hf[0], hf[1], hf[2]); if (sv > 1e-9) M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.H || (_lfp.H = M4.create()), [0, 0, 0], qAxis([hf[0] / sv, hf[1] / sv, hf[2] / sv], ang * hh), 1)); }
@@ -6714,6 +6800,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
     M4.rotZ(_lfp.M, -0.78 * lev); M4.rotY(_lfp.M, 0.18 * lev); M4.rotX(_lfp.M, 0.16 * lev);
     M4.translate(_lfp.M, -pv[0], -pv[1], -pv[2]);
   }
+  if (key === 'mp' && ow > 0.001) M4.translate(_lfp.M, 0.025 * ow, -0.07 * ow, -0.15 * ow);      // al recargar el MP, el arma se aparta un poco del ojo (el soldado lo sube al pecho)
   if (fa > 0.001) { const q = fx.q, h = fa, qq = v3nrm([q[0] * h, q[1] * h, q[2] * h]), ang = 2 * Math.acos(clamp(q[3], -1, 1)) * h, qa = Math.hypot(q[0], q[1], q[2]) > 1e-9 ? qAxis(v3nrm([q[0], q[1], q[2]]), ang) : [0, 0, 0, 1];
     M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.X || (_lfp.X = M4.create()), [fx.t[0] * h, fx.t[1] * h, fx.t[2] * h], qa, 1)); }
   M4.rotY(_lfp.M, Math.PI); M4.mul(_lfp.M, _lfp.M, _lfp.D);
@@ -7397,7 +7484,7 @@ function drawFpWeapon(camWorld) {
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
   const lk = skLegFpKey(p);
   if (lk) {       // legionario: sus brazos y su arma como en su cámara de primera persona; aquí solo el vaivén, el retroceso y el cambio de arma
-    const lrel = lk === 'thompson' ? 0 : rel;
+    const lrel = lk === 'thompson' || lk === 'mp' ? 0 : rel;       // (la Thompson y el MP traen su recarga en el clip)
     M4.copy(_fp, camWorld);
     M4.translate(_fp, Math.sin(ph) * 0.008 * mv, Math.abs(Math.cos(ph)) * 0.008 * mv - lrel * 0.2 - p.switchT * 0.5, p.kick * 0.03 * (w.auto ? 0.5 : 1) - pt * 0.03 * (1 - a));
     M4.rotX(_fp, p.kick * 0.025 * (w.auto ? 0.4 : 1) - lrel * 0.6 - p.switchT * 0.8); M4.rotZ(_fp, -lrel * 0.3);
@@ -7513,6 +7600,7 @@ function useVehicle() {
   const p = P; if (!p || !p.alive || game.state !== 'play') return;
   if (p.aa) { leaveAA(p); return; }
   if (p.veh) { exitVehicle(p); return; }
+  if (tommyNear(p) && tommyCan(p)) { takeTommy(p); return; }
   const v = nearVehicle(p); if (!v) { const a = nearAA(p); if (a) manAA(p, a); else gunPick(p); return; }
   takeVehicle(p, v);
 }
@@ -8628,7 +8716,7 @@ function startMatch(team) {
   if (duo.role === 'guest') duoStop(true);       // quien estaba unido a otra partida empieza la suya
   audioInit();
   Object.assign(game, { team, time: 0, tickets: [300, 300], bleedAcc: [0, 0], bleedT: 1, eventT: 45, eventI: 0, floodT: 0, winner: -1, firstDeploy: true, respawnT: 0, selClass: 0, shake: 0, killer: null, camOff: 0, vehTold: {} });
-  resetVehicles(); resetAA(); towerOcc.length = 0;
+  resetVehicles(); resetAA(); towerOcc.length = 0; tommyReset();
   waterY = 0; pasarela.on = true; navBuild();
   push[0] = push[1] = null; projectiles.length = 0; planes.length = 0; shells.length = 0; parts.length = 0; tracers.length = 0; cards.length = 0; cardNow = null;
   for (const f of FLAGS) {
@@ -8811,6 +8899,7 @@ function update(dt) {
   else if (P.spawned && !P.alive) P.fall = Math.min(1, P.fall + dt * 2.6);
   updateVehicles(dt); updateAA(dt); towerDuty(dt);
   NAV.budget = 2; NAV.lbudget = 10;       // caminos nuevos y líneas rectas que se pueden mirar en cada paso
+  tommyUpdate(dt);
   for (const s of soldiers) if (!s.isPlayer) { if (s.remote) duoHostRemote(s, dt); else updateBot(s, dt); }
   separate();
   updateProjectiles(dt); updateEvents(dt); updateFlags(dt); updateTickets(dt); updateParts(dt);
@@ -9106,7 +9195,7 @@ function duoHostEvent(e) {
 function duoGuestStart(H) {
   audioInit();
   Object.assign(game, { team: H.gteam, time: 0, tickets: H.tk.slice(), bleedAcc: [0, 0], bleedT: 1, eventT: 1e9, eventI: 0, floodT: H.flood ? 55 : 0, winner: -1, firstDeploy: true, respawnT: 0, selClass: 0, shake: 0, killer: null, camOff: 0, vehTold: {} });
-  resetVehicles(); resetAA(); towerOcc.length = 0;
+  resetVehicles(); resetAA(); towerOcc.length = 0; tommyReset();
   waterY = 0; pasarela.on = H.pas;
   push[0] = push[1] = null; projectiles.length = 0; planes.length = 0; shells.length = 0; parts.length = 0; tracers.length = 0; cards.length = 0; cardNow = null;
   FLAGS.forEach((f, i) => { const q = H.F[i] || { owner: -1, control: 0 }; f.owner = q.owner; f.control = q.control; f.contested = !!q.cont; f.told = false; f.cnt = [q.c0 || 0, q.c1 || 0]; });
@@ -9899,11 +9988,13 @@ function uiTick(dt) {
     $('wName').textContent = ws.def.name; $('ammo').textContent = p.reloadT > 0 ? 'Recargando' : ws.ammo + ' / ' + ws.reserve;
     $('extra').textContent = 'Granadas ' + p.nades + (p.prone ? (ws.def.kind === 'lmg' ? ' · tumbado, bípode apoyado' : ' · tumbado') : p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
   }
+  const nt = !nv && tommyNear(p), ntOk = nt && tommyCan(p);
   if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : padX ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; }
+  else if (nt) { pr.textContent = ntOk ? (input.touch ? 'Toca Coger' : padX ? 'Pulsa X' : 'Pulsa E') + ' para coger la Thompson' : 'Una Thompson escondida: solo la pueden usar los legionarios'; pr.hidden = false; }
   else if (!input.touch && !input.locked && !lockOff() && !(input.pad && pad.on) && !xr.on) { pr.textContent = 'Haz clic para capturar el ratón'; pr.hidden = false; }
   else if (!input.touch && !p.veh && !p.aa && gunNear(p)) { pr.textContent = (padX ? 'Pulsa X' : 'Pulsa E') + ' para coger: ' + WEAPONS[gunNear(p).g.id].name; pr.hidden = false; }       // sin captura no se apunta bien: se avisa siempre
   else pr.hidden = true;
-  const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa); ub.textContent = p.veh || p.aa ? 'Bajar' : 'Subir';
+  const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa || ntOk); ub.textContent = p.veh || p.aa ? 'Bajar' : nv ? 'Subir' : 'Coger';
   const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
   document.body.classList.toggle('fly', fly); fh.hidden = !fly;
   const moscaButton = $('tbMoscaCam');
@@ -9926,7 +10017,7 @@ function uiTick(dt) {
   $('dmg').style.opacity = clamp(Math.max(game.dmgT, 0) * 0.75 + (p.alive ? clamp((40 - p.hp) / 80, 0, 0.45) : 0.7), 0, 0.9);
   if (scoreOn) renderScore();
   tagT -= 0.12;
-  if (p.alive && !uiTick.towerTold && !p.veh) { const T = world.tower; if (Math.abs(p.x - T.x) < T.h && Math.abs(p.z - T.z) < T.h && p.y < T.yf + 1) { uiTick.towerTold = true; showHint('Campanario de Sant Pere: sube por la rampa que rodea el pilar hasta las campanas. Desde arriba se domina la plaza.'); } }
+  if (p.alive && !uiTick.towerTold && !p.veh) { const T = world.tower; if (Math.abs(p.x - T.x) < T.h && Math.abs(p.z - T.z) < T.h && p.y < T.yf + 1) { uiTick.towerTold = true; showHint('Campanario de Sant Pere: sube por la rampa que rodea el pilar hasta las campanas. Desde arriba se domina la plaza, y en una caja hay una Thompson escondida que pueden coger los legionarios.'); } }
   if (p.veh || p.aa || !p.alive) tag = null;
   else if (p.alive && tagT <= 0) { tagT = 0.12; const c = camBasis(), h = rayWorld(c.ex, c.ey, c.ez, c.fx, c.fy, c.fz, 140, p.team); tag = h.s ? h.s.name : null; }
 }
@@ -10961,11 +11052,12 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
 })();
 
 </script>
 </body>
 </html>
+
 
 </body></html>
