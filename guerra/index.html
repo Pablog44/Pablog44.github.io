@@ -6644,6 +6644,16 @@ function skLegGrip(C, st, key, w) {
     qNorm(gq, j * 4);
   }
 }
+/* oculta un dedo: sus falanges se encogen hasta la base del dedo (escala casi nula y todas en el mismo punto). Solo afecta a ese
+   dedo: la mano, el brazo, la postura y el arma quedan exactamente donde estaban */
+function skHideFinger(C, st, side, finger) {
+  const js = [1, 2, 3, 4].map(i => C.jx['mixamorig:' + side + 'Hand' + finger + i]).filter(j => j !== undefined && j >= 0);
+  if (!js.length) return;
+  if (!st.sc || st.sc.length !== C.NJ) st.sc = new Float32Array(C.NJ).fill(1);
+  if (!st.scOn) { st.sc.fill(1); st.scOn = true; }
+  const b = js[0] * 3, gp = st.gp;
+  for (const j of js) { st.sc[j] = 0.001; for (let c = 0; c < 3; c++) gp[j * 3 + c] = gp[b + c]; }
+}
 /* primera persona del legionario: el esqueleto se pone como en la cámara de primera persona del modelo (cada clip trae dónde va el
    cuerpo respecto a ella), entre «Sujetar» (a la cadera) y «Apuntar» (por las miras) según cuánto se apunta, con la palanca, el tambor
    y el cerrojo animados */
@@ -6689,6 +6699,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   skGlobals(C, st);
   if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
   if (lev < 0.05) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
+  if (key === 'rifle') skHideFinger(C, st, 'Right', 'Index');       // con la carabina, el índice derecho atravesaba el cajón del arma: no se ve
   skBonesTo(C, st, _lfp.B);
   m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
