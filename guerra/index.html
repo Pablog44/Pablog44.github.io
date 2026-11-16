@@ -524,7 +524,8 @@ body.nogl #fatal{max-width:none}
     <div class="gopt">
       <label class="sens" for="gRes">Resolución <input type="range" id="gRes" min="0.4" max="2" step="0.05" value="1"> <output id="gResOut"></output></label>
       <label for="g_dist">Distancia de visión</label><select id="g_dist" data-gk="dist"></select>
-      <label for="g_grass">Hierba</label><select id="g_grass" data-gk="grass"></select>
+      <label class="sens" for="gGrassAmt">Cantidad de hierba <input type="range" id="gGrassAmt" min="0" max="2" step="0.1" value="1"> <output id="gGrassAmtOut"></output></label>
+      <label for="g_grass">Hierba: hasta dónde se ve</label><select id="g_grass" data-gk="grass"></select>
       <label for="g_plants">Matorral y plantas</label><select id="g_plants" data-gk="plants"></select>
       <label for="g_trees">Árboles y matas</label><select id="g_trees" data-gk="trees"></select>
       <label for="g_ground">Suelo</label><select id="g_ground" data-gk="ground"></select>
@@ -1932,7 +1933,7 @@ const GFX_TOUCH = (() => { try { return matchMedia('(pointer: coarse)').matches 
 const GFX_LEVELS = ['bajo', 'medio', 'alto', 'ultra'];
 const GFX_OPT = {
   dist: [{ n: 70, f: 480, t: 'Corta' }, { n: 95, f: 760, t: 'Media' }, { n: 120, f: 1150, t: 'Larga' }, { n: 150, f: 1600, t: 'Muy larga' }],
-  grass: [{ r: 0, d: 0, t: 'Sin hierba' }, { r: 24, d: 0.55, t: 'Poca' }, { r: 34, d: 0.8, t: 'Normal' }, { r: 46, d: 1.05, t: 'Densa' }, { r: 62, d: 1.3, t: 'Muy densa' }],
+  grass: [{ r: 0, d: 0, t: 'Sin hierba' }, { r: 30, d: 0.55, t: 'Cerca' }, { r: 42, d: 0.8, t: 'Normal' }, { r: 56, d: 1.0, t: 'Lejos' }, { r: 72, d: 1.15, t: 'Muy lejos' }],
   plants: [{ k: 0, r: 0, t: 'Ninguna' }, { k: 0.4, r: 110, t: 'Poca' }, { k: 0.7, r: 170, t: 'Normal' }, { k: 1, r: 250, t: 'Mucha' }, { k: 1, r: 400, t: 'Mucha, hasta lejos' }],
   trees: [{ near: 0, real: 0, t: 'Sencillos' }, { near: 70, real: 0, t: 'Normales' }, { near: 150, real: 1, rn: 55, t: 'Realistas: solo ramas y hojas' }, { near: 340, real: 2, rn: 130, t: 'Realistas, todo el detalle hasta lejos' }],
   models: [{ d0: 0, d1: 12, dw: 5, ev: 15, t: 'Bajo' }, { d0: 5, d1: 22, dw: 9, ev: 25, t: 'Medio' }, { d0: 9, d1: 32, dw: 12, ev: 35, t: 'Alto' }, { d0: 16, d1: 55, dw: 18, ev: 60, t: 'Ultra' }],
@@ -2539,23 +2540,73 @@ const world = { houses: [] };
     for (let d = 0; d <= L; d += 14) noGo.push([ax + vx * d / L, az + vz * d / L, 15]);
   }
 
+  /* allana el solar (como en las casas huecas) y devuelve la cota del suelo, a ras del punto más alto de las esquinas */
+  function level(x, z, hw, hd) {
+    const y0 = terrainH(x, z);
+    for (let j = Math.max(0, Math.floor((z - hd - 6 - W.Z0) / W.CELL)); j <= Math.min(W.NZ - 1, Math.ceil((z + hd + 6 - W.Z0) / W.CELL)); j++)
+      for (let i = Math.max(0, Math.floor((x - hw - 6 - W.X0) / W.CELL)); i <= Math.min(W.NX - 1, Math.ceil((x + hw + 6 - W.X0) / W.CELL)); i++) {
+        const px = W.X0 + i * W.CELL, pz = W.Z0 + j * W.CELL, out = Math.hypot(Math.max(0, Math.abs(px - x) - hw), Math.max(0, Math.abs(pz - z) - hd));
+        hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(1.8, 6, out));
+      }
+    return Math.max(terrainH(x, z), terrainH(x - hw, z - hd), terrainH(x + hw, z - hd), terrainH(x - hw, z + hd), terrainH(x + hw, z + hd)) + 0.06;
+  }
+  /* lo más bajo del terreno bajo una planta: para que muros y parapetos lleguen siempre al suelo, también en pendiente */
+  const tmin = (x, z, sx, sz) => { let m = 1e9; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) m = Math.min(m, terrainH(x + a * sx / 2, z + b * sz / 2)); return m; };
+  /* edificio hueco de un solo material: cuatro muros que bajan bajo tierra, con sus huecos (puertas, troneras, ventanas), y una colisión
+     por tramo para poder entrar. ops: { n, s, e, w } con huecos { c, w, y0, y1 } (c, a lo largo del muro desde su centro; alturas desde
+     el suelo yf; y1 >= 50: sin dintel). topOf: alturas distintas por tramo (ruinas) */
+  function shell(V, x, z, w, d, h, t, ops, yf, col, topOf) {
+    const hw = w / 2, hd = d / 2;
+    const run = (alongX, cx, cz, len, list) => {
+      list = (list || []).slice().sort((a, b) => a.c - b.c); let cur = -len / 2;
+      const seg = (c0, c1, y0, y1) => {
+        if (c1 - c0 < 0.04 || y1 - y0 < 0.04) return;
+        const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
+        stone(V, () => g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, col)); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
+      };
+      const full = (c0, c1) => {
+        if (!topOf) return seg(c0, c1, yf - 3, yf + h);
+        const n = Math.max(1, Math.round((c1 - c0) / 1.5));
+        for (let i = 0; i < n; i++) seg(c0 + (c1 - c0) * i / n, c0 + (c1 - c0) * (i + 1) / n, yf - 3, yf + topOf());
+      };
+      for (const q of list) {
+        full(cur, q.c - q.w / 2);
+        if (q.y0 > 0) seg(q.c - q.w / 2, q.c + q.w / 2, yf - 3, yf + q.y0);
+        if (q.y1 < 50) seg(q.c - q.w / 2, q.c + q.w / 2, yf + q.y1, yf + h);
+        cur = q.c + q.w / 2;
+      }
+      full(cur, len / 2);
+    };
+    run(true, x, z - hd + t / 2, w, ops.n); run(true, x, z + hd - t / 2, w, ops.s);
+    run(false, x - hw + t / 2, z, d - 2 * t, ops.w); run(false, x + hw - t / 2, z, d - 2 * t, ops.e);
+    addFloor(x - hw, x + hw, z - hd, z + hd, yf); addBotBox(x - hw, x + hw, z - hd, z + hd);
+  }
+  /* cascotes: cada piedra sobre el suelo que tiene debajo (no flotan) */
+  function rubble(x, z, n, rx, rz, col, yFloor) {
+    for (let i = 0; i < n; i++) {
+      const s = rr(0.25, 0.75), px = x + rr(-rx, rx), pz = z + rr(-rz, rz), py = yFloor !== undefined ? yFloor : tmin(px, pz, s, s);
+      const m = M4.create(); M4.translate(m, px, py + s * 0.18, pz); M4.rotY(m, rr(0, 3)); M4.rotX(m, rr(-0.3, 0.3));
+      stone('seca', () => g.with(m, () => g.box(0, 0, 0, s, s * 0.6, s * rr(0.7, 1.2), shade(col, rr(0.7, 0.95)))));
+    }
+  }
   function house(x, z, w, d, h, o) {
     o = o || {};
     const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
-    world.houses.push([x, z, w, d, o.open ? 1 : 0]);
+    world.houses.push([x, z, w, d, o.open || o.ruin ? 1 : 0]);
     const V = o.ruin ? 'seca' : 'mamp';       // un solo material por casa
     if (o.open) openHouse(x, z, w, d, h, o, wall, roof, V);
-    else if (o.ruin) stone(V, () => {
-      const t = 0.55, hs = [rr(0.35, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.25, 0.8), rr(0.3, 1), rr(0.3, 0.9), rr(0.4, 1), rr(0.2, 0.7)];
-      const seg = (cx, cz, sx, sz, k) => g.box(cx, y + h * k / 2 - 2, cz, sx, h * k + 4, sz, shade(wall, 0.86 + R() * 0.14));
-      seg(x - w / 4, z - d / 2 + t / 2, w / 2, t, hs[0]); seg(x + w / 4, z - d / 2 + t / 2, w / 2, t, hs[1]);
-      seg(x - w / 4, z + d / 2 - t / 2, w / 2, t, hs[2]); seg(x + w / 4, z + d / 2 - t / 2, w / 2, t, hs[3]);
-      seg(x - w / 2 + t / 2, z - d / 4, t, d / 2, hs[4]); seg(x - w / 2 + t / 2, z + d / 4, t, d / 2, hs[5]);
-      seg(x + w / 2 - t / 2, z - d / 4, t, d / 2, hs[6]); seg(x + w / 2 - t / 2, z + d / 4, t, d / 2, hs[7]);
-      for (let i = 0; i < 6; i++) { const s = rr(0.4, 1.1); g.box(x + rr(-w / 2 - 1.5, w / 2 + 1.5), terrainH(x, z) + s * 0.2, z + rr(-d / 2 - 1.5, d / 2 + 1.5), s, s * 0.6, s, shade(wall, rr(0.7, 0.95))); }
-      g.box(x, y + 0.25, z, w - 1.2, 0.5, d - 1.2, shade(wall, 0.72));
-      addAABB(x - w / 2, x + w / 2, y - 4, y + h * 0.8, z - d / 2, z + d / 2);
-    });
+    else if (o.ruin) {
+      /* casa en ruinas: muros rotos a distintas alturas, con el hueco de la puerta (sin hoja) y algún boquete; se puede entrar */
+      const t = 0.55, yf = level(x, z, w / 2, d / 2), sd = o.door || (R() < 0.5 ? 's' : 'n'), lenOf = k => (k === 'n' || k === 's') ? w : d - 2 * t;
+      const ops = { n: [], s: [], e: [], w: [] };
+      ops[sd].push({ c: rr(-0.2, 0.2) * lenOf(sd), w: 1.3, y0: 0, y1: 99 });
+      const bk = ['e', 'w'][(R() * 2) | 0]; ops[bk].push({ c: rr(-0.2, 0.2) * lenOf(bk), w: rr(1.4, 2.2), y0: rr(0.4, 0.9), y1: 99 });       // boquete de un obús
+      shell(V, x, z, w, d, h, t, ops, yf, wall, () => h * rr(0.3, 0.95));
+      stone(V, () => g.box(x, yf - 0.3, z, w - 2 * t + 0.02, 0.6, d - 2 * t + 0.02, shade(wall, 0.72)));       // suelo de tierra y escombro
+      rubble(x, z, 7, w / 2 - 1, d / 2 - 1, wall, yf);       // cascotes dentro
+      rubble(x, z, 6, w / 2 + 1.5, d / 2 + 1.5, wall);       // y fuera, cada uno en su suelo
+      g.limb([x - w * 0.3, yf + 0.15, z - d * 0.2], [x + w * 0.2, yf + h * 0.45, z + d * 0.25], 0.18, 0.18, shade(WOOD, 0.7));       // viga caída
+    }
     else {
       stone(V, () => g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall));
       const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
@@ -2566,7 +2617,7 @@ const world = { houses: [] };
         if (h > 5) g.box(x + sx * w * 0.27, y + h * 0.68, z + dz, 0.8, 1.0, 0.08, DARK);
         g.box(x + sx * (w / 2 + 0.03), y + h * 0.66, z + rr(-d / 4, d / 4), 0.08, 1.0, 0.8, DARK);
       }
-      if (o.chimney !== false && R() < 0.6) { const cx = x + rr(-w / 3, w / 3), cz = z + rr(-d / 4, d / 4); stone(V, () => g.box(cx, y + h + rh * 0.9, cz, 0.6, 1.4, 0.6, shade(wall, 0.85))); }
+      if (o.chimney !== false && R() < 0.6) { const cx = x + rr(-w / 3, w / 3), cz = z + rr(-d / 4, d / 4); stone(V, () => { g.box(cx, y + h + rh * 0.9, cz, 0.8, 1.6, 0.8, shade(wall, 0.85)); g.box(cx, y + h + rh * 0.9 + 0.85, cz, 1.0, 0.12, 1.0, shade(wall, 0.75)); }); }
       addAABB(x - w / 2, x + w / 2, y - 4, y + h + rh * 0.6, z - d / 2, z + d / 2);
     }
     noGo.push([x, z, Math.max(w, d) * 0.5 + 4]);
@@ -2574,14 +2625,7 @@ const world = { houses: [] };
   /* casa hueca: muros con puerta y ventanas, suelo propio y tejado; el jugador puede ocuparla */
   function openHouse(x, z, w, d, h, o, wall, roof, V) {
     const t = 0.4, hw = w / 2, hd = d / 2, FLOORC = hex(0x86583c), inner = shade(wall, 0.9), lining = shade(wall, 0.6);
-    /* allana el solar para que la puerta quede a ras de calle */
-    const y0 = terrainH(x, z);
-    for (let j = Math.max(0, Math.floor((z - hd - 6 - W.Z0) / W.CELL)); j <= Math.min(W.NZ - 1, Math.ceil((z + hd + 6 - W.Z0) / W.CELL)); j++)
-      for (let i = Math.max(0, Math.floor((x - hw - 6 - W.X0) / W.CELL)); i <= Math.min(W.NX - 1, Math.ceil((x + hw + 6 - W.X0) / W.CELL)); i++) {
-        const px = W.X0 + i * W.CELL, pz = W.Z0 + j * W.CELL, out = Math.hypot(Math.max(0, Math.abs(px - x) - hw), Math.max(0, Math.abs(pz - z) - hd));
-        hmap[j * W.NX + i] = lerp(hmap[j * W.NX + i], y0, 1 - smooth(1.8, 6, out));
-      }
-    const yf = Math.max(terrainH(x, z), terrainH(x - hw, z - hd), terrainH(x + hw, z - hd), terrainH(x - hw, z + hd), terrainH(x + hw, z + hd)) + 0.06;
+    const yf = level(x, z, hw, hd);       // allana el solar para que la puerta quede a ras de calle
     const DOOR = c => ({ c, w: 1.35, y0: 0, y1: 2.15 }), WIN = c => ({ c, w: 1.15, y0: 0.95, y1: 1.95 });
     const wins = len => { const n = Math.max(1, Math.round(len / 5)), a = []; for (let i = 0; i < n; i++) a.push(WIN(-len / 2 + (i + 0.5) * len / n)); return a; };
     function wallRun(alongX, cx, cz, len, ops, ins) {
@@ -2631,16 +2675,17 @@ const world = { houses: [] };
   }
   function parapet(x, z, len, alongX) {
     const sx = alongX ? len : 0.8, sz = alongX ? 0.8 : len, y = Math.max(terrainH(x - sx / 2, z - sz / 2), terrainH(x + sx / 2, z + sz / 2), terrainH(x, z));
-    stone('sacos', () => { g.box(x, y + 0.05, z, sx, 1.3, sz, BURLAP, shade(BURLAP, 1.08)); g.box(x, y + 0.82, z, sx * 0.94, 0.3, sz * 0.7, shade(BURLAP, 0.9)); });
-    addAABB(x - sx / 2, x + sx / 2, y - 1, y + 0.97, z - sz / 2, z + sz / 2);
+    const yb = tmin(x, z, sx, sz) - 0.35;       // hasta el suelo, también donde el terreno baja
+    stone('sacos', () => { g.box(x, (yb + y + 0.7) / 2, z, sx, y + 0.7 - yb, sz, BURLAP, shade(BURLAP, 1.08)); g.box(x, y + 0.82, z, sx * 0.94, 0.3, sz * 0.7, shade(BURLAP, 0.9)); });
+    addAABB(x - sx / 2, x + sx / 2, yb, y + 0.97, z - sz / 2, z + sz / 2);
   }
   function stoneWall(x0, z0, x1, z1) {
-    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 3.5)), alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
-    for (let i = 0; i < n; i++) {
-      const cx = lerp(x0, x1, (i + 0.5) / n), cz = lerp(z0, z1, (i + 0.5) / n), L = len / n + 0.05, y = terrainH(cx, cz), hh = rr(0.85, 1.1);
-      const sx = alongX ? L : 0.7, sz = alongX ? 0.7 : L;
-      const col = shade(STONE, rr(0.88, 1.06)); stone('seca', () => g.box(cx, y + hh / 2 - 0.6, cz, sx, hh + 1.2, sz, col));       // todo el muro, de piedra seca
-      addAABB(cx - sx / 2, cx + sx / 2, y - 1.5, y + hh, cz - sz / 2, cz + sz / 2);
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 2)), alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), col = shade(STONE, rr(0.9, 1.04));
+    for (let i = 0; i < n; i++) {       // tramos cortos que siguen el terreno y bajan hasta su punto más bajo (no quedan flotando)
+      const cx = lerp(x0, x1, (i + 0.5) / n), cz = lerp(z0, z1, (i + 0.5) / n), L = len / n + 0.05, y = terrainH(cx, cz), hh = rr(0.9, 1.05);
+      const sx = alongX ? L : 0.7, sz = alongX ? 0.7 : L, yb = tmin(cx, cz, sx, sz) - 0.5;
+      stone('seca', () => g.box(cx, (yb + y + hh) / 2, cz, sx, y + hh - yb, sz, col));       // todo el muro, de piedra seca
+      addAABB(cx - sx / 2, cx + sx / 2, yb, y + hh, cz - sz / 2, cz + sz / 2);
     }
   }
   function crate(x, z, s) { const y = terrainH(x, z); g.box(x, y + s / 2, z, s * 1.3, s, s, shade(WOOD, rr(1.0, 1.4))); addAABB(x - s * 0.65, x + s * 0.65, y - 1, y + s, z - s / 2, z + s / 2); }
@@ -2848,9 +2893,25 @@ const world = { houses: [] };
 
   /* ---- Cota 481 ---- */
   (function fortin() {
-    const x = -194, z = -26, y = terrainH(x, z), c = hex(0x9a968a);
-    stone('hormigon', () => g.box(x, y + 0.6, z, 6, 2.6 + 2, 5, c)); g.box(x + 3.02, y + 1.35, z, 0.1, 0.35, 2.4, DARK); g.box(x, y + 1.35, z + 2.52, 3, 0.35, 0.1, DARK);
-    addAABB(x - 3, x + 3, y - 2, y + 1.9, z - 2.5, z + 2.5); noGo.push([x, z, 6]); world.houses.push([x, z, 6, 5]);
+    /* fortín de hormigón de encofrado, medio enterrado: todo del mismo hormigón por fuera y por dentro, con troneras para disparar
+       (de pie, a la altura de los ojos) hacia el este, el norte y el sur, entrada por detrás protegida por un muro contra metralla */
+    const x = -194, z = -26, w = 6.4, d = 5.4, t = 0.55, H = 2.3, c = hex(0x9a968a), yf = level(x, z, w / 2 + 1.6, d / 2 + 0.4);
+    const SL = (cc, ww) => ({ c: cc, w: ww, y0: 1.28, y1: 1.72 });       // tronera: la mira de un soldado de pie (1,62 m) queda dentro
+    shell('hormigon', x, z, w, d, H, t, { e: [SL(0, 1.7)], n: [SL(0.9, 1.3)], s: [SL(0.9, 1.3)], w: [{ c: -0.6, w: 1.0, y0: 0, y1: 2.0 }] }, yf, c);
+    stone('hormigon', () => {
+      g.box(x, yf + H + 0.25, z, w + 0.5, 0.5, d + 0.5, c);       // losa del techo, con vuelo
+      g.box(x, yf - 0.25, z, w - 2 * t + 0.02, 0.5, d - 2 * t + 0.02, shade(c, 0.9));       // solera
+      g.box(x - w / 2 - 1.35, (yf - 2 + yf + 1.9) / 2, z - 0.6, 0.45, 3.9, 2.6, c);       // muro contra metralla delante de la puerta
+      for (const [cx, cz, sx, sz] of [[x + w / 2 - t - 0.25, z, 0.5, 1.9], [x + 0.9, z - d / 2 + t + 0.25, 1.5, 0.5], [x + 0.9, z + d / 2 - t - 0.25, 1.5, 0.5]])
+        g.box(cx, yf + 1.12, cz, sx, 0.1, sz, shade(c, 0.95));       // repisas bajo las troneras para apoyar el arma
+    });
+    addAABB(x - w / 2 - 0.25, x + w / 2 + 0.25, yf + H, yf + H + 0.5, z - d / 2 - 0.25, z + d / 2 + 0.25);
+    addAABB(x - w / 2 - 1.58, x - w / 2 - 1.12, yf - 2, yf + 1.9, z - 1.9, z + 0.7);
+    /* dentro: cajas de munición y un banco */
+    g.box(x - 1.6, yf + 0.25, z + 1.7, 0.8, 0.5, 0.5, shade(WOOD, 1.1)); g.box(x - 1.6, yf + 0.72, z + 1.7, 0.7, 0.44, 0.45, shade(WOOD, 1.25));
+    g.box(x - 0.4, yf + 0.22, z + 1.85, 1.6, 0.06, 0.35, WOOD); g.box(x - 1.0, yf + 0.1, z + 1.85, 0.08, 0.2, 0.3, WOOD); g.box(x + 0.2, yf + 0.1, z + 1.85, 0.08, 0.2, 0.3, WOOD);
+    addAABB(x - 2.0, x - 1.2, yf, yf + 0.95, z + 1.45, z + 1.95);
+    noGo.push([x, z, 6]); world.houses.push([x, z, w, d, 1]);
   })();
   parapet(-178, -24, 6, false); parapet(-180, -12, 5, false); parapet(-186, -6, 5, true); parapet(-198, -8, 5, true); parapet(-182, -34, 5, true);
   for (let i = 0; i < 26; i++) {   // piquetes de alambrada
@@ -2861,10 +2922,72 @@ const world = { houses: [] };
 
   /* ---- Serra de Pàndols: ermita de Santa Magdalena ---- */
   (function ermita() {
-    const x = -74, z = 212, y = terrainH(x, z), c = hex(0xd9d0b8);
-    stone('mamp', () => { g.box(x, y + 2.2 - 2, z, 6, 4.4 + 4, 9, c); g.gable(x - 3.3, x + 3.3, z - 4.8, z + 4.8, y + 4.4, 1.6, ROOF[0], false, c); });
-    g.box(x, y + 6.6, z - 4.5, 1.4, 1.6, 0.5, c); g.box(x, y + 1, z - 4.55, 1.2, 2, 0.1, WOOD);
-    addAABB(x - 3, x + 3, y - 4, y + 5.2, z - 4.5, z + 4.5); noGo.push([x, z, 8]); world.houses.push([x, z, 6, 9]);
+    /* ermita de Santa Magdalena: una sola nave de mampostería con tejado a dos aguas, puerta con arco de medio punto y óculo en la
+       fachada, espadaña de una campana sobre el frontón y cruz de término de piedra delante. Por dentro, techo de vigas, bancos y,
+       al fondo, el altar con su retablo dorado */
+    const x = -74, z = 212, w = 6, d = 9, t = 0.6, H = 4.4, c = hex(0xd9d0b8), hw = w / 2, hd = d / 2, yf = level(x, z, hw, hd + 1.5);
+    const GOLD = hex(0xc49a3c), GOLDK = hex(0x8a6420), RED = hex(0x7a2a22), STN = hex(0xcfc4a8), FL = hex(0x9a8b74);
+    shell('mamp', x, z, w, d, H, t, { n: [{ c: 0, w: 1.5, y0: 0, y1: 2.5 }], e: [{ c: 0.8, w: 0.5, y0: 2.4, y1: 3.4 }], w: [{ c: 0.8, w: 0.5, y0: 2.4, y1: 3.4 }] }, yf, c);
+    const fz = z - hd + t / 2;       // fachada (al norte)
+    stone('mamp', () => {
+      g.gable(x - hw - 0.3, x + hw + 0.3, z - hd - 0.3, z + hd + 0.3, yf + H, 1.6, ROOF[0], false, c);
+      /* espadaña: pared pequeña sobre el vértice del frontón con un vano para la campana y su remate */
+      const ey = yf + H + 1.6;
+      g.box(x - 0.62, ey + 0.75, fz, 0.36, 1.5, 0.5, c); g.box(x + 0.62, ey + 0.75, fz, 0.36, 1.5, 0.5, c);
+      g.box(x, ey - 0.2, fz, 1.6, 0.8, 0.5, c); g.box(x, ey + 1.62, fz, 1.6, 0.25, 0.5, STN);
+    });
+    /* (fuera de la malla de piedra: sus caras inclinadas no deben pasar a la de teja) */
+    g.gable(x - 0.8, x + 0.8, fz - 0.25, fz + 0.25, yf + H + 1.6 + 1.74, 0.45, STN, true, STN);       // remate de la espadaña
+    for (let i = 0; i <= 6; i++) {       // dovelas del arco de medio punto sobre la puerta
+      const a = Math.PI * i / 6, m = M4.create(); M4.translate(m, x + Math.cos(a) * 0.95, yf + 2.5 + Math.sin(a) * 0.95, fz); M4.rotZ(m, a - Math.PI / 2);
+      g.with(m, () => g.box(0, 0, 0, 0.4, 0.32, t + 0.12, STN));
+    }
+    const ey = yf + H + 1.6, BR = hex(0x8a6a3a);
+    g.cyl(x, ey + 1.2, fz, 0.05, 0.05, 0.08, 6, DARK); g.cyl(x, ey + 0.88, fz, 0.13, 0.27, 0.55, 12, BR, true);       // campana de bronce
+    g.box(x, ey + 1.32, fz, 0.9, 0.08, 0.08, WOOD);       // yugo
+    g.box(x, ey + 2.42, fz, 0.07, 0.5, 0.07, DARK); g.box(x, ey + 2.5, fz, 0.32, 0.06, 0.06, DARK);       // crucecita de hierro
+    { const m = M4.create(); M4.translate(m, x, yf + H + 0.6, z - hd - 0.33); M4.rotX(m, Math.PI / 2); g.with(m, () => { g.cyl(0, 0, 0, 0.38, 0.38, 0.06, 16, STN, true); g.cyl(0, -0.02, 0, 0.28, 0.28, 0.06, 16, DARK, true); }); }       // óculo con su marco
+    /* puerta de madera entreabierta */
+    { const m = M4.create(); M4.translate(m, x - 0.72, yf + 1.25, fz + 0.1); M4.rotY(m, -1.1); g.with(m, () => g.box(0.36, 0, 0, 0.72, 2.5, 0.08, shade(WOOD, 0.9))); }
+    /* dentro: suelo de losas, techo de madera con vigas, bancos, altar y retablo */
+    g.box(x, yf - 0.02, z, w - 2 * t, 0.06, d - 2 * t, FL);
+    g.box(x, yf + H - 0.05, z, w - 2 * t, 0.1, d - 2 * t, shade(WOOD, 0.55));
+    for (let i = 0; i < 5; i++) g.box(x, yf + H - 0.2, z - hd + 1.3 + i * 1.6, w - 2 * t, 0.2, 0.18, shade(WOOD, 0.7));
+    for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) {
+      const bz = z - hd + 1.9 + i * 1.15, bx = x + sx * 1.15;
+      g.box(bx, yf + 0.45, bz, 1.6, 0.06, 0.36, WOOD); g.box(bx, yf + 0.75, bz - 0.17, 1.6, 0.36, 0.05, WOOD);       // respaldo detrás: se mira al altar
+      g.box(bx - 0.75, yf + 0.22, bz, 0.06, 0.45, 0.34, shade(WOOD, 0.8)); g.box(bx + 0.75, yf + 0.22, bz, 0.06, 0.45, 0.34, shade(WOOD, 0.8));
+      addAABB(bx - 0.8, bx + 0.8, yf, yf + 0.5, bz - 0.2, bz + 0.2);
+    }
+    const az = z + hd - t;       // altar al fondo (sur), sobre una grada
+    g.box(x, yf + 0.1, az - 1.0, 3.4, 0.2, 2.0, STN); addFloor(x - 1.7, x + 1.7, az - 2.0, az, yf + 0.2);
+    stone('mamp', () => g.box(x, yf + 0.65, az - 0.85, 1.9, 0.9, 0.8, STN)); g.box(x, yf + 1.12, az - 0.85, 2.0, 0.05, 0.86, hex(0xe8e2d2));       // ara con su mantel
+    for (const sx of [-0.7, 0.7]) { g.cyl(x + sx, yf + 1.24, az - 0.75, 0.05, 0.05, 0.18, 6, GOLD); g.cyl(x + sx, yf + 1.45, az - 0.75, 0.03, 0.03, 0.26, 6, hex(0xf2ead8)); }
+    addAABB(x - 1.0, x + 1.0, yf, yf + 1.15, az - 1.3, az - 0.4);
+    /* retablo: banco (predela), tres calles separadas por columnas doradas, hornacina central con la santa y ático con un cuadro */
+    const ry = yf + 0.85, rz = az - 0.18;       // detrás del altar, desde poco más arriba de la mesa hasta casi el techo
+    g.box(x, ry + 0.25, rz, 3.6, 0.5, 0.3, GOLDK);       // predela
+    g.box(x, ry + 1.45, rz + 0.06, 3.6, 1.9, 0.16, shade(GOLD, 0.8));       // cuerpo
+    for (const cx of [-1.2, 0, 1.2]) { g.box(x + cx, ry + 1.45, rz - 0.03, cx ? 0.8 : 1.0, cx ? 1.3 : 1.6, 0.06, cx ? RED : hex(0x3a2a40)); }       // hornacinas y cuadros
+    for (const cx of [-1.75, -0.6, 0.6, 1.75]) { g.cyl(x + cx, ry + 1.45, rz - 0.1, 0.07, 0.07, 1.9, 8, GOLD); g.box(x + cx, ry + 2.44, rz - 0.1, 0.2, 0.1, 0.2, GOLD); g.box(x + cx, ry + 0.52, rz - 0.1, 0.2, 0.08, 0.2, GOLD); }
+    g.box(x, ry + 2.55, rz, 3.8, 0.18, 0.36, GOLD);       // cornisa
+    g.box(x, ry + 2.98, rz + 0.04, 1.4, 0.7, 0.12, shade(GOLD, 0.8)); g.box(x, ry + 2.98, rz - 0.03, 1.0, 0.5, 0.04, hex(0x50402a));       // ático y su cuadro
+    g.gable(x - 0.8, x + 0.8, rz - 0.06, rz + 0.12, ry + 3.33, 0.18, GOLD, true, GOLD);
+    g.box(x - 1.05, ry + 2.75, rz - 0.05, 0.3, 0.22, 0.1, GOLD); g.box(x + 1.05, ry + 2.75, rz - 0.05, 0.3, 0.22, 0.1, GOLD);       // aletones
+    /* la santa en su hornacina: túnica, manto y cabeza */
+    g.cyl(x, ry + 1.1, rz - 0.06, 0.2, 0.13, 0.9, 10, hex(0x6d3a2e), true); g.cyl(x, ry + 1.3, rz - 0.07, 0.24, 0.18, 0.6, 10, hex(0x2f4a6a));
+    g.cyl(x, ry + 1.74, rz - 0.06, 0.09, 0.09, 0.24, 8, hex(0xd8b48e), true); g.cyl(x, ry + 1.8, rz - 0.07, 0.12, 0.1, 0.18, 8, hex(0x5a3a22), true);       // cara y cabello
+    addAABB(x - 1.9, x + 1.9, yf, ry + 3.5, rz - 0.2, az);
+    /* cruz de término de piedra delante de la ermita: gradas, fuste octogonal, capitel y cruz */
+    const cx = x + 3.5, cz = z - hd - 6.5, cy = Math.max(terrainH(cx, cz), tmin(cx, cz, 2.4, 2.4) + 0.4);
+    stone('mamp', () => {
+      g.box(cx, cy - 0.35, cz, 2.6, 0.9, 2.6, STN); g.box(cx, cy + 0.25, cz, 1.9, 0.3, 1.9, STN); g.box(cx, cy + 0.55, cz, 1.2, 0.3, 1.2, STN);
+      g.box(cx, cy + 0.85, cz, 0.6, 0.3, 0.6, STN);
+    });
+    g.cyl(cx, cy + 2.2, cz, 0.15, 0.13, 2.4, 8, STN, true); g.box(cx, cy + 3.45, cz, 0.42, 0.2, 0.42, STN);
+    g.box(cx, cy + 4.1, cz, 0.17, 1.15, 0.17, STN); g.box(cx, cy + 4.25, cz, 0.85, 0.17, 0.17, STN);
+    addAABB(cx - 1.3, cx + 1.3, cy - 1, cy + 0.7, cz - 1.3, cz + 1.3); addCircle(cx, cz, 0.35);
+    noGo.push([x, z, 8], [cx, cz, 2.5]); world.houses.push([x, z, w, d, 1]);
   })();
   stoneWall(-54, 196, -42, 196); stoneWall(-66, 198, -66, 190); stoneWall(-50, 212, -38, 212); parapet(-58, 196, 4, true);
 
@@ -2949,7 +3072,7 @@ const world = { houses: [] };
     const y = terrainH(a.x, a.z), dk = hex(0x2a2a28);
     for (let i = 0; i < 9; i++) {
       const an = i / 9 * Math.PI * 2, m = M4.create(); M4.translate(m, a.x + Math.cos(an) * 1.75, terrainH(a.x + Math.cos(an) * 1.75, a.z + Math.sin(an) * 1.75), a.z + Math.sin(an) * 1.75); M4.rotY(m, -an);
-      stone('sacos', () => g.with(m, () => { g.box(0, 0.2, 0, 0.5, 0.9, 1.3, BURLAP, shade(BURLAP, 1.08)); g.box(0, 0.68, 0, 0.42, 0.26, 1.1, shade(BURLAP, 0.9)); }));
+      stone('sacos', () => g.with(m, () => { g.box(0, -0.05, 0, 0.5, 1.4, 1.3, BURLAP, shade(BURLAP, 1.08)); g.box(0, 0.68, 0, 0.42, 0.26, 1.1, shade(BURLAP, 0.9)); }));
     }
     for (let i = 0; i < 3; i++) { const an = i / 3 * Math.PI * 2 + 0.5; g.limb([a.x, y + 1.3, a.z], [a.x + Math.cos(an) * 0.75, y, a.z + Math.sin(an) * 0.75], 0.07, 0.07, dk); }
     g.box(a.x, y + 1.32, a.z, 0.16, 0.14, 0.16, dk); g.box(a.x + 0.9, y + 0.2, a.z + 0.5, 0.5, 0.35, 0.3, hex(0x5a5d48));
@@ -3123,8 +3246,10 @@ function initVegProgram() {
        float sw = (sin(ph)*0.65 + sin(ph*2.7 + aI2.w*6.0)*0.35 + 0.35) * uWind.y * hy * hy * uBend;
        p.xz += uWind.zw * sw;
        float d = length(aI0.xz - uCam.xz);
-       float thr = mix(1.09, uFade.z, clamp(d/uFade.y, 0.0, 1.0));
-       float k = (1.0 - smoothstep(uFade.x, uFade.y, d)) * clamp((thr - aI2.w)*12.0, 0.0, 1.0);
+       /* a lo lejos las plantas se van aclarando (cada una aparece o desaparece entera, de golpe, a su distancia), en vez de encogerse:
+          ya no se ve crecer la hierba al andar */
+       float thr = 1.09 - 1.11*smoothstep(uFade.x, uFade.y, d);
+       float k = clamp((thr - aI2.w)*60.0, 0.0, 1.0);
        vec3 w = aI0.xyz + p*k;
        vW = w; vCol = aCol*aI2.rgb;
        gl_Position = uVP*vec4(w, 1.0);
@@ -3555,7 +3680,7 @@ const GRC = { S: 20, cells: new Map(), lvl: -1, nx: 0, nz: 0 };
 GRC.nx = Math.ceil((W.X1 - W.X0) / GRC.S); GRC.nz = Math.ceil((W.Z1 - W.Z0) / GRC.S);
 const GRASS_REF = [0.62, 0.58, 0.37];
 function grassBuild(ix, iz) {
-  const S = GRC.S, x0 = W.X0 + ix * S, z0 = W.Z0 + iz * S, rng = seeded((ix * 7919 + iz * 104729 + 17) | 0), dens = GFX_OPT.grass[GFX.grass].d;
+  const S = GRC.S, x0 = W.X0 + ix * S, z0 = W.Z0 + iz * S, rng = seeded((ix * 7919 + iz * 104729 + 17) | 0), dens = GFX_OPT.grass[GFX.grass].d * grassAmt();
   const lists = [[], [], []], N = Math.round(S * S * dens);
   let ys = 0, ny = 0;
   for (let k = 0; k < N; k++) {
@@ -3576,11 +3701,14 @@ function grassBuild(ix, iz) {
   if (tot) { cell.buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cell.buf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); }
   return cell;
 }
+/* cantidad de hierba elegida en Ajustes (0 = sin hierba, 1 = la normal, hasta 2 = el doble); se guarda aparte de la calidad */
+let GRASS_AMT = 1; try { const v = parseFloat(localStorage.getItem('ebro1938hierba')); if (isFinite(v)) GRASS_AMT = clamp(v, 0, 2); } catch (e) { }
+const grassAmt = () => GRASS_AMT;
 function grassClear() { for (const c of GRC.cells.values()) if (c.buf) gl.deleteBuffer(c.buf); GRC.cells.clear(); }
 function grassUpdate(ex, ez) {
   const L = GFX_OPT.grass[GFX.grass], R = xr.on && opts.vrMode === 'std' ? Math.min(L.r, 22) : L.r;
-  if (GRC.lvl !== GFX.grass) { grassClear(); GRC.lvl = GFX.grass; }
-  if (!R || !progVeg) return 0;
+  if (GRC.lvl !== GFX.grass || GRC.amt !== GRASS_AMT) { grassClear(); GRC.lvl = GFX.grass; GRC.amt = GRASS_AMT; }
+  if (!R || !progVeg || GRASS_AMT <= 0) return 0;
   const S = GRC.S;
   for (const [k, c] of GRC.cells) if (Math.hypot(c.x - ex, c.z - ez) > R + 45) { if (c.buf) gl.deleteBuffer(c.buf); GRC.cells.delete(k); }
   const i0 = clamp(Math.floor((ex - R - W.X0) / S), 0, GRC.nx - 1), i1 = clamp(Math.floor((ex + R - W.X0) / S), 0, GRC.nx - 1);
@@ -3701,7 +3829,7 @@ function vegDrawAll(vp, ex, ey, ez, newFrame, vr) {
   /* hierba */
   const R = newFrame ? (VEG.grR = grassUpdate(ex, ez)) : VEG.grR;
   if (R) {
-    gl.uniform1f(UVG.uBend, 0.8); gl.uniform3f(UVG.uFade, R * 0.62, R, 0.35);
+    gl.uniform1f(UVG.uBend, 0.8); gl.uniform3f(UVG.uFade, R * 0.55, R, 0.35);
     const vis = VEG._gv || (VEG._gv = []); vis.length = 0;
     for (const c of GRC.cells.values()) {
       if (!c.buf) continue;
@@ -3715,7 +3843,7 @@ function vegDrawAll(vp, ex, ey, ez, newFrame, vr) {
         const L = VEG.grassTpl[k].greal; if (L.noWood) continue;
         for (const c of vis) { if (!c.n[k]) continue; vegBind(L.wood, c.buf, c.off[k] * 48); INST.drawArraysInstancedANGLE(gl.TRIANGLES, 0, L.wood.n, c.n[k]); }
       }
-      leafOn(); gl.uniform1f(ULF.uBend, 0.8); gl.uniform3f(ULF.uFade, R * 0.62, R, 0.35);
+      leafOn(); gl.uniform1f(ULF.uBend, 0.8); gl.uniform3f(ULF.uFade, R * 0.55, R, 0.35);
       for (let k = 0; k < 3; k++) {
         const L = VEG.grassTpl[k].greal; if (!L.leaf) continue;
         for (const c of vis) { if (!c.n[k]) continue; vegBindLeaf(L.leaf, c.buf, c.off[k] * 48); INST.drawArraysInstancedANGLE(gl.TRIANGLES, 0, L.leaf.n, c.n[k]); }
@@ -3770,8 +3898,10 @@ function initLeafProgram() {
        float fl = sin(uWind.x*4.3 + dot(aPos, vec3(9.1, 6.3, 7.7)) + aI2.w*11.0) * 0.025 * uWind.y * min(hy, 1.5);
        p += vec3(fl, fl*0.6, -fl*0.8);
        float d = length(aI0.xz - uCam.xz);
-       float thr = mix(1.09, uFade.z, clamp(d/uFade.y, 0.0, 1.0));
-       float k = (1.0 - smoothstep(uFade.x, uFade.y, d)) * clamp((thr - aI2.w)*12.0, 0.0, 1.0);
+       /* a lo lejos las plantas se van aclarando (cada una aparece o desaparece entera, de golpe, a su distancia), en vez de encogerse:
+          ya no se ve crecer la hierba al andar */
+       float thr = 1.09 - 1.11*smoothstep(uFade.x, uFade.y, d);
+       float k = clamp((thr - aI2.w)*60.0, 0.0, 1.0);
        vec3 w = aI0.xyz + p*k;
        vW = w; vCol = aCol*aI2.rgb; vUV = aUV;
        gl_Position = uVP*vec4(w, 1.0);
@@ -10748,6 +10878,9 @@ function gfxUiBoot() {
     gfxApply(); gfxSave(); renderGfxSheet();
   }));
   document.querySelectorAll('[data-gk]').forEach(s => s.addEventListener('change', () => { GFX[s.dataset.gk] = +s.value; GFX.q = 'custom'; GFX.dyn = 1; gfxApply(); gfxSave(); renderGfxSheet(); }));
+  { const gA = $('gGrassAmt'), out = () => $('gGrassAmtOut').textContent = GRASS_AMT <= 0 ? 'Sin hierba' : Math.round(GRASS_AMT * 100) + ' %';
+    gA.value = GRASS_AMT; out();
+    gA.addEventListener('input', e => { GRASS_AMT = clamp(+e.target.value || 0, 0, 2); out(); try { localStorage.setItem('ebro1938hierba', GRASS_AMT); } catch (er) { } }); }
   $('gRes').addEventListener('input', e => { GFX.res = clamp(+e.target.value || 1, 0.4, 2); GFX.q = 'custom'; GFX.dyn = 1; gfxApply(); gfxSave(); renderGfxSheet(); });
   $('gFps').addEventListener('change', e => { GFX.fps = e.target.checked; gfxApply(); gfxSave(); });
 }
