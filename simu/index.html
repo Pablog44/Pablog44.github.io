@@ -8974,6 +8974,17 @@ uniform vec3 uMR;       // metallic, roughness, has texture
 uniform vec3 uHit;      // soot, fire glow, hit flash
 uniform vec4 uEmis;     // emissive colour (HDR), w = use the base texture as emission map
 uniform vec3 uCabinL;   // warm fill from the cabin lights (interior pass only)
+uniform mat4 uInvBody;  // world -> jet body, to keep the sun out of the closed cabin
+uniform float uMaskOn;
+// 1 inside the jet's passenger cabin and lavatory (behind the cockpit bulkhead), 0 outside / in the cockpit.
+// The point is pushed 6 cm along the shading normal so the fuselage skin seen from outside stays outside.
+float jetCabinMask(vec3 N) {
+  if (uMaskOn < 0.5) return 0.0;
+  vec3 p = (uInvBody * vec4(vWP + N * 0.06, 1.0)).xyz;
+  float x = p.z + 9.5, z = p.y + 0.04;
+  float e = (p.x * p.x) / (0.95 * 0.95) + (z - 0.15) * (z - 0.15) / (0.86 * 0.86);
+  return step(3.62, x) * step(x, 12.62) * step(-0.72, z) * (1.0 - smoothstep(0.9, 1.0, e));
+}
 uniform float uAlpha;
 void main(){
   if (vWP.y < uClipY) discard;
@@ -8985,9 +8996,10 @@ void main(){
   float n = texture(uNoise, vWP.xz * 0.7 + vWP.y * 0.45).r;
   alb *= 1.0 - uHit.x * smoothstep(0.3, 0.72, n) * 0.85;
   float metal = uMR.x, rough = clamp(uMR.y, 0.05, 1.0);
-  float sh = planeShadow(vWP + N * 0.04) * cloudShadow(vWP);
+  float inCab = jetCabinMask(N);
+  float sh = planeShadow(vWP + N * 0.04) * cloudShadow(vWP) * (1.0 - 0.88 * inCab);   // only soft daylight through the windows
   vec3 c = lighting(alb * (1.0 - metal * 0.8), N, V, vWP, rough, (1.0 - rough) * (0.6 + metal), sh);
-  float F = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+  float F = (0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0)) * (1.0 - 0.7 * inCab);
   vec3 R = reflect(-V, N);
   vec3 env = skyBase(normalize(vec3(R.x, abs(R.y), R.z)));
   if (R.y < 0.0) env = mix(env, uAmbGround * 1.4 + uAmbSky * 0.3, 0.7);
@@ -9638,7 +9650,7 @@ const _noEmis = [0, 0, 0, 0], _noFill = [0, 0, 0];
 function drawGLB(model, world, pose, hit) {
   if (!model) return;
   const p = RENDER.P.glb; useProg(p);
-  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]); setU(p, 'uCabinL', RENDER.cabinFill || _noFill);
+  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]); setU(p, 'uCabinL', RENDER.cabinFill || _noFill); setU(p, 'uMaskOn', RENDER.jetInv ? 1 : 0); if (RENDER.jetInv) setU(p, 'uInvBody', RENDER.jetInv);
   let blend = false;
   for (const G of model.groups) {
     if (G.anim && pose && pose.hide && pose.hide[G.anim]) continue;
@@ -9667,7 +9679,12 @@ function planeHit(ac) {
   const dmg = 1 - clamp((ac.hp ?? 100) / 100, 0, 1);
   return [dmg * 0.9, ac.dead ? 0.6 + 0.4 * Math.sin(SIM.t * 23) : 0, (ac.hitFlash || 0) * 0.6];
 }
-function drawGLBPlane(ac, M) { drawGLB(MODELS[AC.model], M, planePose(AC.type, ac), planeHit(ac)); }
+const _jetInv = M4.create();
+function drawGLBPlane(ac, M) {
+  RENDER.jetInv = AC.jet ? M4.invert(_jetInv, M) : null;
+  drawGLB(MODELS[AC.model], M, planePose(AC.type, ac), planeHit(ac));
+  RENDER.jetInv = null;
+}
 function updatePlaneAnim(ac, dt) {
   if (GAME.state === 'flying') {
     ac.fuel = Math.max(0.03, (ac.fuel ?? 0.85) - (ac.engineOn ? (0.15 + 0.85 * ac.throttle) * ac.rpm : 0) * dt / (AC.jet ? 9000 : 2400));
