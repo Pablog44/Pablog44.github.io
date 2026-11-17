@@ -2215,6 +2215,96 @@ const SFX = {
   cap() { if (!AC || AC.state !== 'running') return; const t = AC.currentTime; [392, 523].forEach((fq, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'triangle'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t + i * 0.16); g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.16 + 0.03); g.gain.exponentialRampToValueAtTime(0.0008, t + i * 0.16 + 0.5); o.connect(g); g.connect(master); o.start(t + i * 0.16); o.stop(t + i * 0.16 + 0.55); }); }
 };
 
+/* ---------- sonidos de recarga: cada arma con los suyos, al compás de su animación (sintetizados: chasquidos, roces de metal,
+   golpes y ruido de tela del correaje). Cada guion va en segundos sobre la duración de su animación (D) y suena en el momento en
+   que la recarga pasa por ahí, así se corta solo si se cambia de arma. Los soldados de cerca también se oyen, más bajo y de lado */
+function rsOut(x, y, z, vol) {
+  if (!AC || AC.state !== 'running' || !noiseBuf) return null;
+  let d = 0, pan = 0;
+  if (x !== null) {
+    const dx = x - listener.x, dz = z - listener.z; d = Math.hypot(dx, y - listener.y, dz);
+    if (d > 40) return null;
+    const rx = Math.cos(listener.yaw), rz = -Math.sin(listener.yaw); pan = d > 0.5 ? clamp((dx * rx + dz * rz) / d, -1, 1) * 0.8 : 0;
+  }
+  if (sfxActive > 24 && d > 5) return null;
+  const v = vol / (1 + d / 3.5); if (v < 0.003) return null;
+  let dst = master;
+  if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; p.connect(master); dst = p; }
+  return { dst, v, t: AC.currentTime, lp: d > 2 ? Math.max(900, 9000 / (1 + d / 6)) : 0 };
+}
+function rsNoise(o, f0, f1, q, dur, type, at, vm) {
+  const t = o.t + (at || 0), v = o.v * (vm || 1), src = AC.createBufferSource(); src.buffer = noiseBuf; src.playbackRate.value = 1 + Math.random() * 0.1;
+  const fl = AC.createBiquadFilter(); fl.type = type || 'bandpass'; fl.Q.value = q;
+  const fa = o.lp ? Math.min(f0, o.lp) : f0, fb = o.lp ? Math.min(f1, o.lp) : f1;
+  fl.frequency.setValueAtTime(fa, t); fl.frequency.exponentialRampToValueAtTime(Math.max(40, fb), t + dur);
+  const g = AC.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + Math.min(0.01, dur * 0.25)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(fl); fl.connect(g); g.connect(o.dst); sfxActive++; src.onended = () => { sfxActive--; };
+  src.start(t, Math.random() * 1.5, dur + 0.05);
+}
+function rsTone(o, f, dur, at, vm, drop) {
+  const t = o.t + (at || 0), os = AC.createOscillator(), g = AC.createGain();
+  os.frequency.setValueAtTime(f, t); if (drop) os.frequency.exponentialRampToValueAtTime(f * drop, t + dur);
+  g.gain.setValueAtTime(o.v * (vm || 1), t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  os.connect(g); g.connect(o.dst); os.start(t); os.stop(t + dur + 0.02);
+}
+const RS = {
+  click: (o, f, at) => rsNoise(o, f * 1.15, f * 0.85, 3.5, 0.035, 'bandpass', at, 1.4),                    // chasquido corto (palanca, retén, gatillo)
+  clank: (o, f, at) => { rsNoise(o, f * 1.7, f, 2.2, 0.055, 'bandpass', at, 1.3); for (const [m, a] of [[1, 0.5], [2.41, 0.28], [3.87, 0.16]]) rsTone(o, f * m, 0.13 / Math.sqrt(m), at, a); },   // golpe de metal que suena
+  slide: (o, f0, f1, d, at) => rsNoise(o, f0, f1, 5, d, 'bandpass', at, 0.8),                               // metal que se desliza (cerrojo, cargador)
+  thud: (o, f, at) => { rsTone(o, f, 0.1, at, 1.1, 0.5); rsNoise(o, 700, 250, 0.8, 0.07, 'lowpass', at, 0.9); },    // golpe sordo (encajar el cargador)
+  rustle: (o, d, at) => rsNoise(o, 1100, 600, 0.6, d || 0.25, 'lowpass', at, 0.45),                          // la mano en el correaje
+  rattle: (o, f, n, gap, at) => { for (let k = 0; k < n; k++) rsNoise(o, f * (1.1 + Math.random() * 0.2), f * 0.8, 4, 0.03, 'bandpass', (at || 0) + k * gap * (0.85 + Math.random() * 0.3), 1.1); }   // cartuchos que entran uno tras otro
+};
+const RS_BOLT = (p, k) => [[0.15 * k, 'click', 2300 * p], [0.25 * k, 'slide', 1700 * p, 1000 * p, 0.15], [0.40 * k, 'clank', 1300 * p]];
+const RS_SHUT = (p, t) => [[t, 'slide', 1000 * p, 1800 * p, 0.15], [t + 0.16, 'clank', 1600 * p], [t + 0.28, 'click', 2200 * p]];
+const RS_STRIP = (p) => [[0.75, 'rustle', 0.3], [1.15, 'click', 3200 * p], [1.30, 'rattle', 2800 * p, 5, 0.09], [1.85, 'click', 2600 * p]];
+const RS_SMG = (p) => [[0.55, 'click', 2400 * p], [0.60, 'slide', 1600 * p, 1000 * p, 0.22], [1.25, 'rustle', 0.3], [1.35, 'thud', 300 * p], [1.95, 'slide', 1000 * p, 1700 * p, 0.15], [2.12, 'clank', 1100 * p], [2.13, 'thud', 260 * p],
+  [2.32, 'slide', 1500 * p, 900 * p, 0.1], [2.43, 'clank', 1300 * p], [2.52, 'clank', 1800 * p]];
+const RS_PAN = (p) => [[0.45, 'click', 2000 * p], [0.55, 'slide', 500 * p, 350 * p, 0.35], [1.4, 'rustle', 0.4], [2.3, 'slide', 400 * p, 550 * p, 0.3], [2.65, 'thud', 200 * p], [2.66, 'clank', 700 * p],
+  [3.3, 'slide', 1400 * p, 800 * p, 0.15], [3.48, 'clank', 1100 * p], [3.75, 'clank', 1500 * p]];
+const RELOAD_SND = {
+  /* fusiles de cerrojo con peine de láminas: abrir, peine en las guías, empujar los cinco cartuchos, sacar la lámina y cerrar */
+  mosin: { D: 2.9, ev: [...RS_BOLT(1, 1), ...RS_STRIP(1), ...RS_SHUT(1, 2.2)] },
+  mauser93: { D: 2.7, ev: [...RS_BOLT(1.08, 1), ...RS_STRIP(1.08).map(e => [e[0] * 0.95, ...e.slice(1)]), ...RS_SHUT(1.08, 2.05)] },
+  mauser16: { D: 2.6, ev: [...RS_BOLT(1.12, 1), ...RS_STRIP(1.12).map(e => [e[0] * 0.92, ...e.slice(1)]), ...RS_SHUT(1.12, 1.98)] },
+  /* Carcano: sube la manija, cerrojo atrás, peine entero por arriba (encaja con un golpe), cerrojo adelante y manija abajo */
+  carcano: { D: 2.5, ev: [[0.20, 'click', 2600], [0.34, 'slide', 1900, 1100, 0.14], [0.49, 'clank', 1500], [0.9, 'rustle', 0.3], [1.32, 'slide', 2600, 1600, 0.12], [1.50, 'clank', 950], [1.50, 'thud', 260],
+    [1.77, 'slide', 1100, 2000, 0.15], [1.94, 'clank', 1700], [2.07, 'click', 2300]] },
+  /* carabina de palanca: tres cartuchos por la portilla, cada uno con su roce y su chasquido */
+  tigre: { D: 3.3, ev: [[0.45, 'rustle', 0.3], [0.95, 'slide', 2800, 2100, 0.12], [1.08, 'click', 3400], [1.08, 'clank', 2500], [1.3, 'rustle', 0.25], [1.80, 'slide', 2800, 2100, 0.12], [1.93, 'click', 3400], [1.93, 'clank', 2500],
+    [2.15, 'rustle', 0.25], [2.65, 'slide', 2800, 2100, 0.12], [2.78, 'click', 3400], [2.78, 'clank', 2500]] },
+  /* subfusiles de cargador lateral: retén, cargador fuera (cae al suelo), otro del correaje, dentro, y montar */
+  mp28: { D: 3.0, ev: RS_SMG(1) },
+  naranjero: { D: 3.0, ev: RS_SMG(0.94) },
+  /* Thompson: tambor fuera, otro dentro con un golpe y cerrojo */
+  thompson: { D: 3.6, ev: [[0.40, 'click', 2200], [0.50, 'slide', 900, 600, 0.25], [1.10, 'rustle', 0.3], [1.70, 'slide', 600, 900, 0.22], [1.95, 'clank', 800], [1.96, 'thud', 220],
+    [2.55, 'slide', 1500, 900, 0.12], [2.70, 'clank', 1200], [3.05, 'clank', 1700]] },
+  /* ametralladoras de plato encima del cajón */
+  dp27: { D: 4.4, ev: RS_PAN(1) },
+  lewis: { D: 4.0, ev: RS_PAN(0.9).map(e => [e[0] * 0.91, ...e.slice(1)]) },
+  /* Breda 30: retén, el cargador se abre hacia delante, entra el peine de veinte, fuera la lámina, se cierra y se monta */
+  breda30: { D: 4.2, ev: [[0.40, 'click', 2000], [0.45, 'slide', 600, 900, 0.3], [0.75, 'clank', 700], [1.0, 'rustle', 0.35], [1.78, 'slide', 2200, 1400, 0.35], [1.80, 'rattle', 2600, 6, 0.055], [2.12, 'clank', 1000],
+    [2.20, 'slide', 1500, 2500, 0.15], [2.45, 'slide', 900, 600, 0.3], [2.80, 'clank', 650], [2.81, 'click', 1800], [3.0, 'slide', 1600, 1000, 0.15], [3.16, 'clank', 1200], [3.27, 'clank', 1500]] },
+  /* pistola: retén, cargador fuera, otro dentro y la corredera adelante */
+  astra: { D: 1.7, ev: [[0.15, 'click', 2600], [0.22, 'slide', 1500, 900, 0.12], [0.45, 'rustle', 0.2], [0.95, 'slide', 900, 1500, 0.1], [1.08, 'clank', 1500], [1.40, 'slide', 1800, 1200, 0.06], [1.47, 'clank', 2000]] }
+};
+/* el cerrojo del Carcano después de cada disparo, al compás de su animación (0,92 s) */
+const BOLT_SND = { carcano: { D: 0.92, ev: [[0.22, 'click', 2600], [0.31, 'slide', 1900, 1100, 0.12], [0.43, 'clank', 1500], [0.48, 'slide', 1100, 2000, 0.1], [0.57, 'clank', 1700], [0.66, 'click', 2300]] } };
+const RS_VOL = { click: 0.2, clank: 0.2, slide: 0.17, thud: 0.28, rustle: 0.12, rattle: 0.16 };
+function rsPlay(snd, r0, r1, s, gain) {
+  if (!snd || r1 <= r0 || !AC || AC.state !== 'running') return;
+  for (const e of snd.ev) {
+    const r = e[0] / snd.D; if (r <= r0 || r > r1) continue;
+    const o = rsOut(s ? s.x : null, s ? s.y + 1.2 : 0, s ? s.z : 0, (RS_VOL[e[1]] || 0.15) * (gain || 1)); if (!o) continue;
+    RS[e[1]](o, ...e.slice(2));
+  }
+}
+/* r0 → r1: la parte de la recarga (de 0 a 1) que acaba de pasar; s: el soldado (null: el jugador) */
+function reloadSnd(id, w, r0, r1, s) {
+  const snd = RELOAD_SND[id] || RELOAD_SND[w.kind === 'pistol' ? 'astra' : w.kind === 'smg' ? 'mp28' : w.kind === 'lmg' ? 'dp27' : 'mosin'];
+  rsPlay(snd, r0, r1, s, s ? 0.8 : 1);
+}
+
 /* ============ datos históricos, armas, uniformes ============ */
 const REP = 0, NAT = 1;
 const TEAM = [
@@ -4948,7 +5038,7 @@ function updateBot(s, dt) {
   if (s.prim && (!s.enemy || Math.hypot(s.enemy.x - s.x, s.enemy.z - s.z) > 32)) botSidearm(s, false);
   const w = s.wpn, e = s.enemy;
   let mvx = 0, mvz = 0, spd = 0, wantYaw = s.yaw, nav = null;
-  if (s.reloadT > 0) { s.reloadT -= dt; if (s.reloadT <= 0) s.ammo = w.mag; }
+  if (s.reloadT > 0) { const r0 = 1 - s.reloadT / w.reload; s.reloadT -= dt; reloadSnd(s.wid, w, r0, Math.min(1, 1 - s.reloadT / w.reload), s); if (s.reloadT <= 0) s.ammo = w.mag; }
   s.fireT -= dt;
   if (e) {
     const ex = e.x - s.x, ez = e.z - s.z, d = Math.hypot(ex, ez) || 0.01;
@@ -5097,7 +5187,7 @@ function towerBot(s, dt) {
   s.y = groundAt(s.x, s.z, s.y); s.swim = false;
   s.speed = d > stepLen ? 2.8 : 0; s.walkPhase += s.speed * dt * 1.9; s.stuckT = 0; s.sx = s.x; s.sz = s.z;
   s.crouchT = clamp(s.crouchT - dt * 6, 0, 1); s.proneT = clamp((s.proneT || 0) - dt * 2.4, 0, 1);
-  if (s.reloadT > 0) { s.reloadT -= dt; if (s.reloadT <= 0) s.ammo = s.wpn.mag; }
+  if (s.reloadT > 0) { const r0 = 1 - s.reloadT / s.wpn.reload; s.reloadT -= dt; reloadSnd(s.wid, s.wpn, r0, Math.min(1, 1 - s.reloadT / s.wpn.reload), s); if (s.reloadT <= 0) s.ammo = s.wpn.mag; }
   return true;
 }
 function separate() {
@@ -7294,7 +7384,7 @@ function giveLoadout(p, ci) {
 function startReload() {
   const p = P, ws = p.weps[p.cur];
   if (!p.alive || p.reloadT > 0 || ws.ammo >= ws.def.mag || ws.reserve <= 0) return;
-  p.bredaInspectAt = null; p.reloadT = ws.def.reload; SFX.click();
+  p.bredaInspectAt = null; p.reloadT = ws.def.reload;
 }
 function switchWeapon(i) {
   const p = P; if (!p.alive || i === p.cur || !p.weps[i]) return;
@@ -7395,7 +7485,7 @@ function playerFire(ws) {
   const rk = p.prone ? (w.kind === 'lmg' ? 0.2 : 0.6) : 1;       // tumbado el arma retrocede menos; con bípode, casi nada
   p.kick = rk; p.recoil = Math.min(0.09, p.recoil + w.kick * rk);       // el retroceso sacude la vista un instante, pero no mueve la puntería: la mira vuelve a donde apuntabas
   if (w.auto) p.spreadAdd = Math.min(0.045, p.spreadAdd + 0.005);
-  if (w.kind === 'rifle') { p.boltT = w.rate; if (ws.ammo > 0) setTimeout(() => { if (game.state === 'play') SFX.bolt(); }, w.leg ? 130 : 280); }
+  if (w.kind === 'rifle') { p.boltT = w.rate; if (ws.ammo > 0 && !BOLT_SND[ws.id]) setTimeout(() => { if (game.state === 'play') SFX.bolt(); }, w.leg ? 130 : 280); }       // (el Carcano suena con su cerrojo, al compás de la animación)
 }
 /* Sin captura del ratón (cuando el navegador no la permite), el cursor topa con el borde de la ventana y no se puede seguir girando.
    Solo en ese caso, y solo con el cursor apretado contra el mismo borde, la vista sigue girando despacio. Nunca gira sola por tener
@@ -7503,7 +7593,8 @@ function updatePlayer(dt) {
   p.fireT -= dt; input.fireQ -= dt; p.nadeT -= dt;
   p.switchT = Math.max(0, p.switchT - dt); p.kick = Math.max(0, p.kick - dt * 6); p.recoil *= Math.max(0, 1 - dt * 8); p.spreadAdd = Math.max(0, p.spreadAdd - dt * 0.07);
   if (p.boltT > 0) p.boltT -= dt;
-  if (p.reloadT > 0) { p.reloadT -= dt; if (p.reloadT <= 0) { const n = Math.min(w.mag - ws.ammo, ws.reserve); ws.ammo += n; ws.reserve -= n; SFX.click(); } }
+  if (p.reloadT > 0) { const r0 = 1 - p.reloadT / w.reload; p.reloadT -= dt; reloadSnd(ws.id, w, r0, Math.min(1, 1 - p.reloadT / w.reload), null); if (p.reloadT <= 0) { const n = Math.min(w.mag - ws.ammo, ws.reserve); ws.ammo += n; ws.reserve -= n; } }
+  if (p.boltT > 0 && BOLT_SND[ws.id] && ws.ammo > 0) { const sb = BOLT_SND[ws.id], k = Math.min(0.92, Math.max(0.5, w.rate - 0.2)), u0 = (w.rate - p.boltT - 0.06) / k; rsPlay(sb, u0, (w.rate - Math.max(0, p.boltT - dt) - 0.06) / k, null); }
   const want = w.auto ? input.fire : input.fireQ > 0;
   if (want && p.fireT <= 0 && p.reloadT <= 0 && p.switchT <= 0) {
     if (ws.ammo <= 0) { input.fireQ = 0; p.fireT = 0.3; if (ws.reserve > 0) startReload(); else SFX.click(); }
