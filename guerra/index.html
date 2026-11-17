@@ -2249,8 +2249,8 @@ const WEAPONS = {
     origin: 'España (Oviedo)', cal: '7 × 57 mm', feed: 'Peine de 5 cartuchos, cerrojo', note: 'El «Mauser español», reglamentario desde 1893 y presente en los dos bandos. Su cartucho de 7 mm era famoso por su trayectoria tensa.' },
   mauser16: { name: 'Mosquetón Mauser M1916', kind: 'rifle', mag: 5, reserve: 60, dmg: 78, rate: 1.1, reload: 2.6, auto: false, hip: 0.032, ads: 0.0017, kick: 0.033, zoom: 0.62, len: 0.98, botAcc: 0.62, botRange: 115,
     origin: 'España (Oviedo)', cal: '7 × 57 mm', feed: 'Peine de 5 cartuchos, cerrojo', note: 'Versión corta del Mauser español, más manejable, muy extendida entre la infantería desde antes de la guerra.' },
-  carcano: { name: 'Carcano M1891', kind: 'rifle', mag: 6, reserve: 60, dmg: 72, rate: 1.15, reload: 2.5, auto: false, hip: 0.034, ads: 0.0013, kick: 0.028, zoom: 0.52, len: 1.12, botAcc: 0.66, botRange: 130,
-    origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Peine de 6 cartuchos, cerrojo', note: 'Fusil italiano enviado en gran número por Mussolini. Su cargador admite seis cartuchos, uno más que el Mauser.' },
+  carcano: { name: 'Mosquetón Carcano M91', kind: 'rifle', leg: 'carcano', mag: 6, reserve: 60, dmg: 72, rate: 1.15, reload: 2.5, auto: false, hip: 0.034, ads: 0.0013, kick: 0.028, zoom: 0.52, len: 0.913, botAcc: 0.66, botRange: 130,
+    origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Peine de 6 cartuchos que entra entero en el depósito, cerrojo', note: 'El mosquetón de caballería del Carcano, de 91 cm, con la bayoneta de espiga plegada bajo el cañón. Mussolini lo envió en gran número. El peine entra entero en el depósito y, al disparar el último cartucho, cae vacío por debajo.' },
   tigre: { name: 'Carabina «El Tigre»', kind: 'rifle', leg: 'rifle', mag: 10, reserve: 50, dmg: 62, rate: 0.6, reload: 3.3, auto: false, hip: 0.032, ads: 0.0011, kick: 0.027, zoom: 0.6, len: 0.96, botAcc: 0.6, botRange: 105,
     origin: 'España (Éibar)', cal: '.44-40 (11 mm)', feed: 'Depósito tubular bajo el cañón, de palanca', note: 'Copia española del Winchester 1892 que fabricaban en Éibar Garate, Anitua y Cía. Era el arma de la Guardia Civil y de los Carabineros, y en la guerra la usaron los dos bandos. La palanca deja disparar más deprisa que un cerrojo.' },
   naranjero: { name: 'Subfusil «Naranjero»', kind: 'smg', mag: 32, reserve: 128, dmg: 27, rate: 0.105, reload: 2.5, auto: true, hip: 0.04, ads: 0.014, kick: 0.011, zoom: 0.8, len: 0.62, botAcc: 0.55, botRange: 46,
@@ -2263,8 +2263,8 @@ const WEAPONS = {
     origin: 'URSS', cal: '7,62 × 54 mm R', feed: 'Plato de 47 cartuchos, unos 550 disparos/min', note: 'Ametralladora ligera soviética Degtiariov. Su cargador plano y circular le valió apodos como «tocadiscos».' },
   lewis: { name: 'Fusil ametrallador Lewis', kind: 'lmg', mag: 47, reserve: 141, dmg: 40, rate: 0.109, reload: 4.0, auto: true, hip: 0.065, ads: 0.0095, kick: 0.013, zoom: 0.7, len: 1.28, botAcc: 0.34, botRange: 90,
     origin: 'Reino Unido y Estados Unidos', cal: '.303 British (7,7 mm)', feed: 'Plato giratorio de 47 cartuchos encima del cajón, unos 550 disparos/min', note: 'Ametralladora ligera de la Gran Guerra, reconocible por el plato que gira encima del cajón a cada disparo. A España llegaron por compras sueltas en el extranjero y la usaron los dos bandos. Pesada para llevar a la cadera, pero muy precisa apuntando.' },
-  breda30: { name: 'Fusil ametrallador Breda 30', kind: 'lmg', mag: 20, reserve: 160, dmg: 36, rate: 0.12, reload: 3.1, auto: true, hip: 0.055, ads: 0.011, kick: 0.011, zoom: 0.72, len: 0.95, botAcc: 0.34, botRange: 85,
-    origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Cargador fijo de 20, unos 500 disparos/min', note: 'Ametralladora ligera italiana. Su cargador fijo se rellenaba con peines y su mecanismo, que engrasaba cada cartucho, se encasquillaba con el polvo.' },
+  breda30: { name: 'Fusil ametrallador Breda 30', kind: 'lmg', leg: 'breda', mag: 20, reserve: 160, dmg: 36, rate: 0.12, reload: 4.2, auto: true, hip: 0.055, ads: 0.011, kick: 0.011, zoom: 0.72, len: 1.23, botAcc: 0.34, botRange: 85,
+    origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Cargador fijo de 20 en el costado derecho, unos 500 disparos/min', note: 'Ametralladora ligera italiana de 1,23 m y 10,6 kg. Su cargador, en el costado derecho, no se quita: se abre hacia delante, se llena con un peine de veinte cartuchos y se vuelve a cerrar. Su mecanismo, que engrasaba cada cartucho, se encasquillaba con el polvo.' },
   astra: { name: 'Pistola Astra 400', kind: 'pistol', mag: 8, reserve: 32, dmg: 30, rate: 0.2, reload: 1.7, auto: false, hip: 0.03, ads: 0.012, kick: 0.02, zoom: 0.85, len: 0.2, botAcc: 0.3, botRange: 25,
     origin: 'España (Gernika)', cal: '9 mm Largo', feed: 'Cargador de 8 cartuchos', note: 'Pistola reglamentaria del ejército español desde 1921, usada por ambos bandos.' }
 };
@@ -4634,6 +4634,7 @@ function classWeapon(s, ci) {
 }
 function setClass(s, ci) {
   s.ci = ci; s.cls = CLASSES[s.team][ci]; s.wid = classWeapon(s, ci); s.wpn = WEAPONS[s.wid]; s.prim = null;
+  s.nac = s.team === NAT && (s.cls.id === 'ame' || s.cls.id === 'tir');       // con el esqueleto del legionario, el cuerpo del soldado nacional
   s.armsM = armsMesh(s.team, s.ui, s.skin, s.wid);
 }
 function placeAt(s, f) {
@@ -5302,18 +5303,20 @@ async function skBuild(g, tag, maxU) {
   for (let ni = 0; ni < nodes.length; ni++) {
     const nd = nodes[ni]; if (nd.mesh === undefined || nd.skin === undefined) continue;
     const name = nd.name || '', mesh = J.meshes[nd.mesh], m = /LOD(\d)/i.exec(name), lv = m ? +m[1] : 0, parts = [];
-    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv' || name === 'brazos_breda30_fpv';
+    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv' || name === 'brazos_breda30_fpv', nac = name.startsWith('nac_');
     for (const pr of mesh.primitives) {
       parts.push(await skPart(g, pr, cache, slot));
-      if (lv === 0 && !wm && !isArm) { const a = J.accessors[pr.attributes.POSITION]; if (a.min && a.max) { minY = Math.min(minY, a.min[1]); maxY = Math.max(maxY, a.max[1]); } }
+      if (lv === 0 && !wm && !isArm && !nac) { const a = J.accessors[pr.attributes.POSITION]; if (a.min && a.max) { minY = Math.min(minY, a.min[1]); maxY = Math.max(maxY, a.max[1]); } }
     }
     if (wm) { (C.wp[wm[1]] = C.wp[wm[1]] || {})[wm[2]] = parts; continue; }
     if (isArm) { if (name === 'brazos_breda30_fpv') C.bredaArms = parts; else C.arms = parts; continue; }
+    if (nac) { const n = C.nac = C.nac || { lod: [] }; if (name === 'nac_brazos_fpv') n.arms = parts; else n.lod[lv] = (n.lod[lv] || []).concat(parts); continue; }       // el soldado nacional en el esqueleto del legionario
     C.lod[lv] = (C.lod[lv] || []).concat(parts);
   }
   if (!C.lod[0]) throw new Error('sin cuerpo');
   if (!C.lod[1]) C.lod[1] = C.lod[0];
   if (!C.lod[2]) C.lod[2] = C.lod[1];
+  if (C.nac) { const n = C.nac; if (!n.lod[0] || !n.arms) C.nac = null; else { if (!n.lod[1]) n.lod[1] = n.lod[0]; if (!n.lod[2]) n.lod[2] = n.lod[1]; if (!SK.u32 && n.lod[0].some(p => p.u32)) n.lod[0] = n.lod[1]; } }
   if (!SK.u32 && C.lod[0].some(p => p.u32)) { C.lod0big = C.lod[0]; C.lod[0] = C.lod[1]; }       // sin índices de 32 bits: la original no se puede dibujar
   C.scale = SK_H / Math.max(0.5, maxY - minY); C.foot = minY;
   /* animaciones: cada canal se remuestrea a 30 fotogramas por segundo */
@@ -6099,7 +6102,10 @@ function skFingers(C, st, grips) {
 /* el agarre de cada mano de un soldado en tercera persona según su arma (null: se deja lo del clip) */
 function skGripsFor(s, C) {
   if (!s.alive) return null;
-  if (C.leg) { if (s.boltT > 0) return null; const k = skLegKey(s); return { Right: k === 'revolver' ? 'pistol' : 'stock' }; }       // la izquierda del legionario ya se apoya en el arma (skLegGrip)
+  if (C.leg) { if (s.boltT > 0) return null; const k = skLegKey(s);
+    if (k === 'carcano' && (s.reloadT > 0 || (s.ammo > 0 && game.time - (s.lastShot || -99) < 1.0))) return null;       // la derecha en la manija del cerrojo
+    if (k === 'rifle' && s.reloadT > 0) return null;       // la derecha mete los cartuchos
+    return { Right: k === 'revolver' ? 'pistol' : 'stock' }; }       // la izquierda del legionario ya se apoya en el arma (skLegGrip)
   if (s.wid === 'breda30' && C.breda) return null;       // la Breda trae en sus clips las manos hechas para ella
   if (s.wpn && s.wpn.kind === 'pistol') return { Right: 'pistol', Left: 'relax' };
   return { Right: 'stock', Left: s.reloadT > 0 ? 'relax' : 'fore' };
@@ -6122,7 +6128,7 @@ function skBonesTo(C, st, B) {
 function skBones(s, C, st) {
   if (C.leg) {      // la mano izquierda del legionario agarra el arma (menos al cambiar el tambor de la Thompson)
     const k = skLegKey(s);
-    if (k !== 'revolver' && s.alive) { const r = (k === 'thompson' || k === 'mp') && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
+    if (k !== 'revolver' && s.alive) { const r = (k === 'thompson' || k === 'mp' || k === 'carcano' || k === 'breda') && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
   }
   st.gun = null;
   if (C.leg) { st.weapon = null; st.wpk = s.alive ? skLegKey(s) : null; }       // el arma del legionario va cosida a sus huesos: se dibuja con ellos (muerto, la suelta)
@@ -6214,7 +6220,7 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   for (const s of vis) {
     const st = s.sk, C = st.C, d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez);
     gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, st.model);
-    skParts(C.lod[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
+    skParts((s.nac && C.nac ? C.nac.lod : C.lod)[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
     if (C.leg && st.wpk && C.wp[st.wpk]) skParts(d2 < dw ? C.wp[st.wpk].near : C.wp[st.wpk].far);
   }
   /* la Thompson escondida en el campanario, tumbada sobre su lado izquierdo encima de la caja */
@@ -6367,7 +6373,8 @@ function gunNear(p) {
   if (!p || !p.alive || p.veh || p.aa || !p.weps || !SK.ready || duo.role) return null;
   let best = null, bd = 1.9 * 1.9;
   for (const d of gunDrops) {
-    const id = d.g.id; if (!d.rest || d.g.base !== 'rifle' || id === p.weps[0].id || WEAPONS[id].leg || id === 'breda30') continue;
+    const id = d.g.id, W = WEAPONS[id]; if (!d.rest || d.g.base !== 'rifle' || id === p.weps[0].id || !W) continue;
+    if (W.leg && !(p.team === NAT && SK.leg)) continue;       // las armas nacionales hechas en Blender (Tigre, MP 28, Thompson, Carcano, Breda), solo los nacionales: las llevan con el esqueleto del legionario
     const q = (d.p[0] - p.x) * (d.p[0] - p.x) + (d.p[2] - p.z) * (d.p[2] - p.z); if (q < bd && Math.abs(d.p[1] - p.y) < 2.5) { bd = q; best = d; }
   }
   return best;
@@ -6436,23 +6443,24 @@ function skLegTexHD(g) {
     if (best) im.uri = best[1];
   }
 }
-const SK_LEGPRE = { rifle: 'Rifle_Palanca__', thompson: 'Thompson__', mp: 'MP__', revolver: 'Revolver__' };
+const SK_LEGPRE = { rifle: 'Rifle_Palanca__', thompson: 'Thompson__', mp: 'MP__', revolver: 'Revolver__', carcano: 'Carcano__', breda: 'Breda__' };
 const skLegKey = s => s.wpn.kind === 'pistol' ? 'revolver' : (s.wpn.leg || 'rifle');
 /* miras de cada arma en el espacio de su hueso raíz (alza y punto de mira): al apuntar, la línea que las une se lleva al centro de la vista */
 /* los clips «Apuntar» suben el arma en dos segundos y la mantienen al final; «Sujetar» es el arma bajada. En primera persona, a la cadera se
    usa una mezcla de las dos (cuánto de «Apuntar» en cada arma) para que el arma se vea */
-const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, mp: 0.42, revolver: 0.62 };
+const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, mp: 0.42, revolver: 0.62, carcano: 0.42, breda: 0.42 };
 /* al apuntar, el alza queda a esta distancia del ojo (la cámara del modelo iba casi sobre la cantonera) */
-const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0 };
+const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0, carcano: 0.42, breda: 0.26 };
 /* a la cadera y al recargar, la cámara va este tanto más adelante (hacia las manos) que la del modelo: el hombro izquierdo, que con el
    cuerpo de perfil queda delante del ojo, y el corte de la manga pasan a quedar a un lado y detrás, también en pantallas muy anchas.
    Al apuntar no se toca (la mira la coloca fpFix) */
-const SK_LEG_FWD = { rifle: 0.12, thompson: 0.06, mp: 0.12, revolver: 0 };       // (la Thompson sube mucho para cambiar el tambor: con 6 cm basta)
+const SK_LEG_FWD = { rifle: 0.12, thompson: 0.06, mp: 0.12, revolver: 0, carcano: 0.12, breda: 0.08 };       // (la Thompson sube mucho para cambiar el tambor: con 6 cm basta)
 function skLegFwdNow(p) { const lk = skLegFpKey(p); return lk ? (SK_LEG_FWD[lk] || 0) * (1 - (p.aimT || 0)) : 0; }
 /* medidas en la malla: la carabina, del borde de arriba de la muesca del alza (la que se le pone, ver skLegSights) a la punta del punto de
    mira; la Thompson, de lo alto de las orejas del alza Lyman a la punta de su hoja; el revólver, de la ranura del puente a la punta del
    guion. Así la punta del punto de mira queda justo en el centro de la vista, que es por donde sale la bala */
-const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], mp: [[0.00775, 0, 0.104], [0.3815, 0, 0.106]], revolver: [[0.058, 0.1202, 0], [0.322, 0.1199, 0]] };       // (en el revólver, el guion asoma un pelo por encima del puente, que si no se pierde en lo negro)
+const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], mp: [[0.00775, 0, 0.104], [0.3815, 0, 0.106]], revolver: [[0.058, 0.1202, 0], [0.322, 0.1199, 0]],
+  carcano: [[0.06, 0, 0.0995], [0.42175, 0, 0.0955]], breda: [[-0.255, 0, 0.1665], [0.357, 0, 0.1625]] };       // Carcano y Breda: hoja del alza con muesca y guion nuevos (de Blender)       // (en el revólver, el guion asoma un pelo por encima del puente, que si no se pierde en lo negro)
 /* puntos de mira más finos (eran hojas de 6 mm): se estrechan hacia su centro */
 const SK_LEGTHIN = { rifle: { x: [0.455, 0.477], z: 0.0838, y: -0.0008, w: 0.0055, k: 0.36 }, thompson: { x: [0.408, 0.434], z: 0.1295, y: 0, w: 0.0072, k: 0.38 } };
 function skLegSights(C) {
@@ -6596,6 +6604,14 @@ function skLegOverlays(s, C, st, pre, since) {
     const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1), k = r < 0.62 ? cl.Thompson__Recargar_Tambor : cl.Thompson__Montar_Cerrojo, u = r < 0.62 ? r / 0.62 : (r - 0.62) / 0.38;
     if (k) skBlend(C, st, k, u * k.dur, Math.min(1, r * 10, (1 - r) * 10), C.upper, hq);
   }
+  if (pre === 'Carcano__' && s.ammo > 0 && !(s.reloadT > 0)) {       // Carcano: sube la manija, tira, empuja y la baja
+    const ac = cl.Carcano__Accionar_Cerrojo, u = (since - 0.08) / Math.min(0.92, Math.max(0.5, s.wpn.rate - 0.2));
+    if (ac && u > 0 && u < 1) skBlend(C, st, ac, u * ac.dur, Math.min(1, u * 10, (1 - u) * 10), C.upper, hq);
+  }
+  if ((pre === 'Carcano__' || pre === 'Breda__' || pre === 'Rifle_Palanca__') && s.reloadT > 0) {       // Carcano: peine de seis por arriba; Breda: abre el cargador, lo llena y monta; carabina: cartuchos por la portilla
+    const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1), k = cl[pre === 'Carcano__' ? 'Carcano__Recargar_Peine' : pre + 'Recargar'];
+    if (k) skBlend(C, st, k, r * k.dur, Math.min(1, r * 10, (1 - r) * 10), C.upper, hq);
+  }
   if (pre === 'MP__' && s.reloadT > 0) {       // MP 28: saca el cargador por la izquierda, coge otro del correaje y monta el cerrojo
     const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1), k = cl.MP__Recargar_Cargador;
     if (k) skBlend(C, st, k, r * k.dur, Math.min(1, r * 10, (1 - r) * 10), C.upper, hq);
@@ -6620,7 +6636,14 @@ const SK_LEGGRIP = {
   /* MP 28: por debajo de la camisa perforada del cañón, delante del alojamiento del cargador, como la carabina por el guardamanos */
   mp: { pc: [0.24, 0.012, -0.004], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
     flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
-    body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0199, 0.0425], [-0.0097, 0.0326], [0.0077, 0.032], [0.0211, 0.0454], [0.0195, 0.0645], [0.01, 0.0732], [-0.001, 0.0753], [-0.0107, 0.0729], [-0.0221, 0.0576], [-0.0226, 0.054]] }] }
+    body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0199, 0.0425], [-0.0097, 0.0326], [0.0077, 0.032], [0.0211, 0.0454], [0.0195, 0.0645], [0.01, 0.0732], [-0.001, 0.0753], [-0.0107, 0.0729], [-0.0221, 0.0576], [-0.0226, 0.054]] }] },
+  /* Carcano: bajo el guardamanos, a un palmo del cajón; Breda: bajo la caja del cargador (las patas del bípode van plegadas hacia delante) */
+  carcano: { pc: [0.10, 0.012, -0.007], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
+    flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
+    body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0144, 0.0894], [-0.0209, 0.0693], [-0.0233, 0.0499], [-0.0196, 0.035], [-0.0155, 0.031], [-0.0072, 0.0284], [0.0136, 0.0314], [0.0199, 0.0412], [0.0211, 0.0509], [0.0189, 0.07], [0.007, 0.0863], [-0.0108, 0.0949]] }] },
+  breda: { pc: [0.06, 0.012, 0.028], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.55, hs: 0.92, fs: 0.95, fr: [0.0135, 0.0122, 0.011, 0.017],
+    flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
+    body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0264, 0.1151], [-0.0265, 0.0838], [-0.0246, 0.0762], [-0.0057, 0.0626], [0.0038, 0.0627], [0.0271, 0.0773], [0.0288, 0.085], [0.0292, 0.1141], [0.0281, 0.1241], [0.0132, 0.1431], [-0.0141, 0.1432], [-0.0248, 0.1244]] }] }
 };
 /* distancia con signo de un punto (2D) a un polígono convexo en sentido antihorario */
 function skPolyDist(h, a, b) {
@@ -6774,7 +6797,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   skBlend(C, st, S, now, 1, null); skLegDispBlend(S, now, 1);
   skBlend(C, st, A, ta, wa, null); skLegDispBlend(A, ta, wa);
   let o = null, ot = 0, ow = 0;
-  let lev = 0;
+  let lev = 0, bolt = 0;
   if (key === 'rifle' && p.boltT > 0 && ws.ammo > 0) {
     const u = clamp((w.rate - p.boltT - 0.04) / Math.max(0.3, w.rate - 0.1), 0, 1); o = cl.Rifle_Palanca__Accionar_Palanca; ot = skLeverT(u); ow = Math.min(1, u * 12, (1 - u) * 12);
     lev = Math.pow(Math.sin(Math.PI * u), 0.6);
@@ -6783,21 +6806,26 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
     ot = (r < 0.62 ? r / 0.62 : (r - 0.62) / 0.38) * (o ? o.dur : 0); ow = Math.min(1, r * 10, (1 - r) * 10);
   } else if (key === 'mp' && p.reloadT > 0) {
     const r = clamp(1 - p.reloadT / w.reload, 0, 1); o = cl.MP__Recargar_Cargador; ot = r * (o ? o.dur : 0); ow = Math.min(1, r * 12, (1 - r) * 12);
+  } else if ((key === 'carcano' || key === 'breda' || key === 'rifle') && p.reloadT > 0) {
+    const r = clamp(1 - p.reloadT / w.reload, 0, 1); o = cl[key === 'carcano' ? 'Carcano__Recargar_Peine' : pre + 'Recargar']; ot = r * (o ? o.dur : 0); ow = o ? Math.min(1, r * 12, (1 - r) * 12) : 0;
+  } else if (key === 'carcano' && p.boltT > 0 && ws.ammo > 0) {       // el cerrojo después de cada disparo, con el arma al hombro
+    const u = clamp((w.rate - p.boltT - 0.06) / Math.min(0.92, Math.max(0.5, w.rate - 0.2)), 0, 1); o = cl.Carcano__Accionar_Cerrojo; ot = u * (o ? o.dur : 0); bolt = Math.min(1, u * 12, (1 - u) * 12);
   }
   if (o && ow > 0) { skBlend(C, st, o, ot, ow, null); skLegDispBlend(o, ot, ow); }
+  if (o && bolt > 0) { skBlend(C, st, o, ot, bolt, null); skLegDispBlend(o, ot, bolt); }       // el cerrojo del Carcano, con el arma al hombro (como la palanca)
   const since = now - (p.lastShot || -99), capa = cl[pre + 'Disparo_Capa'];
   if (capa && since < capa.dur && ow < 0.5) skBlend(C, st, capa, since, 0.6 * Math.min(1, (capa.dur - since) * 8, since * 30 + 0.3), C.capa[pre]);
   skGlobals(C, st);
-  if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' || key === 'mp' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
-  if (lev < 0.05) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
-  if (key === 'rifle') skHideFinger(C, st, 'Right', 'Index');       // con la carabina, el índice derecho atravesaba el cajón del arma: no se ve
+  if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' || key === 'mp' || key === 'carcano' || key === 'breda' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
+  if (lev < 0.05 && bolt < 0.05 && !((key === 'carcano' || key === 'rifle') && ow > 0.05)) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
+  if (key === 'rifle' && ow < 0.05) skHideFinger(C, st, 'Right', 'Index');       // con la carabina, el índice derecho atravesaba el cajón del arma: no se ve
   skBonesTo(C, st, _lfp.B);
   m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
   /* al apuntar, la corrección que alinea las miras con el centro de la vista */
-  const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : key === 'mp' ? a * (1 - ow) : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
+  const fx = C.fpFix && C.fpFix[key], fa = !fx ? 0 : key === 'thompson' ? a + (0.7 - a) * ow : key === 'mp' || key === 'breda' || key === 'rifle' ? a * (1 - ow) : key === 'carcano' ? (a + (1 - a) * bolt) * (1 - ow) : a;       // la palanca se acciona con el arma al hombro; el tambor, algo más alto para verlo
   M4.copy(_lfp.M, K);
   const fw = (SK_LEG_FWD[key] || 0) * (1 - a); if (fw > 0.001) M4.translate(_lfp.M, 0, 0, fw);       // la cámara, más cerca de las manos
-  const hf = C.hipFix && C.hipFix[key], hh = hf ? (1 - a) * (1 - lev) : 0;       // a la cadera, el cañón hacia el centro de la pantalla
+  const hf = C.hipFix && C.hipFix[key], hh = hf ? (1 - a) * (1 - Math.max(lev, bolt)) : 0;       // a la cadera, el cañón hacia el centro de la pantalla
   if (hh > 0.001) { const ang = 2 * Math.acos(clamp(hf[3], -1, 1)), sv = Math.hypot(hf[0], hf[1], hf[2]); if (sv > 1e-9) M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.H || (_lfp.H = M4.create()), [0, 0, 0], qAxis([hf[0] / sv, hf[1] / sv, hf[2] / sv], ang * hh), 1)); }
   if (lev > 0.001) {      // al accionar la palanca, la carabina se ladea a la derecha (la parte de arriba hacia la derecha) y sube un poco:
                           // se ve la acción abierta y, por debajo, la palanca con la mano derecha detrás
@@ -6806,13 +6834,16 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
     M4.rotZ(_lfp.M, -0.78 * lev); M4.rotY(_lfp.M, 0.18 * lev); M4.rotX(_lfp.M, 0.16 * lev);
     M4.translate(_lfp.M, -pv[0], -pv[1], -pv[2]);
   }
-  if (key === 'mp' && ow > 0.001) M4.translate(_lfp.M, 0.025 * ow, -0.07 * ow, -0.15 * ow);      // al recargar el MP, el arma se aparta un poco del ojo (el soldado lo sube al pecho)
+  if (key === 'mp' && ow > 0.001) M4.translate(_lfp.M, 0.025 * ow, -0.07 * ow, -0.15 * ow);
+  else if ((key === 'carcano' || key === 'breda') && ow > 0.001) M4.translate(_lfp.M, 0.04 * ow, -0.10 * ow, -0.22 * ow);
+  else if (key === 'rifle' && ow > 0.001) M4.translate(_lfp.M, -0.02 * ow, -0.03 * ow, -0.06 * ow);       // la carabina, algo más cerca que las otras: se ven los cartuchos entrar por la portilla
+  if (bolt > 0.001) M4.translate(_lfp.M, 0.03 * bolt, -0.07 * bolt, -0.14 * bolt);       // al accionar el cerrojo, el arma baja un poco de la cara: la mano no tapa la vista       // al recargar, el arma algo más lejos y más baja: los brazos no tapan la vista      // al recargar el MP, el arma se aparta un poco del ojo (el soldado lo sube al pecho)
   if (fa > 0.001) { const q = fx.q, h = fa, qq = v3nrm([q[0] * h, q[1] * h, q[2] * h]), ang = 2 * Math.acos(clamp(q[3], -1, 1)) * h, qa = Math.hypot(q[0], q[1], q[2]) > 1e-9 ? qAxis(v3nrm([q[0], q[1], q[2]]), ang) : [0, 0, 0, 1];
     M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.X || (_lfp.X = M4.create()), [fx.t[0] * h, fx.t[1] * h, fx.t[2] * h], qa, 1)); }
   M4.rotY(_lfp.M, Math.PI); M4.mul(_lfp.M, _lfp.M, _lfp.D);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
   gl.uniform4fv(SK.U.uB, _lfp.B); gl.uniformMatrix4fv(SK.U.uM, false, _lfp.M);
-  skParts(C.arms); skParts(C.wp[key].near);
+  skParts(p.nac && C.nac ? C.nac.arms : C.arms); skParts(C.wp[key].near);
   skEnd();
   return true;
 }
@@ -7482,7 +7513,7 @@ function updatePlayer(dt) {
 const _fp = M4.create();
 function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
-  if (ws.id === 'breda30' && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
+  if (ws.id === 'breda30' && !skLegFpKey(p) && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
   if (ws.id === 'naranjero' && p.team === REP && nfpDraw(camWorld, p, w)) return;       // el de Blender: brazos y subfusil animados
   if (ws.id === 'lewis' && p.team === REP && fpvDraw('lewis', camWorld, p, w, ws)) return;       // la Lewis de Blender, con su plato que gira
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
@@ -7490,7 +7521,7 @@ function drawFpWeapon(camWorld) {
   const pt = p.proneT || 0, mv = Math.min(1, p.speed / 5) * (1 - a * 0.85) * (1 - pt * 0.5), ph = p.walkPhase * 0.5;
   const lk = skLegFpKey(p);
   if (lk) {       // legionario: sus brazos y su arma como en su cámara de primera persona; aquí solo el vaivén, el retroceso y el cambio de arma
-    const lrel = lk === 'thompson' || lk === 'mp' ? 0 : rel;       // (la Thompson y el MP traen su recarga en el clip)
+    const lrel = lk === 'thompson' || lk === 'mp' || lk === 'carcano' || lk === 'breda' || (lk === 'rifle' && SK.leg.clips.Rifle_Palanca__Recargar) ? 0 : rel;       // (la Thompson, el MP, el Carcano y la Breda traen su recarga en el clip)
     M4.copy(_fp, camWorld);
     M4.translate(_fp, Math.sin(ph) * 0.008 * mv, Math.abs(Math.cos(ph)) * 0.008 * mv - lrel * 0.2 - p.switchT * 0.5, p.kick * 0.03 * (w.auto ? 0.5 : 1) - pt * 0.03 * (1 - a));
     M4.rotX(_fp, p.kick * 0.025 * (w.auto ? 0.4 : 1) - lrel * 0.6 - p.switchT * 0.8); M4.rotZ(_fp, -lrel * 0.3);
@@ -10689,7 +10720,7 @@ function vrDrawGun(ew) {
   M4.translate(_gk, 0, -rel * 0.06 - p.switchT * 0.2, p.kick * 0.04 * (w.auto ? 0.5 : 1));
   M4.rotX(_gk, p.kick * 0.05 * (w.auto ? 0.4 : 1) - rel * 0.7 - p.switchT * 0.9); M4.rotZ(_gk, -bolt * 0.22 - rel * 0.3);
   M4.translate(_gk, -hd[0], -hd[1], -hd[2]);
-  if (ws.id === 'breda30' && skBredaFpDraw(XVP, _gk, p, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, true)) return;
+  if (ws.id === 'breda30' && !skLegFpKey(p) && skBredaFpDraw(XVP, _gk, p, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, true)) return;
   if (!gunFpDraw(XVP, _gk, w, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR']) && !skFpDraw(XVP, _gk, w.kind, p.team, ew ? ew[0] : 0, ew ? ew[1] : 0, ew ? ew[2] : 0, ['RightVR'])) drawMesh(ws.mesh, _gk);
 }
 
@@ -11058,7 +11089,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
 })();
 
 </script>
