@@ -1730,17 +1730,34 @@ progMesh = compile(
    void main(){
      vec3 c = vCol*uTint, nP = normalize(vNor); float rgh = -1.0;
      /* materiales PBR (4): color, normal y rugosidad de un solo material por muro, proyectado en la cara dominante (sin mezclar
-        proyecciones); los tejados, a lo largo de su pendiente. uTxA: x escala (1/m), y tejado, z fuerza del relieve; uTxB: color de referencia */
+        proyecciones); los tejados, a lo largo de su pendiente. uTxA: x escala (1/m), y tejado, z fuerza del relieve, w musgo;
+        uTxB: color de referencia y, en w, las tres proyecciones mezcladas (rocas: formas redondas, sin costuras) */
      if(uTxMode>3.5){
        vec3 nn = normalize(vNO), aw = abs(nn), T, B; vec2 uv; float ts = uTxA.x;
-       if(uTxA.y > 0.5 && aw.y > 0.25 && aw.y < 0.985){ T = normalize(vec3(-nn.z, 0.0, nn.x)); B = cross(T, nn); }
-       else if(aw.x >= aw.y && aw.x >= aw.z){ T = vec3(0.0,0.0,1.0); B = vec3(0.0,1.0,0.0); }
-       else if(aw.z >= aw.y){ T = vec3(1.0,0.0,0.0); B = vec3(0.0,1.0,0.0); }
-       else { T = vec3(1.0,0.0,0.0); B = vec3(0.0,0.0,1.0); }
-       uv = vec2(dot(vO,T), dot(vO,B))*ts;
-       vec3 tn = texture2D(uTxN, uv).rgb; vec2 nxy = (tn.xy*2.0-1.0)*uTxA.z; rgh = tn.b;
-       nP = normalize(T*nxy.x + B*nxy.y + nn*sqrt(max(0.0, 1.0-dot(nxy,nxy))));
-       c = texture2D(uTx, uv).rgb*clamp(vCol/uTxB.rgb, 0.7, 1.2)*uTint;
+       if(uTxB.w > 0.5){
+         vec3 tw = aw*aw*aw*aw; tw /= (tw.x+tw.y+tw.z);
+         vec2 ux = vO.zy*ts, uy = vO.xz*ts, uz = vO.xy*ts;
+         vec3 nx = texture2D(uTxN, ux).rgb, ny = texture2D(uTxN, uy).rgb, nz = texture2D(uTxN, uz).rgb;
+         vec2 dx = (nx.xy*2.0-1.0)*uTxA.z, dy = (ny.xy*2.0-1.0)*uTxA.z, dz = (nz.xy*2.0-1.0)*uTxA.z;
+         nP = normalize(nn + vec3(0.0, dx.y, dx.x)*tw.x + vec3(dy.x, 0.0, dy.y)*tw.y + vec3(dz.x, dz.y, 0.0)*tw.z);
+         rgh = nx.b*tw.x + ny.b*tw.y + nz.b*tw.z;
+         c = (texture2D(uTx, ux).rgb*tw.x + texture2D(uTx, uy).rgb*tw.y + texture2D(uTx, uz).rgb*tw.z)*clamp(vCol/uTxB.rgb, 0.7, 1.2)*uTint;
+       } else {
+         if(uTxA.y > 0.5 && aw.y > 0.25 && aw.y < 0.985){ T = normalize(vec3(-nn.z, 0.0, nn.x)); B = cross(T, nn); }
+         else if(aw.x >= aw.y && aw.x >= aw.z){ T = vec3(0.0,0.0,1.0); B = vec3(0.0,1.0,0.0); }
+         else if(aw.z >= aw.y){ T = vec3(1.0,0.0,0.0); B = vec3(0.0,1.0,0.0); }
+         else { T = vec3(1.0,0.0,0.0); B = vec3(0.0,0.0,1.0); }
+         uv = vec2(dot(vO,T), dot(vO,B))*ts;
+         vec3 tn = texture2D(uTxN, uv).rgb; vec2 nxy = (tn.xy*2.0-1.0)*uTxA.z; rgh = tn.b;
+         nP = normalize(T*nxy.x + B*nxy.y + nn*sqrt(max(0.0, 1.0-dot(nxy,nxy))));
+         c = texture2D(uTx, uv).rgb*clamp(vCol/uTxB.rgb, 0.7, 1.2)*uTint;
+       }
+       if(uTxA.w > 0.0){       /* musgo, a manchas, en lo que mira hacia arriba: encima de rocas, albardillas y piedras de los márgenes */
+         float mz = vnw(vO.xz*2.3 + vO.y*1.3)*0.55 + vnw(vO.xz*6.1 + vO.y*3.7)*0.3 + vnw(vO.xz*17.0 + vO.y*9.0)*0.15;
+         float m = smoothstep(0.62, 0.95, nP.y*0.6 + mz*0.72) * uTxA.w;
+         vec3 mc = vec3(0.16, 0.2, 0.075)*(0.55 + 0.9*dot(c, vec3(0.4, 0.4, 0.2))/max(uTint.g, 0.2))*(0.8 + 0.4*vnw(vO.xz*23.0 + vO.y*11.0));
+         c = mix(c, mc*uTint, m*0.85); rgh = mix(rgh, 0.97, m);
+       }
      }
      /* modelos por código: textura de detalle por los tres ejes del objeto (1) o calca plana (2) */
      else if(uTxMode>0.5){ if(uTxMode<1.5){ vec3 tw = abs(normalize(vNO)); tw = tw*tw*tw*tw; tw /= (tw.x+tw.y+tw.z); float ts = uTxA.x;
@@ -1811,15 +1828,19 @@ function txRestore() { for (const k in TX) txUpload(TX[k]); }
 /* ============ materiales PBR de la zona ============
    Lo que se veía en la Terra Alta y la ribera del Ebro en 1938, cada uno con su color (con la oclusión ya metida) y su mapa de normal
    y rugosidad (R, G: normal; B: rugosidad), hechos con pbr/gen.py:
-   - seca: piedra seca de los márgenes de los bancales y de las casas en ruinas (foto piedra_0);
+   - seca: piedra seca de los márgenes de los bancales y de las casas en ruinas (foto piedra_0), con musgo encima;
    - mamp: mampostería irregular de piedra caliza con mortero de cal de casas, iglesia, torre y ermita (foto piedra_1);
+   - sillar: sillería de caliza labrada en hiladas de pilastras, molduras, esquinales, portadas y suelo de la iglesia (foto piedra_3);
+   - roca: caliza de los afloramientos, con estratos, grietas, líquenes y musgo (por las tres caras, sin costuras);
    - teja: teja árabe de barro cocido, en canal y cobija, de todos los tejados;
    - sacos: sacos terreros de arpillera de parapetos y nidos antiaéreos;
    - hormigon: hormigón de encofrado de tablas de los fortines.
    Cada muro lleva un único material (nada de mezclar texturas en una misma pared). En el móvil o con texturas bajas, a la mitad. */
 const PBR = {
-  seca: { ts: 1 / 2.4, ref: [0.54, 0.5, 0.43], k: 1.0 },
+  seca: { ts: 1 / 2.4, ref: [0.54, 0.5, 0.43], k: 1.0, moss: 0.55 },
   mamp: { ts: 1 / 3.0, ref: [0.7, 0.64, 0.51], k: 1.0 },
+  sillar: { ts: 1 / 2.6, ref: [0.86, 0.82, 0.71], k: 0.9, moss: 0.2 },
+  roca: { ts: 1 / 2.2, ref: [0.66, 0.63, 0.55], k: 0.75, moss: 1.0, tri: 1 },
   teja: { ts: 1 / 2.0, ref: [0.65, 0.34, 0.23], k: 1.0, roof: 1 },
   sacos: { ts: 1 / 1.6, ref: [0.66, 0.6, 0.44], k: 1.0 },
   hormigon: { ts: 1 / 3.0, ref: [0.6, 0.59, 0.54], k: 1.0 }
@@ -1840,7 +1861,7 @@ function drawStone() {
     const on = !!(tc && tc.tex && tn && tn.tex);
     if (on) {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tn.tex); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tc.tex);
-      gl.uniform1f(U.uTxMode, 4); gl.uniform4f(U.uTxA, M.ts, M.roof || 0, M.k, 0); gl.uniform4f(U.uTxB, M.ref[0], M.ref[1], M.ref[2], 0);
+      gl.uniform1f(U.uTxMode, 4); gl.uniform4f(U.uTxA, M.ts, M.roof || 0, M.k, M.moss || 0); gl.uniform4f(U.uTxB, M.ref[0], M.ref[1], M.ref[2], M.tri || 0);
     }
     drawMesh(mesh);
     if (on) gl.uniform1f(U.uTxMode, 0);
@@ -2275,7 +2296,7 @@ const RELOAD_SND = {
     [2.15, 'rustle', 0.25], [2.65, 'slide', 2800, 2100, 0.12], [2.78, 'click', 3400], [2.78, 'clank', 2500]] },
   /* subfusiles de cargador lateral: retén, cargador fuera (cae al suelo), otro del correaje, dentro, y montar */
   mp28: { D: 3.0, ev: RS_SMG(1) },
-  naranjero: { D: 3.0, ev: RS_SMG(0.94) },
+  naranjero: { D: 3.0, ev: RS_SMG(1) },       // el mismo modelo y la misma recarga que el MP 28
   /* Thompson: tambor fuera, otro dentro con un golpe y cerrojo */
   thompson: { D: 3.6, ev: [[0.40, 'click', 2200], [0.50, 'slide', 900, 600, 0.25], [1.10, 'rustle', 0.3], [1.70, 'slide', 600, 900, 0.22], [1.95, 'clank', 800], [1.96, 'thud', 220],
     [2.55, 'slide', 1500, 900, 0.12], [2.70, 'clank', 1200], [3.05, 'clank', 1700]] },
@@ -2343,7 +2364,7 @@ const WEAPONS = {
     origin: 'Italia', cal: '6,5 × 52 mm', feed: 'Peine de 6 cartuchos que entra entero en el depósito, cerrojo', note: 'El mosquetón de caballería del Carcano, de 91 cm, con la bayoneta de espiga plegada bajo el cañón. Mussolini lo envió en gran número. El peine entra entero en el depósito y, al disparar el último cartucho, cae vacío por debajo.' },
   tigre: { name: 'Carabina «El Tigre»', kind: 'rifle', leg: 'rifle', mag: 10, reserve: 50, dmg: 62, rate: 0.6, reload: 3.3, auto: false, hip: 0.032, ads: 0.0011, kick: 0.027, zoom: 0.6, len: 0.96, botAcc: 0.6, botRange: 105,
     origin: 'España (Éibar)', cal: '.44-40 (11 mm)', feed: 'Depósito tubular bajo el cañón, de palanca', note: 'Copia española del Winchester 1892 que fabricaban en Éibar Garate, Anitua y Cía. Era el arma de la Guardia Civil y de los Carabineros, y en la guerra la usaron los dos bandos. La palanca deja disparar más deprisa que un cerrojo.' },
-  naranjero: { name: 'Subfusil «Naranjero»', kind: 'smg', mag: 32, reserve: 128, dmg: 27, rate: 0.105, reload: 2.5, auto: true, hip: 0.04, ads: 0.014, kick: 0.011, zoom: 0.8, len: 0.62, botAcc: 0.55, botRange: 46,
+  naranjero: { name: 'Subfusil «Naranjero»', kind: 'smg', leg: 'mp', mag: 32, reserve: 128, dmg: 27, rate: 0.105, reload: 2.5, auto: true, hip: 0.04, ads: 0.014, kick: 0.011, zoom: 0.8, len: 0.81, botAcc: 0.55, botRange: 46,
     origin: 'España (Valencia)', cal: '9 mm Largo', feed: 'Cargador lateral, fuego automático', note: 'Copia del MP28 alemán fabricada en Valencia. El apodo alude a las naranjas de la región. Demoledor de cerca, inútil de lejos.' },
   mp28: { name: 'Subfusil MP 28/II', kind: 'smg', leg: 'mp', mag: 32, reserve: 128, dmg: 28, rate: 0.108, reload: 3.0, auto: true, hip: 0.04, ads: 0.009, kick: 0.011, zoom: 0.7, len: 0.81, botAcc: 0.55, botRange: 46,
     origin: 'Alemania (Bergmann)', cal: '9 mm', feed: 'Cargador lateral de 32, fuego automático', note: 'El subfusil de Hugo Schmeisser para Bergmann, con camisa perforada sobre el cañón y el cargador clavado en el costado izquierdo. Llegaron a España por compras en el extranjero y lo usaron los dos bandos; en la zona republicana se copió en Valencia como «Naranjero».' },
@@ -2611,7 +2632,7 @@ const world = { houses: [] };
   const rr = (a, b) => a + R() * (b - a);
   /* muros, tejados, sacos y hormigón van aparte, una malla por material PBR (ver «materiales PBR de la zona»); los tejados se separan
      de los muros al final, por su inclinación */
-  const GS = { seca: new Geo(), mamp: new Geo(), sacos: new Geo(), hormigon: new Geo() };
+  const GS = { seca: new Geo(), mamp: new Geo(), sillar: new Geo(), roca: new Geo(), sacos: new Geo(), hormigon: new Geo(), teja: new Geo() };
   const stone = (k, f) => { const o = g; g = GS[k]; try { return f(); } finally { g = o; } };
   const WALLS = [0xcbb994, 0xbfa780, 0xd6c7a4, 0xb89f7a, 0xc9b08a].map(hex), ROOF = [0xa5573a, 0x9a4f36, 0xb0623f].map(hex);
   const STONE = hex(0x9c917c), WOOD = hex(0x6a4b2e), DARK = hex(0x2a241d), BURLAP = hex(0xa8996f);
@@ -2679,6 +2700,56 @@ const world = { houses: [] };
       stone('seca', () => g.with(m, () => g.box(0, 0, 0, s, s * 0.6, s * rr(0.7, 1.2), shade(col, rr(0.7, 0.95)))));
     }
   }
+  /* reparte los triángulos de src (desde from) por su color: los que tienen un color de la lista pasan a la malla de ese material PBR */
+  function routeCol(src, from, map) {
+    const a = src.a; let w = from;
+    for (let i = from; i < a.length; i += 27) {
+      const r = a[i + 6], gg = a[i + 7], b = a[i + 8]; let dst = null;
+      for (const [c, k] of map) if (c[0] === r && c[1] === gg && c[2] === b) { dst = GS[k]; break; }
+      if (dst && dst !== src) { for (let j = 0; j < 27; j++) dst.a.push(a[i + j]); }
+      else { if (w !== i) for (let j = 0; j < 27; j++) a[w + j] = a[i + j]; w += 27; }
+    }
+    a.length = w;
+  }
+  /* Tejado a dos aguas de teja árabe, como los de la Terra Alta: faldones de teja con su grueso que vuelan sobre el muro (alero) y
+     sobre los hastiales; bajo los faldones, la tablazón de madera y, bajo el alero, las cabezas de los canecillos; caballete de tejas en
+     la cumbrera; hastiales de mampostería a ras de la fachada. Del tejado, solo los hastiales llevan la textura de piedra.
+     x0..z1: planta exterior de los muros; y: coronación de los muros; rh: altura de la cumbrera sobre ella; alongX: cumbrera a lo largo
+     de X. o: ov (alero), ov2 (vuelo sobre los hastiales), tin (grueso del muro), gab: [hastial al principio, al final] */
+  function tejado(x0, x1, z0, z1, y, rh, alongX, col, wallCol, V, o) {
+    o = o || {};
+    const ov = o.ov !== undefined ? o.ov : 0.45, ov2 = o.ov2 !== undefined ? o.ov2 : 0.22, th = 0.14, tin = o.tin || 0.4, gab = o.gab || [1, 1];
+    const ca = alongX ? (x0 + x1) / 2 : (z0 + z1) / 2, cb = alongX ? (z0 + z1) / 2 : (x0 + x1) / 2;
+    const La = (alongX ? x1 - x0 : z1 - z0) / 2, S = (alongX ? z1 - z0 : x1 - x0) / 2, k = rh / S;
+    const P = (a, b, yy) => alongX ? [ca + a, yy, cb + b] : [cb + b, yy, ca + a];
+    const a0 = -La - (gab[0] ? ov2 : 0), a1 = La + (gab[1] ? ov2 : 0), yR = y + rh + th, yE = y + th - k * ov;
+    const edge = shade(col, 0.6), WOODR = hex(0x5c4329), WOODK = hex(0x3d2b1a);
+    for (const sd of [-1, 1]) {
+      const bE = sd * (S + ov);
+      stone('teja', () => g.quad(P(a0, bE, yE), P(a1, bE, yE), P(a1, 0, yR), P(a0, 0, yR), col, P(0, 0, y - 3)));       // faldón de teja
+      g.quad(P(a0, bE, yE - th), P(a1, bE, yE - th), P(a1, 0, yR - th), P(a0, 0, yR - th), WOODR, P(0, 0, yR + 3));       // tablazón
+      g.quad(P(a0, bE, yE), P(a1, bE, yE), P(a1, bE, yE - th), P(a0, bE, yE - th), edge, P(0, 0, y));       // canto del alero: bocas de las tejas
+      for (const ae of [a0, a1]) g.quad(P(ae, bE, yE), P(ae, 0, yR), P(ae, 0, yR - th), P(ae, bE, yE - th), edge, P(0, 0, y));       // cantos del vuelo lateral
+      for (let a = -La + 0.3; a < La - 0.15; a += 0.62)       // canecillos, siguiendo la pendiente del alero
+        g.limb(P(a, sd * (S - 0.08), y + 0.08 * k - 0.07), P(a, sd * (S + ov - 0.07), y - k * (ov - 0.07) - 0.07), 0.09, 0.11, WOODK);
+    }
+    /* hastiales: el muro sube en triángulo hasta la cumbrera, a ras de la fachada (cara de fuera y cara de dentro) */
+    for (const [ae, on] of [[-La, gab[0]], [La, gab[1]]]) {
+      if (!on) continue;
+      const ai = ae - Math.sign(ae) * tin, sh = S - tin;
+      stone(V, () => {
+        g.tri(P(ae, -S, y), P(ae, S, y), P(ae, 0, y + rh), wallCol, P(0, 0, y + rh / 3));
+        g.tri(P(ai, -sh, y), P(ai, sh, y), P(ai, 0, y + rh * sh / S), shade(wallCol, 0.7), P(ae * 3, 0, y + rh / 3));
+      });
+    }
+    /* caballete: tejas boca abajo a lo largo de la cumbrera, montadas unas sobre otras */
+    const nr = Math.max(2, Math.round((a1 - a0) / 0.5)), sl = (a1 - a0) / nr;
+    for (let i = 0; i < nr; i++) {
+      const p = P(a0 + (i + 0.5) * sl, 0, yR - 0.03), m = M4.create(); M4.translate(m, p[0], p[1], p[2]);
+      if (alongX) M4.rotZ(m, -Math.PI / 2); else M4.rotX(m, Math.PI / 2);
+      g.with(m, () => g.cyl(0, 0, 0, 0.13, 0.11, sl + 0.04, 7, shade(col, 0.88 + (i % 3) * 0.06), true));
+    }
+  }
   function house(x, z, w, d, h, o) {
     o = o || {};
     const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
@@ -2700,7 +2771,7 @@ const world = { houses: [] };
     else {
       stone(V, () => g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall));
       const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-      stone(V, () => g.gable(x - w / 2 - 0.35, x + w / 2 + 0.35, z - d / 2 - 0.35, z + d / 2 + 0.35, y + h, rh, roof, alongX, shade(wall, 0.92)));
+      tejado(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h, rh, alongX, roof, shade(wall, 0.92), V);
       const dz = (o.door === 'n' ? -1 : 1) * (d / 2 + 0.03);
       g.box(x + rr(-w / 4, w / 4), y + 1.05, z + dz, 1.1, 2.1, 0.08, WOOD);
       for (const sx of [-1, 1]) {
@@ -2725,7 +2796,7 @@ const world = { houses: [] };
         const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
         stone(V, () => g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, wall)); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
         const iy = Math.max(y0, yf), off = ins * (t / 2 + 0.012);     // cara interior en penumbra
-        if (y1 > iy) g.box(alongX ? px : px + off, (iy + y1) / 2, alongX ? pz + off : pz, alongX ? l : 0.024, y1 - iy, alongX ? 0.024 : l, lining);
+        if (y1 > iy) stone(V, () => g.box(alongX ? px : px + off, (iy + y1) / 2, alongX ? pz + off : pz, alongX ? l : 0.024, y1 - iy, alongX ? 0.024 : l, lining));       // por dentro, la misma piedra en penumbra
       };
       for (const q of ops) {
         seg(cur, q.c - q.w / 2, yf - 4, yf + h);
@@ -2756,7 +2827,7 @@ const world = { houses: [] };
     bx(mx, mz, 1.5, 0.8, yf + 0.74, 0.08, WOOD, false); bx(mx, mz, 1.3, 0.6, yf + 0.36, 0.72, shade(WOOD, 0.8), true);
     /* tejado y vigas */
     const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-    stone(V, () => g.gable(x - hw - 0.35, x + hw + 0.35, z - hd - 0.35, z + hd + 0.35, yf + h, rh, roof, alongX, shade(wall, 0.92)));
+    tejado(x - hw, x + hw, z - hd, z + hd, yf + h, rh, alongX, roof, shade(wall, 0.92), V, { tin: t });
     addAABB(x - hw, x + hw, yf + h, yf + h + rh * 0.7, z - hd, z + hd);
     const span = alongX ? w : d, nb = Math.max(2, Math.round(span / 3));
     for (let i = 1; i < nb; i++) { const q = -span / 2 + i * span / nb; if (alongX) g.box(x + q, yf + h - 0.43, z, 0.18, 0.2, d - 2 * t, shade(WOOD, 0.8)); else g.box(x, yf + h - 0.43, z + q, w - 2 * t, 0.2, 0.18, shade(WOOD, 0.8)); }
@@ -2783,13 +2854,21 @@ const world = { houses: [] };
     const y = terrainH(x, z) - 0.1, c = hex(0xb7ab88);
     g.gable(x - 2.2, x + 2.2, z - 1.6, z + 1.6, y, 2.1, c, true, shade(c, 0.8)); addCircle(x, z, 1.5); noGo.push([x, z, 4]);
   }
-  function pole(x, z) { const y = terrainH(x, z); g.cyl(x, y + 4, z, 0.07, 0.05, 8.4, 6, hex(0x5b5146)); addCircle(x, z, 0.15); }
+  /* mástil de la bandera de cada posición: de madera, grueso y claro (el de antes, fino y oscuro, se veía de lejos como una raya que
+     parpadeaba), sobre una basa de sillería y con su perilla */
+  function pole(x, z) {
+    const y = terrainH(x, z), yb = tmin(x, z, 0.9, 0.9), STB = hex(0xddd2b6);
+    stone('sillar', () => { g.box(x, (yb - 0.3 + y + 0.32) / 2, z, 0.95, y + 0.32 - yb + 0.3, 0.95, STB); g.box(x, y + 0.42, z, 0.62, 0.2, 0.62, STB); });
+    g.cyl(x, y + 4.4, z, 0.11, 0.07, 7.9, 8, hex(0x8c7a5e)); g.blob(x, y + 8.4, z, 0.11, 0.11, 0.11, hex(0x9a7a42), 6, 3, 0, null, 0);
+    addCircle(x, z, 0.5);
+  }
 
   /* ---- Corbera d'Ebre: Poble Vell ---- */
   const cw = hex(0xc8b792);
   (function church() {
     /* Iglesia de Sant Pere: nave en ruinas sin tejado, en la que se puede entrar, y campanario con rampa interior hasta las campanas */
     const x = -54, z = 16, W2 = 5.5, L2 = 10, t = 0.8, H = 9, lin = shade(cw, 0.62), STN = hex(0xddd2b6), FLR = hex(0x8f8672);
+    const g0 = g.a.length, m0 = GS.mamp.a.length;       // lo de la iglesia que se hace con colores sueltos pasa al final a su material PBR
     const tx = x + W2 + 2.6, tz = z + L2 - 2.6, h = 2.6, wt = 0.5, ih = h - wt, BF = 13.2, TOP = 16.6;
     const y0 = terrainH(x, z);
     for (let j = 0; j < W.NZ; j++) for (let i = 0; i < W.NX; i++) {      // allana el solar
@@ -2809,8 +2888,8 @@ const world = { houses: [] };
     }
     /* cabecera con ábside y un resto de tejado */
     piece(x, z - L2 + t / 2, 2 * W2 - 2 * t, t, yf - 4, yf + H, cw); g.box(x, yf + H / 2, z - L2 + t + 0.012, 2 * W2 - 2 * t, H, 0.024, lin);
-    piece(x, z - L2 - 1.4, 6.4, 2.8, yf - 4, yf + 6.6, shade(cw, 0.95)); g.gable(x - 3.4, x + 3.4, z - L2 - 3, z - L2, yf + 6.6, 1.5, ROOF[0], false, cw);
-    g.gable(x - W2 - 0.2, x + W2 + 0.2, z - L2 - 0.1, z - L2 + 4.2, yf + H, 2.6, ROOF[1], false, cw, true); addAABB(x - W2, x + W2, yf + H, yf + H + 1.6, z - L2, z - L2 + 4.2);
+    piece(x, z - L2 - 1.4, 6.4, 2.8, yf - 4, yf + 6.6, shade(cw, 0.95)); tejado(x - 3.2, x + 3.2, z - L2 - 2.8, z - L2, yf + 6.6, 1.5, false, ROOF[0], cw, 'mamp', { ov: 0.3, ov2: 0.18, tin: 0.6, gab: [1, 0] });
+    tejado(x - W2, x + W2, z - L2, z - L2 + 4.2, yf + H, 2.6, false, ROOF[1], cw, 'mamp', { ov: 0.3, tin: t, gab: [1, 0] }); addAABB(x - W2, x + W2, yf + H, yf + H + 1.6, z - L2, z - L2 + 4.2);
     /* fachada: portada con pilastras, óculo y remate escalonado */
     const fz = z + L2 - t / 2;
     piece(x - 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x + 3.3, fz, 4.4, t, yf - 4, yf + H + 1.2, cw); piece(x, fz, 2.2, t, yf + 3.7, yf + H + 1.2, cw);
@@ -2820,7 +2899,7 @@ const world = { houses: [] };
     g.box(x, yf + H + 1.25, fz + 0.1, 2 * W2 + 0.3, 0.3, t + 0.3, STN);
     for (const sd of [-1, 1]) { g.box(x + sd * 1.55, yf + 2.2, fz + t / 2 + 0.12, 0.55, 4.4, 0.3, STN); g.box(x + sd * 4.9, yf + (H + 1.2) / 2, fz + t / 2 + 0.1, 0.8, H + 1.2, 0.25, shade(cw, 0.94)); }
     g.box(x, yf + 4.6, fz + t / 2 + 0.14, 4, 0.45, 0.36, STN); g.gable(x - 1.9, x + 1.9, fz + t / 2, fz + t / 2 + 0.32, yf + 4.82, 0.9, STN, true, STN);
-    g.box(x, yf + 7.1, fz + t / 2 + 0.03, 1.5, 1.5, 0.08, DARK); g.box(x, yf + 7.1, fz + t / 2 + 0.05, 1.9, 0.14, 0.1, STN); g.box(x, yf + 7.1, fz + t / 2 + 0.05, 0.14, 1.9, 0.1, STN);
+    g.box(x, yf + 7.0, fz + t / 2 + 0.03, 1.2, 1.2, 0.08, DARK); g.box(x, yf + 7.0, fz + t / 2 + 0.05, 1.5, 0.14, 0.1, STN); g.box(x, yf + 7.0, fz + t / 2 + 0.05, 0.14, 1.4, 0.1, STN);       // óculo con su cruz
     /* interior: suelo, arcos que quedan en pie, altar y escombros */
     g.box(x, yf - 2, z, 2 * W2 - 0.1, 4, 2 * L2 - 0.1, lin, FLR); addFloor(x - W2, x + W2, z - L2, z + L2, yf);
     g.box(x, yf - 2.03, z + L2 + 0.75, 3.2, 4, 1.5, STONE); addFloor(x - 1.6, x + 1.6, z + L2, z + L2 + 1.5, yf - 0.03);
@@ -2832,10 +2911,33 @@ const world = { houses: [] };
     g.limb([x - 3.6, yf + 0.3, z + 6.5], [x + 1.2, yf + 1.5, z + 4.4], 0.26, 0.26, shade(WOOD, 0.8)); g.limb([x + 1, yf + 0.25, z - 1], [x + 3.8, yf + 0.25, z - 3], 0.24, 0.24, shade(WOOD, 0.75));
     /* campanario: muros, puerta al sur, pilar central y rampa que sube en espiral */
     const tw = shade(cw, 0.97), tl = shade(cw, 0.58);
-    piece(tx, tz - h + wt / 2, 2 * h, wt, yf - 4, yf + BF, tw); piece(tx + h - wt / 2, tz, wt, 2 * ih, yf - 4, yf + BF, tw); piece(tx - h + wt / 2, tz, wt, 2 * ih, yf - 4, yf + BF, tw);
-    piece(tx - 1.625, tz + h - wt / 2, 1.95, wt, yf - 4, yf + BF, tw); piece(tx + 1.625, tz + h - wt / 2, 1.95, wt, yf - 4, yf + BF, tw); piece(tx, tz + h - wt / 2, 1.3, wt, yf + 2.25, yf + BF, tw);
-    g.box(tx, yf + BF / 2, tz - ih + 0.012, 2 * ih, BF, 0.024, tl); g.box(tx + ih - 0.012, yf + BF / 2, tz, 0.024, BF, 2 * ih, tl); g.box(tx - ih + 0.012, yf + BF / 2, tz, 0.024, BF, 2 * ih, tl);
-    g.box(tx - 1.375, yf + BF / 2, tz + ih - 0.012, 1.45, BF, 0.024, tl); g.box(tx + 1.375, yf + BF / 2, tz + ih - 0.012, 1.45, BF, 0.024, tl);
+    /* Muros de la torre con sus saeteras abiertas de verdad: se ve y se dispara por ellas desde la rampa. Cada una queda a la altura de
+       los ojos de quien sube por el tramo que pasa por delante (sin cortar las impostas ni los relojes). La puerta es otro hueco. */
+    const SAW = 0.3, SAH = 0.95, sae = (c, yc) => ({ c, w: SAW, y0: yf + yc - SAH / 2, y1: yf + yc + SAH / 2 });
+    const towerWall = (alongX, cx, cz, len, holes, inS, ext) => {
+      const cuts = [-len / 2, len / 2]; for (const q of holes) cuts.push(q.c - q.w / 2, q.c + q.w / 2); cuts.sort((a, b) => a - b);
+      for (let i = 0; i + 1 < cuts.length; i++) {
+        const c0 = cuts[i], c1 = cuts[i + 1]; if (c1 - c0 < 0.02) continue;
+        const cm = (c0 + c1) / 2, hs = holes.filter(q => Math.abs(q.c - cm) < q.w / 2).sort((a, b) => a.y0 - b.y0);
+        const px = alongX ? cx + cm : cx, pz = alongX ? cz : cz + cm, sx = alongX ? c1 - c0 : wt, sz = alongX ? wt : c1 - c0;
+        const seg = (ya, yb) => {
+          if (yb - ya < 0.02) return; piece(px, pz, sx, sz, ya, yb, tw);
+          const iy = Math.max(ya, yf), o = inS * (wt / 2 + 0.012), lw = Math.min(c1, ext) - Math.max(c0, -ext);       // forro de dentro, solo en el hueco interior
+          if (yb > iy && lw > 0.01) { const lc = (Math.min(c1, ext) + Math.max(c0, -ext)) / 2; g.box(alongX ? cx + lc : px + o, (iy + yb) / 2, alongX ? pz + o : cz + lc, alongX ? lw : 0.024, yb - iy, alongX ? 0.024 : lw, tl); }
+        };
+        let y = yf - 4; for (const q of hs) { seg(y, q.y0); y = q.y1; } seg(y, yf + BF);
+      }
+      /* recerco de sillería de cada saetera, por fuera */
+      for (const q of holes) if (q.w < 1) {
+        const o = -inS * (wt / 2 + 0.03), at = (c, yy, lc, ly) => g.box(alongX ? cx + c : cx + o, yy, alongX ? cz + o : cz + c, alongX ? lc : 0.08, ly, alongX ? 0.08 : lc, STN);
+        at(q.c - q.w / 2 - 0.07, (q.y0 + q.y1) / 2, 0.14, q.y1 - q.y0 + 0.28); at(q.c + q.w / 2 + 0.07, (q.y0 + q.y1) / 2, 0.14, q.y1 - q.y0 + 0.28);
+        at(q.c, q.y0 - 0.07, q.w + 0.28, 0.14); at(q.c, q.y1 + 0.07, q.w + 0.28, 0.14);
+      }
+    };
+    towerWall(true, tx, tz - h + wt / 2, 2 * h, [sae(0, 3.1), sae(0, 7.5), sae(0, 11.9)], 1, ih);       // norte: tramos 1, 5 y 9
+    towerWall(false, tx + h - wt / 2, tz, 2 * ih, [sae(0, 2.0), sae(0, 6.4)], -1, ih);       // este: tramos 0 y 4 (el 8 pasa por detrás del reloj)
+    towerWall(false, tx - h + wt / 2, tz, 2 * ih, [sae(-0.62, 3.7), sae(-0.7, 8.05)], 1, ih);       // oeste: tramos 2 y 6, al empezar (por debajo de las impostas)
+    towerWall(true, tx, tz + h - wt / 2, 2 * h, [{ c: 0, w: 1.3, y0: yf - 4, y1: yf + 2.25 }, sae(0, 5.3), sae(-0.56, 9.3)], -1, ih);       // sur: la puerta y los tramos 3 y 7
     g.box(tx, yf - 2, tz, 2 * ih, 4, 2 * ih, tl, FLR); addFloor(tx - h, tx + h, tz - h, tz + h, yf);
     g.box(tx, yf - 2.03, tz + h + 0.6, 1.9, 4, 1.2, STONE); addFloor(tx - 0.95, tx + 0.95, tz + h, tz + h + 1.2, yf - 0.03);
     g.box(tx - 0.72, yf + 1.1, tz + h + 0.5, 0.07, 2.2, 1.1, WOOD);
@@ -2897,8 +2999,8 @@ const world = { houses: [] };
     const ly = yf + TOP + 0.42, om = M4.create(); M4.translate(om, tx, 0, tz); M4.rotY(om, Math.PI / 8);
     g.with(om, () => {
       g.cyl(0, ly + 0.95, 0, 1.75, 1.75, 1.9, 8, tw, true); g.cyl(0, ly + 1.98, 0, 1.95, 1.95, 0.16, 8, STN, true);
-      g.cyl(0, ly + 3.0, 0, 1.9, 0.12, 1.9, 8, ROOF[1], true);
     });
+    stone('teja', () => g.with(om, () => g.cyl(0, ly + 3.0, 0, 1.9, 0.12, 1.9, 8, ROOF[1], true)));       // chapitel de teja
     for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, m = M4.create(); M4.translate(m, tx, 0, tz); M4.rotY(m, a); g.with(m, () => { g.box(0, ly + 1.0, 1.63, 0.5, 1.0, 0.06, DARK); g.box(0, ly + 1.56, 1.63, 0.62, 0.12, 0.08, STN); }); }
     g.blob(tx, ly + 4.02, tz, 0.17, 0.17, 0.17, DARK, 6, 3, 0, null, 0); g.box(tx, ly + 4.7, tz, 0.07, 1.2, 0.07, DARK); g.box(tx, ly + 4.95, tz, 0.6, 0.07, 0.07, DARK);
     g.limb([tx, ly + 4.38, tz], [tx + 0.55, ly + 4.38, tz + 0.1], 0.04, 0.2, DARK);
@@ -2908,8 +3010,6 @@ const world = { houses: [] };
       g.box(px - sx * lx / 2, qy, pz, lx, 0.62, 0.07, STN); g.box(px, qy, pz - sz * lz / 2, 0.07, 0.62, lz, STN);
     }
     for (const yy of [4.35, 8.7]) band(yf + yy, 0.2, 0.08);
-    for (const yy of [2.9, 6.6]) { g.box(tx + h + 0.02, yf + yy, tz - 0.4, 0.06, 1.3, 0.34, DARK); g.box(tx - 0.5, yf + yy, tz - h - 0.02, 0.34, 1.3, 0.06, DARK); }
-    g.box(tx + 1.5, yf + 6.4, tz + h + 0.02, 0.34, 1.3, 0.06, DARK);
     for (const [cx2, cz2, ang] of [[tx, tz + h + 0.03, 0], [tx + h + 0.03, tz, Math.PI / 2]]) {
       const m = M4.create(); M4.translate(m, cx2, yf + 10.9, cz2); M4.rotY(m, ang); M4.rotX(m, Math.PI / 2);
       g.with(m, () => { g.cyl(0, 0, 0, 0.98, 0.98, 0.1, 14, STN, true); g.cyl(0, 0.03, 0, 0.82, 0.82, 0.1, 14, hex(0xe9e2cf), true); });
@@ -2921,9 +3021,9 @@ const world = { houses: [] };
     g.box(tx - 0.78, yf + 1.15, tz + h + 0.06, 0.26, 2.3, 0.16, STN); g.box(tx + 0.78, yf + 1.15, tz + h + 0.06, 0.26, 2.3, 0.16, STN); g.box(tx, yf + 2.42, tz + h + 0.06, 1.9, 0.3, 0.2, STN);
     /* ---- fachada: rosetón, hornacina con imagen, volutas, pináculos, portón y escalinata ---- */
     const fo = fz + t / 2;
-    { const m = M4.create(); M4.translate(m, x, yf + 7.1, fo + 0.06); M4.rotX(m, Math.PI / 2);
-      g.with(m, () => { g.cyl(0, 0, 0, 1.25, 1.25, 0.12, 14, STN, true); g.cyl(0, 0.03, 0, 0.98, 0.98, 0.12, 14, hex(0x1d2126), true); g.cyl(0, 0.06, 0, 0.22, 0.22, 0.12, 8, STN, true); });
-      for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4; g.limb([x + Math.sin(a) * 0.2, yf + 7.1 + Math.cos(a) * 0.2, fo + 0.14], [x + Math.sin(a) * 0.98, yf + 7.1 + Math.cos(a) * 0.98, fo + 0.14], 0.07, 0.05, STN); } }
+    { const RY = yf + 9.0, m = M4.create(); M4.translate(m, x, RY, fo + 0.06); M4.rotX(m, Math.PI / 2);       // rosetón, por encima del óculo con la cruz
+      g.with(m, () => { g.cyl(0, 0, 0, 1.04, 1.04, 0.12, 20, STN, true); g.cyl(0, 0.05, 0, 0.9, 0.9, 0.12, 20, shade(STN, 0.93), true); g.cyl(0, 0.08, 0, 0.8, 0.8, 0.12, 20, hex(0x1d2126), true); g.cyl(0, 0.11, 0, 0.18, 0.18, 0.12, 10, STN, true); });
+      for (let q = 0; q < 12; q++) { const a = q * Math.PI / 6; g.limb([x + Math.sin(a) * 0.16, RY + Math.cos(a) * 0.16, fo + 0.25], [x + Math.sin(a) * 0.8, RY + Math.cos(a) * 0.8, fo + 0.25], 0.06, 0.06, STN); } }
     g.box(x, yf + 5.6, fo + 0.02, 0.9, 1.3, 0.06, hex(0x2a2622)); g.box(x, yf + 6.32, fo + 0.1, 1.1, 0.14, 0.22, STN); g.box(x, yf + 4.98, fo + 0.12, 1.1, 0.12, 0.26, STN);
     g.box(x, yf + 5.45, fo + 0.12, 0.3, 0.8, 0.16, hex(0xcfc6ae)); g.blob(x, yf + 6.0, fo + 0.12, 0.13, 0.15, 0.12, hex(0xcfc6ae), 6, 3, 0, null, 0);
     for (const sd of [-1, 1]) {
@@ -2963,6 +3063,11 @@ const world = { houses: [] };
       path.push([tx + rc, tz - 0.1]);
       world.tower = { x: tx, z: tz, h, yf, top: yf + BF, path, spots: [[tx + 1.82, tz - 0.3, -Math.PI / 2], [tx + 0.3, tz - 1.82, 0], [tx + 1.3, tz + 1.82, Math.PI]] }; }       // pegados al pretil del este, del norte y del sur
     world.houses.push([x, z, 11, 20, 1], [tx, tz, 5.2, 5.2, 1], [x, z - L2 - 1.4, 6.4, 2.8]); noGo.push([x, z, 14], [tx, tz, 8]);
+    /* PBR por dentro y por fuera: la piedra labrada (molduras, pilastras, contrafuertes, pilares de los arcos, recercos, cornisas, relojes,
+       el altar y el suelo de losas) a la sillería; los forros de dentro y los remates de la torre a la mampostería */
+    const toSillar = [STN, shade(STN, 0.85), shade(STN, 0.93), FLR, shade(cw, 0.94), shade(cw, 0.93), shade(cw, 0.9)].map(c => [c, 'sillar']);
+    routeCol(g, g0, toSillar.concat([lin, tl, tw, cw, shade(cw, 0.8)].map(c => [c, 'mamp'])));
+    routeCol(GS.mamp, m0, toSillar);
   })();
   [[-30, 4, 8, 7, 6, 1], [-14, 12, 7, 9, 6.5, 0], [-6, 26, 8, 7, 5.5, 1], [-8, 44, 9, 7, 6, 0], [-22, 56, 8, 8, 6, 1], [-40, 56, 7, 9, 6.5, 0], [-56, 50, 8, 7, 5.5, 1],
    [-70, 34, 7, 8, 6, 0], [-74, 8, 8, 7, 6, 1], [-36, -10, 9, 7, 6, 0], [6, 40, 7, 7, 5.5, 1], [-18, -6, 7, 7, 5.5, 1]]
@@ -3024,8 +3129,8 @@ const world = { houses: [] };
     const GOLD = hex(0xc49a3c), GOLDK = hex(0x8a6420), RED = hex(0x7a2a22), STN = hex(0xcfc4a8), FL = hex(0x9a8b74);
     shell('mamp', x, z, w, d, H, t, { n: [{ c: 0, w: 1.5, y0: 0, y1: 2.5 }], e: [{ c: 0.8, w: 0.5, y0: 2.4, y1: 3.4 }], w: [{ c: 0.8, w: 0.5, y0: 2.4, y1: 3.4 }] }, yf, c);
     const fz = z - hd + t / 2;       // fachada (al norte)
+    tejado(x - hw, x + hw, z - hd, z + hd, yf + H, 1.6, false, ROOF[0], c, 'mamp', { tin: t, ov: 0.35, ov2: 0.18 });
     stone('mamp', () => {
-      g.gable(x - hw - 0.3, x + hw + 0.3, z - hd - 0.3, z + hd + 0.3, yf + H, 1.6, ROOF[0], false, c);
       /* espadaña: pared pequeña sobre el vértice del frontón con un vano para la campana y su remate */
       const ey = yf + H + 1.6;
       g.box(x - 0.62, ey + 0.75, fz, 0.36, 1.5, 0.5, c); g.box(x + 0.62, ey + 0.75, fz, 0.36, 1.5, 0.5, c);
@@ -3159,8 +3264,9 @@ const world = { houses: [] };
     const x = rr(W.X0 + 6, W.X1 - 6), z = rr(W.Z0 + 6, W.Z1 - 6), h = terrainH(x, z);
     if (!okSpot(x, z) || (h < 30 && slopeAt(x, z) < 0.22)) continue;
     const s = rr(0.7, 2.2);
-    g.blob(x, h + s * 0.25, z, s, s * 0.7, s * rr(0.7, 1.2), shade(hex(0xa9a18d), rr(0.82, 1.08)), 5, 3, 0.5, R, 0.12);
+    stone('roca', () => g.blob(x, h + s * 0.25, z, s, s * 0.7, s * rr(0.7, 1.2), shade(hex(0xa9a18d), rr(0.82, 1.08)), 10, 6, 0.4, R, 0.12));       // caliza con musgo (PBR)
     if (s > 1.2) addCircle(x, z, s * 0.75);
+    (world.rocks = world.rocks || []).push([x, z, s]);
   }
   for (const f of FLAGS) pole(f.x, f.z);
   for (const a of AAPOS) {       // emplazamiento antiaéreo: anillo de sacos terreros y trípode
@@ -3182,16 +3288,9 @@ const world = { houses: [] };
     }
   }
   world.staticMesh = makeMesh(g.a);
-  /* los tejados (caras inclinadas) de casas, iglesia y ermita pasan a la malla de teja árabe */
-  const TEJA = [];
-  for (const k of ['seca', 'mamp']) {
-    const a = GS[k].a, keep = [];
-    for (let i = 0; i < a.length; i += 27) { const ny = Math.abs(a[i + 4]); (ny > 0.25 && ny < 0.985 ? TEJA : keep).push(...a.slice(i, i + 27)); }
-    GS[k].a = keep;
-  }
+  /* una malla por material PBR (los faldones de los tejados van a la teja al construirlos) */
   world.mat = {};
-  for (const k of ['seca', 'mamp', 'sacos', 'hormigon']) if (GS[k].a.length) world.mat[k] = makeMesh(GS[k].a);
-  if (TEJA.length) world.mat.teja = makeMesh(TEJA);
+  for (const k of ['seca', 'mamp', 'sillar', 'roca', 'sacos', 'hormigon', 'teja']) if (GS[k].a.length) world.mat[k] = makeMesh(GS[k].a);
 
   /* ---- puentes ---- */
   function bridgeGeo(b, boats) {
@@ -5958,7 +6057,7 @@ async function skLoad() {
     SK.nj = nj; skProgram();
     SK.chars = chars; SK.ready = true;
   } catch (e) { SK.failed = true; SK.err = String(e && e.message || e); console.warn('[soldados 3D] se usan los de cajas:', SK.err); }
-  if (SK.ready) { vmLoad(); nfpLoad(); }       // el Mosca, los carros y el Naranjero de primera persona de Blender, sin esperar por ellos
+  if (SK.ready) vmLoad();       // el Mosca y los carros de Blender, sin esperar por ellos (el Naranjero es el MP 28 del legionario)
 }
 
 /* ---------- animación ---------- */
@@ -7609,7 +7708,7 @@ const _fp = M4.create();
 function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
   if (ws.id === 'breda30' && !skLegFpKey(p) && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
-  if (ws.id === 'naranjero' && p.team === REP && nfpDraw(camWorld, p, w)) return;       // el de Blender: brazos y subfusil animados
+  if (ws.id === 'naranjero' && p.team === REP && !skLegFpKey(p) && nfpDraw(camWorld, p, w)) return;       // el viejo de Blender, solo si no hay legionario (el Naranjero es el MP 28)
   if (ws.id === 'lewis' && p.team === REP && fpvDraw('lewis', camWorld, p, w, ws)) return;       // la Lewis de Blender, con su plato que gira
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));

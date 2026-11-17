@@ -103,3 +103,48 @@ cimg = cimg * (1 - streak[..., None]) + np.array([0.42, 0.4, 0.36]) * streak[...
 cimg *= (1 - np.clip(pores, 0, 1) * 0.6)[..., None] * (1 - (fv < 0.03) * 0.2)[..., None]
 nrm(h * px, 1.4, 0.88 + 0.08 * np.clip(fnoise(N, 1.2, 30), -1, 1), 'hormigon'); save(cimg, 'hormigon_c')
 print('ok')
+
+# ---- 5. sillería: piedra caliza labrada en hiladas (pilastras, molduras, esquinales, portadas y suelo de la iglesia) (foto piedra_3) ----
+c = np.asarray(Image.open(f'{OUT}/piedra_3.jpg').convert('RGB'), np.float32) / 255
+if c.shape[0] != N: c = np.asarray(Image.fromarray((c * 255).astype(np.uint8)).resize((N, N), Image.LANCZOS), np.float32) / 255
+L = lum(c); h = blur(L, 1.2) - blur(L, 24) * 0.8; h += blur(np.clip(0.36 - L, 0, 1), 2.5) * -1.4       # juntas finas y poros
+h = blur(h, 0.7) + fnoise(N, 1.9, 41) * 0.012       # labra menuda
+rough = 0.7 + 0.2 * (1 - (L - L.min()) / (L.max() - L.min()))
+nrm(h, 7.0, rough, 'sillar')
+L3 = lum(c)[..., None]; c = np.clip((c * 0.68 + L3 * 0.32) * np.array([1.2, 1.18, 1.08]) + 0.03, 0, 1)       # más clara y menos saturada: piedra labrada
+stain = np.clip(blur(fnoise(N, 1.0, 42), (40, 3)) * 0.5, 0, 1) * 0.18       # chorreones de lluvia, verticales
+lich = np.clip((fnoise(N, 1.4, 43) - 1.35) * 2.2, 0, 1)       # líquenes ocres y grises
+c = c * (1 - stain[..., None]) + np.array([0.42, 0.4, 0.34]) * stain[..., None]
+c = c * (1 - lich[..., None] * 0.45) + np.array([0.72, 0.62, 0.36]) * lich[..., None] * 0.45
+save(c, 'sillar_c')
+
+# ---- 6. roca: caliza de la Terra Alta, con estratos, grietas irregulares, picaduras, líquenes y musgo en las grietas ----
+y, x = np.mgrid[0:N, 0:N].astype(np.float32)
+wx = x + fnoise(N, 1.6, 63) * 38 + fnoise(N, 2.2, 64) * 9; wy = y + fnoise(N, 1.6, 65) * 38 + fnoise(N, 2.2, 66) * 9       # coordenadas torcidas
+pts = np.random.default_rng(54).random((16, 2)) * N
+d1 = np.full((N, N), 1e9, np.float32); d2 = np.full((N, N), 1e9, np.float32)
+for px_, py_ in pts:
+    for ox in (-N, 0, N):
+        for oy in (-N, 0, N):
+            d = np.hypot(wx - px_ - ox, wy - py_ - oy); m = d < d1; d2 = np.where(m, d1, np.minimum(d2, d)); d1 = np.where(m, d, d1)
+edge = np.clip((d2 - d1) / (3.0 + 5.0 * np.clip(fnoise(N, 1.4, 67) * 0.5 + 0.5, 0, 1)), 0, 1)
+crack = (1 - edge) ** 1.5 * np.clip(fnoise(N, 1.2, 55) * 0.9 + 0.35, 0, 1)       # solo algunos tramos de cada borde se abren
+strata = np.sin((y + fnoise(N, 1.8, 68) * 40) / N * 2 * np.pi * 9) * 0.5 + 0.5       # estratos de la caliza
+base = fnoise(N, 1.7, 51) * 0.6 + fnoise(N, 1.15, 52) * 0.32 + blur(fnoise(N, 0.75, 53), 0.9) * 0.08
+pits = np.clip(fnoise(N, 0.55, 56) - 1.4, 0, None)
+h = base * 0.02 + strata * 0.004 - crack * 0.03 - pits * 0.012 + blur(1 - edge, 6) * -0.004
+lime = np.array([0.7, 0.67, 0.6]); warm = np.array([0.74, 0.64, 0.5]); grey = np.array([0.52, 0.52, 0.5])
+t1 = np.clip(fnoise(N, 1.4, 57) * 0.45 + 0.5, 0, 1)[..., None]; t2 = np.clip(fnoise(N, 1.2, 58) * 0.35 + 0.2, 0, 1)[..., None]
+cimg = lime * (1 - t1) + warm * t1; cimg = cimg * (1 - t2 * 0.45) + grey * t2 * 0.45
+cimg *= (0.86 + 0.1 * np.clip(base * 0.5 + 0.5, 0, 1) + 0.04 * strata)[..., None]
+cimg *= (1 - crack * 0.6)[..., None] * (1 - np.clip(pits, 0, 1) * 0.45)[..., None]
+lichO = np.clip((fnoise(N, 1.2, 59) - 1.3) * 2.5, 0, 1) * np.clip(fnoise(N, 2.4, 69) * 0.6 + 0.6, 0, 1)
+lichG = np.clip((fnoise(N, 1.4, 60) - 1.05) * 2.0, 0, 1)
+cimg = cimg * (1 - lichO[..., None] * 0.6) + np.array([0.8, 0.55, 0.17]) * lichO[..., None] * 0.6       # liquen naranja
+cimg = cimg * (1 - lichG[..., None] * 0.45) + np.array([0.7, 0.72, 0.63]) * lichG[..., None] * 0.45       # liquen gris verdoso
+moss = np.clip(blur(crack, 3.0) * 1.8 + fnoise(N, 1.3, 61) * 0.3 - 0.5, 0, 1)       # musgo en grietas y huecos
+mcol = np.array([0.27, 0.34, 0.12]) * (0.7 + 0.6 * np.clip(fnoise(N, 2.0, 62) * 0.5 + 0.5, 0, 1))[..., None]
+cimg = cimg * (1 - moss[..., None] * 0.85) + mcol * moss[..., None] * 0.85
+ao = np.clip(1 + blur(h - blur(h, 12), 3) * 14, 0.6, 1.08); cimg *= ao[..., None]
+nrm(blur(h + moss * 0.003, 0.7) * (N / 2.2), 1.6, 0.8 + 0.14 * moss + 0.04 * t2[..., 0], 'roca'); save(cimg, 'roca_c')
+print('ok sillar roca')
