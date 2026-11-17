@@ -5108,12 +5108,12 @@ function updateBot(s, dt) {
   s.proneT = clamp((s.proneT || 0) + (s.prone ? 1 : -1) * dt * 2.4, 0, 1);
 }
 /* ============ la Thompson del campanario ============
-   Escondida en una caja de munición del piso de campanas de Sant Pere. La puede coger un legionario (el fusilero o el de asalto
-   sublevados, que llevan el modelo con sus animaciones): el jugador, con la tecla de usar, o un centinela legionario que suba. Si quien
+   Escondida en una caja de munición del piso de campanas de Sant Pere. La puede coger cualquiera de los dos bandos (la lleva con el
+   esqueleto y las animaciones del legionario): el jugador, con la tecla de usar, o un centinela que suba. Si quien
    la lleva cae (o vuelve a desplegar con otra arma), al rato vuelve a aparecer en la caja. */
 const TOMMY = { state: 'tower', carrier: null, t: 0 };
 function tommyReset() { TOMMY.state = 'tower'; TOMMY.carrier = null; TOMMY.t = 0; }
-function tommyCan(s) { const w = s.isPlayer ? (s.weps && s.weps[0] && s.weps[0].def) : WEAPONS[s.prim || s.wid]; return s.team === NAT && !!(w && w.leg) && !(w === WEAPONS.thompson); }
+function tommyCan(s) { const w = s.isPlayer ? (s.weps && s.weps[0] && s.weps[0].def) : WEAPONS[s.prim || s.wid]; if (!w || w === WEAPONS.thompson) return false; return s.team === NAT ? !!(w.leg || SK.leg) : skLegOk(s); }
 function tommyNear(s) {
   const k = world.tommy;
   return !!k && TOMMY.state === 'tower' && duo.role !== 'guest' && s.alive && !s.veh && !s.aa && Math.hypot(s.x - k.x, s.z - k.z) < 1.5 && Math.abs(s.y - k.floor) < 1.2;
@@ -5393,20 +5393,20 @@ async function skBuild(g, tag, maxU) {
   for (let ni = 0; ni < nodes.length; ni++) {
     const nd = nodes[ni]; if (nd.mesh === undefined || nd.skin === undefined) continue;
     const name = nd.name || '', mesh = J.meshes[nd.mesh], m = /LOD(\d)/i.exec(name), lv = m ? +m[1] : 0, parts = [];
-    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv' || name === 'brazos_breda30_fpv', nac = name.startsWith('nac_');
+    const wm = /^arma_(\w+)_(near|far)$/.exec(name), isArm = name === 'brazos_fpv' || name === 'brazos_breda30_fpv', body = /^(nac|rep)_/.exec(name);
     for (const pr of mesh.primitives) {
       parts.push(await skPart(g, pr, cache, slot));
-      if (lv === 0 && !wm && !isArm && !nac) { const a = J.accessors[pr.attributes.POSITION]; if (a.min && a.max) { minY = Math.min(minY, a.min[1]); maxY = Math.max(maxY, a.max[1]); } }
+      if (lv === 0 && !wm && !isArm && !body) { const a = J.accessors[pr.attributes.POSITION]; if (a.min && a.max) { minY = Math.min(minY, a.min[1]); maxY = Math.max(maxY, a.max[1]); } }
     }
     if (wm) { (C.wp[wm[1]] = C.wp[wm[1]] || {})[wm[2]] = parts; continue; }
     if (isArm) { if (name === 'brazos_breda30_fpv') C.bredaArms = parts; else C.arms = parts; continue; }
-    if (nac) { const n = C.nac = C.nac || { lod: [] }; if (name === 'nac_brazos_fpv') n.arms = parts; else n.lod[lv] = (n.lod[lv] || []).concat(parts); continue; }       // el soldado nacional en el esqueleto del legionario
+    if (body) { const k = body[1], n = C[k] = C[k] || { lod: [] }; if (name === k + '_brazos_fpv') n.arms = parts; else n.lod[lv] = (n.lod[lv] || []).concat(parts); continue; }       // el soldado nacional y el republicano en el esqueleto del legionario
     C.lod[lv] = (C.lod[lv] || []).concat(parts);
   }
   if (!C.lod[0]) throw new Error('sin cuerpo');
   if (!C.lod[1]) C.lod[1] = C.lod[0];
   if (!C.lod[2]) C.lod[2] = C.lod[1];
-  if (C.nac) { const n = C.nac; if (!n.lod[0] || !n.arms) C.nac = null; else { if (!n.lod[1]) n.lod[1] = n.lod[0]; if (!n.lod[2]) n.lod[2] = n.lod[1]; if (!SK.u32 && n.lod[0].some(p => p.u32)) n.lod[0] = n.lod[1]; } }
+  for (const k of ['nac', 'rep']) if (C[k]) { const n = C[k]; if (!n.lod[0] || !n.arms) C[k] = null; else { if (!n.lod[1]) n.lod[1] = n.lod[0]; if (!n.lod[2]) n.lod[2] = n.lod[1]; if (!SK.u32 && n.lod[0].some(p => p.u32)) n.lod[0] = n.lod[1]; } }
   if (!SK.u32 && C.lod[0].some(p => p.u32)) { C.lod0big = C.lod[0]; C.lod[0] = C.lod[1]; }       // sin índices de 32 bits: la original no se puede dibujar
   C.scale = SK_H / Math.max(0.5, maxY - minY); C.foot = minY;
   /* animaciones: cada canal se remuestrea a 30 fotogramas por segundo */
@@ -6310,7 +6310,7 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   for (const s of vis) {
     const st = s.sk, C = st.C, d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez);
     gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, st.model);
-    skParts((s.nac && C.nac ? C.nac.lod : C.lod)[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
+    const bd = skBodyOf(s, C); skParts((bd ? bd.lod : C.lod)[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
     if (C.leg && st.wpk && C.wp[st.wpk]) skParts(d2 < dw ? C.wp[st.wpk].near : C.wp[st.wpk].far);
   }
   /* la Thompson escondida en el campanario, tumbada sobre su lado izquierdo encima de la caja */
@@ -6464,7 +6464,7 @@ function gunNear(p) {
   let best = null, bd = 1.9 * 1.9;
   for (const d of gunDrops) {
     const id = d.g.id, W = WEAPONS[id]; if (!d.rest || d.g.base !== 'rifle' || id === p.weps[0].id || !W) continue;
-    if (W.leg && !(p.team === NAT && SK.leg)) continue;       // las armas nacionales hechas en Blender (Tigre, MP 28, Thompson, Carcano, Breda), solo los nacionales: las llevan con el esqueleto del legionario
+    if (W.leg && !skLegOk(p)) continue;       // las armas nacionales hechas en Blender (Tigre, MP 28, Thompson, Carcano, Breda) se llevan con el esqueleto del legionario: los dos bandos lo tienen
     const q = (d.p[0] - p.x) * (d.p[0] - p.x) + (d.p[2] - p.z) * (d.p[2] - p.z); if (q < bd && Math.abs(d.p[1] - p.y) < 2.5) { bd = q; best = d; }
   }
   return best;
@@ -6606,8 +6606,12 @@ function skLegBoxes(C, key, boxes) {
   for (const lod of ['near', 'far']) if (C.wp[key][lod]) C.wp[key][lod].push(part);
 }
 function skLegW(s) { const w = WEAPONS[s.wid]; return !!(w && w.leg) || !!(s.prim && WEAPONS[s.prim] && WEAPONS[s.prim].leg); }
-/* modelo de cada soldado: el legionario para los nacionales que llevan sus armas (y la pistola que sacan de cerca) */
-function skChar(s) { return s.team === NAT && SK.leg && skLegW(s) ? SK.leg : SK.chars[s.team]; }
+/* modelo de cada soldado: el esqueleto del legionario para quien lleva sus armas (y la pistola que saca de cerca); los republicanos
+   también, con su cuerpo de soldado republicano pasado a ese esqueleto, cuando cogen del suelo un arma nacional */
+function skLegOk(s) { return !!SK.leg && (s.team === NAT || !!SK.leg.rep); }
+function skChar(s) { return skLegOk(s) && skLegW(s) ? SK.leg : SK.chars[s.team]; }
+/* el cuerpo que se viste sobre el esqueleto del legionario: el del republicano, el del soldado nacional (ametrallador y tirador) o, si no, el suyo */
+function skBodyOf(s, C) { return !C.leg ? null : s.team === REP ? C.rep : s.nac ? C.nac : null; }
 function skSetupLeg(C, J) {
   C.leg = true;
   const ex = (J.asset && J.asset.extras) || {}, root = ex.root || {}, muz = ex.muzzle || {};
@@ -6873,9 +6877,9 @@ function skLegDispBlend(clip, time, w) {
   for (let c = 0; c < 4; c++) q[c] = w >= 0.999 ? nq[c] : q[c] * (1 - w) + nq[c] * w * sg;
   const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1; for (let c = 0; c < 4; c++) q[c] /= l;
 }
-/* ¿el jugador es legionario?: devuelve su arma (rifle, thompson o revolver) */
+/* ¿el jugador lleva el esqueleto del legionario (un arma nacional)?: devuelve su arma (rifle, carcano, mp, thompson, breda o revolver) */
 function skLegFpKey(p) {
-  if (!SK.ready || !SK.leg || glLost || !p || p.team !== NAT || !p.weps) return null;
+  if (!SK.ready || !p || !skLegOk(p) || glLost || !p.weps) return null;
   const ws = p.weps[p.cur], prim = p.weps[0] && p.weps[0].def; if (!ws || !prim || !prim.leg) return null;
   return ws.def.kind === 'pistol' ? 'revolver' : ws.def.leg || null;
 }
@@ -6933,7 +6937,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   M4.rotY(_lfp.M, Math.PI); M4.mul(_lfp.M, _lfp.M, _lfp.D);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
   gl.uniform4fv(SK.U.uB, _lfp.B); gl.uniformMatrix4fv(SK.U.uM, false, _lfp.M);
-  skParts(p.nac && C.nac ? C.nac.arms : C.arms); skParts(C.wp[key].near);
+  const bd = skBodyOf(p, C); skParts(bd ? bd.arms : C.arms); skParts(C.wp[key].near);
   skEnd();
   return true;
 }
@@ -11180,7 +11184,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
 })();
 
 </script>
