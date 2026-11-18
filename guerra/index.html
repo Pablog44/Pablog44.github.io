@@ -1051,13 +1051,16 @@ function mkTruck(team) {
       q.box(0, 1.06, -2.69, 0.76, 0.58, 0.06, bd); q.box(0, 1.05, -2.722, 0.62, 0.46, 0.02, dk);
       for (let i = -4; i <= 4; i++) q.box(i * 0.068, 1.05, -2.735, 0.012, 0.46, 0.012, steel);
       q.tube([0, 1.34, -2.68], [0, 1.4, -2.68], 0.03, 0.022, steel, 8);
-      q.box(0, 0.62, -2.86, 1.9, 0.11, 0.05, dk);
+      /* parachoques: viga en U atornillada a los cuernos del bastidor, que llegan hasta ella */
+      q.mir(q => { q.box(0.42, 0.635, -2.69, 0.07, 0.11, 0.3, dk); q.box(0.42, 0.62, -2.815, 0.16, 0.15, 0.05, dk); });
+      q.box(0, 0.62, -2.86, 1.9, 0.13, 0.06, dk); q.box(0, 0.62, -2.893, 1.86, 0.02, 0.012, shade(dk, 1.6));
     } else {
       const E = (z, w, cy, ry) => Mdl.ell(z, 0, cy, w, ry, 16, 3.2);
       q.loft([E(-2.76, 0.2, 1.02, 0.2), E(-2.7, 0.3, 1.04, 0.29), E(-2.2, 0.43, 1.09, 0.32), E(-1.58, 0.5, 1.12, 0.35)], body, { capA: true });
       q.box(0, 1.0, -2.745, 0.36, 0.44, 0.05, dk); for (let i = 0; i < 8; i++) q.box(0, 0.82 + i * 0.052, -2.775, 0.34 - Math.abs(i - 3.5) * 0.03, 0.014, 0.012, hex(0xa8aaa6));
       q.box(0, 1.03, -2.785, 0.02, 0.5, 0.02, hex(0xa8aaa6));
       q.mir(q => { for (let i = 0; i < 6; i++) q.box(hw(-2.1 + i * 0.07) + 0.012, 1.1, -2.1 + i * 0.07, 0.012, 0.16, 0.03, shade(body, 0.5)); });
+      q.mir(q => { q.box(0.42, 0.62, -2.7, 0.07, 0.1, 0.32, dk); q.box(0.42, 0.6, -2.835, 0.14, 0.13, 0.05, dk); q.box(0.68, 0.63, -2.77, 0.05, 0.1, 0.2, dk); });       // cuernos del bastidor y soportes del parachoques (los de fuera, hasta las aletas)
       q.rbox(0, 0.6, -2.88, 1.86, 0.12, 0.05, 0.02, hex(0x8f918c));
     }
     /* aletas y estribos */
@@ -1088,10 +1091,15 @@ function mkTruck(team) {
     q.mir(q => { q.box(0.6, 1.32, 2.775, 0.07, 0.6, 0.012, steel); }); q.box(-0.9, 0.9, 2.8, 0.1, 0.1, 0.05, VC.red);
     if (!rep) {
       q.mat('canvas');
-      const cv = VC.canvas, prof = [[-1.1, 1.62], [-1.1, 2.05], [-0.97, 2.36], [-0.55, 2.58], [0, 2.64], [0.55, 2.58], [0.97, 2.36], [1.1, 2.05], [1.1, 1.62]], rings = [];
+      /* toldo con los faldones de los lados recogidos (se ve a la tropa y puede asomarse), sobre sus estacas de madera */
+      const cv = VC.canvas, prof = [[-1.1, 2.02], [-1.1, 2.1], [-0.97, 2.36], [-0.55, 2.58], [0, 2.64], [0.55, 2.58], [0.97, 2.36], [1.1, 2.1], [1.1, 2.02]], rings = [];
       for (let i = 0; i <= 12; i++) { const z = -0.27 + 3.04 * i / 12, sag = 1 - 0.035 * Math.abs(Math.sin(i / 12 * Math.PI * 4)); rings.push(prof.map(([x, y]) => [x * (y > 2.1 ? sag : 1), y > 2.1 ? 1.62 + (y - 1.62) * sag : y, z])); }
       q.loft(rings, (p, i) => shade(cv, 0.92 + 0.08 * Math.abs(Math.sin(i / 12 * Math.PI * 4))), { capA: true, capB: true });
-      q.mir(q => { for (const z of [0.2, 1.25, 2.3]) q.tube([1.11, 1.7, z], [1.09, 1.45, z], 0.008, 0.008, hex(0x6b5c40), 4); });
+      q.mir(q => {
+        q.tube([1.1, 2.0, -0.27], [1.1, 2.0, 2.77], 0.065, 0.065, shade(cv, 0.86), 8);       // el faldón enrollado
+        q.mat('wood'); for (const z of [-0.2, 0.82, 1.7, 2.68]) q.box(1.07, 1.8, z, 0.06, 0.5, 0.07, wd2);       // estacas, de la caja al toldo
+        q.mat('canvas'); for (const z of [0.3, 1.25, 2.2]) q.tube([1.12, 2.04, z], [1.1, 1.92, z], 0.01, 0.01, hex(0x6b5c40), 4);       // cuerdas del faldón
+      });
     }
   });
 }
@@ -4827,6 +4835,7 @@ function setClass(s, ci) {
   s.armsM = armsMesh(s.team, s.ui, s.skin, s.wid);
 }
 function placeAt(s, f) {
+  if (s.ride) rideOff(s, null);
   let x = f.x + 2, z = f.z + 2;
   for (let i = 0; i < 12; i++) {
     const a = rnd(0, 6.283), r = rnd(3.5, 13), tx = f.x + Math.cos(a) * r, tz = f.z + Math.sin(a) * r;
@@ -4885,7 +4894,10 @@ function botSpawn(s) {
   else if (!s.isPlayer && (s.tommyLost || s.wid === 'thompson' || s.prim === 'thompson')) setClass(s, s.ci);       // la Thompson ya ha vuelto al campanario
   s.tommyLost = false;
   if (s.goVeh && !s.goVeh.dead) sp = base;       // el que va a por un vehículo sale de la base y camina hasta él
+  const tr = !s.isPlayer && !s.goVeh ? truckBoarding(s.team) : null;       // un camión espera tropa en la base: se sale de allí y se sube
+  if (tr && Math.random() < 0.7) sp = base;
   placeAt(s, sp);
+  if (tr && sp === base) rideJoin(s, tr, false);
   s.yaw = Math.atan2(-(s.dx - s.x), -(s.dz - s.z));
 }
 /* ============ el mapa de los bots ============
@@ -5297,6 +5309,16 @@ function updateBot(s, dt) {
     if (v.dead || v.driver || v.claim !== s) s.goVeh = null;
     else { s.dx = v.x; s.dz = v.z; if (Math.hypot(v.x - s.x, v.z - s.z) < (v.kind === 'plane' ? 5.2 : 4.6)) { botBoard(v, s); return; } }
   }
+  if (s.ride) {       // en camión: va andando hasta él y sube; en la caja no anda, pero ve, apunta y dispara
+    const R = s.ride, v = R.v;
+    if (v.dead || !v.riders.includes(s)) s.ride = null;
+    else if (R.phase === 'go') {
+      R.t -= dt;
+      if (R.t <= 0 || Math.abs(v.speed) > 1.5 || (v.aiOn && v.ai.mode !== 'carga')) rideOff(s, null);       // se ha ido sin él: a pie
+      else { s.dx = v.x; s.dz = v.z; if (Math.hypot(v.x - s.x, v.z - s.z) < 5 && Math.abs(v.speed) < 0.6) rideBoard(s); }
+    }
+  }
+  const riding = !!(s.ride && s.ride.phase === 'in');
   if (s.tower && towerBot(s, dt)) return;
   if (s.prim && (!s.enemy || Math.hypot(s.enemy.x - s.x, s.enemy.z - s.z) > 32)) botSidearm(s, false);
   const w = s.wpn, e = s.enemy;
@@ -5307,7 +5329,8 @@ function updateBot(s, dt) {
     const ex = e.x - s.x, ez = e.z - s.z, d = Math.hypot(ex, ez) || 0.01;
     wantYaw = Math.atan2(-ex, -ez);
     s.aimPitch = Math.atan2((e.y + 1.1) - (s.y + 1.4), d);
-    if (w.kind === 'smg' && d > 14 && d < 48) { const q = botNav(s, e.x, e.z), qx = q[0] - s.x, qz = q[1] - s.z, ql = Math.hypot(qx, qz) || 1; mvx = qx / ql; mvz = qz / ql; spd = 3.9; s.crouch = false; s.prone = false; }
+    if (riding) { s.crouch = s.team === NAT; s.prone = false; }       // en la caja abierta se levanta para tirar por encima del costado; bajo el toldo, agachado
+    else if (w.kind === 'smg' && d > 14 && d < 48) { const q = botNav(s, e.x, e.z), qx = q[0] - s.x, qz = q[1] - s.z, ql = Math.hypot(qx, qz) || 1; mvx = qx / ql; mvz = qz / ql; spd = 3.9; s.crouch = false; s.prone = false; }
     else if (d > 95) { nav = navPoint(s); spd = 3.0; s.crouch = false; s.prone = false; }
     else {
       s.strafeT -= dt;
@@ -5322,8 +5345,8 @@ function updateBot(s, dt) {
       }
     }
     s.aimT -= dt;
-    if (s.aimT <= 0 && s.fireT <= 0 && s.reloadT <= 0 && Math.abs(angDiff(wantYaw, s.yaw)) < 0.25) botFire(s, e, d, spd > 2);
-  } else { s.aimPitch = 0; nav = navPoint(s); spd = 4.5; s.prone = false; }
+    if (s.aimT <= 0 && s.fireT <= 0 && s.reloadT <= 0 && Math.abs(angDiff(wantYaw, s.yaw)) < 0.25) botFire(s, e, d, spd > 2 || (riding && Math.abs(s.ride.v.speed) > 1.5));
+  } else { s.aimPitch = 0; if (!riding) { nav = navPoint(s); spd = 4.5; } s.prone = false; }
   if (nav) {
     const dx = nav.x - s.x, dz = nav.z - s.z, d = Math.hypot(dx, dz) || 0.001;
     if (nav.final && d < 2.2) {
@@ -5344,13 +5367,15 @@ function updateBot(s, dt) {
   const ox = s.x, oz = s.z;
   if (s.tower && s.tower.phase === 'top') {       // arriba, en el campanario: quieto en su vano, vigilando hacia fuera
     spd = 0; s.crouch = s.reloadT > 0; if (!e) wantYaw = s.tower.yaw;
+  } else if (riding) {       // en la caja: agachado y mirando afuera mientras no tenga a quién disparar
+    spd = 0; rideSeat(s); s.swim = false; s.prone = false; if (!e) { wantYaw = s.ride.yaw; s.crouch = true; } else if (s.reloadT > 0) s.crouch = true;
   } else {
     s.x += mvx * spd * dt; s.z += mvz * spd * dt;
     resolveCollide(s, 0.38, true);
     const gy = groundAt(s.x, s.z);
     if (gy < waterY - 1.15) { s.y = waterY - 1.25; s.swim = true; } else { s.y = gy; s.swim = false; }
   }
-  s.speed = Math.hypot(s.x - ox, s.z - oz) / Math.max(dt, 1e-4);
+  s.speed = riding ? 0 : Math.hypot(s.x - ox, s.z - oz) / Math.max(dt, 1e-4);
   if (spd > 0) {
     s.stuckT += dt;
     if (s.stuckT > 1.1) {
@@ -5418,7 +5443,7 @@ function towerDuty(dt) {
   if (C.owner < 0 || towerOcc.length >= 2 || Math.random() > (towerOcc.length ? 0.2 : 0.5)) return;
   let best = null, bd = 70;
   for (const s of soldiers) {
-    if (s.isPlayer || s.remote || !s.alive || s.team !== C.owner || s.veh || s.goVeh || s.tower || s.enemy || s.swim) continue;
+    if (s.isPlayer || s.remote || !s.alive || s.team !== C.owner || s.veh || s.goVeh || s.ride || s.tower || s.enemy || s.swim) continue;
     const d = Math.hypot(s.x - T.path[0][0], s.z - T.path[0][1]) - (s.wpn.kind === 'rifle' ? 12 : 0);       // mejor un fusilero
     if (d < bd) { bd = d; best = s; }
   }
@@ -5462,7 +5487,7 @@ function separate() {
   for (let i = 0; i < soldiers.length; i++) {
     const a = soldiers[i]; if (!a.alive) continue;
     for (let j = i + 1; j < soldiers.length; j++) {
-      const b = soldiers[j]; if (!b.alive || (a.tower && a.tower.phase !== 'go') || (b.tower && b.tower.phase !== 'go')) continue;       // a los del campanario no se les empuja
+      const b = soldiers[j]; if (!b.alive || (a.tower && a.tower.phase !== 'go') || (b.tower && b.tower.phase !== 'go') || (a.ride && a.ride.phase === 'in') || (b.ride && b.ride.phase === 'in')) continue;       // a los del campanario y a los de la caja de un camión no se les empuja
       const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
       if (d2 < 0.49 && d2 > 1e-6) {
         const d = Math.sqrt(d2), k = (0.7 - d) / d * 0.5;
@@ -7562,7 +7587,7 @@ function pollPad(dt) {
     if (ax || ay) { input.mvx = ax; input.mvz = ay; pad.move = true; } else if (pad.move) { input.mvx = input.mvz = 0; pad.move = false; }
     input.lookX += rx * Math.abs(rx) * 3.0 * dt / 0.0023 * opts.sens; input.lookY += ry * Math.abs(ry) * 2.1 * dt / 0.0023 * opts.sens;
     input.padSprint = PB('sprint');
-    if (PH('use') && (P.veh || P.aa || nearVehicle(P) || nearAA(P))) useVehicle(); else if (PH('reload') && !P.veh && !P.aa) startReload();
+    if (PH('use') && (P.veh || P.aa || P.ride || nearVehicle(P) || nearAA(P))) useVehicle(); else if (PH('reload') && !P.veh && !P.aa) startReload();
     if (inPlane) {       // caza: palanca, alabeo y cabeceo; timón y motor con botones o con sus ejes (giro de la palanca, palanca de gases)
       const ta = M.a.thr, ru = AX('rud');
       if (ax || ay || ru || PB('pfire') || PB('thrUp') || PB('thrDn') || PB('rudL') || PB('rudR') || (ta[0] >= 0 && Math.abs((gp.axes[ta[0]] || 0) - (pad.pax[ta[0]] || 0)) > 0.02)) input.flyPad = true;
@@ -7826,31 +7851,39 @@ function updatePlayer(dt) {
   p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.2 * dt, -1.45, 1.45);
   if (!p.alive) { p.fall = Math.min(1, p.fall + dt * 2.6); return; }
   if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); p.x = p.aa.x; p.z = p.aa.z; p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
-  let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx;
-  const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
-  const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
-  p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
-  if (p.swim) p.prone = false;
-  const sprint = (k.ShiftLeft || k.ShiftRight || input.padSprint || ((input.touch || input.pad || xr.on) && f > 0.92)) && f > 0.5 && !p.crouch && !p.prone && !aiming;
-  let sp = p.prone ? (aiming ? 0.6 : 1.05) : p.crouch ? 2.1 : sprint ? 6.6 : aiming ? 2.6 : 4.4; if (p.swim) sp *= 0.5;
-  const myw = xr.on ? xr.moveYaw : p.yaw, sy = Math.sin(myw), cy = Math.cos(myw), tx = (-sy * f + cy * r) * sp, tz = (-cy * f - sy * r) * sp, acc = Math.min(1, (p.onGround ? 12 : 2.5) * dt);       // en realidad virtual se avanza hacia donde miras
-  p.vx += (tx - p.vx) * acc; p.vz += (tz - p.vz) * acc;
-  p.x += p.vx * dt; p.z += p.vz * dt;
-  resolveCollide(p, 0.38);
-  const gy = groundAt(p.x, p.z, p.y), swimming = gy < waterY - 1.15, floor = swimming ? waterY - 1.25 : gy;
-  if (input.jump && p.prone) setStance(p, 0);       // tumbado, saltar es levantarse
-  else if (input.jump && p.onGround && !swimming && (p.proneT || 0) < 0.1) { p.vy = 4.9; p.onGround = false; p.crouch = false; }
-  input.jump = false;
-  p.vy -= 13 * dt; p.y += p.vy * dt;
-  if (p.y <= floor || (p.onGround && p.y - floor < 0.5 && p.vy <= 0)) {
-    const fall = -p.vy; p.y = floor; p.vy = 0; p.onGround = true;
-    if (fall > 11 && !swimming) applyDamage(p, (fall - 11) * 13, null, false, 'Caída desde lo alto');      // tirarse del campanario duele
-  } else p.onGround = false;
-  p.swim = swimming && p.onGround;
-  p.speed = Math.hypot(p.vx, p.vz); p.walkPhase += p.speed * dt * 1.9;
-  p.crouchT = clamp(p.crouchT + (p.crouch ? 1 : -1) * dt * 7, 0, 1);
-  p.proneT = clamp((p.proneT || 0) + (p.prone ? 1 : -1) * dt * 2.7, 0, 1);
-  p.aimPitch = p.pitch;
+  if (p.ride) {       // en la caja de un camión: no anda, pero mira, apunta y dispara
+    const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
+    p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
+    input.jump = false; p.prone = false; p.proneT = 0; p.swim = false;
+    rideSeat(p); p.vx = p.vz = p.vy = 0; p.onGround = true; p.speed = 0;
+    p.crouchT = clamp(p.crouchT + (p.crouch ? 1 : -1) * dt * 7, 0, 1); p.aimPitch = p.pitch;
+  } else {
+    let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) - input.mvz, r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + input.mvx;
+    const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
+    const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
+    p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
+    if (p.swim) p.prone = false;
+    const sprint = (k.ShiftLeft || k.ShiftRight || input.padSprint || ((input.touch || input.pad || xr.on) && f > 0.92)) && f > 0.5 && !p.crouch && !p.prone && !aiming;
+    let sp = p.prone ? (aiming ? 0.6 : 1.05) : p.crouch ? 2.1 : sprint ? 6.6 : aiming ? 2.6 : 4.4; if (p.swim) sp *= 0.5;
+    const myw = xr.on ? xr.moveYaw : p.yaw, sy = Math.sin(myw), cy = Math.cos(myw), tx = (-sy * f + cy * r) * sp, tz = (-cy * f - sy * r) * sp, acc = Math.min(1, (p.onGround ? 12 : 2.5) * dt);       // en realidad virtual se avanza hacia donde miras
+    p.vx += (tx - p.vx) * acc; p.vz += (tz - p.vz) * acc;
+    p.x += p.vx * dt; p.z += p.vz * dt;
+    resolveCollide(p, 0.38);
+    const gy = groundAt(p.x, p.z, p.y), swimming = gy < waterY - 1.15, floor = swimming ? waterY - 1.25 : gy;
+    if (input.jump && p.prone) setStance(p, 0);       // tumbado, saltar es levantarse
+    else if (input.jump && p.onGround && !swimming && (p.proneT || 0) < 0.1) { p.vy = 4.9; p.onGround = false; p.crouch = false; }
+    input.jump = false;
+    p.vy -= 13 * dt; p.y += p.vy * dt;
+    if (p.y <= floor || (p.onGround && p.y - floor < 0.5 && p.vy <= 0)) {
+      const fall = -p.vy; p.y = floor; p.vy = 0; p.onGround = true;
+      if (fall > 11 && !swimming) applyDamage(p, (fall - 11) * 13, null, false, 'Caída desde lo alto');      // tirarse del campanario duele
+    } else p.onGround = false;
+    p.swim = swimming && p.onGround;
+    p.speed = Math.hypot(p.vx, p.vz); p.walkPhase += p.speed * dt * 1.9;
+    p.crouchT = clamp(p.crouchT + (p.crouch ? 1 : -1) * dt * 7, 0, 1);
+    p.proneT = clamp((p.proneT || 0) + (p.prone ? 1 : -1) * dt * 2.7, 0, 1);
+    p.aimPitch = p.pitch;
+  }
   /* junto a una bandera propia: municionamiento y cura */
   p.supT = (p.supT || 0) - dt;
   if (p.supT <= 0) {
@@ -7937,6 +7970,8 @@ const VEH = [
 const vehicles = [];
 function vehHome(v) {
   if (v.type === 'mosca') v.moscaViz = null;
+  if (v.riders) for (const s of v.riders.slice()) rideOff(s, null);
+  v.riders = [];
   const h = v.home; v.x = h.x; v.z = h.z; v.yaw = v.tyaw = h.yaw; v.y = groundAt(v.x, v.z); v.speed = 0; v.steer = 0; v.pitch = v.kind === 'plane' ? 0.16 : 0; v.roll = 0; v.tpitch = 0;
   v.hp = v.def.hp; v.dead = false; v.falling = false; v.air = false; v.idleT = 0; v.fireT = 0; v.mgT = 0; v.bombs = v.def.bombs || 0; v.bombT = 0; v.regenT = 0; v.thr = 1; v.kick = 0; v.smokeT = 0;
   if (v.claim) v.claim.goVeh = null;
@@ -7957,9 +7992,10 @@ const vehOp = v => v.driver || (v.aiOn ? v.crew : null);
 /* Los bots no aparecen dentro de los vehículos: a uno se le encarga cada vehículo libre y va hasta él a pie.
    Se elige al soldado vivo más cercano; si no hay ninguno a mano, al siguiente refuerzo, que saldrá de la base. */
 function assignCrew(v) {
+  if (v.kind === 'truck' && Math.hypot(v.x - v.home.x, v.z - v.home.z) > 60) return false;       // un camión abandonado lejos no se lleva a nadie del frente: vuelve solo a la base
   let best = null, bd = 1e9;
   for (const s of soldiers) {
-    if (s.isPlayer || s.remote || s.team !== v.team || s.veh || s.goVeh) continue;
+    if (s.isPlayer || s.remote || s.team !== v.team || s.veh || s.goVeh || s.ride) continue;
     const d = s.alive ? Math.hypot(s.x - v.x, s.z - v.z) : 160 + Math.max(0, s.respawnT) * 5;
     if (s.alive && d > 150) continue;
     if (d < bd) { bd = d; best = s; }
@@ -8002,8 +8038,14 @@ function useVehicle() {
   const p = P; if (!p || !p.alive || game.state !== 'play') return;
   if (p.aa) { leaveAA(p); return; }
   if (p.veh) { exitVehicle(p); return; }
+  if (p.ride) { rideOff(p, null); SFX.click(); return; }       // bajar de la caja del camión
   if (tommyNear(p) && tommyCan(p)) { takeTommy(p); return; }
   const v = nearVehicle(p); if (!v) { const a = nearAA(p); if (a) manAA(p, a); else gunPick(p); return; }
+  if (v.kind === 'truck' && v.driver && !v.driver.isPlayer) {       // lo conduce un soldado: a la caja, con la tropa
+    if (rideJoin(p, v, true)) { p.reloadT = 0; p.aimT = 0; SFX.click(); showHint('Vas en la caja del camión: puedes apuntar y disparar. ' + (input.touch ? 'Toca Bajar' : input.pad || xr.on ? 'Pulsa X' : 'Pulsa E') + ' para bajar.'); }
+    else showHint('El camión va lleno.');
+    return;
+  }
   takeVehicle(p, v);
 }
 function takeVehicle(p, v) {
@@ -8040,6 +8082,7 @@ function destroyVehicle(v, att) {
   v.dead = true; v.deadT = 45; v.speed = 0; v.aiOn = false; v.falling = false; v.air = false; v.crew.alive = false;
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   boomFx(v.x, v.y + 1, v.z, 1.4);
+  if (v.riders) for (const s of v.riders.slice()) { const inb = s.ride.phase === 'in'; rideOff(s, null); if (inb) applyDamage(s, rnd(50, 140), att && att !== s ? att : null, false, 'Vehículo destruido'); }       // la tropa de la caja sale despedida
   const d = v.driver;
   if (d) {      // la dotación sale despedida junto al vehículo: así se ve el cuerpo desde arriba y no queda dentro de los restos
     d.veh = null; v.driver = null;
@@ -8396,6 +8439,195 @@ function tankAI(v, dt, ctl) {
     ctl.aimYaw = w ? Math.atan2(-(w.x - v.x), -(w.z - v.z)) : v.yaw; ctl.aimPitch = 0;
   }
 }
+/* ============ tropas en camión ============
+   Los dos bandos llevan tropas en sus camiones (dos por bando: ZiS-5 republicanos y Ford sublevados) para llegar antes a una bandera
+   lejana. Un soldado se pone al volante; en la base espera a que suban hasta ocho en la caja (los que aparecen allí y tienen lejos su
+   objetivo), sale hacia la bandera de ataque de su bando (o a una propia en disputa), los deja a cubierto a 45-70 m de ella, del lado
+   de su base, y vuelve a por más (en la base le arreglan los daños). En la caja van agachados mirando afuera; ven, apuntan y disparan
+   como a pie (peor si el camión va deprisa; bajo el toldo del Ford, sin levantarse), y si les dan, caen al suelo junto al camión. Si
+   les disparan por el camino (ven enemigos cerca o el camión pierde mucha chapa), o se queda sin conductor, se bajan donde estén a
+   pelear; si lo destruyen, salen despedidos. El jugador puede subir a la caja de un camión que lleve un soldado (y bajar cuando quiera) o
+   llevar él la tropa: los soldados suben mientras para en la base y se bajan cuando para lejos de ella. */
+const TRUCK_SEATS = [[-0.55, 0.12], [0.55, 0.12], [-0.55, 0.84], [0.55, 0.84], [-0.55, 1.56], [0.55, 1.56], [-0.55, 2.28], [0.55, 2.28]];       // [x, z] en la caja (el morro, hacia -z)
+const TRUCK_FLOOR = 1.03;
+const _tsM = M4.create();
+function truckMat(v) {       // la misma colocación con que se dibuja el camión
+  M4.identity(_tsM); M4.translate(_tsM, v.x, v.y, v.z); M4.rotY(_tsM, v.yaw); M4.rotX(_tsM, v.pitch); M4.rotZ(_tsM, v.roll);
+  if (v.team === REP) M4.scale(_tsM, ...VSC.zis);
+  return _tsM;
+}
+/* lleva al soldado a su sitio en la caja (y mirando afuera, por su lado) */
+function rideSeat(s) {
+  const R = s.ride, v = R.v, q = TRUCK_SEATS[R.i], p = M4.tp(truckMat(v), [q[0], TRUCK_FLOOR, q[1]]);
+  s.x = p[0]; s.y = p[1]; s.z = p[2]; s.vx = s.vz = s.vy = 0;
+  R.yaw = v.yaw + (q[0] < 0 ? Math.PI / 2 : -Math.PI / 2);
+}
+const truckSeat = v => { for (let i = 0; i < TRUCK_SEATS.length; i++) if (!v.riders.some(o => o.ride.i === i)) return i; return -1; };
+function rideJoin(s, v, now) {
+  const i = truckSeat(v); if (i < 0) return false;
+  s.ride = { v, i, phase: 'go', t: 35, yaw: v.yaw }; v.riders.push(s); s.goVeh = null; s.tower = null; s.prone = false;
+  if (now) rideBoard(s);
+  return true;
+}
+function rideBoard(s) { const R = s.ride; R.phase = 'in'; s.crouch = true; s.prone = false; s.swim = false; s.nav = null; rideSeat(s); s.yaw = R.yaw; if (s.isPlayer) { s.onGround = true; s.reloadT = Math.min(s.reloadT, 0); } }
+/* bajarse por su lado, junto a la caja (o por detrás si por ahí no se puede); f: adónde va luego */
+function rideOff(s, f) {
+  const R = s.ride; if (!R) return;
+  const v = R.v; v.riders = v.riders.filter(o => o !== s); s.ride = null;
+  if (R.phase !== 'in') return;
+  const q = TRUCK_SEATS[R.i], k = v.team === REP ? VSC.zis[0] : 1, side = q[0] < 0 ? -1 : 1, rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw), bx = Math.sin(v.yaw), bz = Math.cos(v.yaw);
+  const spots = [[side * 2.1, q[1]], [-side * 2.1, q[1]], [side * 0.6, 3.9], [side * 2.4, -1.5]];
+  let x = v.x, z = v.z;
+  for (const [a, b] of spots) { const tx = v.x + (rx * a + bx * b) * k, tz = v.z + (rz * a + bz * b) * k; if (!insideSolid(tx, tz, 0.45) && groundAt(tx, tz) > waterY - 1) { x = tx; z = tz; break; } }
+  s.x = x; s.z = z; s.y = Math.max(groundAt(x, z), waterY - 1.25); s.sx = x; s.sz = z; s.stuckT = 0; s.crouch = false; s.nav = null; s.yaw = R.yaw;
+  if (s.isPlayer) { s.vx = s.vz = s.vy = 0; s.onGround = true; }
+  else if (f) { s.tgt = f; s.retargetT = rnd(25, 40); s.atFlagT = 0; botNewDest(s); }
+}
+/* todos abajo (sin conductor, muy tocado, o el jugador ha parado lejos de la base): van a la bandera que no es suya más cercana */
+function truckUnload(v) {
+  let f = null, fd = 1e9;
+  for (const q of FLAGS) if (q.base === undefined && (q.owner !== v.team || q.contested)) { const d = Math.hypot(q.x - v.x, q.z - v.z); if (d < fd) { fd = d; f = q; } }
+  for (const s of v.riders.slice()) rideOff(s, f || teamPush(v.team));
+}
+/* un camión del bando parado en su base con sitio en la caja (y conductor), que va a salir hacia una bandera lejana */
+function truckBoarding(team) {
+  for (const v of vehicles) {
+    if (v.kind !== 'truck' || v.team !== team || v.dead || !v.driver || Math.abs(v.speed) > 0.6 || v.riders.length >= TRUCK_SEATS.length || v.hp < v.def.hp * 0.5) continue;
+    if (Math.hypot(v.x - v.home.x, v.z - v.home.z) > 25) continue;
+    if (v.aiOn ? v.ai.mode === 'carga' && truckFlag(v) : v.driver.isPlayer) return v;
+  }
+  return null;
+}
+/* adónde llevar a la tropa: a una bandera propia en disputa o a la de ataque del bando, si está lejos (si no, que vayan andando) */
+function truckFlag(v) {
+  let own = null, od = 1e9; const h = v.home;
+  for (const f of FLAGS) if (f.base === undefined && f.owner === v.team && f.contested) { const d = Math.hypot(f.x - h.x, f.z - h.z); if (d < od) { od = d; own = f; } }
+  const f = own || teamPush(v.team);
+  return f && Math.hypot(f.x - h.x, f.z - h.z) > 130 ? f : null;
+}
+/* dónde dejarla: a 45-70 m de la bandera, de su lado, en terreno abierto y, si puede ser, donde no se le vea desde ella */
+function truckSpot(v, f) {
+  const side = flagSide(v, f), fy = groundAt(f.x, f.z); let best = null, bs = -1e9;
+  for (let k = 0; k < 30; k++) {
+    const a = side + rnd(-0.9, 0.9), r = rnd(45, 70), x = f.x + Math.sin(a) * r, z = f.z + Math.cos(a) * r, c = navCell(x, z);
+    if (!tnavFree(c) || TNAV.n[c]) continue;
+    let sc = -Math.abs(angDiff(a, side)) * 0.8 - Math.hypot(x - v.x, z - v.z) * 0.002;
+    if (!losClear(x, groundAt(x, z) + 2, z, f.x, fy + 1.5, f.z)) sc += 1.5;
+    if (roadDist(x, z) < 8) sc += 0.5;
+    if (sc > bs) { bs = sc; best = [x, z]; }
+  }
+  return best || tankSnap(f.x + Math.sin(side) * 55, f.z + Math.cos(side) * 55, 40);
+}
+const onDeck = v => BRIDGES.some(b => b.on && b.half >= 2 && v.x > b.x0 - 2 && v.x < b.x1 + 2 && Math.abs(v.z - b.z) < b.half + 0.5);       // sobre el puente de barcas
+/* conducir el camión por su camino (el mismo mapa que los carros). No gira sobre sí mismo: con el destino detrás da la vuelta hacia
+   delante si hay sitio y, si no, maniobra marcha atrás. Devuelve 'llega' al llegar y 'atasco' si a la tercera no sale de un sitio */
+function truckDrive(v, dt, ctl) {
+  const a = v.ai, P = a.path, fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw);
+  const brake = () => { ctl.f = clamp(-v.speed * 2, -1, 1); a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw; };
+  if (a.backT > 0) {       // marcha atrás con el volante hacia donde ha de quedar el morro
+    a.backT -= dt; const bl = tankBlockedAt(v, v.x - fx * 4.2, v.z - fz * 4.2);
+    ctl.f = bl ? clamp(-v.speed * 2, -1, 1) : -0.9; ctl.r = a.backR;
+    if (a.backT <= 0 || (bl && v.speed > -0.3)) { a.backT = 0; a.repT = Math.min(a.repT, 0.3); a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw; }
+    return '';
+  }
+  if (!P) { brake(); return ''; }
+  while (a.pi < P.length - 1 && Math.hypot(P[a.pi][0] - v.x, P[a.pi][1] - v.z) < 4) a.pi++;
+  const end = P[P.length - 1], dEnd = Math.hypot(end[0] - v.x, end[1] - v.z);
+  if (a.pi >= P.length - 1 && dEnd < 4) { brake(); return 'llega'; }
+  const S = a.pi > 0 ? P[a.pi - 1] : a.p0, E = P[a.pi], sx = E[0] - S[0], sz = E[1] - S[1], sl2 = sx * sx + sz * sz || 1;
+  const t = clamp(((v.x - S[0]) * sx + (v.z - S[1]) * sz) / sl2, 0, 1), qx = S[0] + sx * t, qz = S[1] + sz * t;
+  if (Math.hypot(v.x - qx, v.z - qz) > 7) a.repT = 0;
+  let rem = 5 + Math.abs(v.speed) * 0.6, px = qx, pz = qz, tx = E[0], tz = E[1];
+  for (let i = a.pi; i < P.length; i++) {
+    const d = Math.hypot(P[i][0] - px, P[i][1] - pz);
+    if (d >= rem) { tx = px + (P[i][0] - px) * rem / d; tz = pz + (P[i][1] - pz) * rem / d; break; }
+    rem -= d; px = tx = P[i][0]; pz = tz = P[i][1];
+  }
+  let diff = angDiff(Math.atan2(-(tx - v.x), -(tz - v.z)), v.yaw);
+  let vt = (roadDist(v.x, v.z) < 6 ? 11 : 8.5) * clamp(1.15 - Math.abs(diff) * 1.1, 0.2, 1);
+  if (a.pi < P.length - 1) {
+    const N2 = P[a.pi + 1], turn = Math.abs(angDiff(Math.atan2(-(N2[0] - E[0]), -(N2[1] - E[1])), Math.atan2(-sx, -sz)));
+    if (turn > 0.45) vt = Math.min(vt, 3 + Math.hypot(E[0] - v.x, E[1] - v.z) * 0.45 + (1.6 - Math.min(1.6, turn)) * 2);
+  }
+  vt = Math.min(vt, 1.2 + dEnd * 0.35);
+  const probe = (r, l) => { const y = v.yaw + r; return tankBlockedAt(v, v.x - Math.sin(y) * l, v.z - Math.cos(y) * l); };
+  if (Math.abs(diff) > 1.35) {       // el camino sigue por detrás: la vuelta (en el puente no cabe: marcha atrás en línea hasta salir de él)
+    const sd = diff > 0 ? 1 : -1;
+    if (onDeck(v)) { a.backT = 2.5; a.backR = 0; return ''; }
+    if (!probe(sd * 0.7, 6) && !probe(sd * 1.4, 7) && !probe(0, 4)) vt = 2.5;
+    else { a.backT = rnd(1.4, 2); a.backR = sd; return ''; }
+  } else {
+    const look = 4.2 + Math.max(0, v.speed) * 0.8, close = tankBlockedAt(v, v.x + fx * 3.6, v.z + fz * 3.6), front = probe(diff, look);
+    if (front || close) {
+      let alt = null;
+      for (const d of [0.35, 0.7]) { for (const sg of diff >= 0 ? [1, -1] : [-1, 1]) { const r = diff + sg * d; if (Math.abs(r) < 1.2 && !probe(r, look)) { alt = r; break; } } if (alt !== null) break; }
+      if (alt !== null) { diff = alt; vt = Math.min(vt, close ? 1 : 2.5); } else vt = 0;
+      if (front === 2 || close === 2) { if (v.speed > 0) vt = Math.min(vt, 1); if (a.vRepT <= 0) { a.vRepT = 3; a.repT = 0; } a.vWait = (a.vWait || 0) + dt; }       // otro vehículo delante: espera a que se aparte (no es un atasco)
+      else a.vWait = 0;
+    } else a.vWait = 0;
+  }
+  ctl.r = clamp(-diff * 2.2, -1, 1);
+  ctl.f = clamp((vt - v.speed) * (vt < 0.2 ? 3 : 1.2), -1, 1);
+  if (a.vWait > 0 && a.vWait < 12) { a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw; return ''; }
+  a.stuckT += dt;
+  if (a.stuckT > 2.5) {
+    const stuck = Math.hypot(v.x - a.px, v.z - a.pz) < 1.2 && Math.abs(angDiff(v.yaw, a.pyaw)) < 0.3;
+    a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw;
+    if (stuck) { a.backT = rnd(1.4, 2); a.backR = onDeck(v) ? 0 : diff >= 0 ? 1 : -1; if (++a.stuckN >= 3) { a.stuckN = 0; return 'atasco'; } }
+    else a.stuckN = Math.max(0, a.stuckN - 1);
+  }
+  return '';
+}
+function truckAI(v, dt, ctl) {
+  tnavBuild();
+  const a = v.ai, h = v.home; a.t -= dt; a.repT -= dt; a.vRepT = (a.vRepT || 0) - dt;
+  const inN = v.riders.filter(s => s.ride.phase === 'in').length, goN = v.riders.length - inN;
+  if (a.mode === 'ida' || a.mode === 'vuelta') {       // sin avanzar en mucho rato: la tropa sigue a pie y el conductor deja el camión (volverá a la base él solo)
+    if (!a.progP || Math.hypot(v.x - a.progP[0], v.z - a.progP[1]) > 3) { a.progP = [v.x, v.z]; a.progT = 0; }
+    else if ((a.progT += dt) > 40 && !onDeck(v)) { a.progT = 0; truckUnload(v); ejectBot(v); return; }
+  } else a.progP = null;
+  if (!a.mode) { a.mode = Math.hypot(v.x - h.x, v.z - h.z) < 25 ? 'carga' : 'vuelta'; a.waitT = 0; a.goal = [h.x, h.z]; a.path = null; }
+  if (a.mode === 'carga') {       // en la base, esperando a la tropa (y, si viene tocado, mientras lo arreglan)
+    ctl.f = clamp(-v.speed * 2, -1, 1); a.waitT += dt; a.stuckT = 0; v.hp = Math.min(v.def.hp, v.hp + 4 * dt);
+    if (a.t <= 0) {
+      a.t = 0.5;
+      const f = v.hp >= v.def.hp * 0.7 ? truckFlag(v) : null, withP = v.riders.includes(P);
+      if (!f) { if (inN && a.waitT > 20) { truckUnload(v); a.waitT = 0; } return; }
+      const go = inN >= TRUCK_SEATS.length || (inN >= (withP ? 2 : 4) && goN === 0 && a.waitT > (withP ? 4 : 8)) || (inN >= 4 && a.waitT > 25) || (withP && a.waitT > 12) || (inN && a.waitT > 40);       // (si vas tú, sale antes)
+      if (go) {
+        for (const s of v.riders.slice()) if (s.ride.phase !== 'in') rideOff(s, null);       // los que no han llegado a subir, a pie
+        a.flag = f; a.goal = truckSpot(v, f); a.mode = 'ida'; a.path = null; a.retT = 8; a.stuckN = 0;
+        if (v.team === game.team && P) feedText('Sale un camión con ' + inN + (inN === 1 ? ' soldado' : ' soldados') + ' hacia ' + f.name, 'ally');
+      }
+    }
+    return;
+  }
+  if (a.mode === 'ida') {       // con la tropa, hacia su bandera
+    if (!inN) { a.mode = 'vuelta'; a.goal = [h.x, h.z]; a.path = null; return; }
+    if ((a.retT -= dt) <= 0) { a.retT = 8; const f = truckFlag(v); if (f && f !== a.flag) { a.flag = f; a.goal = truckSpot(v, f); } }       // el objetivo del bando ha cambiado
+    let r = '';
+    /* si les disparan (el camión pierde mucha chapa o la tropa ve enemigos cerca), abajo donde estén, a pelear */
+    const hot = v.riders.some(s => s.ride.phase === 'in' && s.enemy && s.enemy.alive && Math.hypot(s.enemy.x - v.x, s.enemy.z - v.z) < 45);
+    if ((v.hp < v.def.hp * 0.6 || hot) && !onDeck(v)) r = 'peligro';
+    else { tankRoute(v); r = truckDrive(v, dt, ctl); if (r === 'atasco' && Math.hypot(v.x - h.x, v.z - h.z) < 60) { a.path = null; a.repT = 0; r = ''; } }       // aún en la base: otro camino, no se baja nadie
+    if (r && !onDeck(v)) { a.mode = 'baja'; a.dropT = 0.5; }       // (en el puente, nunca: primero a tierra)
+    return;
+  }
+  if (a.mode === 'baja') {       // abajo la tropa, uno a uno
+    ctl.f = clamp(-v.speed * 2, -1, 1); a.stuckT = 0;
+    if (Math.abs(v.speed) < 0.8 && (a.dropT -= dt) <= 0) {
+      const s = v.riders.find(o => o.ride.phase === 'in');
+      if (s) { rideOff(s, a.flag); a.dropT = 0.35; }
+      else { a.mode = 'vuelta'; a.goal = [h.x, h.z]; a.path = null; a.stuckN = 0; }
+    }
+    return;
+  }
+  /* de vuelta a la base, a por más */
+  tankRoute(v);
+  const r = truckDrive(v, dt, ctl);
+  if (r === 'llega' || Math.hypot(v.x - h.x, v.z - h.z) < 6) { a.mode = 'carga'; a.waitT = 0; a.path = null; }
+  else if (r === 'atasco') a.path = null;
+}
 /* ---- IA de los cazas ---- */
 function planeAI(v, dt, ctl) {
   const a = v.ai, D = v.def;
@@ -8503,7 +8735,7 @@ function updateGround(v, dt, ctl) {
   }
   /* soldados: se apartan o son arrollados */
   for (const s of soldiers) {
-    if (!s.alive || s.veh) continue;
+    if (!s.alive || s.veh || (s.ride && s.ride.phase === 'in')) continue;       // (los de la caja van encima)
     for (const off of [fo, -ro]) {
       const cx = v.x + fx * off, cz = v.z + fz * off, dx = s.x - cx, dz = s.z - cz, d2 = dx * dx + dz * dz;
       if (d2 > 2.4 || d2 < 1e-6) continue;
@@ -8690,7 +8922,7 @@ function updateVehicles(dt) {
   TNAV.budget = 1;       // un camino nuevo de carro por paso como mucho
   for (const v of vehicles) {
     if (v.dead) { v.deadT -= dt; if (v.deadT <= 0) vehHome(v); continue; }
-    if (!v.driver && v.kind !== 'truck' && !v.falling) {
+    if (!v.driver && !v.falling) {
       if (v.claim) {       // ya hay un soldado de camino; si cae por el camino o tarda demasiado, se busca a otro
         v.claimT -= dt;
         if (v.claim.goVeh !== v || v.claimT <= 0) { if (v.claim.goVeh === v) v.claim.goVeh = null; v.claim = null; v.launchT = 2; }
@@ -8710,7 +8942,14 @@ function updateVehicles(dt) {
         if (v.kind === 'tank') tankAim(v, drv, ctl);
       }
       input.bomb = false;
-    } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); }
+    } else if (v.aiOn) { if (v.kind === 'tank') tankAI(v, dt, ctl); else if (v.kind === 'plane') planeAI(v, dt, ctl); else truckAI(v, dt, ctl); }
+    if (v.kind === 'truck' && v.riders.length) {       // la tropa de la caja: sin conductor, abajo; si conduce el jugador, se baja cuando para lejos de la base
+      if (!v.driver) truckUnload(v);
+      else if (drv && drv.isPlayer) {
+        if (Math.hypot(v.x - v.home.x, v.z - v.home.z) > 50 && Math.abs(v.speed) < 0.5) { if ((v.stopT = (v.stopT || 0) + dt) > 2.5 && v.riders.some(o => o.ride.phase === 'in')) { v.stopT = 0; truckUnload(v); feedText('La tropa se baja del camión', 'ally'); } }
+        else v.stopT = 0;
+      }
+    }
     if (v.kind === 'plane') updatePlane(v, dt, ctl); else updateGround(v, dt, ctl);
     if (mosca && v.type === 'mosca') moscaTick(v, dt, ctl);
     const c = v.crew; c.x = v.x; c.y = v.y + 0.5; c.z = v.z; c.speed = Math.abs(v.speed);
@@ -9377,6 +9616,7 @@ function applyDamage(t, dmg, att, head, cause) {
   if (t.hp <= 0) {
     if (t.veh) { t.veh.driver = null; t.veh = null; }
     if (t.aa) { t.aa.driver = null; t.aa = null; }
+    if (t.ride) rideOff(t, null);       // de la caja de un camión, al suelo de al lado
     t.alive = false; t.hp = 0; t.deaths++; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.enemy = null; t.respawnT = rnd(7, 11); t.crouch = false; t.prone = false;
     game.tickets[t.team] = Math.max(0, game.tickets[t.team] - 1);
     if (att && att !== t && att.team !== t.team) att.kills++;
@@ -9503,7 +9743,7 @@ function update(dt) {
   game.respawnT -= dt;
   if (game.state === 'play') { updatePlayer(dt); if (!P.alive) { game.deadT -= dt; if (game.deadT <= 0) enterDeploy(); } }
   else if (P.spawned && !P.alive) P.fall = Math.min(1, P.fall + dt * 2.6);
-  updateVehicles(dt); updateAA(dt); towerDuty(dt);
+  updateVehicles(dt); if (P && P.ride) rideSeat(P); updateAA(dt); towerDuty(dt);
   NAV.budget = 2; NAV.lbudget = 10;       // caminos nuevos y líneas rectas que se pueden mirar en cada paso
   tommyUpdate(dt);
   for (const s of soldiers) if (!s.isPlayer) { if (s.remote) duoHostRemote(s, dt); else updateBot(s, dt); }
@@ -10579,7 +10819,7 @@ function uiTick(dt) {
     if (p.alive && Math.hypot(p.x - f.x, p.z - f.z) < CAP_R) near = f;
   }
   $('hp').textContent = Math.max(0, Math.ceil(p.hp));
-  const ws = p.weps[p.cur], nv = p.alive && !p.veh && !p.aa ? (nearVehicle(p) || nearAA(p)) : null, pr = $('prompt');
+  const ws = p.weps[p.cur], nv = p.alive && !p.veh && !p.aa && !p.ride ? (nearVehicle(p) || nearAA(p)) : null, pr = $('prompt');
   const padX = input.pad || xr.on;       // en las gafas, el botón X del mando izquierdo hace lo mismo que la X del mando
   if (p.aa) { $('wName').textContent = p.aa.def.name; $('ammo').textContent = 'Antiaérea'; $('extra').textContent = input.touch ? 'Toca Bajar para dejarla' : padX ? 'X para dejarla' : 'E para dejarla'; }
   else if (p.veh) {
@@ -10595,12 +10835,13 @@ function uiTick(dt) {
     $('extra').textContent = 'Granadas ' + p.nades + (p.prone ? (ws.def.kind === 'lmg' ? ' · tumbado, bípode apoyado' : ' · tumbado') : p.crouch ? ' · agachado' : '') + (p.swim ? ' · a nado' : '');
   }
   const nt = !nv && tommyNear(p), ntOk = nt && tommyCan(p);
-  if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : padX ? 'Pulsa X' : 'Pulsa E') + ' para ' + nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : ''); pr.hidden = false; }
+  if (p.ride && p.alive) { pr.textContent = (input.touch ? 'Toca Bajar' : padX ? 'Pulsa X' : 'Pulsa E') + ' para bajar del camión'; pr.hidden = false; }
+  else if (nv) { pr.textContent = (input.touch ? 'Toca Subir' : padX ? 'Pulsa X' : 'Pulsa E') + ' para ' + (nv.kind === 'truck' && nv.driver && !nv.driver.isPlayer ? (truckSeat(nv) < 0 ? 'subir: el camión va lleno' : 'subir a la caja de ' + nv.def.art + ', que conduce ' + nv.driver.name) : nv.def.verb + ' ' + nv.def.art + (nv.driver ? ': ' + nv.driver.name + ' se baja' : '')); pr.hidden = false; }
   else if (nt) { pr.textContent = ntOk ? (input.touch ? 'Toca Coger' : padX ? 'Pulsa X' : 'Pulsa E') + ' para coger la Thompson' : 'Una Thompson escondida: solo la pueden usar los legionarios'; pr.hidden = false; }
   else if (!input.touch && !input.locked && !lockOff() && !(input.pad && pad.on) && !xr.on) { pr.textContent = 'Haz clic para capturar el ratón'; pr.hidden = false; }
   else if (!input.touch && !p.veh && !p.aa && gunNear(p)) { pr.textContent = (padX ? 'Pulsa X' : 'Pulsa E') + ' para coger: ' + WEAPONS[gunNear(p).g.id].name; pr.hidden = false; }       // sin captura no se apunta bien: se avisa siempre
   else pr.hidden = true;
-  const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa || ntOk); ub.textContent = p.veh || p.aa ? 'Bajar' : nv ? 'Subir' : 'Coger';
+  const ub = $('tbUse'); ub.hidden = !(nv || p.veh || p.aa || ntOk || p.ride); ub.textContent = p.veh || p.aa || p.ride ? 'Bajar' : nv ? 'Subir' : 'Coger';
   const fly = !!(p.alive && p.veh && p.veh.kind === 'plane'), fh = $('flyHud');
   document.body.classList.toggle('fly', fly); fh.hidden = !fly;
   const moscaButton = $('tbMoscaCam');
