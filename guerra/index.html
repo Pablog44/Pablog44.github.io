@@ -4882,6 +4882,8 @@ function botSpawn(s) {
   if (Math.random() < 0.25) sp = pick(own);
   else for (const f of own) { const d = Math.hypot(f.x - s.tgt.x, f.z - s.tgt.z) + (f === s.tgt ? 60 : 0); if (d < bd) { bd = d; sp = f; } }
   if (!s.isPlayer && Math.random() < 0.25) setClass(s, (Math.random() * 4) | 0);
+  else if (!s.isPlayer && (s.tommyLost || s.wid === 'thompson' || s.prim === 'thompson')) setClass(s, s.ci);       // la Thompson ya ha vuelto al campanario
+  s.tommyLost = false;
   if (s.goVeh && !s.goVeh.dead) sp = base;       // el que va a por un vehículo sale de la base y camina hasta él
   placeAt(s, sp);
   s.yaw = Math.atan2(-(s.dx - s.x), -(s.dz - s.z));
@@ -4916,7 +4918,7 @@ function navBuild() {
   for (const c of circles) { const r = c.r + NAV_PAD;
     for (let j = Math.max(0, Math.floor(c.z - r - NAV.z0)); j <= Math.min(nz - 1, Math.ceil(c.z + r - NAV.z0)); j++)
       for (let i = Math.max(0, Math.floor(c.x - r - NAV.x0)); i <= Math.min(nx - 1, Math.ceil(c.x + r - NAV.x0)); i++) { const dx = NAV.x0 + i - c.x, dz = NAV.z0 + j - c.z; if (dx * dx + dz * dz < r * r) B[j * nx + i] = 1; } }
-  NAV.b = B; NAV.t = T; NAV.br = BR;
+  NAV.b = B; NAV.t = T; NAV.br = BR; NAV.gy = G;
   NAV.g = new Float32Array(N); NAV.par = new Int32Array(N); NAV.seen = new Uint32Array(N); NAV.done = new Uint32Array(N);
   NAV.hi = new Int32Array(1 << 18); NAV.hf = new Float32Array(1 << 18);
 }
@@ -5029,6 +5031,168 @@ function navPoint(s) {
   if (!best) return { x: s.dx, z: s.dz, final: true };
   const near = ss > 0 ? best.east : best.west;
   return { x: near.x, z: near.z, final: false };
+}
+/* ============ el mapa de los carros ============
+   Como el de los bots, una rejilla de 1 m, pero con el grueso de un carro (unos 5 × 2,5 m). El centro del carro no puede pisar lo que
+   queda a menos de 2,5 m de una casa, tapia, parapeto, caja, árbol, roca o emplazamiento, y lo que queda a menos de 4 m cuesta el
+   triple: así van por el medio de las calles y de los pasos y no rozan las paredes. El río solo se cruza por el puente de barcas, por
+   su mitad (la pasarela no aguanta un carro); las cuestas empinadas cuestan más y las que no puede subir no se pisan. Se marcan
+   además las zonas a las que se llega desde las bases («isla»), para no mandar nunca a un carro a un sitio cerrado. */
+const TNAV = { b: null, n: null, h: null, k: null, isl: null, budget: 0, ms: 0, exp: 0, hw: 2.5 };
+const TNAV_PAD = 2.5, TNAV_NEAR = 4.2;
+function tnavBuild() {
+  if (TNAV.b) return;
+  navBuild();
+  const t0 = performance.now(), nx = NAV.nx, nz = NAV.nz, N = nx * nz, B = new Uint8Array(N), NR = new Uint8Array(N), H = new Uint8Array(N), K = new Float32Array(N), G = NAV.gy, T = NAV.t;
+  /* B: prohibido para el camino; NR: arrimado a una pared (cuesta más); H: el «núcleo», donde el carro ya chocaría (lo miran sus antenas) */
+  const mark = (x0, x1, z0, z1, extra, test) => {
+    const R = TNAV_NEAR + extra, Rh = TNAV_PAD + extra;
+    const i0 = Math.max(0, Math.floor(x0 - R - NAV.x0)), i1 = Math.min(nx - 1, Math.ceil(x1 + R - NAV.x0));
+    const j0 = Math.max(0, Math.floor(z0 - R - NAV.z0)), j1 = Math.min(nz - 1, Math.ceil(z1 + R - NAV.z0));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = NAV.x0 + i, z = NAV.z0 + j, dx = Math.max(x0 - x, 0, x - x1), dz = Math.max(z0 - z, 0, z - z1), d2 = dx * dx + dz * dz, c = j * nx + i;
+      if (d2 >= R * R || (test && !test(G[c]))) continue;
+      if (d2 < Rh * Rh) { B[c] = 1; if (d2 < (1.4 + extra) * (1.4 + extra)) H[c] = 1; } else NR[c] = 1;
+    }
+  };
+  /* lo mismo que mira resolveCollide con el carro (una caja estorba si no se puede pasar por encima ni por debajo), con 80 cm de margen:
+     en cuesta, la altura del carro no es la del suelo bajo su centro (una tapia de bancal le estorba aunque desde arriba no lo parezca) */
+  for (const b of aabbs) mark(b.x0, b.x1, b.z0, b.z1, 0, gy => !(gy - 0.8 > b.y1 - 0.35 || gy + 2.4 < b.y0));
+  const seenB = new Set(); for (const L of gridB) for (const b of L) if (!seenB.has(b)) { seenB.add(b); mark(b.x0, b.x1, b.z0, b.z1, 0, null); }       // y las casas abiertas: un carro no se mete en una casa
+  for (const c of circles) mark(c.x, c.x, c.z, c.z, c.r, null);
+  /* el agua (con lo que sube en una crecida), salvo el puente de barcas por su mitad */
+  const deck = new Uint8Array(N);
+  for (let c = 0; c < N; c++) {
+    const br = NAV.br[c], bb = br && BRIDGES[br - 1];
+    if (bb && bb.half >= 2) deck[c] = Math.abs(NAV.z0 + ((c / nx) | 0) - bb.z) <= bb.half - 1.25 ? 1 : 2;
+  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const c = j * nx + i;
+    if (deck[c] === 2) { B[c] = H[c] = 1; continue; }
+    if (deck[c] || T[c] >= -0.25) continue;
+    H[c] = 1;
+    for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {       // y metro y medio de orilla
+      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= nz || di * di + dj * dj > 2.25 * 2.25) continue;
+      const k = jj * nx + ii; if (deck[k] !== 1) B[k] = 1;
+    }
+  }
+  /* bordes del campo, cuestas y coste de cada celda */
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const c = j * nx + i, x = NAV.x0 + i, z = NAV.z0 + j;
+    if (x < PLAY.x0 + 3 || x > PLAY.x1 - 3 || z < PLAY.z0 + 3 || z > PLAY.z1 - 3) { B[c] = 1; if (x < PLAY.x0 + 1.5 || x > PLAY.x1 - 1.5 || z < PLAY.z0 + 1.5 || z > PLAY.z1 - 1.5) H[c] = 1; continue; }
+    if (B[c]) continue;
+    const sl = deck[c] ? 0 : slopeAt(x, z);
+    if (sl > 0.78) { B[c] = 1; if (sl > 0.9) H[c] = 1; continue; }
+    K[c] = 1 + Math.max(0, sl - 0.2) * 5 + (NR[c] ? 2 : 0);
+  }
+  /* pasos de una o dos celdas de ancho (entre una casa y una tapia, un callejón): no se meten (salvo en el puente) */
+  const run = (c, di, dj) => { let n = 0, i = c % nx + di, j = ((c / nx) | 0) + dj; while (n < 3 && i >= 0 && j >= 0 && i < nx && j < nz && !B[j * nx + i]) { n++; i += di; j += dj; } return n; };
+  const narrow = [];
+  for (let c = 0; c < N; c++) if (!B[c] && !deck[c] && (run(c, 1, 0) + run(c, -1, 0) < 2 || run(c, 0, 1) + run(c, 0, -1) < 2)) narrow.push(c);
+  for (const c of narrow) B[c] = 1;
+  /* la isla: lo que se alcanza desde donde aparecen los carros */
+  const I = new Uint8Array(N), Q = new Int32Array(N); let qh = 0, qt = 0;
+  for (const h of VEH) { if (VDEF[h.t].kind !== 'tank') continue; const c = navCell(h.x, h.z); if (c >= 0 && !B[c] && !I[c]) { I[c] = 1; Q[qt++] = c; } }
+  while (qh < qt) {
+    const c = Q[qh++], ci = c % nx, cj = (c / nx) | 0;
+    for (let k = 0; k < 4; k++) {
+      const i = ci + (k === 0 ? 1 : k === 1 ? -1 : 0), j = cj + (k === 2 ? 1 : k === 3 ? -1 : 0); if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
+      const n = j * nx + i; if (!B[n] && !I[n]) { I[n] = 1; Q[qt++] = n; }
+    }
+  }
+  TNAV.b = B; TNAV.n = NR; TNAV.h = H; TNAV.k = K; TNAV.isl = I; TNAV.buildMs = performance.now() - t0;
+}
+const tnavFree = c => c >= 0 && !TNAV.b[c] && TNAV.isl[c] === 1;
+/* la celda libre (y alcanzable) más cercana, en anillos de hasta R celdas */
+function tnavNear(c, R) {
+  if (c < 0) return -1; if (tnavFree(c)) return c;
+  const nx = NAV.nx, ci = c % nx, cj = (c / nx) | 0;
+  for (let r = 1; r <= R; r++) { let best = -1, bd = 1e9;
+    for (let j = cj - r; j <= cj + r; j++) for (let i = ci - r; i <= ci + r; i++) {
+      if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r || i < 0 || j < 0 || i >= nx || j >= NAV.nz) continue;
+      const k = j * nx + i, d = (i - ci) * (i - ci) + (j - cj) * (j - cj); if (tnavFree(k) && d < bd) { bd = d; best = k; } }
+    if (best >= 0) return best; }
+  return -1;
+}
+const tnavFreeAt = (x, z) => tnavFree(navCell(x, z));
+/* ¿puede ir el carro en línea recta? Sin pisar nada prohibido y, salvo en los primeros y últimos 2,5 m, sin arrimarse a las paredes */
+function tnavLine(x0, z0, x1, z1) {
+  const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 0.5));
+  for (let k = 1; k <= n; k++) {
+    const t = k / n, c = navCell(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t);
+    if (c < 0 || TNAV.b[c] || !TNAV.isl[c]) return false;
+    if (TNAV.n[c] && t * d > 2.5 && (1 - t) * d > 2.5) return false;
+  }
+  return true;
+}
+/* A* en la rejilla de los carros (8 vecinos, sin cortar esquinas, con el coste de cada celda; algo «impaciente», que prefiere un
+   buen camino en poco tiempo al mejor), acortado luego con tramos rectos. Los demás vehículos en tierra cuentan como obstáculos
+   mientras se busca (se rodea al que está aparcado). Si no llega, el camino hasta lo más cerca que haya alcanzado. */
+function tnavPath(x0, z0, x1, z1, maxExp, self) {
+  tnavBuild();
+  const marks = [], Bm = TNAV.b;
+  for (const o of vehicles) {
+    if (o === self || o.air) continue;
+    const r = o.kind === 'plane' ? 5 : 4, ci = Math.round(o.x - NAV.x0), cj = Math.round(o.z - NAV.z0);
+    for (let j = cj - r; j <= cj + r; j++) for (let i = ci - r; i <= ci + r; i++) {
+      if (i < 0 || j < 0 || i >= NAV.nx || j >= NAV.nz || (i - ci) * (i - ci) + (j - cj) * (j - cj) > r * r) continue;
+      const c = j * NAV.nx + i; if (!Bm[c]) { Bm[c] = 3; marks.push(c); }
+    }
+  }
+  /* de una orilla a la otra, por el puente de barcas: hasta su entrada, por el medio del puente y desde su salida */
+  let out; const br = BRIDGES.find(b => b.on && b.half >= 2), ss = sideOf(x0, z0), sd = sideOf(x1, z1);
+  if (br && ss !== sd) {
+    const n = ss > 0 ? br.east : br.west, f = sd > 0 ? br.east : br.west, onB = x0 > br.x0 - 1 && x0 < br.x1 + 1 && Math.abs(z0 - br.z) < br.half;
+    const a = onB ? null : tnavSearch(x0, z0, n.x, n.z, maxExp), c = tnavSearch(f.x, f.z, x1, z1, maxExp);
+    out = (a || []).concat([[f.x, f.z]], c || []); out.found = (onB || (a && a.found)) && c && c.found;
+  } else out = tnavSearch(x0, z0, x1, z1, maxExp);
+  for (const c of marks) Bm[c] = 0;
+  return out;
+}
+function tnavSearch(x0, z0, x1, z1, maxExp) {
+  const nx = NAV.nx, s = tnavNear(navCell(x0, z0), 8), gl0 = tnavNear(navCell(x1, z1), 16); if (s < 0 || gl0 < 0) return null;
+  const t0 = performance.now(), run = ++NAV.run, G = NAV.g, PA = NAV.par, SE = NAV.seen, DN = NAV.done, HI = NAV.hi, HF = NAV.hf, B = TNAV.b, K = TNAV.k, I = TNAV.isl, cap = HI.length;
+  const gi = gl0 % nx, gj = (gl0 / nx) | 0;
+  const hOf = c => { const dx = Math.abs(c % nx - gi), dz = Math.abs(((c / nx) | 0) - gj); return (Math.max(dx, dz) + 0.414 * Math.min(dx, dz)) * TNAV.hw; };
+  let hn = 0;
+  const push = (c, f) => { if (hn >= cap) return; let k = hn++; while (k > 0) { const p = (k - 1) >> 1; if (HF[p] <= f) break; HI[k] = HI[p]; HF[k] = HF[p]; k = p; } HI[k] = c; HF[k] = f; };
+  const pop = () => { const top = HI[0], lc = HI[--hn], lf = HF[hn]; let k = 0;
+    while (true) { let m = 2 * k + 1; if (m >= hn) break; if (m + 1 < hn && HF[m + 1] < HF[m]) m++; if (HF[m] >= lf) break; HI[k] = HI[m]; HF[k] = HF[m]; k = m; }
+    if (hn > 0) { HI[k] = lc; HF[k] = lf; } return top; };
+  G[s] = 0; PA[s] = -1; SE[s] = run; push(s, hOf(s));
+  let best = s, bh = hOf(s), exp = 0, found = false;
+  const DI = [1, -1, 0, 0, 1, 1, -1, -1], DJ = [0, 0, 1, -1, 1, -1, 1, -1];
+  while (hn > 0 && exp < maxExp) {
+    const c = pop(); if (DN[c] === run) continue; DN[c] = run; exp++;
+    if (c === gl0) { found = true; best = c; break; }
+    const h = hOf(c); if (h < bh) { bh = h; best = c; }
+    const ci = c % nx, cj = (c / nx) | 0;
+    for (let k = 0; k < 8; k++) {
+      const i = ci + DI[k], j = cj + DJ[k]; if (i < 0 || j < 0 || i >= nx || j >= NAV.nz) continue;
+      const n = j * nx + i; if (B[n] || !I[n] || DN[n] === run) continue;
+      if (k >= 4 && (B[cj * nx + i] || B[j * nx + ci])) continue;
+      const g = G[c] + (k < 4 ? 1 : 1.414) * K[n];
+      if (SE[n] !== run || g < G[n]) { SE[n] = run; G[n] = g; PA[n] = c; push(n, g + hOf(n)); }
+    }
+  }
+  TNAV.exp += exp;
+  const cells = []; for (let c = best; c >= 0 && cells.length < 6000; c = PA[c]) cells.push(c);
+  cells.reverse();
+  const pts = cells.map(c => [NAV.x0 + c % nx, NAV.z0 + ((c / nx) | 0)]);
+  if (found && tnavFreeAt(x1, z1)) pts[pts.length - 1] = [x1, z1];
+  const out = []; let ax = x0, az = z0, i = 0;
+  const L = pts.length - 1, ok = m => tnavLine(ax, az, pts[m][0], pts[m][1]);
+  while (i < L) {
+    let k = i + 1;
+    if (ok(L)) k = L;
+    else { let st = 2, bad = L; while (i + st < L) { if (ok(i + st)) { k = i + st; st *= 2; } else { bad = i + st; break; } }
+      while (bad - k > 1) { const m = (k + bad) >> 1; if (ok(m)) k = m; else bad = m; } }
+    out.push(pts[k]); ax = pts[k][0]; az = pts[k][1]; i = k;
+  }
+  if (!out.length) out.push(pts[pts.length - 1]);
+  out.found = found;
+  TNAV.ms += performance.now() - t0;
+  return out;
 }
 function canSee(s, e, ey) {
   const dx = e.x - s.x, dz = e.z - s.z;
@@ -5208,8 +5372,9 @@ function updateBot(s, dt) {
 }
 /* ============ la Thompson del campanario ============
    Escondida en una caja de munición del piso de campanas de Sant Pere. La puede coger cualquiera de los dos bandos (la lleva con el
-   esqueleto y las animaciones del legionario): el jugador, con la tecla de usar, o un centinela que suba. Si quien
-   la lleva cae (o vuelve a desplegar con otra arma), al rato vuelve a aparecer en la caja. */
+   esqueleto y las animaciones del legionario): el jugador, con la tecla de usar, o un centinela que suba. En cuanto quien la lleva
+   cae (o la cambia por otra arma, o vuelve a desplegar con otra), vuelve a aparecer en su caja del campanario: no se queda en el
+   suelo junto al caído ni la conserva un soldado al reaparecer, así que nunca hay más de una. */
 const TOMMY = { state: 'tower', carrier: null, t: 0 };
 function tommyReset() { TOMMY.state = 'tower'; TOMMY.carrier = null; TOMMY.t = 0; }
 function tommyCan(s) { const w = s.isPlayer ? (s.weps && s.weps[0] && s.weps[0].def) : WEAPONS[s.prim || s.wid]; if (!w || w === WEAPONS.thompson) return false; return s.team === NAT ? !!(w.leg || SK.leg) : skLegOk(s); }
@@ -5232,7 +5397,11 @@ function takeTommy(s) {
 function tommyUpdate(dt) {
   if (TOMMY.state === 'carried') {
     const c = TOMMY.carrier, has = c && c.alive && (c.isPlayer ? !!(c.weps && c.weps[0] && c.weps[0].id === 'thompson') : (c.wid === 'thompson' || c.prim === 'thompson'));
-    if (!has) { TOMMY.state = 'wait'; TOMMY.t = 45; TOMMY.carrier = null; }
+    if (!has) {
+      TOMMY.state = 'tower'; TOMMY.carrier = null; TOMMY.t = 0;
+      if (c && !c.isPlayer && (c.wid === 'thompson' || c.prim === 'thompson')) c.tommyLost = true;       // al reaparecer llevará el arma de su clase
+      if (P && game.state !== 'menu') feedText('La Thompson vuelve a su caja del campanario', 'ev');
+    }
   } else if (TOMMY.state === 'wait' && (TOMMY.t -= dt) <= 0) TOMMY.state = 'tower';
 }
 /* ============ centinelas del campanario ============
@@ -6519,6 +6688,7 @@ function gunFpDraw(vp, G, w, team, ex, ey, ez, sides) {
 const gunDrops = [];
 const _gdM = M4.create();
 function gunDrop(s, st) {
+  if (s.wid === 'thompson') return;       // la Thompson del campanario no se queda en el suelo: vuelve a su caja
   const C = st.C, g = gunGet(s.wid) || gunGet('mosin'); if (!g) return;
   const m = M4.create();
   if (st.gun) M4.copy(m, st.wmat);
@@ -6570,7 +6740,7 @@ function gunNear(p) {
 }
 function gunPick(p) {
   const d = gunNear(p); if (!d) return false;
-  const old = gunGet(p.weps[0].id), id = d.g.id, W = WEAPONS[id];
+  const old = p.weps[0].id === 'thompson' ? null : gunGet(p.weps[0].id), id = d.g.id, W = WEAPONS[id];       // la Thompson no se deja en el suelo: vuelve al campanario
   p.weps[0] = { id, def: W, ammo: W.mag, reserve: Math.round(W.reserve / 2), mesh: fpMesh(id, p.team) };
   p.wid = id; p.wpn = W; p.prim = null; p.bredaInspectAt = null; p.cur = 0; p.reloadT = 0; p.boltT = 0; p.switchT = 0.5; p.fireT = 0.5; p.aimT = 0; SFX.click();
   if (old) { d.g = old; d.t = 0; d.side = -d.side; } else gunDrops.splice(gunDrops.indexOf(d), 1);
@@ -7771,7 +7941,8 @@ function vehHome(v) {
   v.hp = v.def.hp; v.dead = false; v.falling = false; v.air = false; v.idleT = 0; v.fireT = 0; v.mgT = 0; v.bombs = v.def.bombs || 0; v.bombT = 0; v.regenT = 0; v.thr = 1; v.kick = 0; v.smokeT = 0;
   if (v.claim) v.claim.goVeh = null;
   v.claim = null; v.claimT = 0; v.aiOn = false; v.crew.alive = false; v.crew.enemy = null; v.launchT = (h.res && v.team === game.team) ? 40 : rnd(6, 16); v.assistT = 0; v.rollout = false; v.dx = undefined; v.dz = undefined;
-  v.ai = { t: Math.random(), tgt: null, tgtV: false, last: null, aimT: 0, backT: 0, backDir: 1, stuckT: 0, px: v.x, pz: v.z, ox: rnd(-13, 13), oz: rnd(-13, 13), sx: 0, sz: 0, flag: null, foe: null, gt: null, egT: 0, egYaw: h.yaw };
+  v.ai = { t: Math.random(), tgt: null, tgtV: false, last: null, aimT: 0, backT: 0, backR: 1, stuckT: 0, stuckN: 0, px: v.x, pz: v.z, pyaw: v.yaw, sx: 0, sz: 0, flag: null, foe: null, gt: null, egT: 0, egYaw: h.yaw,
+    mode: '', planT: 0, repT: 0, goal: null, path: null, pi: 0, p0: null, gx: undefined, gz: undefined, face: h.yaw, leader: null, side: v.team === REP ? 1 : -1, threat: null, threatT: 0, orb: 0, orbDir: 1, arrived: false };
 }
 function resetVehicles() {
   vehicles.length = 0;
@@ -7799,7 +7970,7 @@ function assignCrew(v) {
 }
 function botBoard(v, s) {
   s.goVeh = null; v.claim = null; s.veh = v; s.enemy = null; s.crouch = false; s.swim = false;
-  v.driver = s; v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw; v.thr = 1;
+  v.driver = s; v.aiOn = true; v.crew.alive = true; v.tyaw = v.yaw; v.thr = 1; v.since = game.time;
 }
 function exitSpot(v) {
   const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw), fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), w = v.kind === 'plane' ? 3 : 2.2;
@@ -7839,7 +8010,7 @@ function takeVehicle(p, v) {
   if (v.driver && !v.driver.isPlayer) ejectBot(v);
   if (v.claim) { v.claim.goVeh = null; v.claim = null; }
   v.aiOn = false; v.crew.alive = false;
-  v.driver = p; p.veh = v;
+  v.driver = p; p.veh = v; v.since = game.time;
   if (v.type === 'mosca') p.moscaCabin = false;
   p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.aim = false; input.fire = false; input.bomb = false; game.camOff = 0; p.pitch = 0;
   if (v.kind === 'tank') p.yaw = v.tyaw; else if (v.kind === 'plane') { p.yaw = v.yaw; if (!v.air) { v.thr = 0; v.pitch = 0; v.gp = 0.15; } v.sink = 0; v.graceT = 0; game.pcam = null; game.planeOrb = 0; input.thr = 0; input.brake = false; input.rud = 0; }
@@ -7974,20 +8145,219 @@ function tankMuzzle(v) {
   return [v.x + px * c + pz * s, v.y + m.pivot[1] + m.muzzle, v.z - px * s + pz * c];
 }
 
-/* ---- IA de los carros ---- */
+/* ---- IA de los carros ----
+   Estrategias de cada bando (tankPlan, cada pocos segundos):
+   · República: sus dos T-26 van en pareja, como enseñaban los asesores soviéticos. El de cabeza marcha al objetivo de ataque de su
+     bando (o a socorrer una bandera propia en disputa que le quede cerca) y el otro le sigue escalonado, 11 m detrás y a un lado.
+     A 75 m del objetivo se abren en tenaza: cada uno llega por un lado de la bandera y se queda a 14-24 m, apoyando de cerca el
+     asalto de la infantería. A la infantería le disparan sin pararse (fuego en marcha); ante un carro enemigo se detienen un
+     momento a disparar el cañón, que parado es más certero, y siguen mientras recargan. Si el jugador lleva un T-26, el otro le escolta.
+   · Sublevados: el T-26 capturado es su cazacarros y la punta de la agrupación. Contraataca allí donde les estén quitando una bandera
+     y, si no, apoya el avance desde una posición dominante a 30-50 m del objetivo, con vista sobre la bandera y en alto si puede;
+     busca antes que nada a los carros enemigos y dispara siempre parado. El Panzer I, que solo lleva ametralladoras, le escolta
+     unos metros detrás y al otro lado; si ve infantería enemiga cerca se lanza a por ella y la rodea disparando, y si un T-26
+     enemigo le tiene a tiro se retira tras una casa o un cerro hasta perderlo de vista.
+   Conducción (tankDrive): cada carro sigue su camino del mapa de los carros mirando unos metros por delante; frena antes de las curvas
+   (a toda marcha gira en un círculo de casi 9 m) y al llegar. Sus «antenas» (puntos delante del carro, de frente y a los lados) le
+   avisan de lo que no está en el mapa (otros vehículos, restos) o de una esquina, y entonces frena y gira hacia el lado libre. Si aun
+   así se atasca, da marcha atrás girando hacia su camino y busca otro. */
+const tankLive = o => !o.dead && !o.falling && !!(o.aiOn || o.driver);
+/* el carro al que escolta v (null si va él en cabeza): en la República, el que salió antes (así no cambian los papeles a mitad de camino) */
+function tankLeader(v) {
+  if (v.team === REP) { let L = null; for (const o of vehicles) if (o.kind === 'tank' && o.team === REP && tankLive(o) && (!L || (o.since || 0) < (L.since || 0))) L = o; return L === v ? null : L; }
+  if (v.def.cannon) return null;
+  for (const o of vehicles) if (o.kind === 'tank' && o.team === v.team && o !== v && o.def.cannon && tankLive(o)) return o;
+  return null;
+}
+/* ¿qué estorba si el centro del carro pasa por (x, z)? 0: nada; 1: algo fijo (chocaría); 2: otro vehículo */
+function tankBlockedAt(v, x, z) {
+  const c = navCell(x, z); if (c < 0 || TNAV.h[c]) return 1;
+  for (const o of vehicles) { if (o === v || o.air) continue; const r = o.kind === 'plane' ? 5.5 : 4.3; if ((o.x - x) * (o.x - x) + (o.z - z) * (o.z - z) < r * r) return 2; }
+  return 0;
+}
+const cellXZ = c => [NAV.x0 + c % NAV.nx, NAV.z0 + ((c / NAV.nx) | 0)];
+/* el sitio libre más cercano a (x, z) al que puede llegar un carro, mejor si no está arrimado a una pared */
+function tankSnap(x, z, R) {
+  const c = tnavNear(navCell(x, z), R); if (c < 0) return null;
+  if (TNAV.n[c]) { const nx = NAV.nx, ci = c % nx, cj = (c / nx) | 0; let best = -1, bd = 1e9;
+    for (let j = cj - 4; j <= cj + 4; j++) for (let i = ci - 4; i <= ci + 4; i++) { if (i < 0 || j < 0 || i >= nx || j >= NAV.nz) continue; const k = j * nx + i, d = (i - ci) * (i - ci) + (j - cj) * (j - cj); if (tnavFree(k) && !TNAV.n[k] && d < bd) { bd = d; best = k; } }
+    if (best >= 0) return cellXZ(best); }
+  return cellXZ(c);
+}
+/* un sitio junto a la bandera f: a r0-r1 m, por el lado ang (rumbo desde la bandera) con un margen de ±spread, lejos de las paredes
+   y de los otros carros del bando; los mejores, con vista sobre la bandera (los) y, si se pide, en alto (high) */
+function tankSpot(v, f, r0, r1, ang, spread, los, high) {
+  const fy = groundAt(f.x, f.z); let best = null, bs = -1e9;
+  for (let k = 0; k < 32; k++) {
+    const a = ang + rnd(-spread, spread), r = rnd(r0, r1), x = f.x + Math.sin(a) * r, z = f.z + Math.cos(a) * r, c = navCell(x, z);
+    if (!tnavFree(c) || TNAV.n[c]) continue;
+    let near = false; for (const o of vehicles) if (o !== v && o.kind === 'tank' && o.team === v.team && o.ai && o.ai.goal && Math.hypot(o.ai.goal[0] - x, o.ai.goal[1] - z) < 12) near = true;
+    if (near) continue;
+    const gy = groundAt(x, z);
+    let sc = -Math.abs(angDiff(a, ang)) - Math.hypot(x - v.x, z - v.z) * 0.002;
+    if (high) sc += clamp((gy - fy) * 0.12, -1, 1.5);
+    if (los && losClear(x, gy + 2.3, z, f.x, fy + 1.2, f.z)) sc += 2.5;
+    if (sc > bs) { bs = sc; best = [x, z]; }
+  }
+  return best || tankSnap(f.x + Math.sin(ang) * r1, f.z + Math.cos(ang) * r1, 40);
+}
+/* el Panzer I busca dónde ponerse a cubierto del carro th: un sitio cercano que th no vea, sin acercarse a él */
+function tankCover(v, th) {
+  let best = null, bs = 1e9;
+  for (let k = 0; k < 28; k++) {
+    const a = rnd(0, 6.283), r = rnd(10, 45), x = v.x + Math.sin(a) * r, z = v.z + Math.cos(a) * r;
+    if (!tnavFreeAt(x, z)) continue;
+    const gy = groundAt(x, z); if (losClear(th.x, th.y + 2, th.z, x, gy + 1.8, z)) continue;
+    const sc = r + Math.max(0, 70 - Math.hypot(x - th.x, z - th.z));
+    if (sc < bs) { bs = sc; best = [x, z]; }
+  }
+  return best;
+}
+/* el objetivo del bando para este carro: una bandera propia en disputa (la República, solo si le queda cerca) o la de ataque */
+function tankFlag(v) {
+  let own = null, od = v.team === REP ? 140 : 1e9;
+  for (const f of FLAGS) if (f.base === undefined && f.owner === v.team && f.contested) { const d = Math.hypot(f.x - v.x, f.z - v.z); if (d < od) { od = d; own = f; } }
+  return { f: own || teamPush(v.team) || v.ai.flag || FLAGS.find(f => f.base === 1 - v.team), counter: !!own };
+}
+const flagSide = (v, f) => { const b = FLAGS.find(q => q.base === v.team); return Math.atan2(b.x - f.x, b.z - f.z); };       // rumbo desde la bandera hacia la propia base
+function tankPlan(v) {
+  const a = v.ai, D = v.def, L = tankLeader(v), was = a.mode;
+  a.leader = L; a.planT = 10 + Math.random() * 4;
+  const setGoal = (g, mode, face) => { if (g) { if (mode !== a.mode) { a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw; } a.goal = g; a.mode = mode; a.face = face; } };
+  /* Panzer I: a cubierto de los T-26 enemigos; a por la infantería que tenga cerca */
+  if (!D.cannon && a.threat) {
+    a.planT = 6;
+    if (was === 'cubierto' && a.goal && !losClear(a.threat.x, a.threat.y + 2, a.threat.z, a.goal[0], groundAt(a.goal[0], a.goal[1]) + 1.8, a.goal[1])) return;
+    const c = tankCover(v, a.threat); if (c) { setGoal(c, 'cubierto', Math.atan2(-(a.threat.x - c[0]), -(a.threat.z - c[1]))); return; }
+  }
+  if (!D.cannon && a.tgt && !a.tgtV && Math.hypot(a.tgt.x - v.x, a.tgt.z - v.z) < 75) {
+    const t = a.tgt;
+    if (was !== 'caza') { a.orb = Math.atan2(v.x - t.x, v.z - t.z); a.orbDir = Math.random() < 0.5 ? 1 : -1; } else a.orb += 0.75 * a.orbDir;
+    const g = tankSnap(t.x + Math.sin(a.orb) * 18, t.z + Math.cos(a.orb) * 18, 10);
+    a.planT = 2; if (g) { setGoal(g, 'caza', Math.atan2(-(t.x - g[0]), -(t.z - g[1]))); return; }
+  }
+  /* escolta: el segundo T-26 tras el de cabeza (y en tenaza al llegar al objetivo); el Panzer I tras el T-26 capturado */
+  if (L) {
+    const lf = L.ai && L.aiOn ? L.ai.flag : null;
+    if (v.team === REP && lf && Math.hypot(L.x - lf.x, L.z - lf.z) < 75) {
+      if (was === 'tenaza' && a.flag === lf && a.goal) { a.planT = 8; return; }
+      const g = tankSpot(v, lf, 14, 24, flagSide(v, lf) + 0.8 * a.side, 0.45, true, false);
+      a.flag = lf; a.planT = 8; if (g) { setGoal(g, 'tenaza', Math.atan2(-(lf.x - g[0]), -(lf.z - g[1]))); return; }
+    }
+    const lfx = -Math.sin(L.yaw), lfz = -Math.cos(L.yaw), lrx = Math.cos(L.yaw), lrz = -Math.sin(L.yaw), ahead = clamp(L.speed, 0, 6) * 1.2;
+    a.flag = lf; a.planT = 1.2;
+    for (const [bk, sd] of [[11 - ahead, 7 * a.side], [11 - ahead, 0], [16, 0], [22, 0]]) {       // escalonado; si no cabe (un puente, una calle), en fila
+      const g = tankSnap(L.x - lfx * bk + lrx * sd, L.z - lfz * bk + lrz * sd, 5);
+      if (g && Math.hypot(g[0] - L.x, g[1] - L.z) > 6) { setGoal(g, 'escolta', L.yaw); return; }
+    }
+    setGoal(Math.hypot(L.x - v.x, L.z - v.z) < 28 ? [v.x, v.z] : tankSnap(L.x - lfx * 20, L.z - lfz * 20, 25) || [v.x, v.z], 'escolta', L.yaw);       // sin sitio: espera
+    return;
+  }
+  /* en cabeza */
+  const o = tankFlag(v), f = o.f; if (!f) return;
+  if (f === a.flag && a.goal && was !== 'escolta' && was !== 'caza' && was !== 'cubierto' && Math.hypot(a.goal[0] - f.x, a.goal[1] - f.z) < 60) return;       // mismo objetivo: no cambia de sitio
+  a.flag = f; const side = flagSide(v, f);
+  let g, mode;
+  if (v.team === REP) { const pair = vehicles.some(q => q !== v && q.kind === 'tank' && q.team === REP && tankLive(q)); g = tankSpot(v, f, 14, 24, side - (pair ? 0.8 : 0), 0.45, true, false); mode = 'asalto'; }
+  else if (D.cannon) { if (o.counter) { g = tankSpot(v, f, 16, 28, side, 1.0, true, false); mode = 'contraataque'; } else { g = tankSpot(v, f, 30, 50, side, 1.1, true, true); mode = 'apoyo'; } }
+  else { g = tankSpot(v, f, 18, 32, side, 0.9, true, false); mode = 'avance'; }
+  if (g) setGoal(g, mode, Math.atan2(-(f.x - g[0]), -(f.z - g[1])));
+}
+/* camino hasta la meta (se rehace si la meta se mueve, cada cierto tiempo o si se ha salido de él; un camino nuevo por paso) */
+function tankRoute(v) {
+  const a = v.ai; if (!a.goal) return;
+  const gx = a.goal[0], gz = a.goal[1], moved = a.gx === undefined ? 1e9 : Math.hypot(gx - a.gx, gz - a.gz);
+  if (a.path && moved < (a.mode === 'escolta' || a.mode === 'caza' ? 5 : 1.5) && a.repT > 0) return;
+  if (TNAV.budget <= 0) return;
+  TNAV.budget--;
+  const pts = tnavPath(v.x, v.z, gx, gz, 60000, v);
+  a.gx = gx; a.gz = gz; a.repT = a.mode === 'escolta' ? 2.5 : rnd(9, 13);
+  a.path = pts && pts.length ? pts : null; a.pi = 0; a.p0 = [v.x, v.z];
+}
+/* conducir por el camino; halt: parado (para disparar) */
+function tankDrive(v, dt, ctl, halt) {
+  const a = v.ai, P = a.path, fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw);
+  const stop = face => {
+    ctl.f = clamp(-v.speed * 4, -1, 1);       // freno firme: en cuesta no se deja ir
+    if (face !== undefined && Math.abs(v.speed) < 1) { const d = angDiff(face, v.yaw); if (Math.abs(d) > 0.3) ctl.r = clamp(-d * 2.2, -1, 1); }
+    a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw;
+  };
+  if (a.backT > 0) {       // marcha atrás, girando el morro hacia el camino
+    a.backT -= dt;
+    ctl.f = tankBlockedAt(v, v.x - fx * 3.4, v.z - fz * 3.4) ? 0 : -1; ctl.r = v.speed < -0.3 ? a.backR : -a.backR;       // (marcha atrás, el giro va al revés)
+    if (a.backT <= 0) { a.repT = 0; a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw; }
+    return;
+  }
+  if (halt || !P) { stop(halt ? undefined : a.face); return; }
+  while (a.pi < P.length - 1 && Math.hypot(P[a.pi][0] - v.x, P[a.pi][1] - v.z) < 3) a.pi++;
+  const end = P[P.length - 1], dEnd = Math.hypot(end[0] - v.x, end[1] - v.z);
+  if (a.pi >= P.length - 1 && dEnd < 2.6) { a.arrived = true; stop(a.mode === 'escolta' && a.leader && Math.abs(a.leader.speed) > 1 ? undefined : a.face); return; }
+  a.arrived = false;
+  /* punto del camino unos metros por delante */
+  const S = a.pi > 0 ? P[a.pi - 1] : a.p0, E = P[a.pi], sx = E[0] - S[0], sz = E[1] - S[1], sl2 = sx * sx + sz * sz || 1;
+  const t = clamp(((v.x - S[0]) * sx + (v.z - S[1]) * sz) / sl2, 0, 1), qx = S[0] + sx * t, qz = S[1] + sz * t;
+  if (Math.hypot(v.x - qx, v.z - qz) > 6) a.repT = 0;       // se ha salido del camino: otro
+  let rem = 3.5 + Math.abs(v.speed) * 0.55, px = qx, pz = qz, tx = E[0], tz = E[1];
+  for (let i = a.pi; i < P.length; i++) {
+    const d = Math.hypot(P[i][0] - px, P[i][1] - pz);
+    if (d >= rem) { tx = px + (P[i][0] - px) * rem / d; tz = pz + (P[i][1] - pz) * rem / d; break; }
+    rem -= d; px = tx = P[i][0]; pz = tz = P[i][1];
+  }
+  let diff = angDiff(Math.atan2(-(tx - v.x), -(tz - v.z)), v.yaw);
+  const vmax = v.def.vmax * (a.mode === 'escolta' && a.leader ? clamp(0.75 + Math.hypot(a.goal[0] - v.x, a.goal[1] - v.z) / 40, 0.75, 1.1) : 1);
+  let vt = vmax * clamp(1.2 - Math.abs(diff) * 1.6, 0, 1);
+  if (a.pi < P.length - 1) {       // la curva del siguiente punto de paso: llega despacio
+    const N2 = P[a.pi + 1], turn = Math.abs(angDiff(Math.atan2(-(N2[0] - E[0]), -(N2[1] - E[1])), Math.atan2(-sx, -sz)));
+    if (turn > 0.45) vt = Math.min(vt, 2 + Math.hypot(E[0] - v.x, E[1] - v.z) * 0.5 + (1.6 - Math.min(1.6, turn)) * 1.5);
+  }
+  vt = Math.min(vt, 0.9 + dEnd * 0.45);
+  /* antenas (solo al ir hacia delante; para girar sobre sí mismo no hacen falta): si lo que hay delante estorba, prueba rumbos cada
+     vez más abiertos a un lado y a otro del que quiere llevar y toma el primero libre */
+  const look = 3 + Math.max(0, v.speed) * 0.75;
+  const probe = r => { const y = v.yaw + r; return tankBlockedAt(v, v.x - Math.sin(y) * look, v.z - Math.cos(y) * look); };
+  if (Math.abs(diff) < 0.9) {
+    const close = tankBlockedAt(v, v.x + fx * 2.4, v.z + fz * 2.4), front = probe(diff);
+    if (front || close) {
+      let alt = null;
+      for (const d of [0.4, 0.8, 1.2]) { for (const sg of diff >= 0 ? [1, -1] : [-1, 1]) { const r = diff + sg * d; if (Math.abs(r) < 1.6 && !probe(r)) { alt = r; break; } } if (alt !== null) break; }
+      if (alt !== null) { diff = alt; vt = Math.min(vt, close ? 0.8 : 2.2); }
+      else vt = 0;
+      if (front === 2 || close === 2) { if (v.speed > 0) vt = Math.min(vt, 1); if (a.vRepT <= 0) { a.vRepT = 3; a.repT = 0; } }       // otro vehículo delante: despacio, y otro camino que lo rodee
+    }
+    a.ant = front || close;
+  }
+  if (Math.abs(diff) > 2.4) { if (!a.turnDir) a.turnDir = diff > 0 ? 1 : -1; diff = a.turnDir * Math.abs(diff); } else a.turnDir = 0;       // detrás: gira siempre hacia el mismo lado (no titubea)
+  if (Math.abs(diff) > 2.3 && dEnd < 12 && a.pi >= P.length - 1 && !tankBlockedAt(v, v.x - fx * 3.4, v.z - fz * 3.4)) {       // el sitio queda unos metros detrás: marcha atrás
+    const db = angDiff(Math.atan2(-(tx - v.x), -(tz - v.z)) + Math.PI, v.yaw);
+    ctl.r = v.speed < -0.3 ? clamp(db * 2.6, -1, 1) : 0; ctl.f = clamp((-Math.min(3, 0.6 + dEnd * 0.4) - v.speed) * 2, -1, 1);
+  } else {
+    if (Math.abs(diff) > 0.8) vt = 0;       // giro sobre sí mismo
+    ctl.r = clamp(-diff * 2.6, -1, 1);
+    ctl.f = clamp((vt - v.speed) * (vt < 0.2 ? 4 : 2), -1, 1);
+  }
+  /* atascado: no avanza ni gira */
+  a.stuckT += dt;
+  if (a.stuckT > 2.5) {
+    if (Math.hypot(v.x - a.px, v.z - a.pz) < 1.2 && Math.abs(angDiff(v.yaw, a.pyaw)) < 0.35) {
+      a.backT = rnd(1.3, 2); a.backR = diff >= 0 ? 1 : -1; a.stuckN++;
+      if (a.stuckN >= 3) { a.stuckN = 0; a.planT = 0; a.goal = null; a.path = null; }       // a la tercera, a otro sitio
+    } else a.stuckN = Math.max(0, a.stuckN - 1);
+    a.stuckT = 0; a.px = v.x; a.pz = v.z; a.pyaw = v.yaw;
+  }
+}
 function tankAI(v, dt, ctl) {
+  tnavBuild();
   const a = v.ai, D = v.def, crew = v.crew;
-  a.t -= dt;
+  a.t -= dt; a.planT -= dt; a.repT -= dt; a.vRepT = (a.vRepT || 0) - dt;
   if (a.t <= 0) {
     a.t = 0.4;
-    const fl = FLAGS.find(f => f.base === undefined && f.owner === v.team && f.contested) || teamPush(v.team) || a.flag;
-    if (fl && fl !== a.flag) { a.flag = fl; a.ox = rnd(-13, 13); a.oz = rnd(-13, 13); }
-    if (a.flag) { if (insideSolid(a.flag.x + a.ox, a.flag.z + a.oz, 2.6)) { a.ox = rnd(-13, 13); a.oz = rnd(-13, 13); } v.dx = a.flag.x + a.ox; v.dz = a.flag.z + a.oz; }
-    let best = null, bs = 1e9, isV = false; const ex = v.x, ey = v.y + 2, ez = v.z;
+    let best = null, bs = 1e9, isV = false, th = null, td = 170; const ex = v.x, ey = v.y + 2, ez = v.z;
     for (const o of vehicles) {
-      if (o === v || o.dead || o.falling || o.team === v.team || o.kind === 'plane' || !(o.aiOn || o.driver) || (!D.cannon && o.kind === 'tank')) continue;
+      if (o === v || o.dead || o.falling || o.team === v.team || o.kind === 'plane' || !(o.aiOn || o.driver)) continue;
       const d = Math.hypot(o.x - ex, o.z - ez);
-      if (d < 220 && d * 0.5 < bs && losClear(ex, ey, ez, o.x, o.y + 1.3, o.z)) { bs = d * 0.5; best = o.driver || o.crew; isV = true; }
+      if (!D.cannon && o.kind === 'tank') { if (o.def.cannon && d < td && losClear(ex, ey, ez, o.x, o.y + 2, o.z)) { td = d; th = o; } continue; }       // el Panzer I no puede con un carro: se aparta
+      const k = v.team === NAT ? 0.35 : 0.5, R = v.team === NAT ? 260 : 220;       // el T-26 capturado es el cazacarros de los sublevados
+      if (d < R && d * k < bs && losClear(ex, ey, ez, o.x, o.y + 1.3, o.z)) { bs = d * k; best = o.driver || o.crew; isV = true; }
     }
     if (!isV) for (const s of soldiers) {
       if (!s.alive || s.team === v.team || s.veh) continue;
@@ -7996,21 +8366,22 @@ function tankAI(v, dt, ctl) {
     }
     a.tgt = best; a.tgtV = isV;
     if (best !== a.last) { a.last = best; a.aimT = rnd(0.7, 1.3); a.sx = rnd(-2.5, 2.5); a.sz = rnd(-2.5, 2.5); }
+    if (th) { if (!a.threat) a.planT = 0; a.threat = th; a.threatT = 7; } else if (a.threat && (a.threatT -= 0.4) <= 0) { a.threat = null; a.planT = 0; }
+    if (!D.cannon && a.tgt && !a.tgtV && a.mode !== 'caza' && a.mode !== 'cubierto' && Math.hypot(a.tgt.x - v.x, a.tgt.z - v.z) < 75) a.planT = 0;
+    if (a.leader && (!tankLive(a.leader) || a.leader.team !== v.team)) a.planT = 0;
+    if (!a.leader && tankLeader(v)) a.planT = 0;
+    if (a.planT <= 0) tankPlan(v);
   }
-  let tgt = a.tgt, hold = false;
+  tankRoute(v);
+  let tgt = a.tgt;
   if (tgt && !tgt.alive) tgt = a.tgt = null;
-  if (tgt) { const dT = Math.hypot(tgt.x - v.x, tgt.z - v.z); hold = a.tgtV ? dT < 150 : dT < 40; }
-  if (v.dx !== undefined) {
-    const np = navPoint(v), dx = np.x - v.x, dz = np.z - v.z;
-    if (np.final && Math.hypot(dx, dz) < 9) hold = true;
-    if (a.backT > 0) { a.backT -= dt; ctl.f = -1; ctl.r = a.backDir; }
-    else if (!hold) {
-      const diff = angDiff(Math.atan2(-dx, -dz), v.yaw);
-      ctl.r = clamp(-diff * 2.5, -1, 1); ctl.f = Math.abs(diff) < 0.5 ? 1 : 0.15;
-      a.stuckT += dt;
-      if (a.stuckT > 2.4) { if (Math.hypot(v.x - a.px, v.z - a.pz) < 1.5) { a.backT = 1.8; a.backDir = Math.random() < 0.5 ? -1 : 1; } a.stuckT = 0; a.px = v.x; a.pz = v.z; }
-    } else { a.stuckT = 0; a.px = v.x; a.pz = v.z; }
+  const dT = tgt ? Math.hypot(tgt.x - v.x, tgt.z - v.z) : 1e9;
+  let halt = false;
+  if (tgt && a.mode !== 'cubierto') {
+    if (v.team === REP) halt = a.tgtV && dT < 180 && v.fireT < 1.2;       // alto breve para el cañonazo; recarga en marcha
+    else if (D.cannon) halt = a.tgtV ? dT < 230 : dT < (a.mode === 'contraataque' ? 35 : 80);       // siempre parado
   }
+  tankDrive(v, dt, ctl, halt);
   crew.fireT -= dt;
   if (tgt) {
     const tx = tgt.x + (a.tgtV ? 0 : a.sx), tz = tgt.z + (a.tgtV ? 0 : a.sz), ty = tgt.y + (a.tgtV ? 0.8 : 0.3);
@@ -8020,7 +8391,10 @@ function tankAI(v, dt, ctl) {
     const al = Math.abs(angDiff(ctl.aimYaw, v.tyaw));
     if (a.aimT <= 0 && D.cannon && v.fireT <= 0 && al < 0.04 && (a.tgtV || d > 16) && Math.abs(v.tpitch - clamp(ctl.aimPitch, GUN_LO, GUN_HI)) < 0.03) { ctl.fire = true; a.sx = rnd(-3, 3); a.sz = rnd(-3, 3); }
     if (!a.tgtV && a.aimT <= 0 && al < 0.1 && d < 140 && crew.fireT <= 0) { crew.yaw = v.tyaw; botFire(crew, tgt, d, Math.abs(v.speed) > 1.5); }
-  } else { ctl.aimYaw = v.yaw; ctl.aimPitch = 0; }
+  } else {       // sin blanco, la torre vigila: hacia el carro enemigo del que se esconde, hacia la bandera o hacia delante
+    const w = a.threat || (a.flag && Math.hypot(a.flag.x - v.x, a.flag.z - v.z) < 160 ? a.flag : null);
+    ctl.aimYaw = w ? Math.atan2(-(w.x - v.x), -(w.z - v.z)) : v.yaw; ctl.aimPitch = 0;
+  }
 }
 /* ---- IA de los cazas ---- */
 function planeAI(v, dt, ctl) {
@@ -8313,6 +8687,7 @@ function updatePlane(v, dt, ctl) {
   } else for (const b of gridA[cellOf(v.x, v.z)]) if (v.x > b.x0 && v.x < b.x1 && v.z > b.z0 && v.z < b.z1 && v.y + 1 > b.y0 && v.y < b.y1) { crashPlane(v); break; }
 }
 function updateVehicles(dt) {
+  TNAV.budget = 1;       // un camino nuevo de carro por paso como mucho
   for (const v of vehicles) {
     if (v.dead) { v.deadT -= dt; if (v.deadT <= 0) vehHome(v); continue; }
     if (!v.driver && v.kind !== 'truck' && !v.falling) {
@@ -8948,7 +9323,7 @@ function startMatch(team) {
   audioInit();
   Object.assign(game, { team, time: 0, tickets: [300, 300], bleedAcc: [0, 0], bleedT: 1, eventT: 45, eventI: 0, floodT: 0, winner: -1, firstDeploy: true, respawnT: 0, selClass: 0, shake: 0, killer: null, camOff: 0, vehTold: {} });
   resetVehicles(); resetAA(); towerOcc.length = 0; tommyReset();
-  waterY = 0; pasarela.on = true; navBuild();
+  waterY = 0; pasarela.on = true; navBuild(); tnavBuild();
   push[0] = push[1] = null; projectiles.length = 0; planes.length = 0; shells.length = 0; parts.length = 0; tracers.length = 0; cards.length = 0; cardNow = null;
   for (const f of FLAGS) {
     const o = f.base !== undefined ? f.base : (f.start !== undefined ? f.start : -1);
@@ -11283,7 +11658,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update, TNAV, tnavPath, tnavBuild } };
 })();
 
 </script>
