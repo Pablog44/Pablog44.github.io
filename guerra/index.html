@@ -1089,18 +1089,12 @@ function mkTruck(team) {
       for (const z of [-0.08, 0.82, 1.7, 2.58]) q.box(1.08, 1.32, z, 0.014, 0.6, 0.07, steel); });
     for (let k = 0; k < 3; k++) { q.box(0, 1.125 + k * 0.2, -0.24, 2.1, 0.19, 0.045, k % 2 ? wd2 : wd); q.box(0, 1.125 + k * 0.2, 2.745, 2.1, 0.19, 0.045, k % 2 ? wd : wd2); }
     q.mir(q => { q.box(0.6, 1.32, 2.775, 0.07, 0.6, 0.012, steel); }); q.box(-0.9, 0.9, 2.8, 0.1, 0.1, 0.05, VC.red);
-    if (!rep) {
-      q.mat('canvas');
-      /* toldo con los faldones de los lados recogidos (se ve a la tropa y puede asomarse), sobre sus estacas de madera */
-      const cv = VC.canvas, prof = [[-1.1, 2.02], [-1.1, 2.1], [-0.97, 2.36], [-0.55, 2.58], [0, 2.64], [0.55, 2.58], [0.97, 2.36], [1.1, 2.1], [1.1, 2.02]], rings = [];
-      for (let i = 0; i <= 12; i++) { const z = -0.27 + 3.04 * i / 12, sag = 1 - 0.035 * Math.abs(Math.sin(i / 12 * Math.PI * 4)); rings.push(prof.map(([x, y]) => [x * (y > 2.1 ? sag : 1), y > 2.1 ? 1.62 + (y - 1.62) * sag : y, z])); }
-      q.loft(rings, (p, i) => shade(cv, 0.92 + 0.08 * Math.abs(Math.sin(i / 12 * Math.PI * 4))), { capA: true, capB: true });
-      q.mir(q => {
-        q.tube([1.1, 2.0, -0.27], [1.1, 2.0, 2.77], 0.065, 0.065, shade(cv, 0.86), 8);       // el faldón enrollado
-        q.mat('wood'); for (const z of [-0.2, 0.82, 1.7, 2.68]) q.box(1.07, 1.8, z, 0.06, 0.5, 0.07, wd2);       // estacas, de la caja al toldo
-        q.mat('canvas'); for (const z of [0.3, 1.25, 2.2]) q.tube([1.12, 2.04, z], [1.1, 1.92, z], 0.01, 0.01, hex(0x6b5c40), 4);       // cuerdas del faldón
-      });
-    }
+    /* caja abierta (sin toldo, para que la tropa vea alrededor y pueda tirar) con dos bancos corridos en el centro, espalda con espalda */
+    q.box(0, 1.7, 1.22, 0.05, 0.44, 2.5, wd2);       // respaldo común
+    q.mir(q => {
+      q.box(0.2, 1.435, 1.22, 0.34, 0.05, 2.5, wd); q.box(0.36, 1.405, 1.22, 0.025, 0.07, 2.5, wd2);       // asiento y su canto
+      for (const z of [0.02, 1.22, 2.42]) q.box(0.2, 1.22, z, 0.28, 0.38, 0.06, wd2);       // patas
+    });
   });
 }
 /* banda rojigualda alrededor de una torre de radio r a la altura y */
@@ -4836,6 +4830,7 @@ function setClass(s, ci) {
 }
 function placeAt(s, f) {
   if (s.ride) rideOff(s, null);
+  if (s.aa) leaveAA(s); s.goAA = null;
   let x = f.x + 2, z = f.z + 2;
   for (let i = 0; i < 12; i++) {
     const a = rnd(0, 6.283), r = rnd(3.5, 13), tx = f.x + Math.cos(a) * r, tz = f.z + Math.sin(a) * r;
@@ -5298,6 +5293,7 @@ function updateBot(s, dt) {
     if (s.respawnT <= 0) botSpawn(s);
     return;
   }
+  if (s.aa) { aaGunner(s, dt); return; }       // sirviendo una antiaérea
   s.thinkT -= dt; if (s.thinkT <= 0) { s.thinkT = rnd(0.22, 0.4); botThink(s); }
   s.retargetT -= dt;
   if (!s.tgt) botPickFlag(s);
@@ -5308,6 +5304,19 @@ function updateBot(s, dt) {
     const v = s.goVeh;
     if (v.dead || v.driver || v.claim !== s) s.goVeh = null;
     else { s.dx = v.x; s.dz = v.z; if (Math.hypot(v.x - s.x, v.z - s.z) < (v.kind === 'plane' ? 5.2 : 4.6)) { botBoard(v, s); return; } }
+  }
+  if (s.goAA) {       // a servir una antiaérea: hasta cerca por el camino de los soldados (que no entra en el emplazamiento) y luego derecho, por encima de los sacos
+    const a = s.goAA, dd = Math.hypot(s.x - a.x, s.z - a.z) || 1;
+    if (a.driver || a.team !== s.team || a.downT > 0 || a.claim !== s) s.goAA = null;
+    else if (!(s.enemy && s.enemy.alive && Math.hypot(s.enemy.x - s.x, s.enemy.z - s.z) < 30)) {
+      if (dd < 11) {
+        const sp = Math.min(dd, 3.4 * dt); s.x -= (s.x - a.x) / dd * sp; s.z -= (s.z - a.z) / dd * sp; s.y = groundAt(s.x, s.z);
+        s.yaw = Math.atan2(s.x - a.x, s.z - a.z); s.speed = 3.4; s.walkPhase = (s.walkPhase || 0) + dt * 3.4 * 2.3; s.crouch = false; s.prone = false;
+        if (dd < 1.6) { s.goAA = null; a.claim = null; a.driver = s; s.aa = a; aaGunner(s, dt); }
+        return;
+      }
+      s.dx = a.x + (s.x - a.x) / dd * 8; s.dz = a.z + (s.z - a.z) / dd * 8;
+    }
   }
   if (s.ride) {       // en camión: va andando hasta él y sube; en la caja no anda, pero ve, apunta y dispara
     const R = s.ride, v = R.v;
@@ -5329,7 +5338,7 @@ function updateBot(s, dt) {
     const ex = e.x - s.x, ez = e.z - s.z, d = Math.hypot(ex, ez) || 0.01;
     wantYaw = Math.atan2(-ex, -ez);
     s.aimPitch = Math.atan2((e.y + 1.1) - (s.y + 1.4), d);
-    if (riding) { s.crouch = s.team === NAT; s.prone = false; }       // en la caja abierta se levanta para tirar por encima del costado; bajo el toldo, agachado
+    if (riding) { s.crouch = false; s.prone = false; }       // se levanta del banco para tirar por encima del costado
     else if (w.kind === 'smg' && d > 14 && d < 48) { const q = botNav(s, e.x, e.z), qx = q[0] - s.x, qz = q[1] - s.z, ql = Math.hypot(qx, qz) || 1; mvx = qx / ql; mvz = qz / ql; spd = 3.9; s.crouch = false; s.prone = false; }
     else if (d > 95) { nav = navPoint(s); spd = 3.0; s.crouch = false; s.prone = false; }
     else {
@@ -5443,7 +5452,7 @@ function towerDuty(dt) {
   if (C.owner < 0 || towerOcc.length >= 2 || Math.random() > (towerOcc.length ? 0.2 : 0.5)) return;
   let best = null, bd = 70;
   for (const s of soldiers) {
-    if (s.isPlayer || s.remote || !s.alive || s.team !== C.owner || s.veh || s.goVeh || s.ride || s.tower || s.enemy || s.swim) continue;
+    if (s.isPlayer || s.remote || !s.alive || s.team !== C.owner || s.veh || s.goVeh || s.ride || s.aa || s.goAA || s.tower || s.enemy || s.swim) continue;
     const d = Math.hypot(s.x - T.path[0][0], s.z - T.path[0][1]) - (s.wpn.kind === 'rifle' ? 12 : 0);       // mejor un fusilero
     if (d < bd) { bd = d; best = s; }
   }
@@ -6340,7 +6349,7 @@ function skPose(s, C) {
   const kk = Math.min(1, dt * 8);
   st.mv = skEase(st.mv, alive && spd > 0.35 ? 1 : 0, kk);
   st.run = skEase(st.run, clamp((spd - 2.9) / 1.2, 0, 1), kk);
-  st.aim = skEase(st.aim, alive && (s.enemy || s.isPlayer) ? 1 : 0, Math.min(1, dt * 5));
+  st.aim = skEase(st.aim, alive && (s.enemy || s.isPlayer || s.aa) ? 1 : 0, Math.min(1, dt * 5));       // (el de la antiaérea, con las manos en las empuñaduras)
   st.t += dt;
   const cyc = s.walkPhase / (2 * Math.PI), cl = C.clips, hold = clip => clip.dur * (SK_HOLD[clip.name] || 0.6);
   st.adjOn.fill(0); for (let j = 0; j < C.NJ; j++) { const o = j * 4; st.adjQ[o] = st.adjQ[o + 1] = st.adjQ[o + 2] = 0; st.adjQ[o + 3] = 1; }
@@ -6633,7 +6642,7 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   /* armas por código de los soldados y las caídas en el suelo */
   let lw = 0; const lwD = Math.min(GFX_OPT.models[GFX.models].d1 + 6, 45) ** 2;
   for (const s of vis) {
-    const st = s.sk; if (!st.gun) continue;
+    const st = s.sk; if (!st.gun || s.aa) continue;       // (el de la antiaérea tiene las manos en ella)
     if (st.gun.id === 'lewis' && LEWIS_TP.M && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) { lw++; continue; }       // de cerca, la texturada (abajo)
     drawModel(st.gun.model, st.wmat);
   }
@@ -7222,8 +7231,11 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
     M4.rotZ(_lfp.M, -0.78 * lev); M4.rotY(_lfp.M, 0.18 * lev); M4.rotX(_lfp.M, 0.16 * lev);
     M4.translate(_lfp.M, -pv[0], -pv[1], -pv[2]);
   }
-  if (key === 'mp' && ow > 0.001) M4.translate(_lfp.M, 0.025 * ow, -0.07 * ow, -0.15 * ow);
-  else if ((key === 'carcano' || key === 'breda') && ow > 0.001) M4.translate(_lfp.M, 0.04 * ow, -0.10 * ow, -0.22 * ow);
+  /* al recargar, el arma baja más y se aleja menos de la cara que antes (y la vista se acerca un poco, fpReloadZoom): los extremos de
+     los brazos, que acaban en el hombro sin cuerpo detrás, quedan por debajo del borde de la pantalla en vez de asomar (antes el arma
+     se alejaba 15-22 cm y se veían) */
+  if (key === 'mp' && ow > 0.001) M4.translate(_lfp.M, 0.025 * ow, FP_RELT[1] * 0.75 * ow, FP_RELT[2] * 0.7 * ow);
+  else if ((key === 'carcano' || key === 'breda') && ow > 0.001) { const t = key === 'carcano' ? FP_RELC : FP_RELT; M4.translate(_lfp.M, t[0] * ow, t[1] * ow, t[2] * ow); }
   else if (key === 'rifle' && ow > 0.001) M4.translate(_lfp.M, -0.02 * ow, -0.03 * ow, -0.06 * ow);       // la carabina, algo más cerca que las otras: se ven los cartuchos entrar por la portilla
   if (bolt > 0.001) M4.translate(_lfp.M, 0.03 * bolt, -0.07 * bolt, -0.14 * bolt);       // al accionar el cerrojo, el arma baja un poco de la cara: la mano no tapa la vista       // al recargar, el arma algo más lejos y más baja: los brazos no tapan la vista      // al recargar el MP, el arma se aparta un poco del ojo (el soldado lo sube al pecho)
   if (fa > 0.001) { const q = fx.q, h = fa, qq = v3nrm([q[0] * h, q[1] * h, q[2] * h]), ang = 2 * Math.acos(clamp(q[3], -1, 1)) * h, qa = Math.hypot(q[0], q[1], q[2]) > 1e-9 ? qAxis(v3nrm([q[0], q[1], q[2]]), ang) : [0, 0, 0, 1];
@@ -7850,7 +7862,7 @@ function updatePlayer(dt) {
   p.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.9 * dt;
   p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.2 * dt, -1.45, 1.45);
   if (!p.alive) { p.fall = Math.min(1, p.fall + dt * 2.6); return; }
-  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); p.x = p.aa.x; p.z = p.aa.z; p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
+  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); [p.x, p.z] = aaSeat(p.aa); p.y = groundAt(p.x, p.z); p.aimPitch = clamp(p.pitch * 0.45, -0.1, 0.55); p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
   if (p.ride) {       // en la caja de un camión: no anda, pero mira, apunta y dispara
     const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
     p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
@@ -7995,7 +8007,7 @@ function assignCrew(v) {
   if (v.kind === 'truck' && Math.hypot(v.x - v.home.x, v.z - v.home.z) > 60) return false;       // un camión abandonado lejos no se lleva a nadie del frente: vuelve solo a la base
   let best = null, bd = 1e9;
   for (const s of soldiers) {
-    if (s.isPlayer || s.remote || s.team !== v.team || s.veh || s.goVeh || s.ride) continue;
+    if (s.isPlayer || s.remote || s.team !== v.team || s.veh || s.goVeh || s.ride || s.aa || s.goAA) continue;
     const d = s.alive ? Math.hypot(s.x - v.x, s.z - v.z) : 160 + Math.max(0, s.respawnT) * 5;
     if (s.alive && d > (v.kind === 'truck' ? 40 : 150)) continue;       // al camión, uno que esté al lado (o que reaparezca en la base): nadie se da la vuelta
     if (d < bd) { bd = d; best = s; }
@@ -8443,8 +8455,8 @@ function tankAI(v, dt, ctl) {
    Los dos bandos llevan tropas en sus camiones (dos por bando: ZiS-5 republicanos y Ford sublevados) para llegar antes a una bandera
    lejana. Un soldado se pone al volante; en la base espera a que suban hasta ocho en la caja (los que aparecen allí y tienen lejos su
    objetivo), sale hacia la bandera de ataque de su bando (o a una propia en disputa), los deja a cubierto a 45-70 m de ella, del lado
-   de su base, y vuelve a por más (en la base le arreglan los daños). En la caja van agachados mirando afuera; ven, apuntan y disparan
-   como a pie (peor si el camión va deprisa; bajo el toldo del Ford, sin levantarse), y si les dan, caen al suelo junto al camión. Si
+   de su base, y vuelve a por más (en la base le arreglan los daños). En la caja van sentados en los dos bancos del centro, mirando afuera; ven, apuntan y disparan
+   como a pie (peor si el camión va deprisa; para tirar se levantan del banco), y si les dan, caen al suelo junto al camión. Si
    les disparan por el camino (ven enemigos cerca o el camión pierde mucha chapa), o se queda sin conductor, se bajan donde estén a
    pelear; si lo destruyen, salen despedidos. El jugador puede subir a la caja de un camión que lleve un soldado (y bajar cuando quiera) o
    llevar él la tropa: los soldados suben mientras para en la base y se bajan cuando para lejos de ella. */
@@ -8526,7 +8538,7 @@ function truckRecruit(v) {
   let need = TRUCK_SEATS.length - v.riders.length; if (need <= 0) return;
   const f = truckTarget(v.team), list = [];
   for (const s of soldiers) {
-    if (s.isPlayer || s.remote || !s.alive || s.team !== v.team || s.veh || s.goVeh || s.ride || s.tower || s.aa || s.swim || (s.enemy && s.enemy.alive)) continue;
+    if (s.isPlayer || s.remote || !s.alive || s.team !== v.team || s.veh || s.goVeh || s.ride || s.tower || s.aa || s.goAA || s.swim || (s.enemy && s.enemy.alive)) continue;
     const d = Math.hypot(s.x - v.x, s.z - v.z); if (d > 90) continue;
     const tg = s.tgt || f; if (tg && Math.hypot(tg.x - s.x, tg.z - s.z) < 110) continue;
     list.push([d, s]);
@@ -8688,8 +8700,9 @@ function planeAI(v, dt, ctl) {
     for (const o of vehicles) if (o.kind === 'plane' && o.team !== v.team && o.air && !o.dead && !o.falling) { const d = Math.hypot(o.x - v.x, o.y - v.y, o.z - v.z); if (d < fd) { fd = d; foe = o; } }
     a.foe = foe;
     if (!foe && a.egT <= 0 && (!a.gt || !a.gt.alive)) {
-      a.gt = null;
-      if (D.bombs && v.bombs > 0 && Math.random() < 0.4) { const tv = vehicles.filter(o => o.team !== v.team && !o.dead && o.kind !== 'plane' && (o.aiOn || o.driver)); if (tv.length) { const o = pick(tv); a.gt = o.driver || o.crew; } }
+      if (!(a.gt && a.gt.alive)) a.gt = null;
+      if (!a.gt && D.bombs && v.bombs > 0 && Math.random() < 0.4) { const tv = vehicles.filter(o => o.team !== v.team && !o.dead && o.kind !== 'plane' && (o.aiOn || o.driver)); if (tv.length) { const o = pick(tv); a.gt = o.driver || o.crew; } }
+      if (!a.gt && Math.random() < 0.55) { const g = soldiers.filter(s => s.alive && s.aa && s.team !== v.team && Math.hypot(s.x - v.x, s.z - v.z) < 600); if (g.length) a.gt = pick(g); }       // primero, silenciar las antiaéreas
       if (!a.gt) { const c = soldiers.filter(s => s.alive && s.team !== v.team && !(s.veh && s.veh.kind !== 'truck')); if (c.length) a.gt = pick(c); }
     }
   }
@@ -9532,20 +9545,47 @@ function resetAA() {
     aaGuns.push(a);
   }
 }
+/* ============ sirvientes de las antiaéreas ============
+   Cada antiaérea la maneja un soldado de verdad, de pie detrás de la ametralladora y girando con ella: se le ve agarrado a las
+   empuñaduras y se le puede matar (de un tiro, con una granada o ametrallado desde un avión, que buscan a los sirvientes para
+   silenciar la antiaérea). Sin sirviente, la antiaérea calla hasta que llega otro: el soldado más cercano que no tenga otra tarea.
+   Si la sirve el jugador, la cámara se pone detrás de él y se le ve a los mandos. */
+const aaSeat = a => [a.x + Math.sin(a.yaw) * 0.78, a.z + Math.cos(a.yaw) * 0.78];
+function aaDuty(dt) {
+  for (const a of aaGuns) {
+    if (a.claim && (!a.claim.alive || a.claim.goAA !== a || (a.claimT -= dt) <= 0)) { if (a.claim.goAA === a) a.claim.goAA = null; a.claim = null; }
+    if (a.team < 0 || a.driver || a.claim || a.downT > 0 || duo.role === 'guest') continue;
+    if ((a.dutyT = (a.dutyT || 0) - dt) > 0) continue;
+    a.dutyT = 1.2; let best = null, bd = 140;
+    for (const s of soldiers) {
+      if (s.isPlayer || s.remote || !s.alive || s.team !== a.team || s.veh || s.goVeh || s.ride || s.tower || s.aa || s.goAA || s.swim || (s.enemy && s.enemy.alive)) continue;
+      const d = Math.hypot(s.x - a.x, s.z - a.z); if (d < bd) { bd = d; best = s; }
+    }
+    if (best) { best.goAA = a; a.claim = best; a.claimT = 45; }
+  }
+}
+/* el sirviente en su puesto: detrás de la ametralladora, mirando hacia donde apunta (la IA de la antiaérea apunta y dispara por él) */
+function aaGunner(s, dt) {
+  const a = s.aa;
+  if (a.driver !== s || a.team !== s.team || a.downT > 0) { if (a.driver === s) leaveAA(s); else s.aa = null; return; }
+  const [x, z] = aaSeat(a); s.x = x; s.z = z; s.y = groundAt(x, z); s.vx = s.vz = 0; s.speed = 0;
+  s.yaw = a.yaw; s.aimPitch = clamp(a.pitch * 0.45, -0.1, 0.55); s.crouch = false; s.prone = false; s.swim = false; s.enemy = null;
+}
 function nearAA(p) {
   if (duo.role === 'guest') return null;
   for (const a of aaGuns) if (!a.driver && a.downT <= 0 && a.team === p.team && Math.hypot(a.x - p.x, a.z - p.z) < 3.8) return a;
   return null;
 }
 function manAA(p, a) {
-  a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; p.x = a.x; p.z = a.z; p.y = a.y - 1.42;
+  if (a.claim) { if (a.claim.goAA === a) a.claim.goAA = null; a.claim = null; }
+  a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; [p.x, p.z] = aaSeat(a); p.y = groundAt(p.x, p.z);
   gyroSync();
   if (!game.vehTold[a.home.t] && pushCard(a.def.name, a.def.hist)) game.vehTold[a.home.t] = true;
   SFX.click();
 }
 function leaveAA(p) {
   const a = p.aa; if (!a) return;
-  a.driver = null; p.aa = null; p.switchT = 0.4; input.fire = false;
+  a.driver = null; p.aa = null; p.switchT = 0.4; if (p.isPlayer) input.fire = false;
   let ex = a.x + Math.sin(a.yaw) * 2.7, ez = a.z + Math.cos(a.yaw) * 2.7;
   for (let i = 0; i < 8; i++) { const an = a.yaw + i * 0.785, x = a.x + Math.sin(an) * 2.7, z = a.z + Math.cos(an) * 2.7; if (!insideSolid(x, z, 0.45)) { ex = x; ez = z; break; } }
   p.x = ex; p.z = ez; p.y = groundAt(ex, ez); p.vx = p.vy = p.vz = 0; p.onGround = true; p.pitch = clamp(p.pitch, -1.2, 1.2);
@@ -9566,12 +9606,13 @@ function updateAA(dt) {
       if (a.smokeT <= 0) { a.smokeT = 0.25; addPart(a.x, a.y, a.z, rnd(-0.3, 0.3), rnd(0.8, 1.6), rnd(-0.3, 0.3), 0.8, 1.6, 1.8, 0.2, 0.19, 0.18, 0.5, 0, 0.6); }
       continue;
     }
-    if (a.driver) {
+    if (a.driver && a.driver.isPlayer) {
       const p = a.driver; a.yaw = p.yaw; a.pitch = clamp(p.pitch, -0.12, 1.4);
       if (input.fire && a.fireT <= 0 && game.state === 'play') aaFire(a, p, 0.012);
       continue;
     }
-    if (a.team < 0) continue;
+    if (a.team < 0 || !a.driver) { a.tgt = null; a.pitch += (0.15 - a.pitch) * Math.min(1, dt); continue; }       // sin sirviente, calla
+    const gun = a.driver;
     a.thinkT -= dt;
     if (a.thinkT <= 0) {
       a.thinkT = 0.4; let best = null, bd = 380;
@@ -9588,7 +9629,7 @@ function updateAA(dt) {
       a.yaw += clamp(angDiff(wy, a.yaw), -1.5 * dt, 1.5 * dt); a.pitch += clamp(wp - a.pitch, -1.2 * dt, 1.2 * dt);
       if (a.pauseT > 0) a.pauseT -= dt;
       else if (Math.hypot(angDiff(wy, a.yaw), wp - a.pitch) < 0.1) {
-        a.burstT += dt; if (a.fireT <= 0) aaFire(a, a.crew, 0.07);
+        a.burstT += dt; if (a.fireT <= 0) aaFire(a, gun, 0.07);
         if (a.burstT > 1.4) { a.burstT = 0; a.pauseT = rnd(0.7, 1.3); }
       }
     } else { a.tgt = null; a.yaw += 0.15 * dt; a.pitch += (0.6 - a.pitch) * Math.min(1, dt); }
@@ -9602,7 +9643,14 @@ function drawAA() {
 }
 
 /* ============ reglas: conquista, tickets, partes de guerra ============ */
-const BASE_FOV = 75 * Math.PI / 180, FP_FOV = 1.15;
+const BASE_FOV = 75 * Math.PI / 180, FP_FOV = 1.15, FP_RELZ = 0.88, FP_RELT = [0.04, -0.15, -0.1], FP_RELC = [0.03, -0.1, -0.14];
+/* al recargar, la vista del arma se acerca un poco (y vuelve al acabar): los brazos, que van hasta el hombro y no tienen cuerpo detrás,
+   no asoman por los bordes cuando el arma se baja o se gira para meter el cargador o el peine */
+function fpReloadZoom(p) {
+  if (!p || !p.alive || p.veh || p.aa || !(p.reloadT > 0) || !p.weps) return 0;
+  const w = p.weps[p.cur].def, f = 1 - p.reloadT / (w.reload || 1), k = clamp(Math.min(f, 1 - f) / 0.14, 0, 1);
+  return k * k * (3 - 2 * k);
+}
 let fpFov = FP_FOV;
 const game = { state: 'menu', time: 0, team: REP, tickets: [300, 300], diff: 0.55, held: [0, 0], bleedT: 1, bleedAcc: [0, 0], eventT: 45, eventI: 0, floodT: 0, shake: 0, whizzT: 0,
   dmgT: 0, dmgAng: 0, camOff: 0, vehTold: {}, respawnT: 0, deadT: 0, selSpawn: null, selClass: 0, firstDeploy: true, fov: BASE_FOV, winner: -1, killer: null };
@@ -9668,6 +9716,7 @@ function applyDamage(t, dmg, att, head, cause) {
     if (t.veh) { t.veh.driver = null; t.veh = null; }
     if (t.aa) { t.aa.driver = null; t.aa = null; }
     if (t.ride) rideOff(t, null);       // de la caja de un camión, al suelo de al lado
+    if (t.goAA) { if (t.goAA.claim === t) t.goAA.claim = null; t.goAA = null; }
     t.alive = false; t.hp = 0; t.deaths++; t.fall = 0; t.fallDir = Math.random() < 0.6 ? 1 : -1; t.enemy = null; t.respawnT = rnd(7, 11); t.crouch = false; t.prone = false;
     game.tickets[t.team] = Math.max(0, game.tickets[t.team] - 1);
     if (att && att !== t && att.team !== t.team) att.kills++;
@@ -9794,7 +9843,7 @@ function update(dt) {
   game.respawnT -= dt;
   if (game.state === 'play') { updatePlayer(dt); if (!P.alive) { game.deadT -= dt; if (game.deadT <= 0) enterDeploy(); } }
   else if (P.spawned && !P.alive) P.fall = Math.min(1, P.fall + dt * 2.6);
-  updateVehicles(dt); if (P && P.ride) rideSeat(P); updateAA(dt); towerDuty(dt);
+  updateVehicles(dt); if (P && P.ride) rideSeat(P); updateAA(dt); aaDuty(dt); towerDuty(dt);
   NAV.budget = 2; NAV.lbudget = 10;       // caminos nuevos y líneas rectas que se pueden mirar en cada paso
   tommyUpdate(dt);
   for (const s of soldiers) if (!s.isPlayer) { if (s.remote) duoHostRemote(s, dt); else updateBot(s, dt); }
@@ -10404,9 +10453,9 @@ function camSetup(dt) {
         cam.yaw = yaw; cam.pitch = pit;
       }
     } else if (P.alive && P.aa) {       // tras la ametralladora antiaérea
-      const a = P.aa, cp = Math.cos(P.pitch);
-      cam.x = a.x + Math.sin(P.yaw) * cp * 0.8 + Math.sin(P.yaw) * Math.sin(P.pitch) * 0.3; cam.z = a.z + Math.cos(P.yaw) * cp * 0.8 + Math.cos(P.yaw) * Math.sin(P.pitch) * 0.3;
-      cam.y = a.y - Math.sin(P.pitch) * 0.8 + cp * 0.34; cam.yaw = P.yaw; cam.pitch = P.pitch; fov = BASE_FOV * 0.85;
+      const a = P.aa, back = 2.5 - Math.max(0, P.pitch) * 0.6, side = 0.6;       // detrás del sirviente y algo a su derecha, por encima del hombro: se le ve a los mandos
+      cam.x = a.x + Math.sin(P.yaw) * (0.78 + back) + Math.cos(P.yaw) * side; cam.z = a.z + Math.cos(P.yaw) * (0.78 + back) - Math.sin(P.yaw) * side;
+      cam.y = Math.max(a.y + 0.42 - Math.sin(P.pitch) * 0.7, groundAt(cam.x, cam.z) + 0.6); cam.yaw = P.yaw; cam.pitch = P.pitch; fov = BASE_FOV * 0.85;
     } else if (P.alive) {
       const c = camBasis(); cam.x = c.ex; cam.y = c.ey; cam.z = c.ez; cam.yaw = c.yaw; cam.pitch = c.pitch;
       fov = BASE_FOV * lerp(1, P.weps[P.cur].def.zoom, P.aimT); fp = true;
@@ -10501,7 +10550,7 @@ function render(dt) {
   drawWorld(VP, cam.x, cam.y, cam.z, canvas.height / (2 * Math.tan(fov / 2)), dt, fp, null);
   if (fp) {
     gl.clear(gl.DEPTH_BUFFER_BIT);
-    fpFov = FP_FOV * lerp(1, 0.75, P ? P.aimT || 0 : 0);       // al apuntar el arma se ve algo más grande: la mira se distingue mejor
+    fpFov = FP_FOV * lerp(1, 0.75, P ? P.aimT || 0 : 0) * lerp(1, FP_RELZ, fpReloadZoom(P));       // al apuntar el arma se ve algo más grande: la mira se distingue mejor
     M4.perspective(PROJ, fpFov, asp, 0.03, 12); M4.mul(FPVP, PROJ, VIEW); gl.uniformMatrix4fv(U.uVP, false, FPVP);
     matState(1, 1, 0.05);
     M4.identity(CAMW); M4.translate(CAMW, cam.x, cam.y, cam.z); M4.rotY(CAMW, cam.yaw); M4.rotX(CAMW, cam.pitch); M4.rotZ(CAMW, cam.roll);
@@ -10530,7 +10579,7 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   matState(1, 1, 0.05);
   drawVehicles(vp, ex, ey, ez); drawAA(); matState(1, 1, 0.05);
   const vis = _visSoldiers; vis.length = 0;
-  for (const s of soldiers) if (s.spawned && !s.veh && !s.aa && !(hideP && s === P) && (!cull || cull(s))) vis.push(s);
+  for (const s of soldiers) if (s.spawned && !s.veh && !(hideP && s === P) && !(s.aa && s === P && xr.on) && (!cull || cull(s))) vis.push(s);
   if (!skDrawSoldiers(vis, vp, ex, ey, ez, dt > 0)) for (const s of vis) drawSoldier(s);
   for (const p of projectiles) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); if (p.kind !== 'shell') M4.rotX(TMP, p.spin); if (p.kind === 'bomb') M4.scale(TMP, 3.2, 7, 3.2); else if (p.kind === 'shell') M4.scale(TMP, 2, 2, 2); drawMesh(world.nade, TMP); }
   for (const p of planes) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); M4.rotY(TMP, Math.PI); drawModel(world.plane, TMP); }
@@ -11950,7 +11999,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, navDbg: { NAV, navPath, navLine, navBuild, update, TNAV, tnavPath, tnavBuild } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, aaDbg: { aaGuns, manAA, leaveAA }, navDbg: { NAV, navPath, navLine, navBuild, update, TNAV, tnavPath, tnavBuild } };
 })();
 
 </script>
