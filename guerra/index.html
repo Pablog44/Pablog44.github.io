@@ -529,7 +529,7 @@ body.nogl #fatal{max-width:none}
       <label for="g_plants">Matorral y plantas</label><select id="g_plants" data-gk="plants"></select>
       <label for="g_trees">Árboles y matas</label><select id="g_trees" data-gk="trees"></select>
       <label for="g_ground">Suelo</label><select id="g_ground" data-gk="ground"></select>
-      <label for="g_models">Detalle de los soldados</label><select id="g_models" data-gk="models"></select>
+      <label for="g_models">Detalle de los soldados (en Bajo, modelos ligeros)</label><select id="g_models" data-gk="models"></select>
       <label for="g_fx">Humo, polvo y fogonazos</label><select id="g_fx" data-gk="fx"></select>
       <label for="g_aa">Suavizado de bordes (antialiasing)</label><select id="g_aa" data-gk="aa"></select>
       <label for="g_sharp">Nitidez</label><select id="g_sharp" data-gk="sharp"></select>
@@ -2037,6 +2037,11 @@ const POST = { fb: null, tex: null, rb: null, w: 0, h: 0, prog: null, buf: null,
 /* resolución de dibujo: píxeles por cada píxel de la página, nunca más de los que tiene la pantalla */
 function gfxDpr() { return clamp(GFX.res * GFX.dyn, 0.35, Math.min(devicePixelRatio || 1, 2)) * (GFX_OPT.ss[GFX.ss] || GFX_OPT.ss[0]).k; }
 /* calidad de las texturas grandes (Lewis, carros, avión): nivel 0..3 y tamaño máximo; 8192 solo si la tarjeta lo admite */
+/* modelos completos en todos los aparatos, también en el móvil (las versiones ligeras, con menos triángulos, se veían llenas de
+   agujeros). Las ligeras solo se cargan si el jugador baja él mismo el detalle de los soldados a «Bajo» (con el preajuste Bajo o a
+   mano): en automático, siempre los completos. Se decide al cargar la página */
+const modelsLight = () => GFX.q !== 'auto' && (GFX.models | 0) === 0;
+let MODELS_LIGHT_LOADED = null;
 function gfxTexLevel() { let l = clamp(GFX.tex | 0, 0, 3); const mx = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096; while (l > 0 && GFX_OPT.tex[l].s > mx) l--; return l; }
 function gfxTexCap() { const l = gfxTexLevel(); return l >= 3 ? 0 : GFX_OPT.tex[l].s; }
 /* filtrado anisótropo: las texturas con mipmaps se apuntan aquí y se ajustan al cambiar la opción */
@@ -6238,9 +6243,10 @@ async function skLoad() {
     if (location.protocol === 'file:') throw new Error('abierto como fichero suelto: los modelos solo se cargan desde la web');
     SK.u32 = gl.getExtension('OES_element_index_uint');
     const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
-    /* el legionario: en el móvil, la versión ligera (el MP con menos triángulos); en el ordenador, la completa. Si una no carga, la otra */
+    /* el legionario: el completo; el ligero solo con el detalle de los soldados en «Bajo» puesto a mano. Si uno no carga, el otro */
+    MODELS_LIGHT_LOADED = modelsLight();
     const legP = (async () => {
-      for (const f of GFX_TOUCH ? [SK_LEG_M, SK_LEG] : [SK_LEG, SK_LEG_M]) {
+      for (const f of MODELS_LIGHT_LOADED ? [SK_LEG_M, SK_LEG] : [SK_LEG, SK_LEG_M]) {
         try { const g = await get(f); skLegTexHD(g); return g; } catch (e) { console.warn('[legionario] ' + f + ' no se carga:', e && e.message || e); }
       }
       return null;
@@ -9421,7 +9427,7 @@ async function vmLoad() {
   if (!SK.ready) return;
   const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
   const one = async (key, setup, texMax) => {
-    const files = GFX_TOUCH ? [VM_FILES_M[key], VM_FILES[key]] : [VM_FILES[key], VM_FILES_M[key]];
+    const files = modelsLight() ? [VM_FILES_M[key], VM_FILES[key]] : [VM_FILES[key], VM_FILES_M[key]];
     for (let fi = 0; fi < files.length; fi++) try {
       const g = await get(files[fi]);
       /* las orugas del Panzer tienen 120 huesos: hace falta que la tarjeta los admita (se mira antes de subir nada) */
@@ -11912,8 +11918,9 @@ function renderGfxSheet() {
   const d = gfxDpr(); $('gResOut').textContent = Math.round(innerWidth * d) + ' × ' + Math.round(innerHeight * d);
   document.querySelectorAll('[data-gk]').forEach(s => { s.value = String(GFX[s.dataset.gk]); });
   const an = $('gAaNote'), msaaWant = GFX.aa === 1;
-  an.hidden = msaaWant === GL_MSAA && !(GFX.tex === 3 && gfxTexLevel() < 3) && !(GFX.aniso > 0 && !ANISO.ext);
-  an.textContent = [msaaWant !== GL_MSAA ? (msaaWant ? 'El MSAA se activará al volver a cargar la página.' : 'El MSAA dejará de gastar memoria al volver a cargar la página.') : '',
+  const mlChange = MODELS_LIGHT_LOADED !== null && modelsLight() !== MODELS_LIGHT_LOADED;
+  an.hidden = msaaWant === GL_MSAA && !(GFX.tex === 3 && gfxTexLevel() < 3) && !(GFX.aniso > 0 && !ANISO.ext) && !mlChange;
+  an.textContent = [mlChange ? (modelsLight() ? 'Con el detalle de los soldados en Bajo se cargarán los modelos ligeros (menos triángulos) al volver a cargar la página.' : 'Se cargarán los modelos completos al volver a cargar la página.') : '',msaaWant !== GL_MSAA ? (msaaWant ? 'El MSAA se activará al volver a cargar la página.' : 'El MSAA dejará de gastar memoria al volver a cargar la página.') : '',
     GFX.tex === 3 && gfxTexLevel() < 3 ? 'Esta tarjeta no admite texturas de 8192: se usan de ' + GFX_OPT.tex[gfxTexLevel()].s + '.' : '',
     GFX.aniso > 0 && !ANISO.ext ? 'Este navegador no ofrece filtrado anisótropo.' : ''].filter(Boolean).join(' ');
   $('gFps').checked = GFX.fps; gfxNowText();
