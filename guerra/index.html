@@ -3409,11 +3409,14 @@ const world = { houses: [] };
     maxim: mk(q => {
       const m = M4.create(); M4.translate(m, 0, 0, -0.52); M4.rotX(m, Math.PI / 2); q.with(m, () => q.cyl(0, 0, 0, 0.07, 0.07, 0.75, 8, hex(0x4b5340), true));
       q.limb([0, 0, -0.88], [0, 0, -1.05], 0.03, 0.03, DK); q.box(0, 0, 0.12, 0.12, 0.17, 0.5, DK); q.box(0, -0.03, -0.13, 0.54, 0.34, 0.02, hex(0x5a6350));
-      q.box(0, 0, 0.42, 0.22, 0.06, 0.06, GUNW); q.box(-0.13, -0.02, 0.05, 0.14, 0.2, 0.3, hex(0x5a5d48));
+      q.box(-0.13, -0.02, 0.05, 0.14, 0.2, 0.3, hex(0x5a5d48));
+      /* placa de atrás con las dos empuñaduras verticales y el pulsador entre ellas */
+      q.box(0, 0, 0.385, 0.2, 0.05, 0.03, DK); for (const x of [-0.085, 0.085]) q.box(x, -0.01, 0.42, 0.035, 0.13, 0.035, GUNW); q.box(0, 0, 0.41, 0.05, 0.03, 0.02, DK);
     }),
     hotch: mk(q => {
       q.limb([0, 0, -0.2], [0, 0, -1.1], 0.045, 0.045, DK); for (let i = 0; i < 5; i++) q.box(0, 0, -0.3 - i * 0.07, 0.12, 0.12, 0.03, DK);
       q.box(0, 0, 0.1, 0.09, 0.15, 0.52, DK); q.box(0.16, 0.02, -0.05, 0.28, 0.015, 0.06, hex(0xb08a3c)); q.box(0, -0.08, 0.36, 0.05, 0.14, 0.06, GUNW);
+      q.box(0, -0.05, 0.31, 0.26, 0.03, 0.03, DK); for (const x of [-0.12, 0.12]) q.box(x, -0.11, 0.31, 0.035, 0.12, 0.035, GUNW);       // travesaño con dos empuñaduras para el afuste antiaéreo
       q.limb([0, 0.08, -0.25], [0, 0.2, -0.25], 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.12, 0.012, 0.012, DK); q.box(0, 0.24, -0.25, 0.012, 0.12, 0.012, DK);
     })
   };
@@ -6357,6 +6360,7 @@ function skPose(s, C) {
   st.run = skEase(st.run, clamp((spd - 2.9) / 1.2, 0, 1), kk);
   st.aim = skEase(st.aim, alive && (s.enemy || s.isPlayer || s.aa) ? 1 : 0, Math.min(1, dt * 5));       // (el de la antiaérea, con las manos en las empuñaduras)
   st.t += dt;
+  if (s.aa && alive && C.aaClips) return skAAPose(s, C, st);
   const cyc = s.walkPhase / (2 * Math.PI), cl = C.clips, hold = clip => clip.dur * (SK_HOLD[clip.name] || 0.6);
   st.adjOn.fill(0); for (let j = 0; j < C.NJ; j++) { const o = j * 4; st.adjQ[o] = st.adjQ[o + 1] = st.adjQ[o + 2] = 0; st.adjQ[o + 3] = 1; }
   const breda = !C.leg && C.breda && SK.W.breda30 && s.wid === 'breda30';
@@ -6448,7 +6452,8 @@ const SK_GRIPF = {
   stock: { f: [[26, 38, 24], [70, 80, 50], [74, 82, 52], [78, 84, 54]], t: null },      // garganta de la culata o empuñadura: el índice en el gatillo
   fore: { f: [[50, 58, 34], [54, 60, 36], [58, 62, 38], [62, 64, 40]], t: [30, 8, 10, 6] },       // el pulgar, estirado por el costado       // guardamanos o cargador: los dedos lo rodean
   pistol: { f: [[22, 32, 24], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null },     // culata de pistola o revólver
-  relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null }        // mano libre, algo cerrada
+  relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null },       // mano libre, algo cerrada
+  spade: { f: [[48, 62, 36], [56, 66, 40], [60, 68, 42], [64, 70, 44]], t: [48, 18, 24, 14] }       // empuñadura vertical de la antiaérea: los dedos alrededor y el pulgar encima
 };
 function skFingerRig(C) {
   if (C.fingerRig !== undefined) return C.fingerRig;
@@ -6524,6 +6529,11 @@ function skBonesTo(C, st, B) {
 }
 /* huesos en el espacio del modelo (solo cuando cambia la postura) y el arma colgada del hueso Arma_R */
 function skBones(s, C, st) {
+  if (s.aa && s.alive) {       // en la antiaérea: sin su arma, las dos manos en las empuñaduras
+    st.gun = null; st.weapon = null; st.wpk = null;
+    if (C.aaClips) skAAHands(s, C, st);
+    skFingers(C, st, { Right: 'spade', Left: 'spade' }); skBonesTo(C, st, st.bones); st.drop = 0; return;
+  }
   if (C.leg) {      // la mano izquierda del legionario agarra el arma (menos al cambiar el tambor de la Thompson)
     const k = skLegKey(s);
     if (k !== 'revolver' && s.alive) { const r = (k === 'thompson' || k === 'mp' || k === 'carcano' || k === 'breda') && s.reloadT > 0 ? clamp(1 - s.reloadT / s.wpn.reload, 0, 1) : -1; skLegGrip(C, st, k, r < 0 ? 1 : 1 - Math.min(1, r * 10, (1 - r) * 10)); }
@@ -6918,7 +6928,7 @@ function skLegW(s) { const w = WEAPONS[s.wid]; return !!(w && w.leg) || !!(s.pri
 /* modelo de cada soldado: el esqueleto del legionario para quien lleva sus armas (y la pistola que saca de cerca); los republicanos
    también, con su cuerpo de soldado republicano pasado a ese esqueleto, cuando cogen del suelo un arma nacional */
 function skLegOk(s) { return !!SK.leg && (s.team === NAT || !!SK.leg.rep); }
-function skChar(s) { return skLegOk(s) && skLegW(s) ? SK.leg : SK.chars[s.team]; }
+function skChar(s) { return skLegOk(s) && (skLegW(s) || (s.aa && SK.leg.aaClips)) ? SK.leg : SK.chars[s.team]; }
 /* el cuerpo que se viste sobre el esqueleto del legionario: el del republicano, el del soldado nacional (ametrallador y tirador) o, si no, el suyo */
 function skBodyOf(s, C) { return !C.leg ? null : s.team === REP ? C.rep : s.nac ? C.nac : null; }
 function skSetupLeg(C, J) {
@@ -6987,12 +6997,178 @@ function skSetupLeg(C, J) {
       B[o] = M[0]; B[o + 1] = M[4]; B[o + 2] = M[8]; B[o + 3] = M[12]; B[o + 4] = M[1]; B[o + 5] = M[5]; B[o + 6] = M[9]; B[o + 7] = M[13]; B[o + 8] = M[2]; B[o + 9] = M[6]; B[o + 10] = M[10]; B[o + 11] = M[14];
     }
     C.tommyB = B; C.tommyS = Math.hypot(C.base[0], C.base[1], C.base[2]) || 1; }
+  C.aaClips = skAAClips(C);
 }
 /* la palanca: en el clip se abre de 0,17 a 0,55 s, espera abierta hasta 0,8 y se cierra hasta 1,17. Aquí se recorre entera en el tiempo
    que haya entre disparo y disparo, casi sin espera, para poder tirar deprisa (u de 0 a 1) */
 function skLeverT(u) {
   u = clamp(u, 0, 1);
   return u < 0.45 ? 0.17 + 0.38 * (u / 0.45) : u < 0.53 ? 0.55 + 0.25 * ((u - 0.45) / 0.08) : 0.8 + 0.37 * ((u - 0.53) / 0.47);
+}
+const SK_AA = { p0: -0.12, dp: 0.38, n: 5,
+  fix: {
+    'CodoSuave_Left_01': [0,0,0,1],
+    'CodoSuave_Left_02': [0,0,0,1],
+    'CodoSuave_Left_03': [-.0356,-.3198,-.1945,.9266],
+    'CodoSuave_Left_04': [-.0475,-.3743,-.1938,.9056],
+    'CodoSuave_Left_05': [-.059,-.4277,-.1906,.8816],
+    'CodoSuave_Left_06': [-.0703,-.4794,-.1868,.8546],
+    'CodoSuave_Left_07': [-.0831,-.5377,-.1814,.8192],
+    'CodoSuave_Left_08': [-.1124,-.6679,-.1649,.717],
+    'CodoSuave_Left_09': [-.1297,-.7421,-.1516,.6399],
+    'CodoSuave_Left_10': [-.1453,-.8067,-.1368,.5563],
+    'CodoSuave_Left_11': [-.1521,-.8341,-.1292,.5143],
+    'CodoSuave_Left_12': [-.1531,-.8383,-.1279,.5075],
+    'CodoSuave_Right_01': [0,0,0,1],
+    'CodoSuave_Right_02': [0,0,0,1],
+    'CodoSuave_Right_03': [-.5698,.0084,.6294,.5283],
+    'CodoSuave_Right_04': [-.5808,.0095,.6378,.5058],
+    'CodoSuave_Right_05': [-.5826,.011,.6361,.5057],
+    'CodoSuave_Right_06': [-.5844,.0124,.6345,.5057],
+    'CodoSuave_Right_07': [-.5866,.0141,.6325,.5057],
+    'CodoSuave_Right_08': [-.5917,.0182,.6277,.5055],
+    'CodoSuave_Right_09': [-.595,.0209,.6246,.5054],
+    'CodoSuave_Right_10': [-.5982,.0235,.6215,.5053],
+    'CodoSuave_Right_11': [-.5997,.0248,.62,.5053],
+    'CodoSuave_Right_12': [-.6,.025,.6198,.5053],
+    'ElbowArc_Left_01': [.0175,0,-.0189,.9997],
+    'ElbowArc_Left_02': [.019,-.0003,-.0398,.999],
+    'ElbowArc_Left_03': [.0204,-.0005,-.0607,.9979],
+    'ElbowArc_Left_04': [.0219,-.0006,-.0816,.9964],
+    'ElbowArc_Left_06': [.0248,-.0015,-.1233,.9921],
+    'ElbowArc_Left_07': [.0199,-.0461,-.1446,.9882],
+    'ElbowArc_Left_08': [.0027,-.1512,-.1661,.9744],
+    'ElbowArc_Left_09': [-.0215,-.265,-.1857,.946],
+    'ElbowArc_Right_01': [-.0379,.0011,.0672,.997],
+    'ElbowArc_Right_02': [-.1116,.0025,.1481,.9827],
+    'ElbowArc_Right_03': [-.1838,.0034,.2273,.9563],
+    'ElbowArc_Right_04': [-.2537,.004,.3038,.9183],
+    'ElbowArc_Right_06': [-.383,.0038,.4451,.8094],
+    'ElbowArc_Right_07': [-.442,.0048,.5073,.7398],
+    'ElbowArc_Right_08': [-.4973,.0071,.5617,.6611],
+    'ElbowArc_Right_09': [-.5473,.0085,.6087,.5744],
+    'ElbowVolume_Left': [.0234,-.0006,-.1024,.9945],
+    'ElbowVolume_Right': [-.3204,.0041,.3767,.8692],
+    'ForeArmTwist_Left': [0,.3624,0,.932],
+    'ForeArmTwist_Right': [0,-.0027,0,1],
+    'ShoulderRound_Left': [-.3655,-.0615,-.372,.851],
+    'ShoulderRound_Right': [-.2228,.034,.1171,.9672],
+    'headfront': [-.6983,0,0,.7158],
+    '~HeadTop_End': [.0123,0,0,.9999],
+    '~Hips': [0,-.9994,.0343,0],
+    '~LeftFoot': [-.0397,.8752,-.4798,.0475],
+    '~LeftHandIndex1': [-.261,.0109,.0486,.9641],
+    '~LeftHandIndex2': [-.3991,.0139,-.0207,.9166],
+    '~LeftHandIndex3': [-.238,-.0082,.0263,.9709],
+    '~LeftHandIndex4': [0,0,.0179,.9998],
+    '~LeftHandMiddle1': [-.3434,.0035,.0339,.9386],
+    '~LeftHandMiddle2': [-.4311,.0121,-.0162,.9021],
+    '~LeftHandMiddle3': [-.3286,.0013,-.0029,.9445],
+    '~LeftHandMiddle4': [.0414,-.0017,.0415,.9983],
+    '~LeftHandPinky1': [-.3039,-.0109,.0258,.9523],
+    '~LeftHandPinky2': [-.4801,.029,-.0331,.8761],
+    '~LeftHandPinky3': [-.2063,-.0048,.0119,.9784],
+    '~LeftHandPinky4': [.0156,-.0005,.0312,.9994],
+    '~LeftHandRing1': [-.3731,-.0059,.0248,.9274],
+    '~LeftHandRing2': [-.4376,.0098,-.0126,.899],
+    '~LeftHandRing3': [-.2853,.0053,-.0127,.9583],
+    '~LeftHandRing4': [.0262,-.001,.0394,.9989],
+    '~LeftHandThumb1': [-.2768,.1052,-.2291,.9273],
+    '~LeftHandThumb2': [-.1307,-.0084,.0165,.9912],
+    '~LeftHandThumb3': [-.076,-.0132,.1282,.9887],
+    '~LeftHandThumb4': [-.0568,.0142,.2421,.9685],
+    '~LeftLeg': [.0641,.0034,-.0303,.9975],
+    '~LeftToeBase': [.2617,.0078,-.0157,.965],
+    '~LeftToe_End': [.1398,.0004,-.0077,.9901],
+    '~LeftUpLeg': [-.0004,.051,.9984,.0235],
+    '~RightFoot': [-.0397,-.8752,.4798,.0475],
+    '~RightHandIndex1': [-.0285,.0009,-.0076,.9996],
+    '~RightHandIndex2': [.017,-.0041,.0246,.9995],
+    '~RightHandIndex3': [.0475,.0003,-.0275,.9985],
+    '~RightHandIndex4': [0,0,-.0179,.9998],
+    '~RightHandMiddle1': [-.2685,-.0238,-.0638,.9609],
+    '~RightHandMiddle2': [-.4153,-.0118,.0164,.9095],
+    '~RightHandMiddle3': [-.2534,-.001,.003,.9673],
+    '~RightHandMiddle4': [.0414,.0017,-.0415,.9983],
+    '~RightHandPinky1': [-.4706,.0414,.0318,.8808],
+    '~RightHandPinky2': [-.5253,-.0307,.0315,.8498],
+    '~RightHandPinky3': [-.2149,.0049,-.0118,.9766],
+    '~RightHandPinky4': [.0156,.0005,-.0312,.9994],
+    '~RightHandRing1': [-.4519,.0228,.0168,.8916],
+    '~RightHandRing2': [-.4687,-.0103,.0123,.8832],
+    '~RightHandRing3': [-.2937,-.0054,.0127,.9558],
+    '~RightHandRing4': [.0262,.001,-.0394,.9989],
+    '~RightHandThumb1': [-.1922,-.0808,.2023,.9569],
+    '~RightHandThumb2': [.0172,.0059,-.0175,.9997],
+    '~RightHandThumb3': [-.1448,.0222,-.1269,.981],
+    '~RightHandThumb4': [-.0568,-.0142,-.2421,.9685],
+    '~RightLeg': [.0642,-.0034,.0303,.9975],
+    '~RightToeBase': [.2617,-.0078,.0157,.965],
+    '~RightToe_End': [.1398,-.0004,.0077,.9901],
+    '~RightUpLeg': [-.0004,-.0508,-.9984,.0234],
+    '~Spine': [-.0099,0,0,1],
+    '~Spine1': [.0098,0,0,1] },
+  pose: {
+    '~Head': { maxim: [.1083,.0406,.0062,.9933,.1437,.0409,.0042,.9888,.1951,.0411,.0013,.9799,.246,.0412,-.0016,.9684,.2962,.0412,-.0046,.9542], hotch: [.1083,.0406,.0062,.9933,.1437,.0409,.0042,.9888,.1951,.0411,.0013,.9799,.246,.0412,-.0016,.9684,.2962,.0412,-.0046,.9542] },
+    '~LeftArm': { maxim: [-.377,-.2471,-.4783,.7537,-.5329,.0644,-.3382,.773,-.5767,.1908,-.2676,.7479,-.5957,.1254,-.3558,.7091,-.5,.0712,-.2913,.8125], hotch: [-.4506,-.0673,-.373,.8083,-.5365,.1346,-.2729,.7872,-.563,.2028,-.2394,.7646,-.5721,.1754,-.2768,.7519,-.5245,-.0041,-.3982,.7525] },
+    '~LeftForeArm': { maxim: [-.4014,-.5067,-.5596,.5187,-.333,-.398,-.7114,.4739,-.3031,-.4466,-.6044,.586,-.1787,-.5686,-.3018,.7441,-.128,-.5819,-.2043,.7767], hotch: [-.3552,-.4688,-.6527,.4774,-.3082,-.4339,-.6893,.4916,-.288,-.47,-.5994,.5804,-.242,-.5231,-.4602,.6753,-.1172,-.6059,-.2132,.7574] },
+    '~LeftHand': { maxim: [.51,.1619,.4935,.6857,.3648,.3062,.214,.8529,.1456,.3808,-.2362,.8821,-.0804,.3335,-.6087,.7154,-.175,.284,-.7733,.5392], hotch: [.4231,.1954,.445,.7647,.2668,.3099,.1232,.9042,.0948,.3603,-.2486,.8941,-.0484,.3471,-.5311,.7715,-.1936,.288,-.6939,.6308] },
+    '~LeftShoulder': { maxim: [-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.5802,.4058,.5133,.4849], hotch: [-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.4615,.5321,.5019,.502,-.4903,.5047,.4995,.5054] },
+    '~Neck': { maxim: [-.1186,.0271,.0038,.9926,-.0897,.0276,.0002,.9956,-.0474,.0282,-.0051,.9985,-.005,.0288,-.0103,.9995,.0374,.0293,-.0156,.9987], hotch: [-.1186,.0271,.0038,.9926,-.0897,.0276,.0002,.9956,-.0474,.0282,-.0051,.9985,-.005,.0288,-.0103,.9995,.0374,.0293,-.0156,.9987] },
+    '~RightArm': { maxim: [-.3871,.2324,.6386,.6232,-.5987,.1002,.3974,.6882,-.6537,.0437,.281,.7013,-.6426,.0634,.3262,.6904,-.5403,.0849,.3188,.7741], hotch: [-.4977,.161,.5014,.6892,-.5998,.0759,.3319,.7241,-.6334,.0437,.2678,.7247,-.6563,.058,.3208,.6804,-.5032,.1056,.3518,.7822] },
+    '~RightForeArm': { maxim: [-.2327,.4679,.4812,.7038,-.3166,.2156,.5903,.7105,-.2521,.0464,.4867,.8351,-.0842,-.0525,.219,.9707,-.0227,-.1341,.0974,.9859], hotch: [-.2834,.3759,.5309,.7046,-.2975,.1959,.5575,.7499,-.2385,.0684,.4764,.8435,-.1233,-.017,.3065,.9437,-.0392,.0138,.2334,.9715] },
+    '~RightHand': { maxim: [.3349,-.0696,-.5261,.7786,.2628,-.1316,-.2386,.9256,.1595,-.0796,.2016,.9631,.1501,.0232,.591,.7923,.2295,.07,.7677,.5942], hotch: [.284,-.0961,-.4583,.8367,.1858,-.1079,-.1475,.9654,.1168,-.0613,.2264,.9651,.1079,.0102,.546,.8308,.1494,.0547,.6789,.7168] },
+    '~RightShoulder': { maxim: [-.4553,-.5382,-.5078,.4952,-.4553,-.5382,-.5078,.4952,-.4553,-.5382,-.5078,.4952,-.5141,-.4799,-.5114,.4938,-.621,-.3528,-.5119,.4774], hotch: [-.4553,-.5382,-.5078,.4952,-.4553,-.5382,-.5078,.4952,-.4553,-.5382,-.5078,.4952,-.4553,-.5382,-.5078,.4952,-.5972,-.3869,-.4782,.5148] },
+    '~Spine2': { maxim: [-.0445,-.076,.0024,.9961,-.06,-.0759,.0036,.9953,-.0827,-.0758,.0053,.9937,-.1053,-.0757,.0071,.9915,-.1279,-.0755,.0088,.9889], hotch: [-.0445,-.076,.0024,.9961,-.06,-.0759,.0036,.9953,-.0827,-.0758,.0053,.9937,-.1053,-.0757,.0071,.9915,-.1279,-.0755,.0088,.9889] } }
+};
+/* Postura del sirviente de la antiaérea, hecha en Blender sobre el esqueleto del legionario (el que llevan todos los soldados): para
+   cada ametralladora, cinco posturas según la elevación del arma (de -0,12 a 1,4 rad), con las manos en las empuñaduras, el tronco
+   algo adelantado y la cabeza mirando por encima del arma. Aquí se hace un clip de 5 fotogramas con ellas y se toma según la elevación */
+function skAAClips(C) {
+  const out = {}, f = SK_AA.n, J = n => C.jx[n.replace('~', 'mixamorig:')];
+  for (const gun of ['maxim', 'hotch']) {
+    const clip = { name: 'AA_' + gun, dur: f / SK_FPS, n: f, r: new Array(C.NJ).fill(null), t: new Array(C.NJ).fill(null) };
+    for (const k in SK_AA.fix) { const j = J(k); if (j === undefined) continue; const r = new Float32Array(f * 4); for (let i = 0; i < f; i++) r.set(SK_AA.fix[k], i * 4); clip.r[j] = r; }
+    for (const k in SK_AA.pose) { const j = J(k); if (j !== undefined) clip.r[j] = Float32Array.from(SK_AA.pose[k][gun]); }
+    for (const r of clip.r) if (r) for (let i = 0; i < f; i++) qNorm(r, i * 4);
+    out[gun] = clip;
+  }
+  return out;
+}
+function skAAPose(s, C, st) {
+  const a = s.aa, clip = C.aaClips[a.home.t] || C.aaClips.maxim, p = clamp(a.pitch, AA_PMIN, AA_PMAX);
+  st.mv = 0; st.run = 0; st.aim = 0; st.turn = 0; st.crouch = 0;
+  skBlend(C, st, clip, Math.min((p - SK_AA.p0) / SK_AA.dp, SK_AA.n - 1.001) / SK_FPS, 1, null);
+  const since = game.time - (s.lastShot || -99);       // el traqueteo de los disparos, en los brazos y el tronco
+  if (since < 0.12) { const k = (0.12 - since) * 0.25; skAdd(st, C.J.Spine2, -k * 0.4); skAdd(st, C.J.RightArm, k); skAdd(st, C.J.LeftArm, k); }
+  skGlobals(C, st);
+  return st;
+}
+/* las manos, justo en las empuñaduras: la postura de Blender ya las deja ahí, salvo lo que se pierde al mezclar entre dos elevaciones
+   y algún centímetro por el terreno; el brazo se corrige con el mismo cálculo que el resto del juego */
+function skAAHands(s, C, st) {
+  const a = s.aa, h = AA_HAND[a.home.t] || AA_HAND.maxim;
+  /* del mundo al espacio del esqueleto (el mismo cálculo que skModel, sin giro de apuntar ni agachado) */
+  const m = _jm; M4.identity(m); M4.translate(m, s.x, s.y, s.z); M4.rotY(m, s.yaw + Math.PI); M4.scale(m, C.scale, C.scale, C.scale); M4.translate(m, 0, -C.foot, 0);
+  M4.mul(_jm2, m, C.base); const inv = m4inv(M4.create(), _jm2);
+  const G = M4.create(); M4.translate(G, a.x, a.y, a.z); M4.rotY(G, a.yaw); M4.rotX(G, a.pitch);
+  for (const [side, sx] of [['Right', 1], ['Left', -1]]) {
+    const w = M4.tp(G, [h[0] * sx, h[1], h[2]]), t = M4.tp(inv, w), pl = skGripPt(C, st, side), H = C.J[side + 'Hand'];
+    if (!pl || H < 0 || v3len(v3sub(t, pl)) < 0.004) continue;
+    const pole = v3sub([st.gp[C.J[side + 'ForeArm'] * 3], st.gp[C.J[side + 'ForeArm'] * 3 + 1], st.gp[C.J[side + 'ForeArm'] * 3 + 2]], [st.gp[C.J[side + 'Arm'] * 3], st.gp[C.J[side + 'Arm'] * 3 + 1], st.gp[C.J[side + 'Arm'] * 3 + 2]]);
+    skReach(C, st, t, pl, side, pole);
+    /* los huesos de ayuda del codo y del antebrazo siguen a los suyos */
+    const S = C.J[side + 'Arm'], E = C.J[side + 'ForeArm'], gq = st.gq, gp = st.gp;
+    for (const j of C.order) {
+      const p = C.parent[j]; if ((p !== S && p !== E) || j === E || j === H) continue;
+      for (const k of C.order) if (k === j || (C.under(k, j) && k !== j)) {
+        const q = C.parent[k], o4 = k * 4, o3 = k * 3;
+        qmulTo(gq, o4, gq, q * 4, st.lr, o4);
+        _v3[0] = st.lt[o3] * C.restS[q]; _v3[1] = st.lt[o3 + 1] * C.restS[q]; _v3[2] = st.lt[o3 + 2] * C.restS[q]; qrotV(gq, q * 4, _v3, _v3b);
+        gp[o3] = gp[q * 3] + _v3b[0]; gp[o3 + 1] = gp[q * 3 + 1] + _v3b[1]; gp[o3 + 2] = gp[q * 3 + 2] + _v3b[2];
+      }
+    }
+  }
 }
 /* capas encima del cuerpo: el retroceso de cada disparo, la palanca después de disparar y el cambio de tambor de la Thompson */
 function skLegOverlays(s, C, st, pre, since) {
@@ -7868,7 +8044,7 @@ function updatePlayer(dt) {
   p.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * 1.9 * dt;
   p.pitch = clamp(p.pitch + ((k.ArrowUp ? 1 : 0) - (k.ArrowDown ? 1 : 0)) * 1.2 * dt, -1.45, 1.45);
   if (!p.alive) { p.fall = Math.min(1, p.fall + dt * 2.6); return; }
-  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); [p.x, p.z] = aaSeat(p.aa); p.y = groundAt(p.x, p.z); p.aimPitch = clamp(p.pitch * 0.45, -0.1, 0.55); p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
+  if (p.aa) { p.pitch = clamp(p.pitch, -0.12, 1.4); [p.x, p.z] = aaSeat(p.aa); p.y = p.aa.y - 1.42; p.aimPitch = clamp(p.pitch * 0.45, -0.1, 0.55); p.speed = 0; p.aimT = 0; p.crouchT = 0; p.proneT = 0; p.prone = false; input.jump = false; return; }      // sirviendo la antiaérea
   if (p.ride) {       // en la caja de un camión: no anda, pero mira, apunta y dispara
     const aiming = input.aim && p.reloadT <= 0 && p.switchT <= 0;
     p.aimT = clamp(p.aimT + (aiming ? 1 : -1) * dt * 6.5, 0, 1);
@@ -9556,7 +9732,11 @@ function resetAA() {
    empuñaduras y se le puede matar (de un tiro, con una granada o ametrallado desde un avión, que buscan a los sirvientes para
    silenciar la antiaérea). Sin sirviente, la antiaérea calla hasta que llega otro: el soldado más cercano que no tenga otra tarea.
    Si la sirve el jugador, la cámara se pone detrás de él y se le ve a los mandos. */
-const aaSeat = a => [a.x + Math.sin(a.yaw) * 0.78, a.z + Math.cos(a.yaw) * 0.78];
+/* empuñaduras de cada antiaérea (centro de la derecha, en el marco del arma: x a la derecha, y arriba, z hacia atrás; la izquierda, en -x) */
+const AA_HAND = { maxim: [0.085, -0.01, 0.42], hotch: [0.12, -0.11, 0.31] }, AA_PMIN = -0.12, AA_PMAX = 1.4;
+/* el sirviente, detrás: a un brazo cómodo de las empuñaduras (más cerca cuanto más alta apunta, que las empuñaduras bajan) */
+function aaSeatD(a) { const h = AA_HAND[a.home.t] || AA_HAND.maxim, p = clamp(a.pitch, AA_PMIN, AA_PMAX); return Math.max(0.3, h[1] * Math.sin(p) + h[2] * Math.cos(p) + 0.4 - 0.12 * Math.max(0, Math.sin(p))); }
+const aaSeat = a => { const d = aaSeatD(a); return [a.x + Math.sin(a.yaw) * d, a.z + Math.cos(a.yaw) * d]; };
 function aaDuty(dt) {
   for (const a of aaGuns) {
     if (a.claim && (!a.claim.alive || a.claim.goAA !== a || (a.claimT -= dt) <= 0)) { if (a.claim.goAA === a) a.claim.goAA = null; a.claim = null; }
@@ -9574,7 +9754,7 @@ function aaDuty(dt) {
 function aaGunner(s, dt) {
   const a = s.aa;
   if (a.driver !== s || a.team !== s.team || a.downT > 0) { if (a.driver === s) leaveAA(s); else s.aa = null; return; }
-  const [x, z] = aaSeat(a); s.x = x; s.z = z; s.y = groundAt(x, z); s.vx = s.vz = 0; s.speed = 0;
+  const [x, z] = aaSeat(a); s.x = x; s.z = z; s.y = a.y - 1.42; s.vx = s.vz = 0; s.speed = 0;       // (a la altura del suelo del arma: las manos, en las empuñaduras)
   s.yaw = a.yaw; s.aimPitch = clamp(a.pitch * 0.45, -0.1, 0.55); s.crouch = false; s.prone = false; s.swim = false; s.enemy = null;
 }
 function nearAA(p) {
@@ -9584,7 +9764,7 @@ function nearAA(p) {
 }
 function manAA(p, a) {
   if (a.claim) { if (a.claim.goAA === a) a.claim.goAA = null; a.claim = null; }
-  a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; [p.x, p.z] = aaSeat(a); p.y = groundAt(p.x, p.z);
+  a.driver = p; p.aa = a; p.crouch = false; p.prone = false; p.reloadT = 0; p.aimT = 0; input.fire = false; input.aim = false; p.yaw = a.yaw; p.pitch = a.pitch; p.vx = p.vz = 0; [p.x, p.z] = aaSeat(a); p.y = a.y - 1.42;
   gyroSync();
   if (!game.vehTold[a.home.t] && pushCard(a.def.name, a.def.hist)) game.vehTold[a.home.t] = true;
   SFX.click();
