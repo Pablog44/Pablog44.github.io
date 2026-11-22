@@ -5907,9 +5907,9 @@ function skBredaFpDraw(vp, view, p, ex, ey, ez, vr = false) {
   M4.mul(B.gun, view, B.F);
   M4.mul(B.arms, B.gun, m4inv(B.W, B.W));
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
-  gl.uniform4fv(SK.U.uB, SK.ident);
+  skSetB(SK.ident);
   skBredaParts(SK.W.breda30, true, B.gun, motion, time, p.proneT || 0);
-  gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, B.arms);
+  skSetB(st.bones); gl.uniformMatrix4fv(SK.U.uM, false, B.arms);
   skParts(vr ? C.fp.rifle.sides.RightVR : C.bredaArms);
   skEnd();
   return true;
@@ -6202,21 +6202,36 @@ function skBufUpload(b) {
   b.ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, b.isrc, gl.STATIC_DRAW);
   b.itype = b.isrc instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
 }
-/* programa con deformación por huesos: 3 vec4 por hueso (las tres filas de una matriz afín); uM coloca al soldado en el mundo */
+/* programa con deformación por huesos: 3 vec4 por hueso (las tres filas de una matriz afín); uM coloca al soldado en el mundo.
+   Los huesos van en uniformes; si la tarjeta no tiene sitio para todos (muchos móviles admiten unos 80 y el legionario lleva 120),
+   van en una textura que lee el programa de vértices: así el móvil deforma con todos los huesos, igual que el ordenador, en vez de
+   fundir los huesos de ayuda de los codos con el brazo (lo que abría agujeros en brazos y antebrazos) */
+function skVTF() {
+  try { return gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) > 0 && !!gl.getExtension('OES_texture_float'); } catch (e) { return false; }
+}
 function skProgram() {
-  const NJ = SK.nj;
+  const NJ = SK.nj, tex = SK.vtf && NJ * 3 + 12 > gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS);
+  SK.tb = tex ? { pool: [], i: 0, fid: -1, W: NJ * 3 } : null;
+  const bone = tex
+    ? `uniform highp sampler2D uBT; uniform float uBW;
+       vec4 bt(float k){ return texture2D(uBT, vec2((k+0.5)*uBW, 0.5)); }
+       #define BONE(J) i = floor(J+0.5)*3.0; r0 = bt(i); r1 = bt(i+1.0); r2 = bt(i+2.0);
+       #define IDX float`
+    : `uniform vec4 uB[${NJ * 3}];
+       #define BONE(J) i = int(J)*3; r0 = uB[i]; r1 = uB[i+1]; r2 = uB[i+2];
+       #define IDX int`;
   SK.prog = compile(
-    `#define NJ ${NJ * 3}
-     attribute vec3 aPos; attribute vec3 aNor; attribute vec2 aUV; attribute vec4 aJ; attribute vec4 aW;
-     uniform mat4 uVP; uniform mat4 uM; uniform vec4 uB[NJ];
+    `attribute vec3 aPos; attribute vec3 aNor; attribute vec2 aUV; attribute vec4 aJ; attribute vec4 aW;
+     uniform mat4 uVP; uniform mat4 uM;
+     ${bone}
      varying vec2 vUV; varying vec3 vNor; varying vec3 vW;
      void main(){
        vec4 p = vec4(aPos,1.0); vec3 sp = vec3(0.0), sn = vec3(0.0);
-       int i; vec4 r0, r1, r2;
-       i = int(aJ.x)*3; r0 = uB[i]; r1 = uB[i+1]; r2 = uB[i+2]; sp += aW.x*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.x*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
-       i = int(aJ.y)*3; r0 = uB[i]; r1 = uB[i+1]; r2 = uB[i+2]; sp += aW.y*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.y*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
-       i = int(aJ.z)*3; r0 = uB[i]; r1 = uB[i+1]; r2 = uB[i+2]; sp += aW.z*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.z*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
-       i = int(aJ.w)*3; r0 = uB[i]; r1 = uB[i+1]; r2 = uB[i+2]; sp += aW.w*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.w*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
+       IDX i; vec4 r0, r1, r2;
+       BONE(aJ.x) sp += aW.x*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.x*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
+       BONE(aJ.y) sp += aW.y*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.y*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
+       BONE(aJ.z) sp += aW.z*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.z*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
+       BONE(aJ.w) sp += aW.w*vec3(dot(r0,p),dot(r1,p),dot(r2,p)); sn += aW.w*vec3(dot(r0.xyz,aNor),dot(r1.xyz,aNor),dot(r2.xyz,aNor));
        vec4 w = uM*vec4(sp,1.0); vW = w.xyz; vNor = (uM*vec4(sn,0.0)).xyz; vUV = aUV; gl_Position = uVP*w;
      }`,
     PREC + `varying vec2 vUV; varying vec3 vNor; varying vec3 vW;
@@ -6230,7 +6245,29 @@ function skProgram() {
        float f = clamp((length(vW-uCam)-uFog.x)/(uFog.y-uFog.x),0.0,1.0);
        gl_FragColor = vec4(mix(c,uFogC,f*(2.0-f)*0.92),uA);
      }`, ['aPos', 'aNor', 'aUV', 'aJ', 'aW']);
-  for (const n of ['uVP', 'uM', 'uB', 'uTex', 'uSun', 'uCam', 'uFogC', 'uFog', 'uTint', 'uA']) SK.U[n] = gl.getUniformLocation(SK.prog, n);
+  for (const n of ['uVP', 'uM', 'uB', 'uBT', 'uBW', 'uTex', 'uSun', 'uCam', 'uFogC', 'uFog', 'uTint', 'uA']) SK.U[n] = gl.getUniformLocation(SK.prog, n);
+  if (tex) { const cur = gl.getParameter(gl.CURRENT_PROGRAM); gl.useProgram(SK.prog); gl.uniform1i(SK.U.uBT, 7); gl.uniform1f(SK.U.uBW, 1 / SK.tb.W); gl.useProgram(cur); }
+}
+/* sube los huesos del siguiente dibujo: a los uniformes o, en los móviles, a una textura de una fila. Cada dibujo del fotograma usa la
+   suya (se reusan en el siguiente): así no se pisa una textura que la tarjeta aún no ha terminado de usar */
+function skBTex(W) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, 1, 0, gl.RGBA, gl.FLOAT, null);
+  return t;
+}
+function skSetB(a) {
+  const T = SK.tb; if (!T) { gl.uniform4fv(SK.U.uB, a); return; }
+  if (T.fid !== SK.fid) { T.fid = SK.fid; T.i = 0; }
+  if (T.i >= 2048) T.i = 0;
+  gl.activeTexture(gl.TEXTURE7);
+  let t = T.pool[T.i]; if (!t) t = T.pool[T.i] = skBTex(T.W); else gl.bindTexture(gl.TEXTURE_2D, t);
+  T.i++;
+  if (!(a instanceof Float32Array)) a = Float32Array.from(a);
+  const n = Math.min(a.length >> 2, T.W);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, n, 1, gl.RGBA, gl.FLOAT, n * 4 === a.length ? a : a.subarray(0, n * 4));
+  gl.activeTexture(gl.TEXTURE0);
 }
 function skRestore() {       // contexto de WebGL recuperado: se vuelve a subir todo
   if (!SK.ready) return;
@@ -6245,6 +6282,7 @@ async function skLoad() {
     if (!window.fetch || !window.TextDecoder) throw new Error('navegador sin fetch');
     if (location.protocol === 'file:') throw new Error('abierto como fichero suelto: los modelos solo se cargan desde la web');
     SK.u32 = gl.getExtension('OES_element_index_uint');
+    SK.vtf = skVTF();
     const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
     /* el legionario: el completo; el ligero solo con el detalle de los soldados en «Bajo» puesto a mano. Si uno no carga, el otro */
     MODELS_LIGHT_LOADED = modelsLight();
@@ -6261,10 +6299,10 @@ async function skLoad() {
     for (const C of chars) skSetupWeapons(C);
     const maxU = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS);
     let leg = null;
-    try { const gL = await legP; if (gL) { leg = await skBuild(gL, 2, maxU); if (leg.pal.length * 3 + 12 > maxU) throw new Error('demasiados huesos para esta tarjeta'); } }
+    try { const gL = await legP; if (gL) { leg = await skBuild(gL, 2, SK.vtf ? 0 : maxU); if (!SK.vtf && leg.pal.length * 3 + 12 > maxU) throw new Error('demasiados huesos para esta tarjeta'); } }
     catch (e) { leg = null; console.warn('[legionario] se usa el soldado nacional:', e && e.message || e); }
     const nj = Math.max(chars[0].NJ, chars[1].NJ, leg ? leg.pal.length : 0);
-    if (nj * 3 + 12 > maxU) throw new Error('la tarjeta solo admite ' + maxU + ' vectores por vértice');
+    if (!SK.vtf && nj * 3 + 12 > maxU) throw new Error('la tarjeta solo admite ' + maxU + ' vectores por vértice');
     SK.leg = leg;
     SK.nj = nj; skProgram();
     SK.chars = chars; SK.ready = true;
@@ -6627,7 +6665,7 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
   skBegin(vp, ex, ey, ez, FOG_N, FOG_F);
   for (const s of vis) {
     const st = s.sk, C = st.C, d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez);
-    gl.uniform4fv(SK.U.uB, st.bones); gl.uniformMatrix4fv(SK.U.uM, false, st.model);
+    skSetB(st.bones); gl.uniformMatrix4fv(SK.U.uM, false, st.model);
     const bd = skBodyOf(s, C); skParts((bd ? bd.lod : C.lod)[d2 < d0 ? 0 : d2 < d1 ? 1 : 2]);
     if (C.leg && st.wpk && C.wp[st.wpk]) skParts(d2 < dw ? C.wp[st.wpk].near : C.wp[st.wpk].far);
   }
@@ -6637,12 +6675,12 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
     const d2 = (tk.x - ex) * (tk.x - ex) + (tk.z - ez) * (tk.z - ez);
     if (d2 < 80 * 80 && skInView(vp, tk.x, tk.y, tk.z, 0.6)) {
       if (!L.tommyM) { const M = L.tommyM = M4.create(); M4.translate(M, tk.x, tk.y + 0.024, tk.z); M4.rotY(M, tk.yaw); M4.rotX(M, Math.PI); M4.scale ? M4.scale(M, L.tommyS, L.tommyS, L.tommyS) : 0; }
-      gl.uniform4fv(SK.U.uB, L.tommyB); gl.uniformMatrix4fv(SK.U.uM, false, L.tommyM);
+      skSetB(L.tommyB); gl.uniformMatrix4fv(SK.U.uM, false, L.tommyM);
       skParts(d2 < 12 * 12 ? L.wp.thompson.near : L.wp.thompson.far);
     }
   }
   /* armas: piezas rígidas (un solo hueso, el identidad) */
-  gl.uniform4fv(SK.U.uB, SK.ident);
+  skSetB(SK.ident);
   for (const s of vis) {
     const st = s.sk; if (!st.weapon) continue;
     const d2 = (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez);
@@ -6729,7 +6767,7 @@ function gunFpDraw(vp, G, w, team, ex, ey, ez, sides) {
   M4.mul(_gfM, G, f.G);
   M4.mul(_gfM, G, f.arms);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
-  gl.uniform4fv(SK.U.uB, f.bones); gl.uniformMatrix4fv(SK.U.uM, false, _gfM);
+  skSetB(f.bones); gl.uniformMatrix4fv(SK.U.uM, false, _gfM);
   for (const sd of sides) if (f.base.sides[sd]) skParts(f.base.sides[sd]);
   skEnd();
   return true;
@@ -7424,7 +7462,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
     M4.mul(_lfp.M, _lfp.M, m4trs(_lfp.X || (_lfp.X = M4.create()), [fx.t[0] * h, fx.t[1] * h, fx.t[2] * h], qa, 1)); }
   M4.rotY(_lfp.M, Math.PI); M4.mul(_lfp.M, _lfp.M, _lfp.D);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
-  gl.uniform4fv(SK.U.uB, _lfp.B); gl.uniformMatrix4fv(SK.U.uM, false, _lfp.M);
+  skSetB(_lfp.B); gl.uniformMatrix4fv(SK.U.uM, false, _lfp.M);
   const bd = skBodyOf(p, C); skParts(bd ? bd.arms : C.arms); skParts(C.wp[key].near);
   skEnd();
   return true;
@@ -7447,9 +7485,9 @@ function skFpDraw(vp, G, kind, team, ex, ey, ez, sides) {
   const fp = skFp(kind, team); if (!fp) return false;
   M4.mul(_fpD, G, fp.F); M4.mul(_fpA, _fpD, fp.WskInv);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
-  gl.uniform4fv(SK.U.uB, SK.ident); gl.uniformMatrix4fv(SK.U.uM, false, _fpD);
+  skSetB(SK.ident); gl.uniformMatrix4fv(SK.U.uM, false, _fpD);
   skParts(SK.W[kind].full);
-  gl.uniform4fv(SK.U.uB, fp.bones); gl.uniformMatrix4fv(SK.U.uM, false, _fpA);
+  skSetB(fp.bones); gl.uniformMatrix4fv(SK.U.uM, false, _fpA);
   for (const sd of sides) if (fp.sides[sd]) skParts(fp.sides[sd]);
   skEnd();
   return true;
@@ -7461,7 +7499,7 @@ function skVrHand(vp, M, team, side, ex, ey, ez) {
   M4.copy(_fpL, M); M4.translate(_fpL, -palm[0], -palm[1], -palm[2]);
   M4.mul(_fpD, _fpL, fp.F); M4.mul(_fpA, _fpD, fp.WskInv);
   skBegin(vp, ex, ey, ez, 1e7, 2e7);
-  gl.uniform4fv(SK.U.uB, fp.bones); gl.uniformMatrix4fv(SK.U.uM, false, _fpA);
+  skSetB(fp.bones); gl.uniformMatrix4fv(SK.U.uM, false, _fpA);
   skParts(parts);
   skEnd();
   return true;
@@ -9426,9 +9464,9 @@ function vmDraw(M, P, base, lod, tint, vp, ex, ey, ez, after) {
           }
         }
         P.bonesFid = P.fid;
-        gl.uniform4fv(SK.U.uB, S.B); gl.uniformMatrix4fv(SK.U.uM, false, base);
+        skSetB(S.B); gl.uniformMatrix4fv(SK.U.uM, false, base);
       } else {
-        gl.uniform4fv(SK.U.uB, SK.ident); gl.uniformMatrix4fv(SK.U.uM, false, M4.mul(_vmM, base, P.W.subarray(m.node * 16, m.node * 16 + 16)));
+        skSetB(SK.ident); gl.uniformMatrix4fv(SK.U.uM, false, M4.mul(_vmM, base, P.W.subarray(m.node * 16, m.node * 16 + 16)));
       }
       if (pass) for (const p of parts) { gl.uniform1f(SK.U.uA, p.a); skParts([p]); }
       else skParts(parts);
@@ -9608,7 +9646,7 @@ async function vmLoad() {
       const g = await get(files[fi]);
       /* las orugas del Panzer tienen 120 huesos: hace falta que la tarjeta los admita (se mira antes de subir nada) */
       const nj = Math.max(0, ...(g.j.skins || []).map(s => s.joints.length));
-      if (nj * 3 + 12 > gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)) throw new Error('la tarjeta no admite ' + nj + ' huesos');
+      if (!SK.vtf && nj * 3 + 12 > gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)) throw new Error('la tarjeta no admite ' + nj + ' huesos');
       const M = await vmBuild(g, texMax), X = setup(M);
       if (nj > SK.nj) { SK.nj = nj; skProgram(); }       // el programa de los soldados se rehace con sitio para ellos
       VM3D[key] = X;
