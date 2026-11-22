@@ -1637,6 +1637,21 @@ class Aircraft {
         return;
       }
     }
+    // trees, palms and rocks are solid
+    if (nearSurf && env.treeHit && !this.onWater) {
+      const fem = { 'cola': 1, 'deriva': 1, 'hélice': 1, 'cúpula': 1 };
+      for (let k = -1; k < AC.crashPts.length; k++) {
+        const cp = k < 0 ? null : AC.crashPts[k];
+        const P = cp ? pointState(cp.p).P : this.pos;
+        const t = env.treeHit(P.x, P.y, P.z);
+        if (t) {
+          const what = TREE_WHAT[t] || 'un árbol';
+          if (speed < 1.5) { this.vel.mul(0); this.w.mul(0); break; }
+          this.crash(cp ? (fem[cp.name] ? 'La ' : 'El ') + cp.name + ' chocó contra ' + what : 'Chocaste contra ' + what);
+          return;
+        }
+      }
+    }
     if (this.onWater && this.up().y < 0.2) { this.crash(this.gearInWater > 0.2 ? 'Capotaje: amerizaje con el tren abajo' : 'El avión volcó'); return; }
     if (speed > 6 && this.onGround) {
       // flying into a hillside with the floats
@@ -2990,7 +3005,20 @@ const TERRAIN_FS = `
 in vec3 vWP; in vec3 vN; in vec4 vMask;
 uniform vec4 uRwyA;   // world x, z, angle, length
 uniform vec4 uRwyB;   // width, number at +end, number at -end, elevation
+uniform vec4 uApron;  // apron u0, u1, v0, v1 in runway coordinates
 uniform float uKind;  // 0 volcano, 1 tropical, 2 rocky
+// concrete apron and runway shoulder, per pixel (the per-vertex mask is far too coarse and smeared
+// pale concrete tens of metres into the grass)
+float apronMask(vec2 xz){
+  vec2 d = xz - uRwyA.xy; float ca = cos(uRwyA.z), sa = sin(uRwyA.z);
+  vec2 uv = vec2(d.x * ca + d.y * sa, -d.x * sa + d.y * ca);
+  vec2 c = vec2((uApron.x + uApron.y) * 0.5, (uApron.z + uApron.w) * 0.5), hh = vec2(abs(uApron.y - uApron.x) * 0.5, abs(uApron.w - uApron.z) * 0.5);
+  vec2 q = abs(uv - c) - hh;
+  float ap = 1.0 - smoothstep(0.0, 1.5, max(q.x, q.y));
+  vec2 q2 = abs(uv) - vec2(uRwyA.w * 0.5 + 30.0, uRwyB.x * 0.5 + 5.0);
+  float sh = 1.0 - smoothstep(0.0, 1.5, max(q2.x, q2.y));
+  return max(ap, sh * 0.55);
+}
 uniform vec3 uCrater;
 uniform float uErupt;
 const int SEGS[10] = int[10](63, 6, 91, 79, 102, 109, 125, 7, 127, 111);
@@ -3054,9 +3082,11 @@ void main(){
   float n1 = texture(uNoise, xz * 0.0041).r, n2 = texture(uNoise, xz * 0.031).g, n3 = texture(uNoise, xz * 0.19).b;
   float dist = length(uCamPos - vWP);
   // detail normal
-  vec2 dn = (vec2(texture(uNoise, xz * 0.05 + 0.13).g, texture(uNoise, xz * 0.05 + 0.57).b) - 0.5) * 0.5 * exp(-dist * 0.0012);
-  dn += (vec2(texture(uNoise, xz * 0.23 + 0.31).r, texture(uNoise, xz * 0.23 + 0.77).g) - 0.5) * 0.42 * exp(-dist * 0.006);
-  dn += (vec2(texture(uNoise, xz * 1.1 + 0.11).b, texture(uNoise, xz * 1.1 + 0.43).r) - 0.5) * 0.3 * exp(-dist * 0.025);
+  // (kept gentle: with a low sun, strong bump normals turned the ground into bright sun-coloured blotches)
+  vec2 dn = (vec2(texture(uNoise, xz * 0.05 + 0.13).g, texture(uNoise, xz * 0.05 + 0.57).b) - 0.5) * 0.14 * exp(-dist * 0.0012);
+  dn += (vec2(texture(uNoise, xz * 0.23 + 0.31).r, texture(uNoise, xz * 0.23 + 0.77).g) - 0.5) * 0.14 * exp(-dist * 0.006);
+  dn += (vec2(texture(uNoise, xz * 1.1 + 0.11).b, texture(uNoise, xz * 1.1 + 0.43).r) - 0.5) * 0.12 * exp(-dist * 0.025);
+  vec3 Ng = N;
   N = normalize(N + vec3(dn.x, 0.0, dn.y));
   float slope = 1.0 - N.y;
   bool volc = uKind < 0.5;
@@ -3076,13 +3106,13 @@ void main(){
   }
   vec3 ash = mix(vec3(0.075, 0.068, 0.066), vec3(0.17, 0.14, 0.125), n2) * (0.8 + 0.4 * n3);
   vec2 cd = xz - uCrater.xz; ash *= 0.72 + 0.56 * texture(uNoise, normalize(cd + 0.001) * 2.3 + length(cd) * 0.00035).b;
-  float beachH = 2.2 + n1 * 3.5;
+  float beachH = 1.4 + n1 * 1.6;
   vec3 col = mix(grass, jungle, vMask.y);
   col = mix(col, sand, 1.0 - smoothstep(beachH - 1.2, beachH + 0.8, h));
   col = mix(col, rock, smoothstep(0.28, 0.5, slope + (n2 - 0.5) * 0.25));
   col = mix(col, ash, clamp(vMask.z, 0.0, 1.0));
   {
-    float gw = (1.0 - vMask.y) * smoothstep(beachH - 0.2, beachH + 1.0, h) * (1.0 - smoothstep(0.24, 0.42, slope)) * (1.0 - vMask.z) * (1.0 - vMask.w);
+    float gw = (1.0 - vMask.y) * smoothstep(beachH - 0.2, beachH + 1.0, h) * (1.0 - smoothstep(0.24, 0.42, slope)) * (1.0 - vMask.z) * (1.0 - apronMask(xz));
     float nearG = 1.0 - smoothstep(25.0, 90.0, dist);
     float mott = texture(uNoise, xz * 0.9).g * 0.6 + texture(uNoise, xz * 3.7).b * 0.4;
     col *= 1.0 - gw * nearG * (0.22 + 0.25 * mott);
@@ -3092,7 +3122,8 @@ void main(){
   float rough = 0.85, spec = 0.05;
   // concrete apron
   vec3 conc = vec3(0.36, 0.36, 0.345) * (0.9 + 0.2 * n3);
-  col = mix(col, conc, vMask.w);
+  float apr = apronMask(xz);
+  col = mix(col, conc, apr);
   // runway
   float paint, skid;
   float rw = runway(xz, paint, skid);
@@ -3120,6 +3151,8 @@ void main(){
     col = mix(col, vec3(0.045, 0.035, 0.03), vMask.x);
     rough = mix(rough, 0.5, vMask.x);
   }
+  // paved surfaces are flat: no bump normals on runway and apron
+  N = normalize(mix(N, Ng, clamp(max(rw, apr), 0.0, 1.0)));
   float sh = planeShadow(vWP) * cloudShadow(vWP);
   vec3 lit = lighting(col, N, V, vWP, rough, spec, sh);
   if (uw > 0.0) {
@@ -3417,7 +3450,7 @@ void main(){
   }
   vec4 m = mix(mix(A, B, f.x), mix(C, D, f.x), f.y);
   float n1 = textureLod(uNoise, xz * 0.0041, 0.0).r, n2 = textureLod(uNoise, xz * 0.031, 0.0).g, n3 = textureLod(uNoise, xz * 0.19, 0.0).b;
-  float beachH = 2.2 + n1 * 3.5;
+  float beachH = 1.4 + n1 * 1.6;
   float dens = m.y * smoothstep(beachH - 0.3, beachH + 0.8, h);
   float sx = (B.x - A.x + D.x - C.x) * 0.5 / uGInfo.w, sz = (C.x - A.x + D.x - B.x) * 0.5 / uGInfo.w;
   float slope = 1.0 - inversesqrt(1.0 + sx * sx + sz * sz);
@@ -6251,6 +6284,8 @@ function drawTerrain() {
   ISLANDS.forEach((isl, i) => {
     const r = isl.rwy;
     setU(p, 'uRwyA', [r.wx, r.wz, r.ang, r.len]); setU(p, 'uRwyB', [r.wid, r.numPlus, r.numMinus, r.elev]);
+    const a = isl.apron, av0 = (r.wid / 2 + 8) * a.side, av1 = (r.wid / 2 + 32 + a.depth) * a.side;
+    setU(p, 'uApron', [a.u0, a.u1, av0, av1]);
     setU(p, 'uKind', isl.kind === 'volcano' ? 0 : isl.kind === 'tropical' ? 1 : 2);
     setU(p, 'uCrater', [CRATER_W.x, CRATER_W.y, CRATER_W.z]); setU(p, 'uErupt', ENV.erupt.glow);
     drawMesh(SCENE.terrain[i]);
@@ -6652,6 +6687,7 @@ function drawWorld(o) {
   drawLights(o.pixel);
   if (o.showPlane && !isBoat()) drawTracers();
   if (!o.reflection) drawSpray();
+  if (!o.reflection) drawSkywrite();
   if (o.showPlane && !o.cockpit && !isBoat() && AC.type === 'seaplane') drawPropDisc();
   if (o.showPlane && !o.cockpit && !isBoat() && AC.type === 'seaplane') drawPlaneGlass(false);
   if (MP.mode) MP.drawOthersLate(o);
@@ -6878,6 +6914,7 @@ function splash(P, strength) {
   emitSpray(P, new V3(0, 2 * strength, 0), n, 0.8, 2.5 * strength, 0.8, 2.2, 6 * strength, 7 * strength);
 }
 function updateFX(dt) {
+  if (GAME.state !== 'paused') SKYW.t += dt;
   const ac = VEH();
   // ---- wake trail: points along the hull's track, spaced by speed, each with its age and odometer ----
   const now = SIM.t, boat = isBoat();
@@ -7534,7 +7571,7 @@ function onKey(e, isDown) {
   // thrust reversers: with the levers at idle on the ground, a fresh press of "less power" deploys / stows them
   if (AC.jet && CAM.mode !== 'walk' && is('thrDown') && ac.throttle < 0.02 && ac.wheelsOnGround > 0) { ac.revSet = ac.revSet ? 0 : 1; ac.lev[0] = ac.lev[1] = ac.throttle = ac._thr = 0; UI.toast(ac.revSet ? 'Reversas desplegadas · R = más empuje inverso · F otra vez para plegarlas' : 'Reversas plegadas'); }
   if (is('gear')) {
-    if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo acrobático ON' : 'Humo acrobático OFF'); }
+    if (AC.smoke) { if (e.shiftKey) cycleSmokeColor(); else toggleSmoke(); }
     else if (ac.toggleGear()) { beep(ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(ac)); } else UI.toast('Tren fijo');
   }
   if (is('flapsDn') && !(AC.guns && is('reload'))) { if (AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); } else UI.toast('Este avión no tiene flaps'); }
@@ -7613,7 +7650,7 @@ function setupTouchControls() {
   hold('tRudL', () => { T.rudder = -1; }, () => { T.rudder = 0; });
   hold('tRudR', () => { T.rudder = 1; }, () => { T.rudder = 0; });
   hold('tBrake', () => { if (isBoat()) { SETTINGS.assist = SETTINGS.assist >= 2 ? 0 : 2; UI.toast(SETTINGS.assist >= 2 ? 'Trimado automático' : 'Velas en manual'); UI.setVehicleUI(); } else T.brake = true; }, () => { T.brake = false; });
-  hold('tGear', () => { if (isBoat()) T.hike = 1; else if (AC.guns) T.fire = true; else if (AC.smoke) { COMBAT.smokeOn = !COMBAT.smokeOn; UI.toast(COMBAT.smokeOn ? 'Humo ON' : 'Humo OFF'); } else { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(AIR.ac)); } }, () => { T.hike = 0; T.fire = false; });
+  hold('tGear', () => { if (isBoat()) T.hike = 1; else if (AC.guns) T.fire = true; else if (AC.smoke) toggleSmoke(); else { AIR.ac.toggleGear(); beep(AIR.ac.gearSet ? 520 : 380, 0.12, 0.07); UI.toast(gearMsg(AIR.ac)); } }, () => { T.hike = 0; T.fire = false; });
   hold('tSpoil', () => { if (AC.jet && GAME.state === 'flying') cycleSpoilers(AIR.ac); });
   hold('tFlapsUp', () => { if (isBoat()) T.jib = 1; else if (AC.guns) startReload(AIR.ac, 'player'); else if (AC.flapDetents.length > 1) { AIR.ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } else toggleFPV(); }, () => { T.jib = 0; });
   hold('tFlapsDn', () => { if (isBoat()) T.jib = -1; else if (AC.flapDetents.length > 1) { AIR.ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[AIR.ac.flapsSet] + '°'); } else toggleFPV(); }, () => { T.jib = 0; });
@@ -7684,7 +7721,7 @@ function pollGamepad(dt) {
   if (edge(15)) nextStyle(1);
   if (isBoat()) { out.hike = act('gear') ? 1 : act('flapsDn') ? -1 : 0; return out; }
   if (AC.guns) { out.fire = act('fire'); if (edgeA('reload') && GAME.state === 'flying') startReload(ac, 'player'); }
-  else if (edgeA('gear') && GAME.state === 'flying') { if (AC.smoke) COMBAT.smokeOn = !COMBAT.smokeOn; else if (ac.toggleGear()) UI.toast(gearMsg(ac)); else UI.toast('Tren fijo'); }
+  else if (edgeA('gear') && GAME.state === 'flying') { if (AC.smoke) toggleSmoke(); else if (ac.toggleGear()) UI.toast(gearMsg(ac)); else UI.toast('Tren fijo'); }
   if (!AC.guns && edgeA('flapsDn') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
   if (!AC.guns && edgeA('flapsUp') && GAME.state === 'flying' && AC.flapDetents.length > 1) { ac.setFlaps(-1); UI.toast('Flaps ' + AC.flapDetents[ac.flapsSet] + '°'); }
   if (act('trimDn')) ac.trim = clamp(ac.trim - 0.15 * dt, -0.6, 0.6);
@@ -9035,7 +9072,7 @@ function buildHelp(target) {
     ['VR', 'Stick dcho: vuelo · Stick izq: potencia y timón · A tren · B estilo · X/Y flaps · Gatillo: freno'],
   ];
   if (AC.guns) K.unshift(['Espacio', 'Disparar las ametralladoras'], ['X', 'Recargar (300 balas por cinta)'], ['B', 'Frenos']);
-  if (AC.smoke) K.unshift(['G', 'Humo acrobático ON / OFF'], ['J', 'Abrir / cerrar la cúpula'], ['Clic en cabina (V)', 'Gases, paso de hélice, mezcla, palanca, pedales y cúpula se mueven con el ratón']);
+  if (AC.smoke) K.unshift(['G', 'Humo de exhibición ON / OFF (queda 3 minutos en el cielo)'], ['Mayús + G', 'Cambiar el color del humo'], ['J', 'Abrir / cerrar la cúpula'], ['Clic en cabina (V)', 'Gases, paso de hélice, mezcla, palanca, pedales, cúpula, interruptores y botones de humo se usan con el ratón']);
   if (AC.guns) K.unshift(['Clic en cabina (V)', 'Gas, mezcla, magnetos, palanca, pedales y gatillos se accionan con el ratón']);
   if (AC.jet) K.unshift(['M', 'Aerofrenos 0 / 50 / 100 %'], ['F (gases en ralentí, en tierra)', 'Desplegar / plegar reversas · R da empuje inverso'], ['J', 'Puerta y escalerilla (parado en tierra)'],
     ['G', 'Tren (no sube con peso en las ruedas)'], ['Ñ', 'Piloto automático (y en el panel: AP, HDG con su perilla, ALT)'], ['Tab / Mayús+Tab', 'Vistas por todo el jet: cabina, pasaje, baño, motores, cola, tren…'],
@@ -9374,7 +9411,9 @@ const GLB_SPECS = {
       'Pedal_Derecho_Delantero', 'Pedal_Izquierdo_Delantero', 'Pedal_Derecho_Trasero', 'Pedal_Izquierdo_Trasero',
       'Aguja_Admision', 'Aguja_Altimetro_100ft', 'Aguja_Altimetro_1000ft', 'Aguja_Combustible', 'Aguja_G', 'Aguja_G_Max', 'Aguja_G_Min', 'Aguja_RPM', 'Aguja_Temp_Aceite',
       'Aguja_Variometro', 'Aguja_Velocidad', 'Avion_Coordinador', 'Bola_Coordinador', 'Brujula_Tarjeta', 'Horizonte_Disco', 'Rosa_Rumbos',
-      'Aguja_Altimetro_100ft_Trasero', 'Aguja_Altimetro_1000ft_Trasero', 'Aguja_G_Trasero', 'Aguja_RPM_Trasero', 'Aguja_Velocidad_Trasero'],
+      'Aguja_Altimetro_100ft_Trasero', 'Aguja_Altimetro_1000ft_Trasero', 'Aguja_G_Trasero', 'Aguja_RPM_Trasero', 'Aguja_Velocidad_Trasero',
+      'Interruptor_Magnetos', 'Interruptor_Navegacion', 'Interruptor_Estrobo', 'Boton_Humo', 'Boton_Color_Humo'],
+    emissive: true,
   },
   fokker: {
     url: 'fokker.glb.txt', fix: M4.mul(M4.create(), _ry(PI), M4.translation(M4.create(), 0, -1.45, -0.45)),
@@ -9628,7 +9667,18 @@ function planePose(type, ac) {
     P.Aguja_Altimetro_100ft_Trasero = P.Aguja_Altimetro_100ft; P.Aguja_Altimetro_1000ft_Trasero = P.Aguja_Altimetro_1000ft;
     P.Aguja_G_Trasero = P.Aguja_G; P.Aguja_RPM_Trasero = P.Aguja_RPM; P.Aguja_Velocidad_Trasero = P.Aguja_Velocidad;
     P.hide = { Helice_Disco: ac.rpm < 0.5 };
-  } else if (type === 'fokker') {
+    // switch panel: toggles up = ON, push buttons sink while pressed; lit caps and the nav lights
+    const sw = ac.sw, night = ENV.night || 0;
+    P.Interruptor_Magnetos = _rx(sw.ign ? -0.45 : 0.45); P.Interruptor_Navegacion = _rx(sw.nav ? -0.45 : 0.45); P.Interruptor_Estrobo = _rx(sw.strobe ? -0.45 : 0.45);
+    const push = k => M4.translation(M4.create(), 0, 0, (SIM.t - (ac.btnT && ac.btnT[k] || -9)) < 0.18 ? -0.005 : 0);
+    P.Boton_Humo = push('humo'); P.Boton_Color_Humo = push('color');
+    const on = ac === AIR.ac ? COMBAT.smokeOn : !!ac.smokeShow, sc = SMOKE_COLORS[SKYW.color].c;
+    const flash = Math.sin(SIM.t * TAU * 1.4) > 0.3;
+    P.glow = {
+      Luz_Humo: on ? 1.4 : 0.04, Luz_Color_Humo: sc.map(v => v * 0.9 + 0.05),
+      Luz_Roja: sw.nav ? 1 : 0, Luz_Verde: sw.nav ? 1 : 0, Luz_Blanca: sw.nav || (sw.strobe && flash) ? 1 : 0,
+      Aguja: lerp(0.08, 0.7, night), Pantallas: sw.batt ? 1 : 0.05,
+    };
     P.PIVOT_Propeller = _rz(ac.propAngle);
     P.PIVOT_Aileron_L = _rx(0.35 * s.a); P.PIVOT_Aileron_R = _rx(-0.35 * s.a);
     P.PIVOT_Elevator = _rx(0.45 * s.e); P.PIVOT_Rudder = _ry(0.45 * s.r);
@@ -9926,6 +9976,11 @@ function glbCockpitTargets() {
     add({ id: 'pedals', kind: 'pedals', nodes: ['Pedal_Derecho_Delantero', 'Pedal_Izquierdo_Delantero'], at: 'center', r: 0.07, label: () => 'Pedales · arrastra a los lados' });
     add({ id: 'pedals', kind: 'pedals', nodes: ['Pedal_Izquierdo_Delantero', 'Pedal_Derecho_Delantero'], at: 'center', r: 0.07, label: () => 'Pedales · arrastra a los lados' });
     add({ id: 'canopy', kind: 'button', nodes: ['Cupula'], at: 'center', r: 0.32, label: () => 'Cúpula · ' + (ac.canopySet ? 'ABIERTA' : 'CERRADA') + ' (J)', act: () => toggleCanopy() });
+    add({ id: 'sw_ign', kind: 'toggle', key: 'ign', nodes: ['Interruptor_Magnetos'], at: 'center', r: 0.018, label: () => 'MAGNETOS · ' + (ac.sw.ign ? 'ON (motor encendido)' : 'OFF (motor parado)') });
+    add({ id: 'sw_nav', kind: 'toggle', key: 'nav', nodes: ['Interruptor_Navegacion'], at: 'center', r: 0.018, label: () => 'NAV · luces de navegación · ' + (ac.sw.nav ? 'ON' : 'OFF') });
+    add({ id: 'sw_strobe', kind: 'toggle', key: 'strobe', nodes: ['Interruptor_Estrobo'], at: 'center', r: 0.018, label: () => 'STROBE · destellos · ' + (ac.sw.strobe ? 'ON' : 'OFF') });
+    add({ id: 'smoke', kind: 'button', nodes: ['Boton_Humo'], at: 'center', r: 0.024, label: () => 'HUMO · ' + (COMBAT.smokeOn ? 'ENCENDIDO' : 'apagado') + ' · dura 3 min en el cielo (G)', act: () => toggleSmoke() });
+    add({ id: 'smokeColor', kind: 'button', nodes: ['Boton_Color_Humo'], at: 'center', r: 0.02, label: () => 'Color del humo · ' + SMOKE_COLORS[SKYW.color].n + ' (Mayús + G)', act: () => cycleSmokeColor() });
   } else if (AC.type === 'fokker') {
     lever('power', 'X_Gas', ['X_Gas'], () => ac.throttle, v => { ac.throttle = v; }, () => 'Gas · ' + Math.round(ac.throttle * 100) + ' %');
     lever('cond', 'X_Mezcla', ['X_Mezcla'], () => ac.condLever, v => { const was = ac.engineOn; ac.condLever = v; if (was !== ac.engineOn) UI.toast(ac.engineOn ? 'Mezcla abierta: motor en marcha' : 'Corte de mezcla: motor parado'); }, () => 'Mezcla (aire/gasolina) · ' + (ac.condLever < 0.08 ? 'CORTE' : Math.round(ac.condLever * 100) + ' %'));
@@ -10012,7 +10067,7 @@ function drawGLB(model, world, pose, hit) {
     const hl = G.anim && pose && pose.hl && pose.hl[G.anim];
     setU(p, 'uHit', hl ? [0, 0, 0.25] : (hit || [0, 0, 0]));
     setU(p, 'uColor', G.color); setU(p, 'uMR', G.mr);
-    if (G.emis) { const k = pose && pose.glow && pose.glow[G.name] !== undefined ? pose.glow[G.name] : 1; setU(p, 'uEmis', [G.emis[0] * k, G.emis[1] * k, G.emis[2] * k, G.emisTex ? 1 : 0]); }
+    if (G.emis) { const k = pose && pose.glow && pose.glow[G.name] !== undefined ? pose.glow[G.name] : 1, K = Array.isArray(k) ? k : [k, k, k]; setU(p, 'uEmis', [G.emis[0] * K[0], G.emis[1] * K[1], G.emis[2] * K[2], G.emisTex ? 1 : 0]); }
     else setU(p, 'uEmis', _noEmis);
     setTex(p, 'uBase', G.tex || RENDER.whiteTex);
     drawMesh(G.mesh);
@@ -10124,7 +10179,7 @@ function spawnEnemy(mode) {
   ac.throttle = 1; ac.lights = false; ac.isAI = true;
   COMBAT.enemy = { ac, assist: {}, ctl: { pitch: 0, roll: 0, yaw: 0 }, state: 'patrol', evadeT: 0, evadeDir: 1, center: new V3(isl.cx, 0, isl.cz), orbit: Math.random() < 0.5 ? 1 : -1, gone: false, goneT: 0, burstT: 0 };
 }
-const ENVQ_AI = { t: 0, wind: new V3(), terrainH: (x, z) => terrainH(x, z), terrainN: (x, z) => terrainNormal(x, z), waterH: (x, z) => waterH(x, z, SIM.t), windAt: () => WIND_NOW.base };
+const ENVQ_AI = { t: 0, wind: new V3(), treeHit: (x, y, z) => treeHit(x, y, z), terrainH: (x, z) => terrainH(x, z), terrainN: (x, z) => terrainNormal(x, z), waterH: (x, z) => waterH(x, z, SIM.t), windAt: () => WIND_NOW.base };
 // the AI pilot: lead pursuit with gravity drop, break turns when the player sits on its tail,
 // terrain look-ahead, energy care (no pulling into a stall) and short aimed bursts
 function aiThink(E, dt) {
@@ -10290,13 +10345,95 @@ function trailFX(ac, M, dt) {
   }
 }
 function acroSmoke(ac, M, dt) {
-  if (!COMBAT.smokeOn || !AC.smoke || ac.crashed || SETTINGS.particles <= 0) return;
-  COMBAT.smokeAcc += dt * 45 * Math.min(SETTINGS.particles, 1);
-  while (COMBAT.smokeAcc >= 1) {
-    COMBAT.smokeAcc -= 1;
-    const P = M4.point(M, AC.smokeP);
-    emitSpray(P, vscale(ac.vel, 0.05), 1, 0.9, 1.6, 5, 8, 0.4, 0.15, 0.9, { g: -0.01, drag: 1.2, grow: 2.5 });
+  if (!COMBAT.smokeOn || !AC.smoke || ac.crashed) { SKYW.last = null; return; }
+  skywEmit(M4.point(M, AC.smokeP), ac.vel);
+}
+// ---------------- display smoke that stays in the sky (3 minutes): write or draw with it ----------------
+// Puffs are laid every ~1.4 m along the track into a ring buffer; the vertex shader grows, drifts and fades them,
+// so the CPU only uploads while smoke is coming out.
+const SMOKE_COLORS = [
+  { n: 'BLANCO', c: [1, 1, 1] }, { n: 'ROJO', c: [0.95, 0.1, 0.08] }, { n: 'AZUL', c: [0.12, 0.32, 1] },
+  { n: 'VERDE', c: [0.12, 0.8, 0.22] }, { n: 'AMARILLO', c: [1, 0.82, 0.08] }, { n: 'ROSA', c: [1, 0.32, 0.68] },
+];
+const SKYW = { N: 14000, life: 180, t: 0, head: 0, count: 0, color: 0, last: null, lastT: 0, dirty: false, mesh: null,
+  A: new Float32Array(14000 * 4), B: new Float32Array(14000 * 4) };
+function toggleSmoke() {
+  if (!AC.smoke) return;
+  COMBAT.smokeOn = !COMBAT.smokeOn; SKYW.last = null;
+  const ac = AIR.ac; (ac.btnT || (ac.btnT = {})).humo = SIM.t; beep(COMBAT.smokeOn ? 760 : 420, 0.06, 0.05);
+  UI.toast(COMBAT.smokeOn ? 'Humo ' + SMOKE_COLORS[SKYW.color].n.toLowerCase() + ' ENCENDIDO · se queda 3 minutos en el cielo: ¡escribe o dibuja!' : 'Humo apagado');
+}
+function cycleSmokeColor() {
+  SKYW.color = (SKYW.color + 1) % SMOKE_COLORS.length;
+  const ac = AIR.ac; (ac.btnT || (ac.btnT = {})).color = SIM.t; beep(620, 0.05, 0.04);
+  UI.toast('Color del humo: ' + SMOKE_COLORS[SKYW.color].n.toLowerCase());
+}
+function skywPut(x, y, z, t) {
+  const i = SKYW.head, c = SMOKE_COLORS[SKYW.color].c;
+  SKYW.A[i * 4] = x; SKYW.A[i * 4 + 1] = y; SKYW.A[i * 4 + 2] = z; SKYW.A[i * 4 + 3] = t;
+  SKYW.B[i * 4] = Math.random() * 10; SKYW.B[i * 4 + 1] = c[0]; SKYW.B[i * 4 + 2] = c[1]; SKYW.B[i * 4 + 3] = c[2];
+  SKYW.head = (i + 1) % SKYW.N; SKYW.count = Math.min(SKYW.count + 1, SKYW.N); SKYW.dirty = true;
+}
+function skywEmit(P, vel) {
+  const L = SKYW.last, t = SKYW.t;
+  if (!L || vsub(P, L.p).len() > 80) { skywPut(P.x, P.y, P.z, t); SKYW.last = { p: P.clone(), t }; return; }
+  const d = vsub(P, L.p), len = d.len(), step = 1.1;
+  if (len < step) { if (t - L.t > 0.12) { skywPut(P.x, P.y, P.z, t); SKYW.last = { p: P.clone(), t }; } return; }
+  const n = Math.floor(len / step);
+  for (let k = 1; k <= n; k++) { const f = k * step / len; skywPut(L.p.x + d.x * f, L.p.y + d.y * f, L.p.z + d.z * f, lerp(L.t, t, f)); }
+  const f = n * step / len; SKYW.last = { p: new V3(L.p.x + d.x * f, L.p.y + d.y * f, L.p.z + d.z * f), t };
+}
+function skywShift(dx, dz) { for (let i = 0; i < SKYW.count; i++) { SKYW.A[i * 4] += dx; SKYW.A[i * 4 + 2] += dz; } if (SKYW.last) { SKYW.last.p.x += dx; SKYW.last.p.z += dz; } SKYW.dirty = true; }
+const SKYW_VS = `
+in vec2 aPos; in vec4 iA; in vec4 iB;
+uniform float uST; uniform vec2 uDrift; uniform float uLife;
+out vec2 vUV; out float vA; out vec3 vWP; out vec3 vCol; out float vSeed;
+void main(){
+  float age = uST - iA.w;
+  vA = 0.0; vUV = aPos; vCol = iB.yzw; vSeed = iB.x; vWP = iA.xyz;
+  if (age < 0.0 || age > uLife) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  float r = 1.1 + 5.0 * (1.0 - exp(-age / 16.0)) + age * 0.02;
+  vec3 c = iA.xyz + vec3(uDrift.x, 0.0, uDrift.y) * age + vec3(0.0, age * 0.03, 0.0);
+  float a = iB.x * 6.2832; float ca = cos(a), sa = sin(a);
+  vec2 q = vec2(aPos.x * ca - aPos.y * sa, aPos.x * sa + aPos.y * ca);
+  vec3 right = vec3(uView[0][0], uView[1][0], uView[2][0]);
+  vec3 up = vec3(uView[0][1], uView[1][1], uView[2][1]);
+  float d = distance(c, uCamPos);
+  // fade puffs that would fill the screen right at the camera, thin them as they spread
+  vA = smoothstep(0.0, 0.35, age) * (1.0 - smoothstep(uLife * 0.7, uLife, age)) * mix(0.6, 0.26, smoothstep(0.0, 60.0, age)) * smoothstep(r * 0.6, r * 2.2, d);
+  vWP = c; vUV = q;
+  gl_Position = uViewProj * vec4(c + (right * aPos.x + up * aPos.y) * r, 1.0);
+}
+`;
+const SKYW_FS = `
+in vec2 vUV; in float vA; in vec3 vWP; in vec3 vCol; in float vSeed;
+void main(){
+  float r = length(vUV); if (r > 1.0 || vA <= 0.002) discard;
+  float n = texture(uNoise, vUV * 0.22 + vSeed * 0.37).r * 0.6 + texture(uNoise, vUV * 0.5 - vSeed * 0.21).g * 0.4;
+  float a = clamp(exp(-r * r * 3.2) * (0.35 + 1.1 * n) - 0.04, 0.0, 1.0) * vA;
+  if (uToon > 0.5) a = step(0.15, a) * vA;
+  vec3 V = normalize(vWP - uCamPos);
+  float ph = pow(max(dot(V, uSunDir), 0.0), 8.0) * 0.8;
+  float shade = 0.82 + 0.18 * n;
+  vec3 lit = (uSunCol * max(uSunDir.y + 0.06, 0.0) * (0.75 + ph) + uAmbSky * 1.35 + uMoonCol * 0.5) * shade;
+  vec3 c = vCol * 0.9 * lit;
+  vec3 fc; float f = fogFactor(vWP, fc); c = mix(c, fc, f);
+  outC(c * a, a);
+}
+`;
+function drawSkywrite() {
+  if (!SKYW.count) return;
+  if (!SKYW.mesh) {
+    const quad = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]);
+    SKYW.mesh = makeMesh({ aPos: { data: quad, size: 2 }, iA: { data: SKYW.A, size: 4, divisor: 1, dynamic: true }, iB: { data: SKYW.B, size: 4, divisor: 1, dynamic: true } }, new Uint16Array([0, 1, 2, 0, 2, 3]));
+    RENDER.P.skyw = makeProgram('skyw', SKYW_VS, SKYW_FS); SKYW.dirty = true;
   }
+  if (SKYW.dirty) { updateBuf(SKYW.mesh, 'iA', SKYW.A, SKYW.count * 4); updateBuf(SKYW.mesh, 'iB', SKYW.B, SKYW.count * 4); SKYW.dirty = false; }
+  const p = RENDER.P.skyw; useProg(p);
+  setU(p, 'uST', SKYW.t); setU(p, 'uLife', SKYW.life); setU(p, 'uDrift', [ENV.wind.x * 0.5, ENV.wind.z * 0.5]);
+  setBlend('premul'); setDepth(true, false); setCull(false);
+  drawMesh(SKYW.mesh, SKYW.count);
+  setBlend(null); setDepth(true, true);
 }
 function explode(P, big) {
   emitSpray(P, new V3(0, 3, 0), Math.round(36 * Math.max(SETTINGS.particles, 0.3)), 1.5, big ? 6 : 4, 1.5, 4, 14, 8, 1, { hot: 1, dark: 0.6, g: 0.15, drag: 1.4 });
@@ -10797,12 +10934,55 @@ function placeVegetation2(density) {
   return T;
 }
 let ringClear = null;   // set by the ring course so no tree grows inside a gate
+// ---------------- solid vegetation: trees, palms, bushes and rocks are obstacles ----------------
+// Each model gets a radial profile (widest point per height band, a bit shrunk because crowns are not solid);
+// instances go into a 32 m hash grid so a check costs a handful of distance tests.
+const TREECOL = { cell: 32, grid: new Map(), prof: {}, names: {} };
+const TREE_WHAT = { palm: 'una palmera', broad: 'un árbol', broad2: 'un árbol', flower: 'un árbol', pine: 'un pino', bush: 'un arbusto', bush2: 'un arbusto', rock: 'una roca', rock2: 'una roca', dead: 'un árbol seco' };
+function buildTreeCollision(inst) {
+  TREECOL.grid.clear(); TREECOL.prof = {};
+  const NB = 10;
+  for (const type in inst) {
+    const list = inst[type]; if (!list.length || !VEG2_MODELS[type]) continue;
+    const g = VEG2_MODELS[type](1), P = g.p;
+    let H = 0; for (let k = 1; k < P.length; k += 3) H = Math.max(H, P[k]);
+    if (H <= 0.05) continue;
+    const r = new Float32Array(NB);
+    for (let k = 0; k < P.length; k += 3) { const b = clamp(Math.floor(P[k + 1] / H * NB), 0, NB - 1); r[b] = Math.max(r[b], Math.hypot(P[k], P[k + 2])); }
+    const solid = type.startsWith('rock') ? 0.9 : type.startsWith('bush') ? 0.75 : 0.62;
+    for (let b = 0; b < NB; b++) r[b] = Math.max(r[b] * solid, type.startsWith('rock') ? 0.3 : 0.25);
+    TREECOL.prof[type] = { H, r, NB };
+    for (const v of list) {
+      const key = Math.floor(v[0] / TREECOL.cell) + ',' + Math.floor(v[2] / TREECOL.cell);
+      let a = TREECOL.grid.get(key); if (!a) TREECOL.grid.set(key, a = []);
+      a.push({ x: v[0], y: v[1], z: v[2], s: v[4], t: type });
+    }
+  }
+}
+// what is at world point (x, y, z)? null or the vegetation type
+function treeHit(x, y, z) {
+  if (!TREECOL.grid.size) return null;
+  const C = TREECOL.cell, cx = Math.floor(x / C), cz = Math.floor(z / C);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = TREECOL.grid.get((cx + i) + ',' + (cz + j)); if (!a) continue;
+    for (const o of a) {
+      const pr = TREECOL.prof[o.t], dy = y - o.y, Hs = pr.H * o.s;
+      if (dy < -0.5 || dy > Hs) continue;
+      const d = Math.hypot(x - o.x, z - o.z);
+      if (d > 12) continue;
+      const b = clamp(Math.floor(dy / Hs * pr.NB), 0, pr.NB - 1);
+      if (d < pr.r[b] * o.s) return o.t;
+    }
+  }
+  return null;
+}
 function buildVegMeshes2(density) {
   for (const k in VEG2.types) { deleteMesh(VEG2.types[k].hi); deleteMesh(VEG2.types[k].lo); }
   VEG2.types = {}; VEG2.camX = 1e9; VEG2.key = '';
-  SCENE.veg = {};
+  SCENE.veg = {}; TREECOL.grid.clear();
   if (density <= 0) return;
   const inst = placeVegetation2(density), C0 = VEG2.cell;
+  buildTreeCollision(inst);
   for (const type in VEG2_MODELS) {
     const list = inst[type]; if (!list.length) continue;
     // sort the instances by cell so each cell is one contiguous run
@@ -11054,7 +11234,7 @@ const BOAT = { b: new Boat(), input: { helm: 0, main: 0, jib: 0, hike: 0 } };
 const VEH = () => GAME.vehicle === 'boat' ? BOAT.b : AIR.ac;
 const isBoat = () => GAME.vehicle === 'boat';
 let CRATER_W = new V3(), LAVA_POS = new V3(), LAVA_ENTRY = new V3();
-const ENVQ = { t: 0, wind: new V3(), terrainH: (x, z) => terrainH(x, z), terrainN: (x, z) => terrainNormal(x, z), waterH: (x, z) => waterH(x, z, SIM.t) };
+const ENVQ = { t: 0, wind: new V3(), treeHit: (x, y, z) => treeHit(x, y, z), terrainH: (x, z) => terrainH(x, z), terrainN: (x, z) => terrainNormal(x, z), waterH: (x, z) => waterH(x, z, SIM.t) };
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -11169,7 +11349,7 @@ function startFlight() {
   UI.show('menu', false); UI.show('crash', false);
   if (CAM_INSIDE(CAM.mode) && !XR.session) CAM.mode = 'chase';
   UI.applyHud(); UI.updateQuick();
-  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo' : AC.type === 'fokker' ? 'Fokker Dr.I · vuelo libre: potencia a tope, levanta la cola y despega a unos 50 nudos' : AC.jet ? (GAME.spawnKind === 'air' ? 'Jet privado en vuelo hacia ' + ISLANDS[GAME.target].name + ' · máximo 320 nudos' : 'Jet privado: flaps 10° (X), gases a tope (R) y rota a 115 nudos sin pasar de 10° de morro') : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
+  UI.toast(isBoat() ? (GAME.touchUI ? 'Velero: joystick = caña · barra MAYOR = escota · FOQUE ± · BANDA' : 'Velero: A/D timón · W/S escota mayor · E/Q foque · X/Z sacar banda') : AC.guns ? (GAME.spawnKind === 'air' ? '¡El Barón Rojo está en el aire! Espacio = disparar' : 'Despega: el Barón Rojo te espera sobre la isla · Espacio = disparar') : AC.smoke ? 'Avioneta acrobática: potencia a tope y rota a 60 nudos · G = humo (dura 3 min, ¡escribe en el cielo!)' : AC.type === 'fokker' ? 'Fokker Dr.I · vuelo libre: potencia a tope, levanta la cola y despega a unos 50 nudos' : AC.jet ? (GAME.spawnKind === 'air' ? 'Jet privado en vuelo hacia ' + ISLANDS[GAME.target].name + ' · máximo 320 nudos' : 'Jet privado: flaps 10° (X), gases a tope (R) y rota a 115 nudos sin pasar de 10° de morro') : GAME.spawnKind === 'water' ? 'En el agua: tren arriba, flaps 10°, potencia a tope' : GAME.spawnKind === 'air' ? 'En vuelo hacia ' + ISLANDS[GAME.target].name : 'En pista: potencia a tope y rota a 80 nudos');
   GAME.lastT = performance.now();
 }
 function respawn() {
@@ -11199,6 +11379,7 @@ function onCrash() {
   const wet = waterH(ac.pos.x, ac.pos.z, SIM.t) > terrainH(ac.pos.x, ac.pos.z);
   splash(ac.pos.clone().add(new V3(0, wet ? -1.5 : 0, 0)), 2.4);
   splash(ac.pos.clone(), 1.6);
+  if (!isBoat() && !wet) explode(ac.pos.clone().add(new V3(0, 1, 0)), true);
   boom(0.7, 1.8);
   CAM.shake = 3;
   $('crashT').textContent = isBoat() ? (ac.crashReason.startsWith('Tumbado') ? 'Volcado' : 'Encallado') : wet ? 'Al agua' : 'Accidente';
@@ -11218,7 +11399,7 @@ function worldWrap() {
   const d = new V3(sx, 0, sz);
   // everything that travels with the player moves with it; the islands stay where they are
   v.pos.add(d); CAM.pos.add(d); if (CAM.fly) CAM.fly.add(d);
-  FX.wake.forEach(w => { w.x += sx; w.z += sz; }); FX.spray.forEach(q => q.p.add(d)); FX.lastWake = null;
+  FX.wake.forEach(w => { w.x += sx; w.z += sz; }); FX.spray.forEach(q => q.p.add(d)); FX.lastWake = null; skywShift(sx, sz);
   const E = COMBAT.enemy; if (E && E.ac) E.ac.pos.add(d);
   COMBAT.bullets.forEach(b => b.p.add(d));
   WORLD.sx += sx; WORLD.sz += sz;
