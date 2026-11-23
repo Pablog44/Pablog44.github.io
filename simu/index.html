@@ -6419,7 +6419,9 @@ function drawCabin(mode) {
     // jet: the cabin lights fill the interior (more noticeable at night)
     const sw = AIR.ac.sw, bus = sw.batt || sw.gen || sw.gen2, k = AC.jet && bus ? (sw.cabin ? 1 : 0.12) * (0.2 + 0.8 * (ENV.night || 0)) : 0;
     RENDER.cabinFill = k ? [0.13 * k, 0.10 * k, 0.068 * k] : null;
-    drawGLBPlane(AIR.ac, RENDER.planeM); RENDER.cabinFill = null; return;
+    drawGLBPlane(AIR.ac, RENDER.planeM); RENDER.cabinFill = null;
+    if (AC.type === 'fokker') drawFokkerDisc(AIR.ac, RENDER.planeM);
+    return;
   }
   const P = PLANE.parts, M = RENDER.planeM;
   const co = cabinOpts();
@@ -6712,6 +6714,8 @@ function drawWorld(o) {
   if (!o.reflection) drawSpray();
   if (!o.reflection) drawSkywrite();
   if (o.showPlane && !o.cockpit && !isBoat() && AC.type === 'seaplane') drawPropDisc();
+  if (o.showPlane && !o.cockpit && !isBoat() && AC.type === 'fokker' && !o.reflection) drawFokkerDisc(AIR.ac, RENDER.planeM);
+  if (o.showPlane && !isBoat() && !o.reflection && COMBAT.enemy && !COMBAT.enemy.gone && !COMBAT.enemy.remote) drawFokkerDisc(COMBAT.enemy.ac, enemyMatrix(COMBAT.enemy));
   if (o.showPlane && !o.cockpit && !isBoat() && AC.type === 'seaplane') drawPlaneGlass(false);
   if (MP.mode) MP.drawOthersLate(o);
 }
@@ -9464,7 +9468,7 @@ const GLB_SPECS = {
   },
   fokker: {
     url: 'fokker.glb.txt', fix: M4.mul(M4.create(), _ry(PI), M4.translation(M4.create(), 0, -1.45, -0.45)),
-    anim: ['PIVOT_Propeller', 'PIVOT_Aileron_L', 'PIVOT_Aileron_R', 'PIVOT_Elevator', 'PIVOT_Rudder', 'PIVOT_Wheel_L', 'PIVOT_Wheel_R', 'PIVOT_Stick',
+    anim: ['PIVOT_Propeller', 'Propeller', 'PIVOT_Aileron_L', 'PIVOT_Aileron_R', 'PIVOT_Elevator', 'PIVOT_Rudder', 'PIVOT_Wheel_L', 'PIVOT_Wheel_R', 'PIVOT_Stick',
       'PIVOT_Pedals', 'PIVOT_Gauge_Altitude', 'PIVOT_Gauge_Fuel', 'PIVOT_Gauge_RPM'],
     extra: m => addFokkerControls(m),
   },
@@ -9727,7 +9731,14 @@ function planePose(type, ac) {
       Luz_Roja: sw.nav ? 1 : 0, Luz_Verde: sw.nav ? 1 : 0, Luz_Blanca: sw.nav || (sw.strobe && flash) ? 1 : 0,
       Aguja: lerp(0.08, 0.7, night), Pantallas: sw.batt ? 1 : 0.05,
     };
-    P.PIVOT_Propeller = _rz(ac.propAngle);
+  } else if (type === 'fokker') {
+    // the rotary engine turns with the propeller. Drawn at its true speed (up to 1350 rpm = 141 rad/s) the two
+    // blades strobe against the frame rate and look frozen, so the visible angle advances at most ~0.4 rad per
+    // frame and, once the engine is really turning, the blades give way to a blurred disc (drawFokkerDisc)
+    const pa = propVisual(ac, 1350);
+    P.PIVOT_Propeller = _rz(pa);
+    P.Propeller = M4.mul(M4.create(), M4.translation(M4.create(), 0, FOKKER_HUB[1], FOKKER_HUB[2]), M4.mul(M4.create(), _rz(pa), M4.translation(M4.create(), 0, -FOKKER_HUB[1], -FOKKER_HUB[2])));
+    P.hide = { Propeller: ac.rpm > 0.5 };
     P.PIVOT_Aileron_L = _rx(0.35 * s.a); P.PIVOT_Aileron_R = _rx(-0.35 * s.a);
     P.PIVOT_Elevator = _rx(0.45 * s.e); P.PIVOT_Rudder = _ry(0.45 * s.r);
     P.PIVOT_Wheel_L = _rx(ac.wheelAng || 0); P.PIVOT_Wheel_R = P.PIVOT_Wheel_L;
@@ -10205,6 +10216,57 @@ function drawTracers() {
   setBlend(null); setDepth(true, true);
 }
 function enemyMatrix(E) { return M4.fromQT(RENDER.enemyM || (RENDER.enemyM = M4.create()), E.ac.q, E.ac.pos); }
+const FOKKER_HUB = [0, 1.59, 1.815], FOKKER_PROP_R = 1.31;
+function propVisual(ac, rpmMax) {
+  if (ac._pvT !== SIM.t) {
+    const dt = clamp(SIM.t - (ac._pvT ?? SIM.t), 0, 0.1); ac._pvT = SIM.t;
+    const w = (ac.rpm || 0) * rpmMax / 60 * TAU;
+    ac._pvA = ((ac._pvA || 0) + Math.min(w * dt, 0.42)) % TAU;
+  }
+  return ac._pvA || 0;
+}
+const PROPDISC_VS = `
+in vec2 aPos;
+uniform mat4 uModel;
+out vec2 vUV; out vec3 vWP; out vec3 vN;
+void main(){ vec4 rp = uModel * vec4(aPos, 0.0, 1.0); vUV = aPos; vWP = rp.xyz + uEyeW; vN = normalize(mat3(uModel) * vec3(0.0, 0.0, 1.0)); gl_Position = uVPR * rp; }
+`;
+const PROPDISC_FS = `
+in vec2 vUV; in vec3 vWP; in vec3 vN;
+uniform float uK; uniform float uAng; uniform vec3 uTint;
+void main(){
+  float r = length(vUV); if (r > 1.0 || r < 0.05) discard;
+  // two blurred blades: wide and dense near the root, narrow at the tips
+  float ang = atan(vUV.y, vUV.x) - uAng;
+  float streak = 0.62 + 0.38 * cos(2.0 * ang);
+  float cov = mix(0.46, 0.16, smoothstep(0.08, 1.0, r)) * streak * (1.0 - smoothstep(0.94, 1.0, r));
+  float tip = smoothstep(0.86, 0.93, r) * (1.0 - smoothstep(0.97, 1.0, r));
+  vec3 N = normalize(vN); vec3 V = normalize(uCamPos - vWP); if (dot(N, V) < 0.0) N = -N;
+  vec3 lit = uSunCol * max(dot(N, uSunDir), 0.0) * 0.55 + uAmbSky * 0.9 + uMoonCol * 0.3;
+  vec3 c = uTint * (1.0 + tip * 0.5) * lit;
+  float a = (cov + tip * 0.05) * uK;
+  vec3 fc; float f = fogFactor(vWP, fc); c = mix(c, fc, f);
+  outC(c * a, a);
+}
+`;
+const _pdM = M4.create(), _pdM2 = M4.create();
+function drawFokkerDisc(ac, world) {
+  const k = clamp((ac.rpm - 0.3) / 0.2, 0, 1); if (k <= 0 || !MODELS.fokker) return;
+  if (!RENDER.propDisc) {
+    const v = [0, 0]; for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU; v.push(Math.cos(a), Math.sin(a)); }
+    const idx = []; for (let i = 1; i <= 48; i++) idx.push(0, i, i + 1);
+    RENDER.propDisc = makeMesh({ aPos: { data: new Float32Array(v), size: 2 } }, new Uint16Array(idx));
+    RENDER.P.propDisc = makeProgram('propDisc', PROPDISC_VS, PROPDISC_FS);
+  }
+  const p = RENDER.P.propDisc; useProg(p);
+  M4.mul(_pdM, world, MODELS.fokker.fix);
+  M4.mul(_pdM, _pdM, M4.translation(_pdM2, FOKKER_HUB[0], FOKKER_HUB[1], FOKKER_HUB[2]));
+  M4.mul(_pdM, _pdM, TRS(0, 0, 0, 0, 0, 0, FOKKER_PROP_R, FOKKER_PROP_R, 1));
+  setU(p, 'uModel', relM(_pdM)); setU(p, 'uK', k); setU(p, 'uAng', propVisual(ac, 1350)); setU(p, 'uTint', [0.3, 0.19, 0.1]);
+  setBlend('premul'); setDepth(true, false); setCull(false);
+  drawMesh(RENDER.propDisc);
+  setBlend(null); setDepth(true, true);
+}
 function drawEnemy() {
   const E = COMBAT.enemy; if (!E || E.gone || E.remote) return;
   drawGLB(MODELS.fokker, enemyMatrix(E), planePose('fokker', E.ac), planeHit(E.ac));
@@ -12098,6 +12160,7 @@ MP.drawOthers = o => {
 MP.drawOthersLate = o => {
   if (!o.showPlane) return;
   for (const e of MP.others()) if (e.kind === 'p' && e.type === 'seaplane') MP.drawSeaplaneFor(e.obj, e.M, true);
+  else if (e.kind === 'p' && e.type === 'fokker' && !o.reflection) drawFokkerDisc(e.obj, e.M);
 };
 MP.dynLights = put => {
   for (const e of MP.others()) {

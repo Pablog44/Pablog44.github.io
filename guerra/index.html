@@ -1686,7 +1686,7 @@ function gBreda(q) {
 }
 const GUN_DEF = {
   mosin: q => gBoltRifle(q, { L: 1.232, wood: GNC.birch, mag: 'mosin', split: true, knob: true, bands: [-0.47, -0.72], hg: [-0.34, -0.74], hood: true, rod: true, exp: 0.09, zr: -0.3 }),
-  mauser93: q => gBoltRifle(q, { L: 1.235, wood: GNC.wal, mag: null, bands: [-0.52], hg: [-0.33, -0.5], rod: true, exp: 0.13, zr: -0.3, left: -0.47 }),
+  mauser93: q => ({ ...gBoltRifle(q, { L: 1.235, wood: GNC.wal, mag: null, bands: [-0.52], hg: [-0.33, -0.5], rod: true, exp: 0.13, zr: -0.3, left: -0.47 }), sight: [0, 0.0865, -0.3] }),       // las miras del modelo de Blender
   mauser16: q => gBoltRifle(q, { L: 1.05, wood: GNC.wal, mag: null, bent: true, bands: [-0.45], hg: [-0.33, -0.6], exp: 0.07, zr: -0.3, left: -0.38 }),
   carcano: q => gBoltRifle(q, { L: 1.29, wood: GNC.beech, mag: 'carcano', split: true, bands: [-0.55, -0.8], hg: [-0.36, -0.55], rod: true, exp: 0.12, zr: -0.32, left: -0.42 }),
   naranjero: q => gMp28(q, { wood: GNC.beech, magL: 0.23, housing: GNC.steel }),
@@ -2045,7 +2045,7 @@ const FPV = {
 const TPM = {
   lewis: { file: 'lewis.json', tex: 'lewis', M: null, P: null, busy: false, err: '' },
   dp27: { file: 'dp27.json', tex: 'dp27', M: null, P: null, busy: false, err: '' },
-  mauser93: { file: 'mauser93.json', tex: 'mauser93', hd: true, bolt: true, M: null, P: null, busy: false, err: '' },
+  mauser93: { file: 'mauser93.json', tex: 'mauser93', hd: true, bolt: true, lift: 0.32, M: null, P: null, busy: false, err: '' },
   mosin: { file: 'mosin.json', tex: 'mosin', hd: true, bolt: true, M: null, P: null, busy: false, err: '' }
 };
 const LEWIS_TP = TPM.lewis;
@@ -9860,11 +9860,11 @@ function lewisTpLoad() { return tpLoad('lewis'); }
 /* cerrojo: u de 0 a 1 = levantar la palanca, atrás, adelante y abajo (0,5: abierto del todo) */
 const _tpS = u => u * u * (3 - 2 * u);
 function tpBolt(T, u) {
-  const M = T.M, P = T.P, i = M.ix.Cerrojo; if (i === undefined) return;
+  const M = T.M, P = T.P, i = M.ix.Cerrojo, ip = M.ix.Palanca; if (i === undefined) return;       // con nodo «Palanca», gira solo la palanca
   u = clamp(u || 0, 0, 1);
   const lift = _tpS(clamp(u < 0.5 ? u / 0.22 : (1 - u) / 0.22, 0, 1)), back = _tpS(clamp(u < 0.5 ? (u - 0.22) / 0.26 : (0.78 - u) / 0.26, 0, 1));
   if (T.bu === lift * 7 + back) return; T.bu = lift * 7 + back;
-  vmRest(M, P); vmTurn(M, P, i, [0, 0, 1], lift * Math.PI * 0.46); P.t[i * 3 + 2] += back * 0.085;
+  vmRest(M, P); vmTurn(M, P, ip !== undefined ? ip : i, [0, 0, 1], lift * Math.PI * (T.lift || 0.46)); P.t[i * 3 + 2] += back * 0.085;
   vmWorld(M, P); P.fid++;
 }
 /* dibuja el arma con la matriz de un arma por código (boca a -Z, arriba +Y); false si aún no está */
