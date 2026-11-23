@@ -750,6 +750,13 @@ class Geo {
     const F = [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]];
     for (let i = 0; i < 6; i++) { const f = F[i]; this.quad(P[f[0]], P[f[1]], P[f[2]], P[f[3]], (i === 4 && colTop) ? colTop : col, c); }
   }
+  /* caja sin las caras de skip (0: -z, 1: +z, 2: -x, 3: +x, 4: arriba, 5: abajo) */
+  boxSkip(cx, cy, cz, sx, sy, sz, col, skip) {
+    const x0 = cx - sx / 2, x1 = cx + sx / 2, y0 = cy - sy / 2, y1 = cy + sy / 2, z0 = cz - sz / 2, z1 = cz + sz / 2, c = [cx, cy, cz];
+    const P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+    const F = [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]];
+    for (let i = 0; i < 6; i++) { if (skip.includes(i)) continue; const f = F[i]; this.quad(P[f[0]], P[f[1]], P[f[2]], P[f[3]], col, c); }
+  }
   /* caja orientada de p0 a p1 */
   limb(p0, p1, w, d, col) {
     let yx = p1[0] - p0[0], yy = p1[1] - p0[1], yz = p1[2] - p0[2];
@@ -1679,7 +1686,7 @@ function gBreda(q) {
 }
 const GUN_DEF = {
   mosin: q => gBoltRifle(q, { L: 1.232, wood: GNC.birch, mag: 'mosin', split: true, knob: true, bands: [-0.47, -0.72], hg: [-0.34, -0.74], hood: true, rod: true, exp: 0.09, zr: -0.3 }),
-  mauser93: q => gBoltRifle(q, { L: 1.235, wood: GNC.wal, mag: null, bands: [-0.52], hg: [-0.33, -0.5], rod: true, exp: 0.13, zr: -0.3, left: -0.4 }),
+  mauser93: q => gBoltRifle(q, { L: 1.235, wood: GNC.wal, mag: null, bands: [-0.52], hg: [-0.33, -0.5], rod: true, exp: 0.13, zr: -0.3, left: -0.47 }),
   mauser16: q => gBoltRifle(q, { L: 1.05, wood: GNC.wal, mag: null, bent: true, bands: [-0.45], hg: [-0.33, -0.6], exp: 0.07, zr: -0.3, left: -0.38 }),
   carcano: q => gBoltRifle(q, { L: 1.29, wood: GNC.beech, mag: 'carcano', split: true, bands: [-0.55, -0.8], hg: [-0.36, -0.55], rod: true, exp: 0.12, zr: -0.32, left: -0.42 }),
   naranjero: q => gMp28(q, { wood: GNC.beech, magL: 0.23, housing: GNC.steel }),
@@ -1956,7 +1963,8 @@ const GFX_TOUCH = (() => { try { return matchMedia('(pointer: coarse)').matches 
 const GFX_LEVELS = ['bajo', 'medio', 'alto', 'ultra'];
 const GFX_OPT = {
   dist: [{ n: 70, f: 480, t: 'Corta' }, { n: 95, f: 760, t: 'Media' }, { n: 120, f: 1150, t: 'Larga' }, { n: 150, f: 1600, t: 'Muy larga' }],
-  grass: [{ r: 0, d: 0, t: 'Sin hierba' }, { r: 30, d: 0.55, t: 'Cerca' }, { r: 42, d: 0.8, t: 'Normal' }, { r: 56, d: 1.0, t: 'Lejos' }, { r: 72, d: 1.15, t: 'Muy lejos' }],
+  grass: [{ r: 0, d: 0, t: 'Sin hierba' }, { r: 30, d: 0.55, t: 'Cerca' }, { r: 42, d: 0.8, t: 'Normal' }, { r: 56, d: 1.0, t: 'Lejos' }, { r: 72, d: 1.15, t: 'Muy lejos' },
+    { r: 115, d: 1.15, t: 'Lejísimos (PC potente)' }, { r: 170, d: 1.15, t: 'Hasta el horizonte (PC muy potente)' }],
   plants: [{ k: 0, r: 0, t: 'Ninguna' }, { k: 0.4, r: 110, t: 'Poca' }, { k: 0.7, r: 170, t: 'Normal' }, { k: 1, r: 250, t: 'Mucha' }, { k: 1, r: 400, t: 'Mucha, hasta lejos' }],
   trees: [{ near: 0, real: 0, t: 'Sencillos' }, { near: 70, real: 0, t: 'Normales' }, { near: 150, real: 1, rn: 55, t: 'Realistas: solo ramas y hojas' }, { near: 340, real: 2, rn: 130, t: 'Realistas, todo el detalle hasta lejos' }],
   models: [{ d0: 0, d1: 12, dw: 5, ev: 15, t: 'Bajo' }, { d0: 5, d1: 22, dw: 9, ev: 25, t: 'Medio' }, { d0: 9, d1: 32, dw: 12, ev: 35, t: 'Alto' }, { d0: 16, d1: 55, dw: 18, ev: 60, t: 'Ultra' }],
@@ -2670,17 +2678,48 @@ const world = { houses: [] };
   }
   /* lo más bajo del terreno bajo una planta: para que muros y parapetos lleguen siempre al suelo, también en pendiente */
   const tmin = (x, z, sx, sz) => { let m = 1e9; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) m = Math.min(m, terrainH(x + a * sx / 2, z + b * sz / 2)); return m; };
+  /* Muro hecho por tramos (cajas) sin las tapas de los extremos que quedan contra otro tramo: el canto de esas tapas cae en el mismo
+     plano que la fachada y, como la tarjeta no sabe cuál de las dos caras va delante, la tapa (de lado al sol) asomaba como una raya
+     clara de arriba abajo en cada junta y junto a las esquinas. Solo se dibuja de cada tapa lo que se ve: el lateral de los huecos, la
+     esquina de fuera y, en las ruinas, lo que un tramo sobresale del de al lado.
+     R: { alongX, cx, cz, len, P: [{ c0, c1, y0, y1 }] }; endCover(e): lo que tapa el extremo e (-1, 1) del muro, en alturas [[a, b]] */
+  function emitWall(V, R, t, col, endCover, each) {
+    const free = (y0, y1, cov) => {
+      let sg = [[y0, y1]];
+      for (const [a, b] of cov) sg = sg.flatMap(([u, v]) => (b <= u || a >= v) ? [[u, v]] : [[u, Math.min(v, a)], [Math.max(u, b), v]].filter(([p, q]) => q - p > 0.01));
+      return sg;
+    };
+    for (const p of R.P) {
+      const c = (p.c0 + p.c1) / 2, l = p.c1 - p.c0, px = R.alongX ? R.cx + c : R.cx, pz = R.alongX ? R.cz : R.cz + c, ym = (p.y0 + p.y1) / 2, ref = [px, ym, pz];
+      stone(V, () => {
+        g.boxSkip(px, ym, pz, R.alongX ? l : t, p.y1 - p.y0, R.alongX ? t : l, col, R.alongX ? [2, 3] : [0, 1]);
+        for (const e of [-1, 1]) {
+          const ce = e < 0 ? p.c0 : p.c1, atEnd = Math.abs(ce - e * R.len / 2) < 1e-5;
+          const cov = atEnd ? endCover(e) : R.P.filter(o => o !== p && Math.abs((e < 0 ? o.c1 : o.c0) - ce) < 1e-5).map(o => [o.y0, o.y1]);
+          for (const [lo, hi] of free(p.y0, p.y1, cov)) {
+            const a = (R.alongX ? px : pz) + e * l / 2;
+            if (R.alongX) g.quad([a, lo, pz - t / 2], [a, lo, pz + t / 2], [a, hi, pz + t / 2], [a, hi, pz - t / 2], col, ref);
+            else g.quad([px - t / 2, lo, a], [px + t / 2, lo, a], [px + t / 2, hi, a], [px - t / 2, hi, a], col, ref);
+          }
+        }
+      });
+      if (each) each(p, px, pz, l);
+    }
+  }
   /* edificio hueco de un solo material: cuatro muros que bajan bajo tierra, con sus huecos (puertas, troneras, ventanas), y una colisión
      por tramo para poder entrar. ops: { n, s, e, w } con huecos { c, w, y0, y1 } (c, a lo largo del muro desde su centro; alturas desde
      el suelo yf; y1 >= 50: sin dintel). topOf: alturas distintas por tramo (ruinas) */
   function shell(V, x, z, w, d, h, t, ops, yf, col, topOf) {
     const hw = w / 2, hd = d / 2;
+    const runs = [];
     const run = (alongX, cx, cz, len, list) => {
       list = (list || []).slice().sort((a, b) => a.c - b.c); let cur = -len / 2;
+      const R = { alongX, cx, cz, len, P: [] }; runs.push(R);
       const seg = (c0, c1, y0, y1) => {
         if (c1 - c0 < 0.04 || y1 - y0 < 0.04) return;
+        R.P.push({ c0, c1, y0, y1 });
         const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
-        stone(V, () => g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, col)); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
+        addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
       };
       const full = (c0, c1) => {
         if (!topOf) return seg(c0, c1, yf - 3, yf + h);
@@ -2697,6 +2736,9 @@ const world = { houses: [] };
     };
     run(true, x, z - hd + t / 2, w, ops.n); run(true, x, z + hd - t / 2, w, ops.s);
     run(false, x - hw + t / 2, z, d - 2 * t, ops.w); run(false, x + hw - t / 2, z, d - 2 * t, ops.e);
+    /* los muros de los lados acaban contra los de delante y detrás: tapa lo que llega a la altura del tramo de la esquina */
+    const corner = (Rns, west) => { const c = west ? -Rns.len / 2 : Rns.len / 2, p = Rns.P.filter(o => Math.abs((west ? o.c0 : o.c1) - c) < 1e-5); return p.map(o => [o.y0, o.y1]); };
+    runs.forEach((R, i) => emitWall(V, R, t, col, e => R.alongX ? [] : corner(runs[e < 0 ? 0 : 1], i === 2)));
     addFloor(x - hw, x + hw, z - hd, z + hd, yf); addBotBox(x - hw, x + hw, z - hd, z + hd);
   }
   /* cascotes: cada piedra sobre el suelo que tiene debajo (no flotan) */
@@ -2757,6 +2799,29 @@ const world = { houses: [] };
       g.with(m, () => g.cyl(0, 0, 0, 0.13, 0.11, sl + 0.04, 7, shade(col, 0.88 + (i % 3) * 0.06), true));
     }
   }
+  /* sillería de las casas, como la de la iglesia (material «sillar»): recerco de cada hueco y esquinales. Solo se ven (no chocan):
+     vuelan unos centímetros sobre la fachada y tapan las juntas entre los tramos de muro */
+  const STQ = hex(0xd9cdb0);
+  /* recerco de un hueco: (cx, cz) en la cara de fuera del muro, (nx, nz) hacia fuera; w ancho; y0..y1 alto; win: ventana (con alféizar) */
+  function recerco(cx, cz, nx, nz, w, y0, y1, win) {
+    const ax = nz ? 1 : 0, az = nx ? 1 : 0, jw = 0.2, dp = 0.08;
+    const b = (c, yy, l, hh, dd) => { const oo = dd / 2 - 0.015; stone('sillar', () => g.box(cx + ax * c + nx * oo, yy, cz + az * c + nz * oo, ax * l + (1 - ax) * dd, hh, az * l + (1 - az) * dd, STQ)); };
+    const yb = win ? y0 - 0.02 : y0 - 0.06;
+    for (const sd of [-1, 1]) b(sd * (w / 2 + jw / 2), (yb + y1) / 2, jw, y1 - yb, dp);       // jambas
+    b(0, y1 + 0.14, w + 2 * jw + 0.08, 0.28, dp + 0.02);       // dintel
+    if (win) b(0, y0 - 0.075, w + 2 * jw + 0.16, 0.13, 0.17);       // alféizar, que vuela más
+  }
+  /* esquinales: en cada esquina, hiladas de sillares que alternan largo y corto en cada cara (yb..yt) */
+  function esquinales(x0, x1, z0, z1, yb, yt) {
+    const ch = 0.42, gap = 0.035, dp = 0.06, o = dp / 2 - 0.015, n = Math.max(1, Math.floor((yt - yb) / (ch + gap)));
+    for (const [cx, sx] of [[x0, -1], [x1, 1]]) for (const [cz, sz] of [[z0, -1], [z1, 1]]) for (let q = 0; q < n; q++) {
+      const yy = yb + q * (ch + gap) + ch / 2, la = q % 2 ? 0.66 : 0.44, lb = q % 2 ? 0.44 : 0.66, e = dp - 0.015;
+      stone('sillar', () => {
+        g.box(cx - sx * la / 2 + sx * e / 2, yy, cz + sz * o, la + e, ch, dp, STQ);       // en la cara que mira a z
+        g.box(cx + sx * o, yy, cz - sz * lb / 2, dp, ch, lb, STQ);       // en la que mira a x
+      });
+    }
+  }
   function house(x, z, w, d, h, o) {
     o = o || {};
     const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
@@ -2771,6 +2836,7 @@ const world = { houses: [] };
       const bk = ['e', 'w'][(R() * 2) | 0]; ops[bk].push({ c: rr(-0.2, 0.2) * lenOf(bk), w: rr(1.4, 2.2), y0: rr(0.4, 0.9), y1: 99 });       // boquete de un obús
       shell(V, x, z, w, d, h, t, ops, yf, wall, () => h * rr(0.3, 0.95));
       stone(V, () => g.box(x, yf - 0.3, z, w - 2 * t + 0.02, 0.6, d - 2 * t + 0.02, shade(wall, 0.72)));       // suelo de tierra y escombro
+      esquinales(x - w / 2, x + w / 2, z - d / 2, z + d / 2, yf - 0.3, yf + Math.min(1.7, h * 0.3));       // la sillería de las esquinas, hasta donde aguanta
       rubble(x, z, 7, w / 2 - 1, d / 2 - 1, wall, yf);       // cascotes dentro
       rubble(x, z, 6, w / 2 + 1.5, d / 2 + 1.5, wall);       // y fuera, cada uno en su suelo
       g.limb([x - w * 0.3, yf + 0.15, z - d * 0.2], [x + w * 0.2, yf + h * 0.45, z + d * 0.25], 0.18, 0.18, shade(WOOD, 0.7));       // viga caída
@@ -2779,12 +2845,14 @@ const world = { houses: [] };
       stone(V, () => g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall));
       const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
       tejado(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h, rh, alongX, roof, shade(wall, 0.92), V);
-      const dz = (o.door === 'n' ? -1 : 1) * (d / 2 + 0.03);
-      g.box(x + rr(-w / 4, w / 4), y + 1.05, z + dz, 1.1, 2.1, 0.08, WOOD);
+      const dz = (o.door === 'n' ? -1 : 1) * (d / 2 + 0.03), fn = Math.sign(dz), dx0 = x + rr(-w / 4, w / 4);
+      g.box(dx0, y + 1.05, z + dz, 1.1, 2.1, 0.08, WOOD); recerco(dx0, z + fn * d / 2, 0, fn, 1.1, y, y + 2.1, false);
       for (const sx of [-1, 1]) {
-        if (h > 5) g.box(x + sx * w * 0.27, y + h * 0.68, z + dz, 0.8, 1.0, 0.08, DARK);
-        g.box(x + sx * (w / 2 + 0.03), y + h * 0.66, z + rr(-d / 4, d / 4), 0.08, 1.0, 0.8, DARK);
+        if (h > 5) { g.box(x + sx * w * 0.27, y + h * 0.68, z + dz, 0.8, 1.0, 0.08, DARK); recerco(x + sx * w * 0.27, z + fn * d / 2, 0, fn, 0.8, y + h * 0.68 - 0.5, y + h * 0.68 + 0.5, true); }
+        const wz = z + rr(-d / 4, d / 4);
+        g.box(x + sx * (w / 2 + 0.03), y + h * 0.66, wz, 0.08, 1.0, 0.8, DARK); recerco(x + sx * w / 2, wz, sx, 0, 0.8, y + h * 0.66 - 0.5, y + h * 0.66 + 0.5, true);
       }
+      esquinales(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y - 0.3, y + h - 0.05);
       if (o.chimney !== false && R() < 0.6) { const cx = x + rr(-w / 3, w / 3), cz = z + rr(-d / 4, d / 4); stone(V, () => { g.box(cx, y + h + rh * 0.9, cz, 0.8, 1.6, 0.8, shade(wall, 0.85)); g.box(cx, y + h + rh * 0.9 + 0.85, cz, 1.0, 0.12, 1.0, shade(wall, 0.75)); }); }
       addAABB(x - w / 2, x + w / 2, y - 4, y + h + rh * 0.6, z - d / 2, z + d / 2);
     }
@@ -2798,12 +2866,20 @@ const world = { houses: [] };
     const wins = len => { const n = Math.max(1, Math.round(len / 5)), a = []; for (let i = 0; i < n; i++) a.push(WIN(-len / 2 + (i + 0.5) * len / n)); return a; };
     function wallRun(alongX, cx, cz, len, ops, ins) {
       ops.sort((a, b) => a.c - b.c); let cur = -len / 2;
+      const R = { alongX, cx, cz, len, P: [] };
       const seg = (c0, c1, y0, y1) => {
         if (c1 - c0 < 0.05 || y1 - y0 < 0.05) return;
         const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
-        stone(V, () => g.box(px, (y0 + y1) / 2, pz, sx, y1 - y0, sz, wall)); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
+        R.P.push({ c0, c1, y0, y1 }); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
         const iy = Math.max(y0, yf), off = ins * (t / 2 + 0.012);     // cara interior en penumbra
-        if (y1 > iy) stone(V, () => g.box(alongX ? px : px + off, (iy + y1) / 2, alongX ? pz + off : pz, alongX ? l : 0.024, y1 - iy, alongX ? 0.024 : l, lining));       // por dentro, la misma piedra en penumbra
+        /* por dentro, la misma piedra en penumbra; en los muros largos, sin llegar a los extremos (si no, su canto asomaba por la cara de
+           fuera del muro de al lado como una raya oscura junto a la esquina) */
+        const e0 = alongX ? Math.max(c0, -len / 2 + t) : c0, e1 = alongX ? Math.min(c1, len / 2 - t) : c1, el = e1 - e0, ec = (e0 + e1) / 2;
+        if (y1 > iy && el > 0.01) {       // una sola cara, mirando al cuarto (como caja, sus tapas daban rayas en las juntas)
+          const o2 = ins * (t / 2 + 0.02), a0 = (alongX ? cx : cz) + e0, a1 = (alongX ? cx : cz) + e1, ref = [alongX ? cx : px, (iy + y1) / 2, alongX ? pz : cz];
+          stone(V, () => alongX ? g.quad([a0, iy, pz + o2], [a1, iy, pz + o2], [a1, y1, pz + o2], [a0, y1, pz + o2], lining, ref)
+                                : g.quad([px + o2, iy, a0], [px + o2, iy, a1], [px + o2, y1, a1], [px + o2, y1, a0], lining, ref));
+        }
       };
       for (const q of ops) {
         seg(cur, q.c - q.w / 2, yf - 4, yf + h);
@@ -2812,12 +2888,17 @@ const world = { houses: [] };
         cur = q.c + q.w / 2;
       }
       seg(cur, len / 2, yf - 4, yf + h);
+      emitWall(V, R, t, wall, () => alongX ? [] : [[-99, 99]]);       // los de los lados acaban dentro de los de delante y detrás
     }
     const side = o.open, lenOf = sd => (sd === 'n' || sd === 's') ? w : d - 2 * t;
     const dc = lenOf(side) > 12 ? 0 : -lenOf(side) * 0.18;
     const ops = sd => { const len = lenOf(sd); if (sd !== side) return wins(len); const a = wins(len).filter(q => Math.abs(q.c - dc) > 1.7); a.push(DOOR(dc)); return a; };
     wallRun(true, x, z - hd + t / 2, w, ops('n'), 1); wallRun(true, x, z + hd - t / 2, w, ops('s'), -1);
     wallRun(false, x - hw + t / 2, z, d - 2 * t, ops('w'), 1); wallRun(false, x + hw - t / 2, z, d - 2 * t, ops('e'), -1);
+    /* sillería: recerco de cada hueco y esquinales */
+    for (const [sd, fx, fz, nx, nz] of [['n', 0, -hd, 0, -1], ['s', 0, hd, 0, 1], ['w', -hw, 0, -1, 0], ['e', hw, 0, 1, 0]])
+      for (const q of ops(sd)) recerco(x + fx + (nz ? q.c : 0), z + fz + (nx ? q.c : 0), nx, nz, q.w, yf + q.y0, yf + q.y1, q.y0 > 0);
+    esquinales(x - hw, x + hw, z - hd, z + hd, yf - 0.3, yf + h - 0.05);
     g.box(x, yf + h - 0.3, z, w - 2 * t, 0.06, d - 2 * t, shade(WOOD, 0.6));
     g.box(x, yf - 2, z, w - 0.1, 4, d - 0.1, inner, FLOORC); addFloor(x - hw, x + hw, z - hd, z + hd, yf);
     /* umbral, hoja de la puerta y mesa */
@@ -2923,17 +3004,22 @@ const world = { houses: [] };
     const SAW = 0.3, SAH = 0.95, sae = (c, yc) => ({ c, w: SAW, y0: yf + yc - SAH / 2, y1: yf + yc + SAH / 2 });
     const towerWall = (alongX, cx, cz, len, holes, inS, ext) => {
       const cuts = [-len / 2, len / 2]; for (const q of holes) cuts.push(q.c - q.w / 2, q.c + q.w / 2); cuts.sort((a, b) => a - b);
+      const R = { alongX, cx, cz, len, P: [] };
       for (let i = 0; i + 1 < cuts.length; i++) {
         const c0 = cuts[i], c1 = cuts[i + 1]; if (c1 - c0 < 0.02) continue;
         const cm = (c0 + c1) / 2, hs = holes.filter(q => Math.abs(q.c - cm) < q.w / 2).sort((a, b) => a.y0 - b.y0);
         const px = alongX ? cx + cm : cx, pz = alongX ? cz : cz + cm, sx = alongX ? c1 - c0 : wt, sz = alongX ? wt : c1 - c0;
         const seg = (ya, yb) => {
-          if (yb - ya < 0.02) return; piece(px, pz, sx, sz, ya, yb, tw);
+          if (yb - ya < 0.02) return; R.P.push({ c0, c1, y0: ya, y1: yb }); addAABB(px - sx / 2, px + sx / 2, ya, yb, pz - sz / 2, pz + sz / 2);
           const iy = Math.max(ya, yf), o = inS * (wt / 2 + 0.012), lw = Math.min(c1, ext) - Math.max(c0, -ext);       // forro de dentro, solo en el hueco interior
-          if (yb > iy && lw > 0.01) { const lc = (Math.min(c1, ext) + Math.max(c0, -ext)) / 2; g.box(alongX ? cx + lc : px + o, (iy + yb) / 2, alongX ? pz + o : cz + lc, alongX ? lw : 0.024, yb - iy, alongX ? 0.024 : lw, tl); }
+          if (yb > iy && lw > 0.01) {       // una sola cara mirando adentro (sin tapas: no hay rayas en las juntas)
+            const a0 = (alongX ? cx : cz) + Math.max(c0, -ext), a1 = (alongX ? cx : cz) + Math.min(c1, ext), o2 = inS * (wt / 2 + 0.02), ref = [px, (iy + yb) / 2, pz];
+            if (alongX) g.quad([a0, iy, pz + o2], [a1, iy, pz + o2], [a1, yb, pz + o2], [a0, yb, pz + o2], tl, ref); else g.quad([px + o2, iy, a0], [px + o2, iy, a1], [px + o2, yb, a1], [px + o2, yb, a0], tl, ref);
+          }
         };
         let y = yf - 4; for (const q of hs) { seg(y, q.y0); y = q.y1; } seg(y, yf + BF);
       }
+      emitWall('mamp', R, wt, tw, () => alongX ? [] : [[-99, 99]]);       // sin las tapas que quedan dentro (ver emitWall)
       /* recerco de sillería de cada saetera, por fuera */
       for (const q of holes) if (q.w < 1) {
         const o = -inS * (wt / 2 + 0.03), at = (c, yy, lc, ly) => g.box(alongX ? cx + c : cx + o, yy, alongX ? cz + o : cz + c, alongX ? lc : 0.08, ly, alongX ? 0.08 : lc, STN);
@@ -3918,7 +4004,8 @@ function grassUpdate(ex, ez) {
   const i0 = clamp(Math.floor((ex - R - W.X0) / S), 0, GRC.nx - 1), i1 = clamp(Math.floor((ex + R - W.X0) / S), 0, GRC.nx - 1);
   const j0 = clamp(Math.floor((ez - R - W.Z0) / S), 0, GRC.nz - 1), j1 = clamp(Math.floor((ez + R - W.Z0) / S), 0, GRC.nz - 1);
   let best = null, bd = 1e9, built = 0;
-  for (let pass = 0; pass < 2; pass++) {
+  const passes = R > 140 ? 6 : R > 90 ? 4 : 2;
+  for (let pass = 0; pass < passes; pass++) {
     best = null; bd = 1e9;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const k = j * 1000 + i; if (GRC.cells.has(k)) continue;
@@ -4033,7 +4120,8 @@ function vegDrawAll(vp, ex, ey, ez, newFrame, vr) {
   /* hierba */
   const R = newFrame ? (VEG.grR = grassUpdate(ex, ez)) : VEG.grR;
   if (R) {
-    gl.uniform1f(UVG.uBend, 0.8); gl.uniform3f(UVG.uFade, R * 0.55, R, 0.35);
+    const f0 = R > 80 ? R * 0.38 : R * 0.55;       // con la hierba muy lejos, se va aclarando en una franja más ancha: no se nota dónde empieza
+    gl.uniform1f(UVG.uBend, 0.8); gl.uniform3f(UVG.uFade, f0, R, 0.35);
     const vis = VEG._gv || (VEG._gv = []); vis.length = 0;
     for (const c of GRC.cells.values()) {
       if (!c.buf) continue;
@@ -4047,7 +4135,7 @@ function vegDrawAll(vp, ex, ey, ez, newFrame, vr) {
         const L = VEG.grassTpl[k].greal; if (L.noWood) continue;
         for (const c of vis) { if (!c.n[k]) continue; vegBind(L.wood, c.buf, c.off[k] * 48); INST.drawArraysInstancedANGLE(gl.TRIANGLES, 0, L.wood.n, c.n[k]); }
       }
-      leafOn(); gl.uniform1f(ULF.uBend, 0.8); gl.uniform3f(ULF.uFade, R * 0.55, R, 0.35);
+      leafOn(); gl.uniform1f(ULF.uBend, 0.8); gl.uniform3f(ULF.uFade, f0, R, 0.35);
       for (let k = 0; k < 3; k++) {
         const L = VEG.grassTpl[k].greal; if (!L.leaf) continue;
         for (const c of vis) { if (!c.n[k]) continue; vegBindLeaf(L.leaf, c.buf, c.off[k] * 48); INST.drawArraysInstancedANGLE(gl.TRIANGLES, 0, L.leaf.n, c.n[k]); }
@@ -6751,7 +6839,9 @@ function gunFp(w, team) {
     const push = g.ref.back === undefined ? 0 : Math.max(0, g.ref.back + 0.1 - (g.ref.sight[2] + 0.3)); d[2] -= push;
     const T = M4.create(); M4.translate(T, d[0], d[1], d[2]);
     let bones = base.bones;
-    if (g.ik && C.fpSt0) {       // los brazos, rehechos con la mano izquierda en su sitio
+    /* los brazos, rehechos con la mano izquierda en su sitio (en los fusiles de cerrojo también: si no, la mano se quedaba donde
+       la animación del Mosin tiene su guardamanos, y en un fusil de otra forma los dedos lo atravesaban) */
+    if ((g.ik || (WEAPONS[id] && WEAPONS[id].kind === 'rifle' && g.ref.left)) && C.fpSt0) {
       const st = { lr: C.fpSt0.lr.slice(), lt: C.fpSt0.lt.slice(), gq: C.fpSt0.gq.slice(), gp: C.fpSt0.gp.slice(), adjQ: null };
       skFpRifleArms(C, st, C.fpWsk, base.F, M4.tp(g.A, g.ref.left)); skFingers(C, st, { Right: 'stock', Left: 'fore' }); bones = new Float32Array(base.bones.length); skBonesTo(C, st, bones);
     }
@@ -12224,7 +12314,7 @@ function gfxUiBoot() {
   vrBoot(); skLoad();
   resize(); animateMenu();
   requestAnimationFrame(frame);
-  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, aaDbg: { aaGuns, manAA, leaveAA }, navDbg: { NAV, navPath, navLine, navBuild, update, TNAV, tnavPath, tnavBuild } };
+  window.__ebro = { VM3D, game, soldiers, FLAGS, input, xr, SK, WEAPONS, groundAt, VEG, GFX, GRC, gfxPreset, gfxApply, cam, world, duo, vehicles, get P() { return P; }, skDbg: { SK_GRIPF, skBlend, skGlobals, m4joint, skLegDispBlend, _lfp, M4, SK_LEGSIGHT, skLegGrip, SK_LEGGRIP, skReach, skBonesTo, SK_LEG_FWD, SK_LEG_RELIEF, SK_LEG_HIP, gunDrops, gunNear, gunPick, gunGet }, tommy: { TOMMY, takeTommy, tommyNear, tommyCan }, aaDbg: { aaGuns, manAA, leaveAA }, navDbg: { NAV, navPath, navLine, navBuild, update, TNAV, tnavPath, tnavBuild } };
 })();
 
 </script>
