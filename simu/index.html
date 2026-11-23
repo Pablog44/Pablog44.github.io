@@ -2273,6 +2273,7 @@ uniform float uVolOn;    // volumetric clouds on (their cover map also drives th
 uniform sampler2DShadow uShadow;
 uniform mat4 uShadowMat;
 uniform float uShadowOn;
+uniform vec2 uShadowGeo;   // metres per shadow-map texel, distance from the light camera to the aircraft
 out vec4 fragColor;
 
 const float PI = 3.14159265;
@@ -2358,9 +2359,26 @@ float planeShadow0(vec3 p){
   if (uShadowOn < 0.5) return 1.0;
   vec4 s = uShadowMat * vec4(p, 1.0);
   vec3 c = s.xyz * 0.5 + 0.5;
-  if (c.x <= 0.001 || c.x >= 0.999 || c.y <= 0.001 || c.y >= 0.999 || c.z >= 1.0) return 1.0;
+  if (c.x <= 0.001 || c.x >= 0.999 || c.y <= 0.001 || c.y >= 0.999 || c.z <= 0.0) return 1.0;
   float bias = 0.0012;
   float px = 1.0 / uShadowOn;
+  // how far below the aircraft (along the sunbeam) this point is: the sun is a 0.53 deg disc, so the shadow
+  // softens with distance (penumbra ~ 0.0093 x distance) and a small plane high up leaves only a faint blur.
+  // Ground beyond the depth range of the map is still under it: anything drawn in the map shadows it.
+  float dist = 1.0 + c.z * 399.0 - uShadowGeo.y;
+  float rz = c.z >= 1.0 ? 0.9995 : c.z - bias;
+  float pen = dist * 0.0047 / max(uShadowGeo.x, 1e-4);   // penumbra radius in texels
+  if (pen > 2.0) {
+    const vec2 PD[12] = vec2[12](vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
+      vec2(0.962, -0.195), vec2(0.473, -0.480), vec2(0.519, 0.767), vec2(0.185, -0.893), vec2(0.507, 0.064),
+      vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598));
+    float an = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453) * 6.2832;
+    mat2 rot = mat2(cos(an), sin(an), -sin(an), cos(an));
+    float r = min(pen, 0.45 * uShadowOn) * px, acc = 0.0;
+    for (int i = 0; i < 12; i++) acc += texture(uShadow, vec3(c.xy + rot * PD[i] * r, rz));
+    return acc / 12.0;
+  }
+  if (c.z >= 1.0) c.z = 0.9995 + bias;
   float sh = texture(uShadow, vec3(c.xy + vec2(-0.6, -0.6) * px, c.z - bias));
   sh += texture(uShadow, vec3(c.xy + vec2(0.6, -0.6) * px, c.z - bias));
   sh += texture(uShadow, vec3(c.xy + vec2(-0.6, 0.6) * px, c.z - bias));
@@ -2928,7 +2946,8 @@ void main(){
   float dd = nh * nh * (a2 - 1.0) + 1.0;
   float D = a2 / (PI * dd * dd);
   float Fh = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
-  float sunVis = smoothstep(-0.02, 0.04, uSunDir.y) * planeShadow(vWP) * cloudShadow(vWP);
+  float psh = planeShadow(vWP);
+  float sunVis = smoothstep(-0.02, 0.04, uSunDir.y) * psh * cloudShadow(vWP);
   vec3 spec = uSunCol * min(D * Fh * 0.35, 40.0) * sunVis;
   float ra = (rough + 0.02) * (rough + 0.02);
   vec3 Hm = normalize(uMoonDir + V);
@@ -2944,15 +2963,17 @@ void main(){
     spec += vec3(1.0, 0.95, 0.85) * pow(max(dot(N, Hll), 0.0), 150.0) * cone * 80.0 / (1.0 + dl * dl * 0.003);
   }
   float sunUp = clamp(uSunDir.y, 0.0, 1.0);
-  vec3 ambL = uAmbSky * 0.9 + uSunCol * sunUp * 0.35 + uMoonCol * 0.25;
+  // a shadow on water: the sunlight scattered up from inside the water is missing there too, not only the glints
+  float bodySh = mix(1.0, psh, 0.75);
+  vec3 ambL = uAmbSky * 0.9 + uSunCol * sunUp * 0.35 * bodySh + uMoonCol * 0.25;
   vec3 body = uWaterDeep * ambL;
   float crest = clamp(vH / max(uWaveAmp, 0.05), 0.0, 1.5);
   float sss = crest * pow(max(dot(normalize(uSunDir + N * 0.4), -V), 0.0), 4.0) * 1.6 + 0.18 * NdV * NdV;
-  body += uWaterSSS * uSunCol * sss * smoothstep(-0.05, 0.25, uSunDir.y);
+  body += uWaterSSS * uSunCol * sss * smoothstep(-0.05, 0.25, uSunDir.y) * bodySh;
   body += lavaLight(vWP, N) * uWaterSSS * 0.25;
   float T = exp(-depth * 0.16);
   float shallowK = exp(-depth * 0.065);
-  body = mix(body, uWaterShallow * (ambL * 1.2 + uSunCol * sunUp * 0.25), shallowK * 0.85);
+  body = mix(body, uWaterShallow * (ambL * 1.2 + uSunCol * sunUp * 0.25 * bodySh), shallowK * 0.85);
   float foam = 0.0;
   float fn2 = texture(uNoise, vXZ * 0.17 - vec2(0.0, uTime * 0.01)).a;
 #ifdef FOAM
@@ -3344,8 +3365,9 @@ void main(){
   float glint = pow(max(dot(N, H), 0.0), 1200.0) * 40.0 * sh * step(0.0, dot(N, uSunDir));
   // dust and fine scratches light up when looking towards the sun
   float dust = texture(uNoise, vWP.xz * 1.9 + vWP.y * 1.3).b * 0.6 + texture(uNoise, vec2(vWP.x + vWP.z, vWP.y) * 6.0).a * 0.4;
-  float toward = pow(max(dot(-V, uSunDir), 0.0), 5.0) * sh;
-  float haze = smoothstep(0.45, 0.9, dust) * toward * 0.35 + toward * 0.04;
+  // (not shadowed: clear glass cannot show a shadow, a dark copy of the frame across it looked like a stain on the sea)
+  float toward = pow(max(dot(-V, uSunDir), 0.0), 5.0);
+  float haze = smoothstep(0.45, 0.9, dust) * toward * 0.3 + toward * 0.035;
   vec3 tint = vec3(0.55, 0.7, 0.72);
   float a, refl;
   if (uInside > 0.5) { refl = F * 0.35; a = 0.05 + refl + haze; }
@@ -6258,6 +6280,7 @@ function setGlobals(view, proj, camPos, o = {}) {
   GU.uCloudK = SETTINGS.cloudScale || 1; GU.uCirrus = SETTINGS.cirrusAmt ?? 0.6; GU.uVolOn = RENDER.volOn ? 1 : 0;
   GU.uCloudOff = ENV.cloudOff;
   GU.uShadowMat = RENDER.lightVP; GU.uShadowOn = RENDER.shadowActive ? RENDER.shadowRT.w : 0;
+  GU.uShadowGeo = [RENDER.shadowActive ? 2 * RENDER.shadowSR / RENDER.shadowRT.w : 0.01, 120];
   newPass();
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RENDER.noiseTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, RENDER.shadowActive ? RENDER.shadowRT.depth : RENDER.dummyShadow);
@@ -6700,7 +6723,7 @@ function renderShadow() {
   const up = Math.abs(L.y) > 0.95 ? new V3(0, 0, 1) : new V3(0, 1, 0);
   const view = M4.lookAt(M4.create(), eye, c, up);
   const sr = isBoat() ? 10.5 : AC.shadowR || 10.5;
-  const proj = M4.ortho(M4.create(), -sr, sr, -sr, sr, 1, 400);
+  const proj = M4.ortho(M4.create(), -sr, sr, -sr, sr, 1, 400); RENDER.shadowSR = sr;
   M4.mul(RENDER.lightVP, proj, view);
   bindRT(RENDER.shadowRT);
   gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -9375,10 +9398,34 @@ float jetCabinMask(vec3 N) {
   return step(3.62, x) * step(x, 12.62) * step(-0.72, z) * (1.0 - smoothstep(0.9, 1.0, e));
 }
 uniform float uAlpha;
+uniform vec2 uGlass;    // x: this material is clear glass, y: the camera is inside the aircraft
+// Clear glass does not scatter light, so it cannot show a shadow: it only reflects the sky (Fresnel) and
+// catches the sun as a glint. Shading it like paint made it milky in the sun and drew the canopy frame's
+// shadow across it as a huge dark band that seemed to lie on the sea.
+vec4 glassShade(vec3 N, vec3 V, vec4 b){
+  float ndv = max(dot(N, V), 0.0);
+  float F = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+  vec3 R = reflect(-V, N);
+  vec3 env = skyBase(normalize(vec3(R.x, abs(R.y), R.z)));
+  if (R.y < 0.0) env = mix(env, uAmbGround * 1.4 + uAmbSky * 0.25, 0.75);
+  float sh = planeShadow(vWP + N * 0.05) * cloudShadow(vWP);
+  vec3 H = normalize(uSunDir + V);
+  float glint = pow(max(dot(N, H), 0.0), 1200.0) * 40.0 * sh * step(0.0, dot(N, uSunDir));
+  // a faint sheen of dust only when looking towards the sun (not shadowed: it is too faint to draw a shape)
+  float dust = texture(uNoise, vWP.xz * 1.9 + vWP.y * 1.3).b * 0.6 + texture(uNoise, vec2(vWP.x + vWP.z, vWP.y) * 6.0).a * 0.4;
+  float toward = pow(max(dot(-V, uSunDir), 0.0), 6.0);
+  float haze = (smoothstep(0.5, 0.9, dust) * 0.12 + 0.02) * toward;
+  float refl = uGlass.y > 0.5 ? F * 0.4 : F;
+  float a = clamp(b.a * (uGlass.y > 0.5 ? 0.25 : 1.2) + refl + haze, 0.0, 0.95);
+  vec3 col = env * refl + uSunCol * (glint * F + haze) + b.rgb * uAmbSky * b.a * 0.08;
+  vec3 fc; float f = fogFactor(vWP, fc);
+  return vec4(col * (1.0 - f) + fc * f * a, a);
+}
 void main(){
   if (vWP.y < uClipY) discard;
   vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(uCamPos - vWP);
+  if (uGlass.x > 0.5) { if (dot(N, V) < 0.0) N = -N; vec4 g = glassShade(N, V, uColor); outC(g.rgb * uAlpha, g.a * uAlpha); return; }
   vec4 b = uColor;
   if (uMR.z > 0.5) { vec4 t = texture(uBase, vUV); b *= vec4(pow(t.rgb, vec3(2.2)), t.a); }
   vec3 alb = b.rgb;
@@ -9581,7 +9628,8 @@ async function buildGLBModel(g, spec) {
   for (const G of groups.values()) {
     const m = mats[G.mat] || { color: [0.6, 0.6, 0.6, 1], metal: 0, rough: 0.6, tex: null, blend: false };
     const mesh = makeMesh({ aPos: { data: new Float32Array(G.p), size: 3 }, aNormal: { data: new Float32Array(G.n), size: 3 }, aUV: { data: new Float32Array(G.uv), size: 2 } }, new Uint32Array(G.i));
-    model.groups.push({ mesh, anim: G.anim, color: m.color, mr: [m.metal, m.rough, m.tex ? 1 : 0], tex: m.tex, blend: m.blend, name: m.name, emis: m.emis, emisTex: m.emisTex });
+    model.groups.push({ mesh, anim: G.anim, color: m.color, mr: [m.metal, m.rough, m.tex ? 1 : 0], tex: m.tex, blend: m.blend, name: m.name, emis: m.emis, emisTex: m.emisTex,
+      glass: m.blend && !m.tex && m.rough < 0.25 && (m.color[3] ?? 1) < 0.5 });
     model.tris += G.i.length / 3;
   }
   model.info = {};
@@ -10057,7 +10105,8 @@ const _noEmis = [0, 0, 0, 0], _noFill = [0, 0, 0];
 function drawGLB(model, world, pose, hit) {
   if (!model) return;
   const p = RENDER.P.glb; useProg(p);
-  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]); setU(p, 'uCabinL', RENDER.cabinFill || _noFill); setU(p, 'uMaskOn', RENDER.jetInv ? 1 : 0); if (RENDER.jetInv) setU(p, 'uInvBody', RENDER.jetInv);
+  setU(p, 'uAlpha', 1); setU(p, 'uHit', hit || [0, 0, 0]); setU(p, 'uCabinL', RENDER.cabinFill || _noFill);
+  const inside = CAM_INSIDE(CAM.mode) && model === MODELS[AC.model] ? 1 : 0; setU(p, 'uMaskOn', RENDER.jetInv ? 1 : 0); if (RENDER.jetInv) setU(p, 'uInvBody', RENDER.jetInv);
   let blend = false;
   for (const G of model.groups) {
     if (G.anim && pose && pose.hide && pose.hide[G.anim]) continue;
@@ -10066,7 +10115,7 @@ function drawGLB(model, world, pose, hit) {
     setU(p, 'uUVOff', (G.anim && pose && pose.uv && pose.uv[G.anim]) || [0, 0]);
     const hl = G.anim && pose && pose.hl && pose.hl[G.anim];
     setU(p, 'uHit', hl ? [0, 0, 0.25] : (hit || [0, 0, 0]));
-    setU(p, 'uColor', G.color); setU(p, 'uMR', G.mr);
+    setU(p, 'uColor', G.color); setU(p, 'uMR', G.mr); setU(p, 'uGlass', [G.glass ? 1 : 0, inside]);
     if (G.emis) { const k = pose && pose.glow && pose.glow[G.name] !== undefined ? pose.glow[G.name] : 1, K = Array.isArray(k) ? k : [k, k, k]; setU(p, 'uEmis', [G.emis[0] * K[0], G.emis[1] * K[1], G.emis[2] * K[2], G.emisTex ? 1 : 0]); }
     else setU(p, 'uEmis', _noEmis);
     setTex(p, 'uBase', G.tex || RENDER.whiteTex);
