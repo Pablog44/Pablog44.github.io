@@ -2039,7 +2039,9 @@ function gfxSave() {
 const FPV = {
   naranjero: { file: 'naranjero_fpv.json', M: null, P: null, Q: null, err: '', busy: false },
   lewis: { file: 'lewis_fpv.json', M: null, P: null, Q: null, err: '', busy: false, tex: 'lewis', pan: 47 },
-  dp27: { file: 'dp27_fpv.json', M: null, P: null, Q: null, err: '', busy: false, tex: 'dp27', pan: 47 }
+  dp27: { file: 'dp27_fpv.json', M: null, P: null, Q: null, err: '', busy: false, tex: 'dp27', pan: 47 },
+  /* Mauser de los republicanos: brazos de Blender que accionan el cerrojo (clip «Cerrojo») y cargan con peine (clip «Recarga») */
+  mauser93: { file: 'mauser93_fpv.json', M: null, P: null, Q: null, err: '', busy: false, tex: 'mauser93' }
 };
 /* armas de Blender sin brazos (soldados, suelo y primera persona con los brazos del juego) */
 const TPM = {
@@ -5653,6 +5655,10 @@ const SK_FPGUN = {
   pistol: { rot: Math.PI / 2, sight: [0.08, 0.125, 0], at: [0, 0.0245, 0.005], muzzle: [0.352, 0.112, 0] }
 };
 
+/* los modelos se piden siempre al servidor (no la copia vieja del navegador) y sus texturas llevan la fecha del modelo:
+   así nunca se mezcla un modelo viejo con una textura nueva al cambiar un arma */
+function assetFetch(f) { return fetch(f, { cache: 'no-cache' }); }
+function assetVer(r) { const v = r.headers.get('last-modified') || r.headers.get('etag') || ''; return v.replace(/[^0-9A-Za-z]+/g, ''); }
 function glbParse(buf) {
   const dv = new DataView(buf);
   if (dv.getUint32(0, true) !== 0x46546C67) {       // glTF en texto con el búfer en base64
@@ -5721,7 +5727,7 @@ async function skTexture(g, ti, cache) {
   if (cache.has(ti)) return cache.get(ti);
   const J = g.j, img = J.images[J.textures[ti].source];
   let src, revoke = null;
-  if (img.uri) src = new URL(img.uri, g.url || location.href).href;
+  if (img.uri) { src = new URL(img.uri, g.url || location.href).href; if (g.v && !/^(data|blob):/.test(src)) src += (src.includes('?') ? '&' : '?') + 'v=' + g.v; }
   else { const bv = J.bufferViews[img.bufferView]; src = revoke = URL.createObjectURL(new Blob([new Uint8Array(g.bin, bv.byteOffset || 0, bv.byteLength)], { type: img.mimeType || 'image/jpeg' })); }
   let im;
   try { im = await new Promise((res, rej) => { const el = new Image(); el.onload = () => res(el); el.onerror = () => rej(new Error('textura ' + (img.uri || ti))); el.src = src; }); }
@@ -6379,7 +6385,7 @@ async function skLoad() {
     if (location.protocol === 'file:') throw new Error('abierto como fichero suelto: los modelos solo se cargan desde la web');
     SK.u32 = gl.getExtension('OES_element_index_uint');
     SK.vtf = skVTF();
-    const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
+    const get = f => assetFetch(f).then(async r => { if (!r.ok) throw new Error(f + ': ' + r.status); const g = glbParse(await r.arrayBuffer()); g.url = new URL(f, location.href).href; g.v = assetVer(r); return g; });
     /* el legionario: el completo; el ligero solo con el detalle de los soldados en «Bajo» puesto a mano. Si uno no carga, el otro */
     MODELS_LIGHT_LOADED = modelsLight();
     const legP = (async () => {
@@ -6680,7 +6686,7 @@ function skBones(s, C, st) {
     else { m4joint(_jm, st.gq, st.gp, C.J.Arma); M4.mul(_jm2, C.base, _jm); M4.mul(st.wloc, _jm2, C.wl[kind]); }
     const g = gunFor(s, C);
     if (!s.alive) st.weapon = null;       // al morir suelta el arma (cae aparte)
-    else if (g) { st.weapon = null; st.gun = g; gunLeftHand(s, C, st, g); }
+    else if (g) { st.weapon = null; st.gun = g; gunLeftHand(s, C, st, g); gunRightBolt(s, C, st, g); }
     else st.weapon = SK.W[kind];
   }
   skFingers(C, st, skGripsFor(s, C));
@@ -6796,7 +6802,7 @@ function skDrawSoldiers(list, vp, ex, ey, ez, newFrame) {
     if (TPM[st.gun.id] && TPM[st.gun.id].M && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) { lw++; continue; }       // de cerca, la texturada (abajo)
     drawModel(st.gun.model, st.wmat);
   }
-  if (lw) { for (const s of vis) { const st = s.sk; if (st.gun && TPM[st.gun.id] && TPM[st.gun.id].M && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) tpDraw(st.gun.id, st.wmat, vp, ex, ey, ez); } matState(1, 1, 0); }
+  if (lw) { for (const s of vis) { const st = s.sk; if (st.gun && TPM[st.gun.id] && TPM[st.gun.id].M && (s.x - ex) * (s.x - ex) + (s.z - ez) * (s.z - ez) < lwD) tpDraw(st.gun.id, st.wmat, vp, ex, ey, ez, botBoltPhase(s)); } matState(1, 1, 0); }
   for (const k in TPM) { const T = TPM[k]; if (!T.M && !T.busy && !T.err && vis.some(s => s.sk.gun && s.sk.gun.id === k)) tpLoad(k); }
   if (newFrame) gunDropsDraw(ex, ez, vp, ey);
   matState(1, 1, 0.05);
@@ -6828,6 +6834,30 @@ function gunFor(s, C) {
 }
 /* tercera persona: la mano izquierda va a su sitio en el arma (subfusiles y fusiles ametralladores) */
 const _gunM = M4.create();
+/* fusiles de cerrojo en manos de los soldados: tras cada disparo la mano derecha deja la empuñadura, coge la bola de la palanca,
+   la acompaña (arriba, atrás, adelante y abajo, igual que la pieza del arma en tpBolt) y vuelve; al recargar, abre y cierra igual.
+   La bola, medida en las mallas: en la palanca (Mauser) o en el cerrojo (Mosin), con el eje del cerrojo a 0,047 sobre el origen */
+const BOLT_KNOB = { mauser93: [0.0391, 0.0109, -0.0492], mosin: [0.0675, 0.004, -0.0591] };
+const _bkP = [0, 0, 0];
+function gunRightBolt(s, C, st, g) {
+  const T = TPM[g.id], K = BOLT_KNOB[g.id];
+  if (!T || !T.bolt || !K || !s.alive || (s.proneT || 0) > 0.5 || s.aa) return;
+  const u = botBoltPhase(s); if (u <= 0 || u >= 1) return;
+  let w;
+  if (s.reloadT > 0 && s.wpn.reload > 0) {       // recarga: solo al abrir (al principio) y al cerrar (al final)
+    const r = clamp(1 - s.reloadT / s.wpn.reload, 0, 1);
+    w = r < 0.22 ? Math.min(r / 0.05, (0.22 - r) / 0.06) : r > 0.78 ? Math.min((r - 0.78) / 0.06, (1 - r) / 0.05) : 0;
+  } else w = Math.min(u / 0.16, (1 - u) / 0.16);
+  w = _tpS(clamp(w, 0, 1)); if (w <= 0.001) return;
+  /* la palanca como la mueve tpBolt: giro sobre el eje del cerrojo y recorrido hacia atrás */
+  const lift = _tpS(clamp(u < 0.5 ? u / 0.22 : (1 - u) / 0.22, 0, 1)), back = _tpS(clamp(u < 0.5 ? (u - 0.22) / 0.26 : (0.78 - u) / 0.26, 0, 1));
+  const a = lift * Math.PI * (T.lift || 0.46), c = Math.cos(a), sn = Math.sin(a);
+  _bkP[0] = K[0] * c - K[1] * sn; _bkP[1] = 0.047 + K[0] * sn + K[1] * c; _bkP[2] = K[2] + back * 0.085;
+  M4.mul(_gunM, st.wloc, g.A);
+  const knob = M4.tp(_gunM, _bkP), palm = skGripPt(C, st, 'Right');
+  skReach(C, st, v3add(palm, v3mul(v3sub(knob, palm), w)), palm, 'Right', BOLT_POLE);
+}
+const BOLT_POLE = [-0.6, -1, 0.2];       // el codo derecho, abajo y hacia fuera
 function gunLeftHand(s, C, st, g) {
   if (!g.ik || !g.ref.left || !s.alive || s.reloadT > 0 || (s.proneT || 0) > 0.5) return;
   M4.mul(_gunM, st.wloc, g.A);
@@ -6863,6 +6893,12 @@ function fpBoltPhase(p, w) {
   if (!w || w.kind !== 'rifle') return 0;
   if (p.reloadT > 0 && w.reload > 0) { const r = clamp(1 - p.reloadT / w.reload, 0, 1); return r < 0.15 ? r / 0.15 * 0.5 : r > 0.85 ? 0.5 + (r - 0.85) / 0.15 * 0.5 : 0.5; }
   return p.boltT > 0 ? clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1) : 0;
+}
+/* cerrojo de un soldado en tercera persona (también los bots): tras cada disparo, y abierto mientras carga el peine */
+function botBoltPhase(s) {
+  const w = s.wpn; if (!w || w.kind !== 'rifle' || !s.alive) return 0;
+  if (s.reloadT > 0 && w.reload > 0) { const r = clamp(1 - s.reloadT / w.reload, 0, 1); return r < 0.15 ? r / 0.15 * 0.5 : r > 0.85 ? 0.5 + (r - 0.85) / 0.15 * 0.5 : 0.5; }
+  const t = game.time - (s.lastShot ?? -99); return t > 0.2 && t < 0.85 ? clamp((t - 0.2) / 0.65, 0, 1) : 0;
 }
 const _gfM = M4.create();
 function gunFpDraw(vp, G, w, team, ex, ey, ez, sides) {
@@ -8249,7 +8285,7 @@ function drawFpWeapon(camWorld) {
   const p = P, ws = p.weps[p.cur], w = ws.def, a = p.aimT;
   if (ws.id === 'breda30' && !skLegFpKey(p) && skBredaFpDraw(FPVP, camWorld, p, cam.x, cam.y, cam.z)) return;
   if (ws.id === 'naranjero' && p.team === REP && !skLegFpKey(p) && nfpDraw(camWorld, p, w)) return;       // el viejo de Blender, solo si no hay legionario (el Naranjero es el MP 28)
-  if ((ws.id === 'lewis' || ws.id === 'dp27') && p.team === REP && fpvDraw(ws.id, camWorld, p, w, ws)) return;       // la DP-27, igual que la Lewis       // la Lewis de Blender, con su plato que gira
+  if ((ws.id === 'lewis' || ws.id === 'dp27' || ws.id === 'mauser93') && p.team === REP && fpvDraw(ws.id, camWorld, p, w, ws)) return;       // la DP-27, igual que la Lewis       // la Lewis de Blender, con su plato que gira
   let rel = 0; if (p.reloadT > 0) rel = Math.sin(Math.PI * clamp(1 - p.reloadT / w.reload, 0, 1));
   let bolt = 0; if (p.boltT > 0 && w.kind === 'rifle') bolt = Math.sin(Math.PI * clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1));
   FP_BOLT = fpBoltPhase(p, w);
@@ -9746,7 +9782,7 @@ function vmDrawT26(v, m, vp, ex, ey, ez) {
 /* carga, cuando los soldados ya tienen su programa (los vehículos usan el mismo) */
 async function vmLoad() {
   if (!SK.ready) return;
-  const get = f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.arrayBuffer(); }).then(b => { const g = glbParse(b); g.url = new URL(f, location.href).href; return g; });
+  const get = f => assetFetch(f).then(async r => { if (!r.ok) throw new Error(f + ': ' + r.status); const g = glbParse(await r.arrayBuffer()); g.url = new URL(f, location.href).href; g.v = assetVer(r); return g; });
   const one = async (key, setup, texMax) => {
     const files = modelsLight() ? [VM_FILES_M[key], VM_FILES[key]] : [VM_FILES[key], VM_FILES_M[key]];
     for (let fi = 0; fi < files.length; fi++) try {
@@ -9785,8 +9821,8 @@ async function fpvLoad(id) {
   const F = FPV[id]; if (!F || F.M || F.busy || F.err) return;
   F.busy = true;
   try {
-    const r = await fetch(F.file); if (!r.ok) throw new Error(F.file + ': ' + r.status);
-    const g = glbParse(await r.arrayBuffer()); g.url = new URL(F.file, location.href).href;
+    const r = await assetFetch(F.file); if (!r.ok) throw new Error(F.file + ': ' + r.status);
+    const g = glbParse(await r.arrayBuffer()); g.url = new URL(F.file, location.href).href; g.v = assetVer(r);
     if (F.tex) for (const im of g.j.images || []) if (new RegExp('^' + F.tex + '_\\dk\\.jpg$').test(im.uri || '')) im.uri = gfxTexName(F.tex);
     const M = await vmBuild(g, gfxTexCap());
     for (const k of ['Cadera', 'Apuntar', 'Recarga']) if (!M.clips[k]) throw new Error('falta el clip ' + k);
@@ -9826,6 +9862,14 @@ function fpvDraw(id, camWorld, p, w, ws) {
   }
   const since = game.time - (p.lastShot ?? -99), cj = M.ix.Cerrojo;
   if (C.Disparo && since >= 0 && since < C.Disparo.dur) vmClip(M, P, 'Disparo', since, i => i === cj);
+  /* fusiles de cerrojo: después de cada disparo la mano derecha va a la palanca, la levanta, tira, empuja y la baja */
+  if (C.Cerrojo && w.kind === 'rifle' && !(rel > 0) && p.boltT > 0) {
+    const u = clamp((w.rate - p.boltT - 0.2) / 0.65, 0, 1);
+    if (u > 0 && u < 1) { vmRest(M, Q); vmClip(M, Q, 'Cerrojo', u * C.Cerrojo.dur); nfpMix(M, P, Q, Math.min(1, u / 0.12, (1 - u) / 0.12)); }
+  }
+  /* DP-27: el bípode se despliega al echarse cuerpo a tierra */
+  const bip = clamp(p.proneT || 0, 0, 1);
+  if (id === 'dp27' && C.Bipode && bip > 0) { const bi = M.ix.Bipode_I, bd = M.ix.Bipode_D; vmClip(M, P, 'Bipode', bip * C.Bipode.dur, i => i === bi || i === bd); }
   /* plato de la Lewis: un paso por cartucho gastado, con un giro corto tras cada disparo; al cambiarlo, el nuevo llega lleno */
   if (F.pan && M.ix.Tambor !== undefined && ws) {
     const used = rel > 0.5 ? 0 : (w.mag - ws.ammo) - (since >= 0 && since < 0.06 ? 1 - since / 0.06 : 0);
@@ -9848,8 +9892,8 @@ function nfpDraw(camWorld, p, w) { return fpvDraw('naranjero', camWorld, p, w, p
 async function tpLoad(id) {
   const T = TPM[id]; if (!T || T.M || T.busy || T.err) return; T.busy = true;
   try {
-    const r = await fetch(T.file); if (!r.ok) throw new Error(T.file + ': ' + r.status);
-    const g = glbParse(await r.arrayBuffer()); g.url = new URL(T.file, location.href).href;
+    const r = await assetFetch(T.file); if (!r.ok) throw new Error(T.file + ': ' + r.status);
+    const g = glbParse(await r.arrayBuffer()); g.url = new URL(T.file, location.href).href; g.v = assetVer(r);
     for (const im of g.j.images || []) im.uri = T.hd ? gfxTexName(T.tex) : T.tex + '_' + (gfxTexLevel() >= 1 ? '2k' : '1k') + '.jpg';
     const M = await vmBuild(g, gfxTexCap());
     T.P = vmState(M); vmWorld(M, T.P); T.P.fid = 1; T.bu = undefined; T.M = M;
