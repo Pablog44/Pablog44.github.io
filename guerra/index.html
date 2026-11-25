@@ -2651,7 +2651,7 @@ function roadDist(x, z) {
 }
 
 /* ============ construcción del mundo ============ */
-const world = { houses: [] };
+const world = { houses: [], interiors: [] };       // interiors: los muebles de cada casa, en su malla (solo se dibujan de cerca)
 (function buildWorld() {
   const R = seeded(1938); let g = new Geo();
   const rr = (a, b) => a + R() * (b - a);
@@ -2834,11 +2834,10 @@ const world = { houses: [] };
   }
   function house(x, z, w, d, h, o) {
     o = o || {};
-    const y = terrainH(x, z), wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
-    world.houses.push([x, z, w, d, o.open || o.ruin ? 1 : 0]);
+    const wall = o.wall || WALLS[(R() * WALLS.length) | 0], roof = ROOF[(R() * ROOF.length) | 0];
+    world.houses.push([x, z, w, d, 1]);       // todas se pueden ocupar
     const V = o.ruin ? 'seca' : 'mamp';       // un solo material por casa
-    if (o.open) openHouse(x, z, w, d, h, o, wall, roof, V);
-    else if (o.ruin) {
+    if (o.ruin) {
       /* casa en ruinas: muros rotos a distintas alturas, con el hueco de la puerta (sin hoja) y algún boquete; se puede entrar */
       const t = 0.55, yf = level(x, z, w / 2, d / 2), sd = o.door || (R() < 0.5 ? 's' : 'n'), lenOf = k => (k === 'n' || k === 's') ? w : d - 2 * t;
       const ops = { n: [], s: [], e: [], w: [] };
@@ -2851,86 +2850,479 @@ const world = { houses: [] };
       rubble(x, z, 6, w / 2 + 1.5, d / 2 + 1.5, wall);       // y fuera, cada uno en su suelo
       g.limb([x - w * 0.3, yf + 0.15, z - d * 0.2], [x + w * 0.2, yf + h * 0.45, z + d * 0.25], 0.18, 0.18, shade(WOOD, 0.7));       // viga caída
     }
-    else {
-      stone(V, () => g.box(x, y + h / 2 - 2, z, w, h + 4, d, wall));
-      const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-      tejado(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h, rh, alongX, roof, shade(wall, 0.92), V);
-      const dz = (o.door === 'n' ? -1 : 1) * (d / 2 + 0.03), fn = Math.sign(dz), dx0 = x + rr(-w / 4, w / 4);
-      g.box(dx0, y + 1.05, z + dz, 1.1, 2.1, 0.08, WOOD); recerco(dx0, z + fn * d / 2, 0, fn, 1.1, y, y + 2.1, false);
-      for (const sx of [-1, 1]) {
-        if (h > 5) { g.box(x + sx * w * 0.27, y + h * 0.68, z + dz, 0.8, 1.0, 0.08, DARK); recerco(x + sx * w * 0.27, z + fn * d / 2, 0, fn, 0.8, y + h * 0.68 - 0.5, y + h * 0.68 + 0.5, true); }
-        const wz = z + rr(-d / 4, d / 4);
-        g.box(x + sx * (w / 2 + 0.03), y + h * 0.66, wz, 0.08, 1.0, 0.8, DARK); recerco(x + sx * w / 2, wz, sx, 0, 0.8, y + h * 0.66 - 0.5, y + h * 0.66 + 0.5, true);
-      }
-      esquinales(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y - 0.3, y + h - 0.05);
-      if (o.chimney !== false && R() < 0.6) { const cx = x + rr(-w / 3, w / 3), cz = z + rr(-d / 4, d / 4); stone(V, () => { g.box(cx, y + h + rh * 0.9, cz, 0.8, 1.6, 0.8, shade(wall, 0.85)); g.box(cx, y + h + rh * 0.9 + 0.85, cz, 1.0, 0.12, 1.0, shade(wall, 0.75)); }); }
-      addAABB(x - w / 2, x + w / 2, y - 4, y + h + rh * 0.6, z - d / 2, z + d / 2);
-    }
+    else casa(x, z, w, d, h, o, wall, roof, V);
     noGo.push([x, z, Math.max(w, d) * 0.5 + 4]);
   }
-  /* casa hueca: muros con puerta y ventanas, suelo propio y tejado; el jugador puede ocuparla */
-  function openHouse(x, z, w, d, h, o, wall, roof, V) {
-    const t = 0.4, hw = w / 2, hd = d / 2, FLOORC = hex(0x86583c), inner = shade(wall, 0.9), lining = shade(wall, 0.6);
-    const yf = level(x, z, hw, hd);       // allana el solar para que la puerta quede a ras de calle
-    const DOOR = c => ({ c, w: 1.35, y0: 0, y1: 2.15 }), WIN = c => ({ c, w: 1.15, y0: 0.95, y1: 1.95 });
-    const wins = len => { const n = Math.max(1, Math.round(len / 5)), a = []; for (let i = 0; i < n; i++) a.push(WIN(-len / 2 + (i + 0.5) * len / n)); return a; };
-    function wallRun(alongX, cx, cz, len, ops, ins) {
-      ops.sort((a, b) => a.c - b.c); let cur = -len / 2;
-      const R = { alongX, cx, cz, len, P: [] };
+  /* ---- casas por dentro ----
+     Casa de pueblo de la Terra Alta y la Ribera d'Ebre hacia 1938. En la planta baja, por el portal ancho, la cuadra: el pesebre
+     contra una pared, la paja, los aperos y, a veces, la mula; al otro lado las botas de vino y las tinajas. Por una escalera de obra
+     contra la pared del fondo se sube al piso, donde vive la familia: el hogar con su campana, la mesa con sus sillas de enea, la alcoba
+     tras un tabique, el arca, el armario, la pica bajo la ventana. Abajo, ventanucos con reja; arriba, ventanas con porticones y, sobre
+     el portal, a veces un balcón con barandilla de hierro. Las de una sola altura son casas pobres: todo en una pieza. La bodega
+     cooperativa (cubos, botas y la prensa) y la venta (taberna con mostrador, cuadra y camas arriba) tienen lo suyo.
+     No hay sombras: todo lo de dentro va más oscuro (IN) para que se lea como penumbra.
+     o.open: fachada de la puerta ('n', 's', 'e', 'w'); o.kind: 'casa' (por defecto), 'venta' o 'bodega' */
+  function casa(x, z, w, d, h, o, wall, roof, V) {
+    const Q = seeded(((Math.round(x * 10) * 73856093) ^ (Math.round(z * 10) * 19349663)) >>> 0), q = (a, b) => a + Q() * (b - a), pk = a => a[(Q() * a.length) | 0];
+    const kind = o.kind || 'casa', t = 0.45, hw = w / 2, hd = d / 2, yf = level(x, z, hw, hd), yTop = yf + h;
+    const two = kind !== 'bodega' && h >= 5.8, H1 = two ? clamp(h * 0.48, 2.9, 3.5) : h, y2 = yf + H1, SL = 0.24;     // planta baja, cota del piso, grueso del forjado
+    /* marco de la casa: X a lo largo de la fachada, Z de la fachada hacia el fondo, origen en el centro */
+    const ds = o.open || 's', NV = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[ds], ZV = [-NV[0], -NV[1]], XV = [ZV[1], -ZV[0]];
+    const fro = ds === 'n' || ds === 's', Wi = (fro ? w : d) - 2 * t, Di = (fro ? d : w) - 2 * t, hW = Wi / 2, hD = Di / 2, big = Wi > 11;
+    const Lw = (a, b) => [x + XV[0] * a + ZV[0] * b, z + XV[1] * a + ZV[1] * b];
+    const HM = new Float32Array([XV[0], 0, XV[1], 0, 0, 1, 0, 0, ZV[0], 0, ZV[1], 0, x, 0, z, 1]);
+    const fr = (ox, oy, oz, rx, rz) => new Float32Array([rx, 0, rz, 0, 0, 1, 0, 0, -rz, 0, rx, 0, ox, oy, oz, 1]);       // x: hacia rx, rz; z: a su izquierda
+    const rot = (ox, oy, oz, ry) => { const m = M4.create(); M4.translate(m, ox, oy, oz); if (ry) M4.rotY(m, ry); return m; };
+    const rectW = (a0, a1, b0, b1) => { const p = Lw(a0, b0), r = Lw(a1, b1); return [Math.min(p[0], r[0]), Math.max(p[0], r[0]), Math.min(p[1], r[1]), Math.max(p[1], r[1])]; };
+    const sol = (a0, a1, y0, y1, b0, b1) => { const r = rectW(a0, a1, b0, b1); addAABB(r[0], r[1], y0, y1, r[2], r[3]); };
+    const lev = (a0, a1, b0, b1, y, k) => {      // piso por el que se anda (solo el jugador); k: pendiente a lo largo de X
+      const r = rectW(a0, a1, b0, b1), lxm = (r[0] - x) * XV[0] + (r[2] - z) * XV[1]; k = k || 0;
+      addLevel(r[0], r[1], r[2], r[3], y + (lxm - a0) * k, k * XV[0], k * XV[1]);
+    };
+    const B = (cx, cy, cz, sx, sy, sz, col, top) => g.box(cx, cy, cz, sx, sy, sz, col, top);
+    const SB = (a0, a1, y0, y1, b0, b1, col, top) => { const r = rectW(a0, a1, b0, b1); stone(V, () => g.box((r[0] + r[1]) / 2, (y0 + y1) / 2, (r[2] + r[3]) / 2, r[1] - r[0], y1 - y0, r[3] - r[2], col, top)); };       // obra, con la textura de la piedra
+    /* colores: lo de dentro, en penumbra */
+    const IN = 0.62, dk = (c, f) => shade(c, (f || 1) * IN);
+    const WOODC = dk(hex(0x6e4c2e)), WOODL = dk(hex(0x8f6a43)), WOODD = dk(hex(0x3f2c1c)), IRONC = dk(hex(0x2c2a27)), STRAW = dk(hex(0xc8a95c)), CLAY = dk(hex(0xa5603c));
+    const LINEN = dk(hex(0xd8d0bd)), WHITE = dk(hex(0xe3dccb)), TILE = dk(hex(0x9c5536)), EARTH = dk(hex(0x6c5a45)), PLAST = dk(hex(0xcfc6b2)), STN = dk(hex(0xa39883));
+    const SOC = dk(hex(pk([0x6f8590, 0x8a7350, 0x7a8a6a]))), SHUT = hex(pk([0x4d6b4b, 0x4a6680, 0x6a4b2e, 0x758a66, 0x5a7a86])), IRONX = hex(0x2c2a27);
+    const BLANK = () => dk(hex(pk([0x7a3a2c, 0x3d5372, 0x6b6838, 0x8a5a2a, 0x8c7a5c])));
+    const LIND = shade(wall, 0.5);
+
+    /* ---- huecos: puerta, ventanas y balcón, en cada pared ---- */
+    const OPS = { n: [], s: [], e: [], w: [] }, opp = { n: 's', s: 'n', e: 'w', w: 'e' };
+    const sideOfV = (vx, vz) => vx > 0.5 ? 'e' : vx < -0.5 ? 'w' : vz > 0.5 ? 's' : 'n';
+    const FACE = { F: ds, B: opp[ds], P: sideOfV(XV[0], XV[1]), M: sideOfV(-XV[0], -XV[1]) };
+    const op = (face, a, ow, y0, y1, k) => {      // a: posición local en la pared (X en F y B, Z en P y M); alturas desde el suelo
+      const p = face === 'F' ? Lw(a, -hD) : face === 'B' ? Lw(a, hD) : face === 'P' ? Lw(hW, a) : Lw(-hW, a), sn = FACE[face];
+      OPS[sn].push({ c: (sn === 'n' || sn === 's') ? p[0] - x : p[1] - z, w: ow, y0, y1, k });
+    };
+    const dw = kind === 'bodega' ? 2.4 : 1.6, dh = kind === 'bodega' ? 3.2 : Math.min(2.45, H1 - 0.4);
+    const dlx = big ? 0 : (Q() < 0.5 ? -1 : 1) * Wi * 0.2, sd = dlx > 0 ? 1 : dlx < 0 ? -1 : (Q() < 0.5 ? -1 : 1);     // sd: lado del portal (y del pie de la escalera)
+    op('F', dlx, dw, 0, dh, 'door');
+    /* escalera de obra contra la pared del fondo: sube desde el lado del portal hacia el otro */
+    let S = null;
+    if (two) {
+      const run = clamp(H1 / 0.72, 3.8, Wi - 1.8), lb = sd * (hW - 0.03), lt = lb - sd * run;
+      S = { run, lb, lt, z0: hD - 0.97, a: Math.min(lb, lt), b: Math.max(lb, lt), n: Math.max(10, Math.round(H1 / 0.19)) };
+    }
+    const pl = two ? Math.min(2.7, S.z0 + hD - 1.0) : 0, px = sd * (hW - 2.45);       // tabique de la alcoba (largo y sitio)
+    const hz = -hD + clamp(Di * 0.36, 1.5, 2.4);       // centro del hogar, en la pared M
+    let mzWin = null;
+    if (kind === 'bodega') {
+      for (const a of [-hW * 0.55, hW * 0.55]) op('F', a, 0.9, h - 2.6, h - 1.6, 'w0');
+      op('P', 0, 0.9, h - 2.6, h - 1.6, 'w0'); op('M', 0, 0.9, h - 2.6, h - 1.6, 'w0');
+    } else if (!two) {
+      const LWn = (face, a) => op(face, a, 0.85, 1.0, 2.05, 'w1');
+      LWn('F', -sd * (hW - 1.15)); LWn('P', -hD * 0.1); LWn('B', -sd * hW * 0.3);
+      mzWin = hz + 1.6 <= hD - 0.7 ? hz + 1.6 : null; if (mzWin !== null) LWn('M', mzWin);
+    } else {
+      const GW = (face, a) => op(face, a, 0.62, 1.5, 2.15, 'w0'), UW = (face, a) => op(face, a, 0.95, H1 + 0.85, H1 + 2.05, 'w1');
+      /* abajo, ventanucos con reja */
+      GW('F', -sd * (hW - 1.1)); if (big) GW('F', sd * hW * 0.5);
+      GW('P', -hD * 0.2); GW('M', -hD * 0.2);
+      const gb = -sd * (hW - 0.8); if (gb < S.a - 0.6 || gb > S.b + 0.6) GW('B', gb);
+      /* arriba, ventanas con porticones y, a veces, el balcón */
+      UW('F', sd * (hW - 1.2));
+      const bx = -sd * clamp(Wi * 0.14, 0.6, 1.5), balc = kind === 'venta' || (Wi >= 6.9 && Q() < 0.6);
+      if (balc) op('F', bx, 1.0, H1 + 0.02, H1 + 2.25, 'bal'); else UW('F', bx);
+      if (Wi >= 8.5) UW('F', -sd * (hW - 0.9));
+      if (big) { UW('F', -sd * hW * 0.55); UW('F', sd * hW * 0.35); }
+      UW('B', -sd * (hW - 1.0)); if (S.run >= 4) UW('B', (S.a + S.b) / 2);
+      if (S.z0 - (-hD + pl) >= 1.3) UW('P', (-hD + pl + S.z0) / 2);
+      mzWin = hz - 1.6 >= -hD + 0.75 ? hz - 1.6 : hz + 1.6 <= hD - 0.75 ? hz + 1.6 : null; if (mzWin !== null) UW('M', mzWin);
+    }
+
+    /* ---- muros: tramos entre huecos (cada hueco a su altura), con una colisión por tramo; por dentro, piedra en penumbra en la cuadra
+       y encalado con zócalo pintado en la vivienda ---- */
+    function wallRun(alongX, cx, cz, len, list, ins) {
+      const R = { alongX, cx, cz, len, P: [] }, ed = [-len / 2, len / 2];
+      for (const p of list) ed.push(clamp(p.c - p.w / 2, -len / 2, len / 2), clamp(p.c + p.w / 2, -len / 2, len / 2));
+      ed.sort((a, b) => a - b);
+      const xs = ed.filter((v, i) => i === 0 || v - ed[i - 1] > 0.02);
+      const lin = (a0, a1, ya, yb, col, plain, o2, pz0, px0) => {
+        if (yb - ya < 0.01) return;
+        const ref = [alongX ? cx : px0, (ya + yb) / 2, alongX ? pz0 : cz];
+        const f = () => alongX ? g.quad([a0, ya, pz0 + o2], [a1, ya, pz0 + o2], [a1, yb, pz0 + o2], [a0, yb, pz0 + o2], col, ref)
+                               : g.quad([px0 + o2, ya, a0], [px0 + o2, ya, a1], [px0 + o2, yb, a1], [px0 + o2, yb, a0], col, ref);
+        if (plain) f(); else stone(V, f);
+      };
       const seg = (c0, c1, y0, y1) => {
-        if (c1 - c0 < 0.05 || y1 - y0 < 0.05) return;
-        const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, px = alongX ? cx + c : cx, pz = alongX ? cz : cz + c;
-        R.P.push({ c0, c1, y0, y1 }); addAABB(px - sx / 2, px + sx / 2, y0, y1, pz - sz / 2, pz + sz / 2);
-        const iy = Math.max(y0, yf), off = ins * (t / 2 + 0.012);     // cara interior en penumbra
-        /* por dentro, la misma piedra en penumbra; en los muros largos, sin llegar a los extremos (si no, su canto asomaba por la cara de
-           fuera del muro de al lado como una raya oscura junto a la esquina) */
-        const e0 = alongX ? Math.max(c0, -len / 2 + t) : c0, e1 = alongX ? Math.min(c1, len / 2 - t) : c1, el = e1 - e0, ec = (e0 + e1) / 2;
-        if (y1 > iy && el > 0.01) {       // una sola cara, mirando al cuarto (como caja, sus tapas daban rayas en las juntas)
-          const o2 = ins * (t / 2 + 0.02), a0 = (alongX ? cx : cz) + e0, a1 = (alongX ? cx : cz) + e1, ref = [alongX ? cx : px, (iy + y1) / 2, alongX ? pz : cz];
-          stone(V, () => alongX ? g.quad([a0, iy, pz + o2], [a1, iy, pz + o2], [a1, y1, pz + o2], [a0, y1, pz + o2], lining, ref)
-                                : g.quad([px + o2, iy, a0], [px + o2, iy, a1], [px + o2, y1, a1], [px + o2, y1, a0], lining, ref));
+        if (c1 - c0 < 0.02 || y1 - y0 < 0.04) return;
+        const c = (c0 + c1) / 2, l = c1 - c0, sx = alongX ? l : t, sz = alongX ? t : l, pxx = alongX ? cx + c : cx, pzz = alongX ? cz : cz + c;
+        R.P.push({ c0, c1, y0, y1 }); addAABB(pxx - sx / 2, pxx + sx / 2, y0, y1, pzz - sz / 2, pzz + sz / 2);
+        /* la cara de dentro (en los muros largos, sin llegar a los extremos: su canto asomaba por fuera junto a la esquina) */
+        const e0 = alongX ? Math.max(c0, -len / 2 + t) : c0, e1 = alongX ? Math.min(c1, len / 2 - t) : c1;
+        if (e1 - e0 < 0.01) return;
+        const a0 = (alongX ? cx : cz) + e0, a1 = (alongX ? cx : cz) + e1, o2 = ins * (t / 2 + 0.012), o3 = ins * (t / 2 + 0.017);
+        const lo = Math.max(y0, yf), hi = Math.min(y1, yTop);
+        if (hi <= lo) return;
+        if (kind === 'bodega') lin(a0, a1, lo, hi, LIND, false, o2, pzz, pxx);
+        else {
+          const yl = two ? y2 : yf;       // donde empieza la vivienda
+          if (two) lin(a0, a1, lo, Math.min(hi, y2), LIND, false, o2, pzz, pxx);
+          lin(a0, a1, Math.max(lo, yl), hi, WHITE, true, o2, pzz, pxx);
+          lin(a0, a1, Math.max(lo, yl), Math.min(hi, yl + 0.9), SOC, true, o3, pzz, pxx);       // zócalo
         }
       };
-      for (const q of ops) {
-        seg(cur, q.c - q.w / 2, yf - 4, yf + h);
-        if (q.y0 > 0) seg(q.c - q.w / 2, q.c + q.w / 2, yf - 4, yf + q.y0);
-        seg(q.c - q.w / 2, q.c + q.w / 2, yf + q.y1, yf + h);
-        cur = q.c + q.w / 2;
+      for (let i = 0; i < xs.length - 1; i++) {
+        const c0 = xs[i], c1 = xs[i + 1], m = (c0 + c1) / 2;
+        const cov = list.filter(p => p.c - p.w / 2 < m && p.c + p.w / 2 > m).sort((a, b) => a.y0 - b.y0);
+        let cur = yf - 4;
+        for (const p of cov) { if (p.y0 > 0.001) seg(c0, c1, cur, yf + p.y0); cur = yf + p.y1; }
+        seg(c0, c1, cur, yTop);
       }
-      seg(cur, len / 2, yf - 4, yf + h);
       emitWall(V, R, t, wall, () => alongX ? [] : [[-99, 99]]);       // los de los lados acaban dentro de los de delante y detrás
     }
-    const side = o.open, lenOf = sd => (sd === 'n' || sd === 's') ? w : d - 2 * t;
-    const dc = lenOf(side) > 12 ? 0 : -lenOf(side) * 0.18;
-    const ops = sd => { const len = lenOf(sd); if (sd !== side) return wins(len); const a = wins(len).filter(q => Math.abs(q.c - dc) > 1.7); a.push(DOOR(dc)); return a; };
-    wallRun(true, x, z - hd + t / 2, w, ops('n'), 1); wallRun(true, x, z + hd - t / 2, w, ops('s'), -1);
-    wallRun(false, x - hw + t / 2, z, d - 2 * t, ops('w'), 1); wallRun(false, x + hw - t / 2, z, d - 2 * t, ops('e'), -1);
-    /* sillería: recerco de cada hueco y esquinales */
-    for (const [sd, fx, fz, nx, nz] of [['n', 0, -hd, 0, -1], ['s', 0, hd, 0, 1], ['w', -hw, 0, -1, 0], ['e', hw, 0, 1, 0]])
-      for (const q of ops(sd)) recerco(x + fx + (nz ? q.c : 0), z + fz + (nx ? q.c : 0), nx, nz, q.w, yf + q.y0, yf + q.y1, q.y0 > 0);
-    esquinales(x - hw, x + hw, z - hd, z + hd, yf - 0.3, yf + h - 0.05);
-    g.box(x, yf + h - 0.3, z, w - 2 * t, 0.06, d - 2 * t, shade(WOOD, 0.6));
-    g.box(x, yf - 2, z, w - 0.1, 4, d - 0.1, inner, FLOORC); addFloor(x - hw, x + hw, z - hd, z + hd, yf);
-    /* umbral, hoja de la puerta y mesa */
-    const nx = side === 'e' ? 1 : side === 'w' ? -1 : 0, nz = side === 's' ? 1 : side === 'n' ? -1 : 0, tx = nz ? 1 : 0, tz = nx ? 1 : 0, hn = nz ? hd : hw;
-    const dx = x + tx * dc + nx * hn, dz = z + tz * dc + nz * hn;
-    const bx = (cx, cz, st, sn, cy, sy, col, solid) => {
-      const sx = tx * st + Math.abs(nx) * sn, sz = tz * st + Math.abs(nz) * sn; g.box(cx, cy, cz, sx, sy, sz, col);
-      if (solid) addAABB(cx - sx / 2, cx + sx / 2, cy - sy / 2, cy + sy / 2, cz - sz / 2, cz + sz / 2); return [sx, sz];
-    };
-    const st = bx(dx + nx * 0.6, dz + nz * 0.6, 1.8, 1.2, yf - 2.03, 4, STONE);
-    addFloor(dx + nx * 0.6 - st[0] / 2, dx + nx * 0.6 + st[0] / 2, dz + nz * 0.6 - st[1] / 2, dz + nz * 0.6 + st[1] / 2, yf - 0.03);
-    bx(dx - nx * (t + 0.62) - tx * 0.66, dz - nz * (t + 0.62) - tz * 0.66, 0.06, 1.2, yf + 1.06, 2.1, WOOD);
-    const mx = x - tx * dc * 1.2 - nx * hn * 0.3, mz = z - tz * dc * 1.2 - nz * hn * 0.3;
-    bx(mx, mz, 1.5, 0.8, yf + 0.74, 0.08, WOOD, false); bx(mx, mz, 1.3, 0.6, yf + 0.36, 0.72, shade(WOOD, 0.8), true);
-    /* tejado y vigas */
+    wallRun(true, x, z - hd + t / 2, w, OPS.n, 1); wallRun(true, x, z + hd - t / 2, w, OPS.s, -1);
+    wallRun(false, x - hw + t / 2, z, d - 2 * t, OPS.w, 1); wallRun(false, x + hw - t / 2, z, d - 2 * t, OPS.e, -1);
+
+    /* ---- por fuera: sillería de los huecos, porticones, rejas, balcón, poyo y esquinales ---- */
+    for (const [sn, nx, nz] of [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0]]) for (const p of OPS[sn]) {
+      const ax = nz ? 1 : 0, az = nx ? 1 : 0, ox = x + nx * hw + ax * p.c, oz = z + nz * hd + az * p.c, y0 = yf + p.y0, y1 = yf + p.y1;
+      const at = (c, n) => [ox + ax * c + nx * n, oz + az * c + nz * n];
+      recerco(ox, oz, nx, nz, p.w, y0, y1, p.k === 'w0' || p.k === 'w1');
+      if (p.k === 'w1' || p.k === 'bal') {       // porticones abiertos contra la fachada (alguno falta)
+        for (const s of [-1, 1]) {
+          if (Q() < 0.1) continue;
+          const c = at(s * (p.w / 2 + 0.22 + p.w / 4), 0.1), ww = p.w / 2;
+          g.box(c[0], (y0 + y1) / 2, c[1], ax * ww + az * 0.035, y1 - y0 + 0.02, az * ww + ax * 0.035, SHUT);
+          for (const yy of [y0 + 0.25, y1 - 0.25]) g.box(c[0] + nx * 0.02, yy, c[1] + nz * 0.02, ax * ww * 0.9 + az * 0.02, 0.04, az * ww * 0.9 + ax * 0.02, IRONX);       // pernios
+        }
+      }
+      if (p.k === 'w0') {       // reja
+        for (let k = 1; k <= 3; k++) { const c = at(-p.w / 2 + k * p.w / 4, -t / 2 + 0.06); g.box(c[0], (y0 + y1) / 2, c[1], 0.03, y1 - y0, 0.03, IRONX); }
+        const c = at(0, -t / 2 + 0.06); g.box(c[0], (y0 + y1) / 2, c[1], ax * p.w + az * 0.03, 0.03, az * p.w + ax * 0.03, IRONX);
+      }
+      if (p.k === 'bal') {       // balcón: losa sobre ménsulas y barandilla de hierro; se puede salir a él
+        const bw = 1.75, bd = 0.6, ys = yf + H1 + 0.02, c = at(0, bd / 2);
+        stone('sillar', () => g.box(c[0], ys - 0.07, c[1], ax * bw + az * bd, 0.14, az * bw + ax * bd, STQ));
+        for (const s of [-1, 1]) { const m = at(s * 0.6, 0.2); stone('sillar', () => g.box(m[0], ys - 0.26, m[1], ax * 0.14 + az * 0.38, 0.26, az * 0.14 + ax * 0.38, STQ)); }
+        const r0 = at(-bw / 2, 0), r1 = at(bw / 2, bd);
+        addLevel(Math.min(r0[0], r1[0]), Math.max(r0[0], r1[0]), Math.min(r0[1], r1[1]), Math.max(r0[1], r1[1]), ys);
+        addAABB(Math.min(r0[0], r1[0]), Math.max(r0[0], r1[0]), ys - 0.14, ys, Math.min(r0[1], r1[1]), Math.max(r0[1], r1[1]));
+        const rail = (ca, na, cb, nb) => {       // tramo de barandilla de (ca, na) a (cb, nb): pasamanos, barrotes y su colisión
+          const A = at(ca, na), Bq = at(cb, nb), L = Math.hypot(Bq[0] - A[0], Bq[1] - A[1]), n = Math.max(2, Math.round(L / 0.12));
+          g.limb([A[0], ys + 0.95, A[1]], [Bq[0], ys + 0.95, Bq[1]], 0.035, 0.035, IRONX); g.limb([A[0], ys + 0.1, A[1]], [Bq[0], ys + 0.1, Bq[1]], 0.025, 0.025, IRONX);
+          for (let i = 0; i <= n; i++) { const u = i / n; g.box(A[0] + (Bq[0] - A[0]) * u, ys + 0.5, A[1] + (Bq[1] - A[1]) * u, 0.018, 0.9, 0.018, IRONX); }
+          addAABB(Math.min(A[0], Bq[0]) - 0.03, Math.max(A[0], Bq[0]) + 0.03, ys, ys + 1.0, Math.min(A[1], Bq[1]) - 0.03, Math.max(A[1], Bq[1]) + 0.03);
+        };
+        rail(-bw / 2 + 0.03, bd - 0.03, bw / 2 - 0.03, bd - 0.03); rail(-bw / 2 + 0.03, 0.02, -bw / 2 + 0.03, bd - 0.03); rail(bw / 2 - 0.03, 0.02, bw / 2 - 0.03, bd - 0.03);
+        for (const s of [-1, 1]) if (Q() < 0.7) { const m = at(s * (bw / 2 - 0.25), bd - 0.22); g.cyl(m[0], ys + 0.12, m[1], 0.09, 0.12, 0.24, 7, hex(0xa5603c), true); g.blob(m[0], ys + 0.33, m[1], 0.16, 0.12, 0.16, hex(0x4d6a34), 7, 3, 0.3, Q, 0.2); if (Q() < 0.7) g.blob(m[0] + 0.05, ys + 0.42, m[1], 0.05, 0.05, 0.05, hex(0xb3322a), 5, 3, 0, null, 0); }       // geranios
+      }
+    }
+    esquinales(x - hw, x + hw, z - hd, z + hd, yf - 0.3, yTop - 0.05);
+    /* suelo de la planta baja, umbral de piedra y, a veces, un poyo junto al portal */
+    g.box(x, yf - 2, z, w - 0.1, 4, d - 0.1, shade(wall, 0.9), two ? EARTH : kind === 'bodega' ? dk(hex(0x8a8070)) : TILE);
+    addFloor(x - hw, x + hw, z - hd, z + hd, yf);
+    g.with(HM, () => B(dlx, yf - 2.03, -hD - t - 0.55, dw + 0.4, 4, 1.1, STONE));
+    { const r = rectW(dlx - dw / 2 - 0.2, dlx + dw / 2 + 0.2, -hD - t - 1.1, -hD - t); addFloor(r[0], r[1], r[2], r[3], yf - 0.03); }
+    if (kind !== 'bodega' && Q() < 0.45) {
+      const pb = dlx + (Math.abs(dlx + dw / 2 + 1.0) < hW - 0.6 ? 1 : -1) * (dw / 2 + 1.0);
+      g.with(HM, () => B(pb, yf + 0.22, -hD - t - 0.22, 1.3, 0.44, 0.42, STONE, shade(STONE, 1.08)));
+      sol(pb - 0.65, pb + 0.65, yf - 0.5, yf + 0.44, -hD - t - 0.43, -hD - t);
+    }
+    /* tejado, techo de la vivienda y la chimenea (encima del hogar) */
     const alongX = w >= d, rh = (alongX ? d : w) * 0.28;
-    tejado(x - hw, x + hw, z - hd, z + hd, yf + h, rh, alongX, roof, shade(wall, 0.92), V, { tin: t });
-    addAABB(x - hw, x + hw, yf + h, yf + h + rh * 0.7, z - hd, z + hd);
-    const span = alongX ? w : d, nb = Math.max(2, Math.round(span / 3));
-    for (let i = 1; i < nb; i++) { const q = -span / 2 + i * span / nb; if (alongX) g.box(x + q, yf + h - 0.43, z, 0.18, 0.2, d - 2 * t, shade(WOOD, 0.8)); else g.box(x, yf + h - 0.43, z + q, w - 2 * t, 0.2, 0.18, shade(WOOD, 0.8)); }
-    if (o.chimney !== false) stone(V, () => g.box(x + (alongX ? w * 0.3 : 0), yf + h + rh * 0.9, z + (alongX ? 0 : d * 0.3), 0.6, 1.4, 0.6, shade(wall, 0.85)));
+    tejado(x - hw, x + hw, z - hd, z + hd, yTop, rh, alongX, roof, shade(wall, 0.92), V, { tin: t });
+    addAABB(x - hw, x + hw, yTop, yTop + rh * 0.7, z - hd, z + hd);
+    if (kind !== 'bodega' && o.chimney !== false) {
+      const c = Lw(-sd * (hW + t / 2), hz), ry = yTop + rh * (1 - Math.min(1, alongX ? Math.abs(c[1] - z) / hd : Math.abs(c[0] - x) / hw));
+      stone(V, () => { g.box(c[0], ry + 0.35, c[1], 0.62, 1.7, 0.62, shade(wall, 0.85)); g.box(c[0], ry + 1.24, c[1], 0.8, 0.12, 0.8, shade(wall, 0.75)); });
+      g.box(c[0], ry + 1.31, c[1], 0.36, 0.02, 0.36, hex(0x16130f));
+    }
     addBotBox(x - hw, x + hw, z - hd, z + hd);
+
+    /* ---- muebles y aperos, en el marco de la casa ---- */
+    const WF = (face, a, y) => face === 'M' ? fr(-sd * hW, y, a, sd, 0) : face === 'P' ? fr(sd * hW, y, a, -sd, 0) : face === 'B' ? fr(a, y, hD, 0, -1) : fr(a, y, -hD, 0, 1);
+    const WS = (face, a, dp, wd, y0, y1) => {      // colisión de algo arrimado a una pared (dp: fondo; wd: ancho)
+      if (face === 'M' || face === 'P') { const s = face === 'M' ? -sd : sd; sol(Math.min(s * hW, s * (hW - dp)), Math.max(s * hW, s * (hW - dp)), y0, y1, a - wd / 2, a + wd / 2); }
+      else { const v0 = face === 'B' ? hD : -hD, v1 = face === 'B' ? hD - dp : -hD + dp; sol(a - wd / 2, a + wd / 2, y0, y1, Math.min(v0, v1), Math.max(v0, v1)); }
+    };
+    const onWall = (face, a, y, fn) => g.with(WF(face, a, y), fn);
+    /* en el marco de una pared: x hacia el cuarto, z a lo largo de la pared, y desde el suelo */
+    function hogar(hr) {       // hogar de leña con su campana, el fuego, la olla y cacharros en la repisa
+      B(0.42, 0.14, 0, 0.84, 0.28, 1.9, STN, dk(hex(0x5a4b3c)));
+      B(0.03, 0.95, 0, 0.06, 1.3, 1.5, dk(hex(0x1c1814)));
+      for (const s of [-1, 1]) B(0.42, 0.92, s * 0.86, 0.84, 1.28, 0.2, STN);
+      B(0.47, 1.66, 0, 0.94, 0.2, 2.0, WOODD); B(0.52, 1.79, 0, 1.04, 0.06, 2.12, WOODC);
+      B(0.38, 2.08, 0, 0.76, 0.52, 1.84, PLAST); B(0.27, (2.34 + hr) / 2, 0, 0.54, hr - 2.34, 1.3, PLAST);
+      g.limb([0.22, 0.34, -0.35], [0.62, 0.31, 0.3], 0.1, 0.1, WOODD); g.limb([0.28, 0.33, 0.36], [0.64, 0.32, -0.24], 0.09, 0.09, dk(hex(0x55402b)));
+      B(0.42, 0.29, 0, 0.5, 0.025, 0.72, dk(hex(0x7a2e16)));
+      for (const s of [-1, 1]) { B(0.45, 0.4, s * 0.38, 0.5, 0.05, 0.04, IRONC); B(0.68, 0.48, s * 0.38, 0.04, 0.2, 0.04, IRONC); }
+      g.limb([0.4, 1.56, 0], [0.4, 0.92, 0], 0.016, 0.016, IRONC); g.cyl(0.4, 0.77, 0, 0.17, 0.2, 0.3, 9, IRONC, true);
+      g.cyl(0.6, 1.92, -0.62, 0.07, 0.06, 0.2, 7, CLAY, true); g.cyl(0.6, 1.9, 0.55, 0.06, 0.075, 0.16, 7, dk(hex(0x8a8a7a)), true); g.cyl(0.6, 1.88, 0.2, 0.05, 0.05, 0.12, 6, dk(hex(0x3a4a5a)), true);
+    }
+    function llit(col, cross) {       // cama de madera: cabecero contra la pared
+      const L = 2.0, Wd = 1.35;
+      B(L / 2, 0.32, 0, L, 0.16, Wd, WOODC);
+      for (const a of [0.06, L - 0.06]) for (const s of [-1, 1]) B(a, 0.16, s * (Wd / 2 - 0.05), 0.07, 0.32, 0.07, WOODD);
+      B(L / 2 + 0.02, 0.5, 0, L - 0.12, 0.2, Wd - 0.08, LINEN); B(L / 2 + 0.25, 0.62, 0, L - 0.55, 0.05, Wd - 0.02, col);
+      B(0.32, 0.65, 0, 0.36, 0.12, Wd - 0.25, LINEN);
+      B(0.04, 0.66, 0, 0.08, 1.3, Wd + 0.04, WOODC); B(0.05, 1.33, 0, 0.12, 0.08, Wd + 0.12, WOODD); B(L - 0.03, 0.44, 0, 0.06, 0.62, Wd + 0.02, WOODC);
+      if (cross) { B(0.02, 1.78, 0, 0.03, 0.44, 0.05, WOODD); B(0.02, 1.88, 0, 0.03, 0.05, 0.27, WOODD); }       // crucifijo
+    }
+    function arca() { B(0.27, 0.26, 0, 0.5, 0.52, 1.0, WOODL); B(0.28, 0.54, 0, 0.55, 0.05, 1.05, WOODC); for (const s of [-1, 1]) B(0.28, 0.27, s * 0.32, 0.52, 0.54, 0.04, IRONC); B(0.53, 0.42, 0, 0.02, 0.08, 0.1, IRONC); }
+    function armari() {       // armario de dos puertas
+      B(0.22, 0.97, 0, 0.44, 1.94, 1.0, WOODC); for (const s of [-1, 1]) { B(0.45, 1.0, s * 0.245, 0.02, 1.72, 0.45, WOODL); B(0.47, 1.0, s * 0.05, 0.03, 0.12, 0.03, IRONC); }
+      B(0.25, 1.97, 0, 0.52, 0.06, 1.1, WOODD);
+    }
+    function pica() {       // pica de piedra con el cántaro
+      B(0.3, 0.42, 0, 0.6, 0.84, 0.85, STN, dk(hex(0x8f8574))); B(0.3, 0.846, 0, 0.42, 0.012, 0.6, dk(hex(0x34312c)));
+      g.cyl(0.25, 1.0, 0.3, 0.1, 0.14, 0.24, 8, CLAY, true); g.cyl(0.25, 1.17, 0.3, 0.14, 0.05, 0.12, 8, CLAY); g.limb([0.25, 1.24, 0.3], [0.35, 1.3, 0.3], 0.02, 0.02, CLAY);
+    }
+    function platera() {       // escurreplatos con la vajilla
+      B(0.11, 1.5, 0, 0.22, 0.03, 0.95, WOODC); B(0.02, 1.63, 0, 0.04, 0.3, 0.95, WOODC);
+      for (let i = 0; i < 5; i++) { const m = M4.create(); M4.translate(m, 0.08, 1.63, -0.36 + i * 0.18); M4.rotZ(m, Math.PI / 2 - 0.12); g.with(m, () => g.cyl(0, 0, 0, 0.11, 0.11, 0.014, 10, i % 2 ? dk(hex(0xe8e2d0)) : dk(hex(0x9fb4c8)), true)); }
+    }
+    function menjadora(Lm) {       // pesebre de tablas sobre un poyo de mampostería, con anillas para atar
+      B(0.32, 0.27, 0, 0.64, 0.54, Lm, STN, dk(hex(0x8a7f6a))); B(0.34, 0.7, 0, 0.6, 0.32, Lm, WOODC);
+      B(0.35, 0.862, 0, 0.44, 0.01, Lm - 0.12, dk(hex(0x2b2218))); B(0.37, 0.84, 0, 0.4, 0.04, Lm - 0.24, STRAW);
+      for (let i = 0; i < Math.max(1, Math.floor(Lm / 1.3)); i++) { const zz = -Lm / 2 + 0.65 + i * 1.3, m = M4.create(); M4.translate(m, 0.04, 1.25, zz); M4.rotZ(m, Math.PI / 2); g.with(m, () => g.cyl(0, 0, 0, 0.06, 0.06, 0.015, 8, IRONC)); }
+    }
+    function collera() {       // collera y yugo colgados de la pared
+      for (let i = 0; i < 10; i++) { const a0 = i / 10 * 6.283, a1 = (i + 1) / 10 * 6.283; g.limb([0.07, 1.5 + Math.cos(a0) * 0.28, Math.sin(a0) * 0.2], [0.07, 1.5 + Math.cos(a1) * 0.28, Math.sin(a1) * 0.2], 0.09, 0.1, dk(hex(0x4a3020))); }
+      g.limb([0.05, 1.82, -0.05], [0.05, 1.86, 0.05], 0.03, 0.03, IRONC);
+    }
+    function roda() {       // rueda de carro apoyada en la pared
+      const n = 14, rr0 = 0.6, cy = 0.62, cx = 0.1;
+      for (let i = 0; i < n; i++) { const a0 = i / n * 6.283, a1 = (i + 1) / n * 6.283; g.limb([cx, cy + Math.cos(a0) * rr0, Math.sin(a0) * rr0], [cx, cy + Math.cos(a1) * rr0, Math.sin(a1) * rr0], 0.08, 0.07, WOODC); }
+      for (let i = 0; i < 6; i++) { const a = i / 6 * 3.1416; g.limb([cx, cy - Math.cos(a) * (rr0 - 0.04), -Math.sin(a) * (rr0 - 0.04)], [cx, cy + Math.cos(a) * (rr0 - 0.04), Math.sin(a) * (rr0 - 0.04)], 0.04, 0.035, WOODL); }
+      const m = M4.create(); M4.translate(m, cx, cy, 0); M4.rotZ(m, Math.PI / 2); g.with(m, () => g.cyl(0, 0, 0, 0.11, 0.11, 0.18, 8, WOODD, true));
+    }
+    /* en el marco de la casa */
+    function bota(cx, cy, cz, r, len, col) {       // bota de vino tumbada, a lo largo de X, con sus aros
+      const m = rot(cx, cy, cz, 0); M4.rotZ(m, Math.PI / 2);
+      g.with(m, () => {
+        g.cyl(0, -len * 0.25, 0, r * 0.87, r, len * 0.5, 10, col); g.cyl(0, len * 0.25, 0, r, r * 0.87, len * 0.5, 10, col);
+        g.cyl(0, -len / 2 + 0.01, 0, r * 0.86, r * 0.86, 0.02, 10, shade(col, 0.75), true); g.cyl(0, len / 2 - 0.01, 0, r * 0.86, r * 0.86, 0.02, 10, shade(col, 0.75), true);
+        for (const f of [-0.4, 0.4]) { const rr1 = r * 0.9 + 0.012; g.cyl(0, f * len, 0, rr1, rr1, 0.05, 10, IRONC); }
+      });
+    }
+    function gerra(cx, yb, cz, s) {       // tinaja de barro
+      g.cyl(cx, yb + 0.25 * s, cz, 0.17 * s, 0.32 * s, 0.5 * s, 9, CLAY, true); g.cyl(cx, yb + 0.72 * s, cz, 0.32 * s, 0.15 * s, 0.44 * s, 9, CLAY);
+      g.cyl(cx, yb + 0.97 * s, cz, 0.15 * s, 0.17 * s, 0.07 * s, 9, shade(CLAY, 0.85));
+    }
+    const sac = (cx, yb, cz) => g.blob(cx, yb + 0.27, cz, q(0.24, 0.3), q(0.26, 0.32), q(0.19, 0.24), dk(hex(0xa8996f)), 7, 4, 0.18, Q, 0.12);
+    function cadira() {       // silla de enea: quien se sienta mira a +x
+      const E = dk(hex(0xb39a5e));
+      B(0, 0.45, 0, 0.42, 0.04, 0.42, E);
+      for (const a of [-0.18, 0.18]) for (const b of [-0.18, 0.18]) B(a, 0.22, b, 0.035, 0.45, 0.035, WOODL);
+      for (const b of [-0.18, 0.18]) B(-0.19, 0.72, b, 0.04, 0.55, 0.04, WOODL);
+      for (const yy of [0.66, 0.86]) B(-0.19, yy, 0, 0.03, 0.07, 0.38, WOODL);
+    }
+    const chair = (cx, yb, cz, r, fallen) => { const m = rot(cx, yb + (fallen ? 0.21 : 0), cz, r); if (fallen) M4.rotZ(m, Math.PI / 2); g.with(m, cadira); };
+    function mesa(cx, yb, cz, lx, lz, fallen, es) {       // mesa con sus sillas, la vajilla, el porrón y el candil colgado encima
+      B(cx, yb + 0.76, cz, lx, 0.05, lz, WOODL);
+      for (const a of [-1, 1]) for (const b of [-1, 1]) B(cx + a * (lx / 2 - 0.07), yb + 0.37, cz + b * (lz / 2 - 0.07), 0.06, 0.74, 0.06, WOODC);
+      for (const b of [-1, 1]) B(cx, yb + 0.66, cz + b * (lz / 2 - 0.07), lx - 0.2, 0.1, 0.025, WOODC);
+      sol(cx - lx / 2, cx + lx / 2, yb - 0.1, yb + 0.79, cz - lz / 2, cz + lz / 2);
+      chair(cx - lx * 0.2, yb, cz + lz / 2 + 0.26, Math.PI / 2, false); chair(cx + lx * 0.2, yb, cz - lz / 2 - 0.26, -Math.PI / 2, fallen);
+      es = es || -1; chair(cx + es * (lx / 2 + 0.3), yb, cz, es > 0 ? Math.PI : 0, false);
+      g.cyl(cx + 0.15, yb + 0.86, cz + 0.1, 0.06, 0.09, 0.16, 8, dk(hex(0x9fb6a0), 1.2), true); g.limb([cx + 0.15, yb + 0.92, cz + 0.1], [cx + 0.42, yb + 1.0, cz + 0.1], 0.02, 0.02, dk(hex(0x9fb6a0), 1.2));       // porrón
+      g.limb([cx + 0.15, yb + 0.92, cz + 0.1], [cx + 0.15, yb + 1.1, cz + 0.1], 0.03, 0.03, dk(hex(0x9fb6a0), 1.2));
+      for (const s of [-1, 1]) g.cyl(cx - 0.3 + s * 0.12, yb + 0.81, cz - 0.12, 0.07, 0.09, 0.06, 8, dk(hex(0xd9cdb0)), true);       // escudillas
+      g.blob(cx - 0.35, yb + 0.85, cz + 0.15, 0.13, 0.07, 0.09, dk(hex(0xb8894e)), 6, 3, 0.1, Q, 0.1);       // pan
+    }
+    const lamp = (cx, yc, cz) => { g.limb([cx, yc, cz], [cx, yc - 0.55, cz], 0.012, 0.012, IRONC); g.cyl(cx, yc - 0.62, cz, 0.09, 0.03, 0.12, 6, IRONC, true); };
+    function mula(cx, yb, cz, face) {       // mula atada al pesebre (mira a +x)
+      const m = rot(cx, yb, cz, face < 0 ? Math.PI : 0), C = dk(hex(pk([0x5a4a3c, 0x6b5844, 0x4a3f36]))), C2 = shade(C, 0.75);
+      g.with(m, () => {
+        g.blob(0, 1.08, 0, 0.74, 0.3, 0.27, C, 9, 5, 0, null, 0);
+        for (const a of [-0.5, 0.46]) for (const s of [-1, 1]) { g.limb([a, 1.0, s * 0.14], [a + 0.03, 0.08, s * 0.14], 0.11, 0.11, C); B(a + 0.03, 0.05, s * 0.14, 0.12, 0.1, 0.12, dk(hex(0x24201c))); }
+        g.limb([0.55, 1.15, 0], [0.92, 1.58, 0], 0.22, 0.3, C); g.limb([0.9, 1.66, 0], [1.26, 1.3, 0], 0.2, 0.26, C); B(1.24, 1.27, 0, 0.16, 0.16, 0.2, shade(C, 1.25));
+        for (const s of [-1, 1]) g.limb([0.88, 1.74, s * 0.06], [0.82, 2.02, s * 0.11], 0.05, 0.08, C2);
+        g.limb([0.62, 1.42, 0], [0.88, 1.78, 0], 0.05, 0.06, C2);       // crin
+        g.limb([-0.72, 1.18, 0], [-0.8, 0.6, 0], 0.05, 0.05, C2);
+        g.limb([1.0, 1.42, 0], [1.2, 1.3, 0], 0.27, 0.02, dk(hex(0x3a2818)));       // cabezada
+      });
+    }
+    function gallina(cx, yb, cz, r) {
+      const C = dk(hex(pk([0x8a5a32, 0xd8cfc0, 0x3a3028, 0xa8783c]))), Y = dk(hex(0xc89a30));
+      g.with(rot(cx, yb, cz, r), () => {
+        g.blob(0, 0.21, 0, 0.17, 0.12, 0.1, C, 7, 4, 0, null, 0); g.blob(0.15, 0.34, 0, 0.06, 0.06, 0.05, C, 6, 3, 0, null, 0);
+        B(0.16, 0.41, 0, 0.06, 0.04, 0.015, dk(hex(0xb02a1c))); B(0.22, 0.34, 0, 0.04, 0.02, 0.02, Y);
+        for (const s of [-1, 1]) g.limb([0, 0.11, s * 0.03], [0, 0, s * 0.03], 0.015, 0.015, Y);
+        g.limb([-0.13, 0.24, 0], [-0.24, 0.36, 0], 0.05, 0.1, C);
+      });
+    }
+    const palla = (cx, cz, s) => g.with(rot(cx, yf + 0.006, cz, q(0, 3.14)), () => B(0, 0, 0, q(0.4, 1.0) * s, 0.012, q(0.3, 0.8) * s, shade(STRAW, q(0.62, 0.8))));       // paja por el suelo
+
+    /* los muebles van en una malla propia de la casa: solo se dibuja cuando la cámara está cerca (de lejos no se ven por las ventanas) */
+    const gMain = g; g = new Geo();
+    g.with(HM, () => {
+      /* hojas del portal, abiertas hacia dentro */
+      for (const s of [-1, 1]) {
+        const ux = dlx + s * (dw / 2 - 0.05), lw = dw / 2;
+        B(ux, yf + (dh - 0.1) / 2 + 0.03, -hD + lw / 2 + 0.02, 0.06, dh - 0.12, lw, WOODC);
+        for (const yy of [0.4, dh - 0.5]) B(ux - s * 0.035, yf + yy, -hD + lw / 2 + 0.02, 0.012, 0.1, lw - 0.06, IRONC);
+        sol(ux - 0.04, ux + 0.04, yf - 0.1, yf + dh, -hD, -hD + lw + 0.04);
+      }
+      const ceil = (y) => {       // techo plano de vigas y tablas
+        B(0, y - 0.03, 0, Wi + 0.02, 0.06, Di + 0.02, WOODD);
+        const alongZ = Di <= Wi, span = alongZ ? Wi : Di, nb = Math.max(3, Math.round(span / 0.8));
+        for (let i = 1; i < nb; i++) { const u = -span / 2 + i * span / nb; if (alongZ) B(u, y - 0.15, 0, 0.15, 0.18, Di, WOODC); else B(0, y - 0.15, u, Wi, 0.18, 0.15, WOODC); }
+      };
+
+      if (kind === 'bodega') {
+        /* ---- bodega cooperativa: los cubos de obra al fondo, filas de botas a los lados, la prensa y las cerchas a la vista ---- */
+        const nv = Math.max(2, Math.floor(Wi / 4.8)), vw = Math.min(3.4, Wi / nv - 0.5), vd = 2.4, vh = 2.3;
+        for (let i = 0; i < nv; i++) {
+          const cx = -hW + (i + 0.5) * Wi / nv, cz = hD - vd / 2 - 0.02;
+          SB(cx - vw / 2, cx + vw / 2, yf - 0.02, yf + vh, cz - vd / 2, cz + vd / 2, shade(wall, 0.6), shade(wall, 0.5));
+          g.cyl(cx, yf + vh + 0.015, cz - 0.3, 0.34, 0.34, 0.03, 10, WOODD, true);       // boca del cubo
+          B(cx, yf + 0.32, cz - vd / 2 - 0.05, 0.46, 0.46, 0.1, WOODD); g.cyl(cx, yf + 0.3, cz - vd / 2 - 0.16, 0.05, 0.05, 0.12, 6, dk(hex(0x9a7a3a)), true);       // portezuela y grifo
+          sol(cx - vw / 2, cx + vw / 2, yf - 0.1, yf + vh, cz - vd / 2, cz + vd / 2);
+        }
+        { const cx = -hW + 0.5 * Wi / nv + 0.9, zf = hD - vd - 0.04;       // escalera de mano apoyada en el primer cubo
+          for (const s of [-1, 1]) g.limb([cx + s * 0.25, yf, zf - 0.75], [cx + s * 0.25, yf + vh + 0.3, zf - 0.02], 0.06, 0.05, WOODL);
+          for (let k = 1; k < 8; k++) { const u = k / 8; B(cx, yf + (vh + 0.3) * u, zf - 0.75 + 0.73 * u, 0.5, 0.04, 0.04, WOODL); } }
+        for (const s of [-1, 1]) {       // botas grandes en las dos paredes
+          const z0b = -hD + 1.2, z1b = hD - vd - 0.9, n = Math.floor((z1b - z0b) / 1.25);
+          for (let i = 0; i < n; i++) { const cz = z0b + 0.62 + i * 1.25; bota(s * (hW - 0.9), yf + 0.85, cz, 0.55, 1.35, dk(hex(0x6a4a2c))); }
+          B(s * (hW - 0.45), yf + 0.15, (z0b + z0b + n * 1.25) / 2, 0.14, 0.3, n * 1.25, WOODD); B(s * (hW - 1.35), yf + 0.15, (z0b + z0b + n * 1.25) / 2, 0.14, 0.3, n * 1.25, WOODD);
+          sol(Math.min(s * hW, s * (hW - 1.62)), Math.max(s * hW, s * (hW - 1.62)), yf - 0.1, yf + 1.42, z0b, z0b + n * 1.25);
+        }
+        { const cx = -sd * hW * 0.35, cz = -0.6;       // prensa de husillo
+          B(cx, yf + 0.15, cz, 1.6, 0.3, 1.6, STN, dk(hex(0x7d7364)));
+          g.cyl(cx, yf + 0.75, cz, 0.62, 0.62, 0.9, 12, WOODC); g.cyl(cx, yf + 1.25, cz, 0.66, 0.66, 0.1, 12, WOODD, true);
+          for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; B(cx + Math.cos(a) * 0.63, yf + 0.75, cz + Math.sin(a) * 0.63, 0.04, 0.9, 0.04, WOODD); }
+          g.cyl(cx, yf + 1.9, cz, 0.07, 0.07, 1.4, 8, IRONC, true); B(cx, yf + 2.45, cz, 1.9, 0.14, 0.16, WOODD);
+          for (const s of [-1, 1]) B(cx + s * 0.88, yf + 1.25, cz, 0.16, 2.5, 0.16, WOODD);
+          g.limb([cx - 0.9, yf + 1.45, cz], [cx + 0.9, yf + 1.45, cz], 0.06, 0.06, WOODL);
+          sol(cx - 0.98, cx + 0.98, yf - 0.1, yf + 2.52, cz - 0.82, cz + 0.82); }
+        for (let i = 0; i < 3; i++) bota(sd * hW * 0.3 + i * 0.05, yf + 0.36, -hD + 2.2 + i * 0.85, 0.34, 0.8, dk(hex(0x7a5634)));       // botas pequeñas, en el suelo
+        sol(sd * hW * 0.3 - 0.5, sd * hW * 0.3 + 0.6, yf - 0.1, yf + 0.7, -hD + 1.8, -hD + 4.2);
+        for (const [cx, cz] of [[sd * (hW * 0.3 + 1.3), -hD + 1.5], [sd * (hW * 0.3 + 1.6), -hD + 2.3]]) { g.cyl(cx, yf + 0.25, cz, 0.42, 0.5, 0.5, 10, WOODC, true); g.cyl(cx, yf + 0.43, cz, 0.51, 0.51, 0.05, 10, IRONC); }       // cubetas
+        /* cerchas: tirante, pendolón y pares bajo el tejado */
+        const nt = Math.max(3, Math.round((alongX ? w : d) / 3.2)), ridgeX = alongX === fro;       // ¿la cumbrera va a lo largo de X local?
+        for (let i = 1; i < nt; i++) {
+          const u = -(ridgeX ? hW : hD) + i * (ridgeX ? Wi : Di) / nt, S2 = ridgeX ? hD + t : hW + t, ys = yTop - 0.2;
+          const P = (a, yy) => ridgeX ? [u, yy, a] : [a, yy, u];
+          g.limb(P(-S2 + 0.3, ys), P(S2 - 0.3, ys), 0.2, 0.22, WOODD); g.limb(P(0, ys), P(0, yTop + rh - 0.35), 0.16, 0.16, WOODD);
+          for (const s of [-1, 1]) g.limb(P(s * (S2 - 0.3), ys + 0.05), P(0, yTop + rh - 0.3), 0.18, 0.2, WOODD);
+        }
+        return;
+      }
+
+      if (two) {
+        /* ---- la escalera de obra, con su barandilla ---- */
+        const kS = H1 / S.run, yAt = u => yf + Math.abs(u - S.lb) * kS, zc = (S.z0 + hD) / 2;
+        for (let i = 0; i < S.n; i++) {
+          const yt = yf + (i + 1) * H1 / S.n, ua = S.lb - sd * i * S.run / S.n, ub = S.lb - sd * (i + 1) * S.run / S.n;
+          SB(Math.min(ua, ub) - 0.002, Math.max(ua, ub) + 0.002, yf - 0.02, yt, S.z0, hD, shade(wall, 0.55), shade(wall, 0.72));
+          B(ub + sd * 0.015, yt - 0.02, S.z0 + 0.012, 0.03, 0.04, 0.025, WOODD);       // canto del peldaño
+        }
+        lev(S.a, S.b, S.z0, hD, S.lb > S.lt ? y2 : yf, (S.lb > S.lt ? -1 : 1) * kS);
+        const nc = Math.ceil(S.run / 0.5);
+        for (let k = 0; k < nc; k++) {       // el macizo de la escalera (no se pasa por debajo) y la barandilla
+          const d0 = k * S.run / nc, d1 = (k + 1) * S.run / nc, yl = yf + d0 * kS, u0 = S.lb - sd * d0, u1 = S.lb - sd * d1;
+          if (yl > yf + 0.42) sol(Math.min(u0, u1), Math.max(u0, u1), yf - 1, yl - 0.03, S.z0, hD);       // los primeros peldaños se suben también de lado
+          if (yl > yf + 0.75) sol(Math.min(u0, u1), Math.max(u0, u1), yl, yl + 1.0, S.z0 - 0.05, S.z0 + 0.04);
+        }
+        const uR = S.lb - sd * Math.min(S.run, 0.8 / kS);
+        for (let u = uR; sd > 0 ? u >= S.lt - 0.01 : u <= S.lt + 0.01; u -= sd * 0.75) B(u, yAt(u) + 0.47, S.z0 + 0.03, 0.05, 0.94, 0.05, WOODC);
+        g.limb([uR, yAt(uR) + 0.95, S.z0 + 0.03], [S.lt, y2 + 0.95, S.z0 + 0.03], 0.06, 0.05, WOODL);
+        /* ---- el forjado: vigas y tablas por abajo, baldosas por arriba; el hueco de la escalera con barandilla ---- */
+        const rects = [[-hW, hW, -hD, S.z0], [-hW, S.a, S.z0, hD], [S.b, hW, S.z0, hD]].filter(r => r[1] - r[0] > 0.05 && r[3] - r[2] > 0.05);
+        for (const r of rects) {
+          lev(r[0], r[1], r[2], r[3], y2, 0); sol(r[0], r[1], y2 - SL, y2, r[2], r[3]);
+          B((r[0] + r[1]) / 2, y2 - SL / 2, (r[2] + r[3]) / 2, r[1] - r[0] + 0.01, SL, r[3] - r[2] + 0.01, WOODD, TILE);
+        }
+        { const nx = Math.round(Wi / 0.42), nz = Math.round(Di / 0.42), JC = shade(TILE, 0.72);       // juntas de las baldosas (de unos 40 cm)
+          for (let i = 1; i < nx; i++) { const u = -hW + i * Wi / nx; if (u > S.a - 0.02 && u < S.b + 0.02) B(u, y2 + 0.002, (-hD + S.z0) / 2, 0.012, 0.004, S.z0 + hD, JC); else B(u, y2 + 0.002, 0, 0.012, 0.004, Di, JC); }
+          for (let i = 1; i < nz; i++) { const u = -hD + i * Di / nz; if (u < S.z0) B(0, y2 + 0.002, u, Wi, 0.004, 0.012, JC); else for (const [r0, r1] of [[-hW, S.a], [S.b, hW]]) if (r1 - r0 > 0.05) B((r0 + r1) / 2, y2 + 0.002, u, r1 - r0, 0.004, 0.012, JC); } }
+        const alongZ = Di <= Wi, span = alongZ ? Wi : Di, nb = Math.max(3, Math.round(span / 0.75));
+        for (let i = 1; i < nb; i++) {
+          const u = -span / 2 + i * span / nb, yb = y2 - SL - 0.09;
+          if (alongZ) { if (u > S.a - 0.1 && u < S.b + 0.1) B(u, yb, (-hD + S.z0) / 2, 0.15, 0.18, S.z0 + hD, WOODC); else B(u, yb, 0, 0.15, 0.18, Di, WOODC); }
+          else if (u < S.z0 - 0.1) B(0, yb, u, Wi, 0.18, 0.15, WOODC);
+          else for (const [r0, r1] of [[-hW, S.a], [S.b, hW]]) if (r1 - r0 > 0.1) B((r0 + r1) / 2, yb, u, r1 - r0, 0.18, 0.15, WOODC);
+        }
+        B((S.a + S.b) / 2, y2 - SL - 0.09, S.z0 - 0.08, S.b - S.a, 0.2, 0.16, WOODD);       // brochal del hueco
+        sol(S.a, S.b, y2, y2 + 1.0, S.z0 - 0.06, S.z0);
+        for (let u = S.a + 0.05; u <= S.b; u += 0.6) B(u, y2 + 0.47, S.z0 - 0.03, 0.05, 0.94, 0.05, WOODC);
+        B((S.a + S.b) / 2, y2 + 0.95, S.z0 - 0.03, S.b - S.a, 0.06, 0.06, WOODL); B((S.a + S.b) / 2, y2 + 0.45, S.z0 - 0.03, S.b - S.a, 0.04, 0.04, WOODL);
+      }
+      ceil(yTop);
+
+      /* ---- la planta de abajo ---- */
+      if (two) {
+        const stairM = sd > 0 ? S.a < -hW + 1.0 : S.b > hW - 1.0;       // ¿llega la escalera hasta la pared del pesebre?
+        const m0 = -hD + 0.45, m1 = stairM ? S.z0 - 0.15 : hD - 0.35, Lm = Math.min(m1 - m0, big ? 4.5 : 4.0), mz = m0 + Lm / 2;
+        onWall('M', mz, yf, () => menjadora(Lm)); WS('M', mz, 0.66, Lm, yf - 0.1, yf + 0.88);
+        onWall('M', m0 + Lm - 0.5, yf, collera);
+        const mule = kind === 'venta' || Q() < 0.45;
+        if (mule) { mula(-sd * (hW - 1.95), yf, mz, -sd); sol(Math.min(-sd * (hW - 0.66), -sd * (hW - 2.75)), Math.max(-sd * (hW - 0.66), -sd * (hW - 2.75)), yf - 0.1, yf + 1.8, mz - 0.38, mz + 0.38); }
+        else for (let i = 0; i < 3; i++) gallina(-sd * (hW - q(1.1, 2.4)), yf, q(m0 + 0.3, m0 + Lm - 0.3), q(0, 6.28));
+        for (let i = 0; i < 7; i++) palla(-sd * (hW - q(0.8, 2.4)), q(m0, m0 + Lm), 1);
+        if (!stairM && hD - (m0 + Lm) > 1.3) { g.blob(-sd * (hW - 0.75), yf + 0.08, hD - 0.75, 0.75, 0.5, 0.6, STRAW, 9, 4, 0.25, Q, 0.15); sol(Math.min(-sd * hW, -sd * (hW - 1.3)), Math.max(-sd * hW, -sd * (hW - 1.3)), yf - 0.1, yf + 0.45, hD - 1.35, hD); }
+        g.limb([-sd * (hW - 0.3), yf, -hD + 0.3], [-sd * (hW - 0.06), yf + 1.75, -hD + 0.1], 0.035, 0.035, WOODL);       // horca
+        for (const s of [-1, 0, 1]) g.limb([-sd * (hW - 0.06), yf + 1.75, -hD + 0.1 + s * 0.05], [-sd * (hW - 0.04), yf + 2.05, -hD + 0.08 + s * 0.08], 0.015, 0.015, WOODL);
+        /* rueda del carro y tinajas contra la fachada, entre el rincón y el portal */
+        const fr0 = -sd * (hW - 0.15), fr1 = dlx - sd * (dw / 2 + 0.35), fl = Math.abs(fr1 - fr0);
+        if (fl > 1.45) onWall('F', fr0 + sd * 0.75, yf, roda);
+        if (fl > 2.3) { gerra(fr1 - sd * 0.35, yf, -hD + 0.38, 1); sol(Math.min(fr1, fr1 - sd * 0.7), Math.max(fr1, fr1 - sd * 0.7), yf - 0.1, yf + 1.0, -hD, -hD + 0.72); }
+        if (fl > 3.0) gerra(fr1 - sd * 0.95, yf, -hD + 0.36, 0.85);
+        /* botas de vino en la otra pared, antes del pie de la escalera */
+        const p0 = -hD + 0.95, p1 = S.z0 - 1.05, nbt = clamp(Math.floor((p1 - p0) / 0.85), 0, 3);       // (se deja paso hasta el pie de la escalera)
+        if (nbt > 0 && !(big && kind === 'venta')) {
+          for (let i = 0; i < nbt; i++) { const cz = p0 + 0.425 + i * 0.85; bota(sd * (hW - 0.62), yf + 0.62, cz, 0.36, 1.0, dk(hex(0x6e4c2e))); B(sd * (hW - 0.06), yf + 0.42, cz, 0.08, 0.05, 0.05, WOODD); }
+          for (const a of [0.25, 0.98]) B(sd * (hW - a), yf + 0.12, p0 + nbt * 0.425, 0.1, 0.24, nbt * 0.85, WOODD);
+          WS('P', p0 + nbt * 0.425, 1.14, nbt * 0.85, yf - 0.1, yf + 1.0);
+          g.limb([sd * (hW - 0.25), yf, p0 + nbt * 0.85 + 0.12], [sd * (hW - 0.05), yf + 1.4, p0 + nbt * 0.85 + 0.2], 0.03, 0.03, WOODL);       // azada
+          B(sd * (hW - 0.07), yf + 1.4, p0 + nbt * 0.85 + 0.2, 0.04, 0.2, 0.22, IRONC);
+        }
+        { const sx = sd > 0 ? S.a - 0.42 : S.b + 0.42; sac(sx, yf, hD - 0.35); sac(sx + sd * 0.05, yf, hD - 0.9); sac(sx, yf + 0.42, hD - 0.6); sol(sx - 0.32, sx + 0.32, yf - 0.1, yf + 0.8, hD - 1.2, hD); }       // sacos de grano junto a la escalera
+        if (kind === 'venta') {
+          /* la taberna: mostrador, botas detrás, estante con botellas y mesas con sus sillas */
+          const cx = sd * (hW - 2.3), z0c = -hD + 1.3, z1c = S.z0 - 1.0;
+          B(cx, yf + 0.5, (z0c + z1c) / 2, 0.55, 1.0, z1c - z0c, WOODC); B(cx, yf + 1.03, (z0c + z1c) / 2, 0.62, 0.06, z1c - z0c + 0.06, WOODL);
+          sol(cx - 0.31, cx + 0.31, yf - 0.1, yf + 1.06, z0c, z1c);
+          for (let i = 0; i < 5; i++) { const bz = z0c + 0.3 + i * (z1c - z0c - 0.6) / 4; g.cyl(cx + q(-0.15, 0.15), yf + 1.18, bz, 0.04, 0.04, 0.24, 6, dk(hex(pk([0x2f4a2a, 0x4a2a22, 0x6a6a5a]))), true); }
+          for (let i = 0; i < 3; i++) bota(sd * (hW - 0.6), yf + 0.62, z0c + 0.5 + i * 0.85, 0.36, 1.0, dk(hex(0x6e4c2e)));
+          WS('P', z0c + 1.3, 1.1, 2.6, yf - 0.1, yf + 1.0);
+          onWall('P', (z0c + z1c) / 2, yf, () => { B(0.12, 1.6, 0, 0.24, 0.03, 2.2, WOODC); for (let i = 0; i < 9; i++) g.cyl(0.12, 1.74, -1.0 + i * 0.25, 0.035, 0.035, 0.22, 6, dk(hex(pk([0x2f4a2a, 0x4a2a22, 0x6a6a5a, 0x8a7a4a]))), true); });
+          mesa(sd * 1.6, yf, -1.4, 1.2, 0.75, false, sd); mesa(sd * 1.6, yf, 1.2, 1.2, 0.75, Q() < 0.5, sd); mesa(-sd * 1.6, yf, 1.0, 1.2, 0.75, false, -sd);
+          lamp(sd * 1.6, y2 - SL, -1.4); lamp(sd * 1.6, y2 - SL, 1.2);
+        }
+      }
+
+      /* ---- la vivienda ---- */
+      const yv = two ? y2 : yf, hr = yTop - yv - 0.06;
+      onWall('M', hz, yv, () => hogar(hr)); WS('M', hz, 0.9, 2.1, yv - 0.1, yv + 1.7);
+      chair(-sd * (hW - 1.25), yv, hz - 1.15 >= -hD + 0.4 ? hz - 1.15 : hz + 1.15, sd > 0 ? Math.PI : 0, false);       // silla baja junto al fuego
+      for (let i = 0; i < 6; i++) { const ry = -sd * (hW - 1.0) + sd * i * 0.06; g.blob(ry, yTop - 0.35 - i * 0.09, hz - 1.25, 0.05, 0.05, 0.05, i % 2 ? dk(hex(0xe8e0cc)) : dk(hex(0xa02a1a)), 6, 3, 0, null, 0); }       // ristra de ajos y ñoras
+      g.limb([-sd * (hW - 1.0), yTop - 0.12, hz - 1.25], [-sd * (hW - 1.0), yTop - 0.85, hz - 1.25], 0.01, 0.01, dk(hex(0x9a8a6a)));
+      if (two) {
+        /* tabique de la alcoba, con la cama, el arca y el crucifijo; la mesa y el armario en la sala */
+        B(px, (y2 + yTop) / 2, -hD + pl / 2, 0.12, yTop - y2, pl, WHITE);
+        for (const s of [-1, 1]) B(px + s * 0.062, y2 + 0.45, -hD + pl / 2, 0.005, 0.9, pl, SOC);
+        sol(px - 0.06, px + 0.06, y2 - 0.1, yTop, -hD, -hD + pl);
+        onWall('P', -hD + 1.05, y2, () => llit(BLANK(), true)); WS('P', -hD + 1.05, 2.0, 1.4, y2 - 0.1, y2 + 0.62);
+        if (pl >= 2.45) { onWall('P', -hD + 2.2, y2, arca); WS('P', -hD + 2.2, 0.56, 1.05, y2 - 0.1, y2 + 0.57); }
+        if (kind === 'venta') for (const bxl of [0, sd * 2.8]) { onWall('F', bxl, y2, () => llit(BLANK(), false)); WS('F', bxl, 2.0, 1.4, y2 - 0.1, y2 + 0.62); }
+        const tcx = -sd * (hW - 2.45), tcz = clamp(-hD + pl + 0.35, -hD + 1.6, S.z0 - 1.55);
+        mesa(tcx, y2, tcz, 1.3, 0.78, Q() < 0.35, -sd); lamp(tcx, yTop - 0.03, tcz);
+        g.box(px - sd * 0.066, y2 + 1.55, -hD + pl * 0.55, 0.01, 0.42, 0.3, dk(hex(0xd8d0b0)));       // calendario
+        const cs = Math.max(hz + 1.05, mzWin !== null && mzWin > hz ? mzWin + 0.6 : -99), ce = hD - 0.08;
+        if (ce - cs >= 1.05) { onWall('M', ce - 0.55, y2, armari); WS('M', ce - 0.55, 0.46, 1.04, y2 - 0.1, y2 + 1.98); }
+        const sk = -sd * (hW - 1.0);
+        if (Math.abs(sk - S.lt) >= 1.25) { onWall('B', sk, y2, pica); WS('B', sk, 0.6, 0.88, y2 - 0.1, y2 + 0.86); }
+        if (Wi < 8.5) onWall('F', -sd * (hW - 0.7), y2, platera);
+      } else {
+        /* casa de una pieza: el hogar, la mesa, la cama en el rincón del fondo, el arca, el armario y algo de la despensa */
+        onWall('P', hD - 1.05, yf, () => llit(BLANK(), true)); WS('P', hD - 1.05, 2.0, 1.4, yf - 0.1, yf + 0.62);
+        if (Di > 5.0) { onWall('P', hD - 2.3, yf, arca); WS('P', hD - 2.3, 0.56, 1.05, yf - 0.1, yf + 0.57); }
+        const tcx = -sd * 0.3, tcz = -0.35; mesa(tcx, yf, tcz, 1.2, 0.75, Q() < 0.3, -sd); lamp(tcx, yTop - 0.03, tcz);
+        onWall('B', -sd * (hW - 0.6), yf, armari); WS('B', -sd * (hW - 0.6), 0.46, 1.04, yf - 0.1, yf + 1.98);
+        onWall('P', -hD + 0.85, yf, platera);
+        gerra(sd * (hW - 0.4), yf, -hD + 0.4, 0.85); sac(sd * (hW - 0.45), yf, -hD + 1.05);
+        sol(sd * (hW - 0.8), sd * hW, yf - 0.1, yf + 0.9, -hD, -hD + 0.8);
+        for (let i = 0; i < 2; i++) gallina(dlx - sd * q(0.4, 1.2), yf, -hD + q(0.9, 1.8), q(0, 6.28));
+      }
+    });
+    world.interiors.push({ x, z, a: g.a, mesh: null }); g = gMain;
   }
   function parapet(x, z, len, alongX) {
     const sx = alongX ? len : 0.8, sz = alongX ? 0.8 : len, y = Math.max(terrainH(x - sx / 2, z - sz / 2), terrainH(x + sx / 2, z + sz / 2), terrainH(x, z));
@@ -3174,16 +3566,16 @@ const world = { houses: [] };
   })();
   [[-30, 4, 8, 7, 6, 1], [-14, 12, 7, 9, 6.5, 0], [-6, 26, 8, 7, 5.5, 1], [-8, 44, 9, 7, 6, 0], [-22, 56, 8, 8, 6, 1], [-40, 56, 7, 9, 6.5, 0], [-56, 50, 8, 7, 5.5, 1],
    [-70, 34, 7, 8, 6, 0], [-74, 8, 8, 7, 6, 1], [-36, -10, 9, 7, 6, 0], [6, 40, 7, 7, 5.5, 1], [-18, -6, 7, 7, 5.5, 1]]
-    .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { ruin: !!a[5], open: a[0] === -14 ? 's' : a[0] === -40 ? 'n' : a[0] === -70 ? 'e' : 0 }));
+    .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { ruin: !!a[5], open: { '-14': 's', '-8': 'n', '-40': 'n', '-70': 'e', '-36': 's' }[a[0]] }));       // la puerta, mirando a la calle
   parapet(-14, 26, 4.5, true); parapet(-44, 45, 5, true); parapet(-30, 20, 5, true);
 
   /* ---- Móra d'Ebre ---- */
-  [[161, 0, 8, 8, 6], [161, 12, 8, 8, 7, 'e'], [161, 27, 8, 9, 6], [161, 42, 8, 8, 6.5], [189, 4, 8, 9, 6], [189, 36, 9, 8, 6, 'w'], [192, 20, 7, 7, 5.5], [176, 54, 10, 7, 6, 'n'], [176, -12, 9, 7, 6, 's']]
+  [[161, 0, 8, 8, 6, 'e'], [161, 12, 8, 8, 7, 'e'], [161, 27, 8, 9, 6, 'e'], [161, 42, 8, 8, 6.5, 'e'], [189, 4, 8, 9, 6, 'w'], [189, 36, 9, 8, 6, 'w'], [192, 20, 7, 7, 5.5, 'w'], [176, 54, 10, 7, 6, 'n'], [176, -12, 9, 7, 6, 's']]
     .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: a[5] }));
   parapet(170, 30, 4.5, true); parapet(184, 45, 4.5, true); crate(178, 14, 0.9); crate(171, 17, 0.8);
 
   /* ---- Venta de Camposines ---- */
-  house(28, -164, 17, 9, 6.5, { wall: hex(0xd3c6a6), open: 's' }); house(52, -166, 7, 6, 4.5); house(22, -138, 6, 8, 4.5, { ruin: true });
+  house(28, -164, 17, 9, 6.5, { wall: hex(0xd3c6a6), open: 's', kind: 'venta' }); house(52, -166, 7, 6, 4.5, { open: 'n' }); house(22, -138, 6, 8, 4.5, { ruin: true });
   stoneWall(20, -152, 32, -152); stoneWall(48, -156, 62, -156); stoneWall(56, -144, 56, -132); parapet(46, -146, 5, true); parapet(34, -142, 4.5, false);
   (function t26() {    // carro T-26 soviético fuera de combate
     const x = 54, z = -138, y = terrainH(x, z), gr = hex(0x464d36), bk = hex(0x25231f);
@@ -3295,10 +3687,10 @@ const world = { houses: [] };
   stoneWall(-54, 196, -42, 196); stoneWall(-66, 198, -66, 190); stoneWall(-50, 212, -38, 212); parapet(-58, 196, 4, true);
 
   /* ---- Gandesa ---- */
-  [[-330, -20, 10, 9, 7], [-316, -24, 8, 8, 6.5], [-338, -2, 9, 10, 7], [-324, 30, 9, 8, 6.5], [-338, 26, 9, 9, 7], [-298, -14, 8, 8, 6], [-296, 26, 8, 9, 6], [-338, 48, 10, 8, 6.5],
-   [-322, 52, 8, 8, 6], [-306, 48, 8, 7, 6], [-290, 44, 7, 7, 5.5], [-284, -2, 7, 8, 6]]
-    .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: (a[0] === -298 && a[1] === -14) ? 's' : (a[0] === -296) ? 'n' : (a[0] === -284) ? 'e' : 0 }));
-  house(-304, -46, 22, 12, 8, { wall: hex(0xe6dfcc), chimney: false, open: 's' });        // bodega cooperativa
+  [[-330, -20, 10, 9, 7, 's'], [-316, -24, 8, 8, 6.5, 's'], [-338, -2, 9, 10, 7, 'e'], [-324, 30, 9, 8, 6.5, 'n'], [-338, 26, 9, 9, 7, 'e'], [-298, -14, 8, 8, 6, 's'], [-296, 26, 8, 9, 6, 'n'],
+   [-338, 48, 10, 8, 6.5, 'n'], [-322, 52, 8, 8, 6, 'n'], [-306, 48, 8, 7, 6, 'n'], [-290, 44, 7, 7, 5.5, 'n'], [-284, -2, 7, 8, 6, 'e']]
+    .forEach(a => house(a[0], a[1], a[2], a[3], a[4], { open: a[5] }));       // la puerta, mirando a la calle
+  house(-304, -46, 22, 12, 8, { wall: hex(0xe6dfcc), chimney: false, open: 's', kind: 'bodega' });        // bodega cooperativa
   (function tower() { const x = -340, z = 12, y = terrainH(x, z); stone('mamp', () => g.box(x, y + 7, z, 5, 18, 5, cw)); g.cyl(x, y + 17.2, z, 3.2, 0, 2.6, 4, ROOF[1], true); addAABB(x - 2.5, x + 2.5, y - 4, y + 16, z - 2.5, z + 2.5); world.houses.push([x, z, 5, 5]); })();
   parapet(-286, 22, 5, false); parapet(-288, 0, 4, false); parapet(-300, 16, 4.5, true); crate(-308, 14, 0.9); crate(-316, 4, 0.8); crate(-314, 5, 0.7);
 
@@ -3391,6 +3783,7 @@ const world = { houses: [] };
     }
   }
   world.staticMesh = makeMesh(g.a);
+  for (const it of world.interiors) { it.mesh = makeMesh(it.a); it.a = null; }
   /* una malla por material PBR (los faldones de los tejados van a la teja al construirlos) */
   world.mat = {};
   for (const k of ['seca', 'mamp', 'sillar', 'roca', 'sacos', 'hormigon', 'teja']) if (GS[k].a.length) world.mat[k] = makeMesh(GS[k].a);
@@ -4944,7 +5337,7 @@ function placeAt(s, f) {
   }
   s.x = x; s.z = z; s.y = groundAt(x, z); s.vx = s.vy = s.vz = 0;
   if (s.prim) botSidearm(s, false);
-  s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; s.tower = null; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
+  s.alive = true; s.spawned = true; s.wreck = null; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; s.tower = null; s.swim = false; s.ammo = s.wpn.mag; s.reloadT = 0; s.fireT = 0.5; s.nades = s.isPlayer ? 2 : (Math.random() < 0.5 ? 1 : 0);
   s.sx = x; s.sz = z; s.stuckT = 0; s.avoidT = 0; s.atFlagT = 0;
 }
 const ownedSpawns = team => FLAGS.filter(f => f.owner === team);
@@ -6598,6 +6991,9 @@ const SK_GRIPF = {
   stock: { f: [[26, 38, 24], [70, 80, 50], [74, 82, 52], [78, 84, 54]], t: null },      // garganta de la culata o empuñadura: el índice en el gatillo
   fore: { f: [[50, 58, 34], [54, 60, 36], [58, 62, 38], [62, 64, 40]], t: [30, 8, 10, 6] },       // el pulgar, estirado por el costado       // guardamanos o cargador: los dedos lo rodean
   pistol: { f: [[22, 32, 24], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null },     // culata de pistola o revólver
+  /* el revólver del legionario: el índice no llega al gatillo sin atravesar el armazón (el nudillo queda casi al lado del gatillo), así que
+     va estirado por el costado derecho, junto al guardamonte y por debajo del tambor. is: grados que baja el índice girando sobre la palma */
+  revolver: { f: [[-21, 23, 3], [76, 84, 52], [80, 86, 54], [84, 88, 56]], t: null, is: 17 },
   relax: { f: [[16, 24, 14], [22, 28, 16], [26, 30, 18], [30, 32, 20]], t: null },       // mano libre, algo cerrada
   spade: { f: [[48, 62, 36], [56, 66, 40], [60, 68, 42], [64, 70, 44]], t: [48, 18, 24, 14] }       // empuñadura vertical de la antiaérea: los dedos alrededor y el pulgar encima
 };
@@ -6622,7 +7018,7 @@ function skFingerRig(C) {
       const s = v3sub(Pp[tc[1]], Pp[H]), sp = v3nrm(v3sub(s, v3mul(fd, v3dot(s, fd))));
       thumb = { c: tc, a: v3nrm(v3cross(td, n)), o: v3nrm(v3cross(sp, n)) };
     }
-    rig[side] = { H, fingers, thumb };
+    rig[side] = { H, fingers, thumb, n };
   }
   return (C.fingerRig = rig);
 }
@@ -6644,7 +7040,7 @@ function skFingers(C, st, grips) {
   for (const side in grips) {
     const G = SK_GRIPF[grips[side]], S = R[side]; if (!G || !S) continue;
     const H = S.H, Rh = qMul([st.gq[H * 4], st.gq[H * 4 + 1], st.gq[H * 4 + 2], st.gq[H * 4 + 3]], qConj(R.Q[H])), I = [0, 0, 0, 1];
-    S.fingers.forEach((f, i) => { if (f) skFingerChain(st, R, H, Rh, f.c, I, f.a, G.f[i]); });
+    S.fingers.forEach((f, i) => { if (f) skFingerChain(st, R, H, Rh, f.c, i === 0 && G.is ? qAA(S.n, G.is * DEG) : I, f.a, G.f[i]); });
     if (S.thumb && G.t) skFingerChain(st, R, H, Rh, S.thumb.c, qAA(S.thumb.o, G.t[0] * DEG), S.thumb.a, G.t.slice(1));
   }
 }
@@ -6654,7 +7050,7 @@ function skGripsFor(s, C) {
   if (C.leg) { if (s.boltT > 0) return null; const k = skLegKey(s);
     if ((k === 'carcano' || k === 'mauser') && (s.reloadT > 0 || (s.ammo > 0 && game.time - (s.lastShot || -99) < 1.0))) return null;       // la derecha en la manija del cerrojo
     if (k === 'rifle' && s.reloadT > 0) return null;       // la derecha mete los cartuchos
-    return { Right: k === 'revolver' ? 'pistol' : 'stock' }; }       // la izquierda del legionario ya se apoya en el arma (skLegGrip)
+    return { Right: k === 'revolver' ? 'revolver' : 'stock' }; }       // la izquierda del legionario ya se apoya en el arma (skLegGrip)
   if (s.wid === 'breda30' && C.breda) return null;       // la Breda trae en sus clips las manos hechas para ella
   if (s.wpn && s.wpn.kind === 'pistol') return { Right: 'pistol', Left: 'relax' };
   return { Right: 'stock', Left: s.reloadT > 0 ? 'relax' : 'fore' };
@@ -7046,7 +7442,7 @@ const skLegKey = s => s.wpn.kind === 'pistol' ? 'revolver' : (s.wpn.leg || 'rifl
    usa una mezcla de las dos (cuánto de «Apuntar» en cada arma) para que el arma se vea */
 const SK_LEG_HOLD = 0.985, SK_LEG_HIP = { rifle: 0.42, thompson: 0.42, mp: 0.42, revolver: 0.62, carcano: 0.42, breda: 0.42, mauser: 0.42 };
 /* al apuntar, el alza queda a esta distancia del ojo (la cámara del modelo iba casi sobre la cantonera) */
-const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0, carcano: 0.42, breda: 0.26, mauser: 0.44 };
+const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0.40, carcano: 0.42, breda: 0.26, mauser: 0.44 };
 /* a la cadera y al recargar, la cámara va este tanto más adelante (hacia las manos) que la del modelo: el hombro izquierdo, que con el
    cuerpo de perfil queda delante del ojo, y el corte de la manga pasan a quedar a un lado y detrás, también en pantallas muy anchas.
    Al apuntar no se toca (la mira la coloca fpFix) */
@@ -7055,9 +7451,9 @@ function skLegFwdNow(p) { const lk = skLegFpKey(p); return lk ? (SK_LEG_FWD[lk] 
 /* medidas en la malla: la carabina, del borde de arriba de la muesca del alza (la que se le pone, ver skLegSights) a la punta del punto de
    mira; la Thompson, de lo alto de las orejas del alza Lyman a la punta de su hoja; el revólver, de la ranura del puente a la punta del
    guion. Así la punta del punto de mira queda justo en el centro de la vista, que es por donde sale la bala */
-const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], mp: [[0.00775, 0, 0.104], [0.3815, 0, 0.106]], revolver: [[0.058, 0.1202, 0], [0.322, 0.1199, 0]],
+const SK_LEGSIGHT = { rifle: [[0.0003, -0.0008, 0.0935], [0.466, -0.0008, 0.09]], thompson: [[-0.16, 0, 0.131], [0.42, 0, 0.1457]], mp: [[0.00775, 0, 0.104], [0.3815, 0, 0.106]], revolver: [[0.0858, 0.124, 0], [0.322, 0.124, 0]],
   carcano: [[0.06, 0, 0.0995], [0.42175, 0, 0.0955]], breda: [[-0.255, 0, 0.1665], [0.357, 0, 0.1625]],
-  mauser: [[0.0898, 0, 0.1136], [0.6984, 0, 0.1141]] };       // Mauser 93 (de Blender): borde de la muesca del alza y punta del guion       // Carcano y Breda: hoja del alza con muesca y guion nuevos (de Blender)       // (en el revólver, el guion asoma un pelo por encima del puente, que si no se pierde en lo negro)
+  mauser: [[0.0898, 0, 0.1136], [0.6984, 0, 0.1141]] };       // Mauser 93 (de Blender): borde de la muesca del alza y punta del guion       // Carcano y Breda: hoja del alza con muesca y guion nuevos (de Blender)       // (en el revólver: lo alto de las orejas del alza y del guion claro que se le ponen, ver skLegSights)
 /* puntos de mira más finos (eran hojas de 6 mm): se estrechan hacia su centro */
 const SK_LEGTHIN = { rifle: { x: [0.455, 0.477], z: 0.0838, y: -0.0008, w: 0.0055, k: 0.36 }, thompson: { x: [0.408, 0.434], z: 0.1295, y: 0, w: 0.0072, k: 0.38 } };
 function skLegSights(C) {
@@ -7092,9 +7488,15 @@ function skLegSights(C) {
   /* la carabina tenía el alza plana: se le pone delante una chapa de acero con muesca, un poco más alta, para centrar la punta */
   { const yc = SK_LEGSIGHT.rifle[0][1], zt = SK_LEGSIGHT.rifle[0][2], nw = 0.0013, nd = 0.0036;
     skLegBoxes(C, 'rifle', [[-0.0012, 0.0018, yc + nw, yc + 0.0094, 0.0848, zt], [-0.0012, 0.0018, yc - 0.0094, yc - nw, 0.0848, zt], [-0.0012, 0.0018, yc - nw, yc + nw, 0.0848, zt - nd]]); }
+  /* el revólver: la mira era la ranura del puente, rasante con todo el arma, y el guion apenas asomaba. Se le ponen dos orejas de acero
+     al principio del puente (una muesca de 3,4 mm) y un guion de alpaca (claro, para verlo sobre lo negro) más alto, a la misma altura: se ve el guion dentro de la muesca
+     (en el marco del revólver: x hacia la boca, y arriba, z al costado) */
+  { const yt = SK_LEGSIGHT.revolver[0][1], x0 = 0.0835, x1 = 0.088;
+    skLegBoxes(C, 'revolver', [[x0, x1, 0.1186, yt, 0.0017, 0.0052], [x0, x1, 0.1186, yt, -0.0052, -0.0017]]);
+    skLegBoxes(C, 'revolver', [[0.317, 0.327, 0.1128, SK_LEGSIGHT.revolver[1][1], -0.0015, 0.0015]], [enc(0.86), enc(0.8), enc(0.62)]); }
 }
 /* piezas de acero pavonado (cajas en el marco del arma: x hacia la boca, y a la izquierda, z arriba) pegadas al hueso raíz del arma */
-function skLegBoxes(C, key, boxes) {
+function skLegBoxes(C, key, boxes, col) {
   const r = C.wroot[key], slot = Array.prototype.indexOf.call(C.pal, r); if (slot < 0 || !C.wp[key]) return;
   const IBi = m4inv(M4.create(), C.ibm.subarray(r * 16, r * 16 + 16));
   const V = [], I = [];
@@ -7109,7 +7511,7 @@ function skLegBoxes(C, key, boxes) {
       I.push(b, b + 1, b + 2, b, b + 2, b + 3); }
   }
   const b = { src: new Float32Array(V), isrc: new Uint16Array(I), n: I.length, vbo: null, ibo: null }; skBufUpload(b); SK.bufs.push(b);
-  const part = { buf: b, tex: null, col: [enc(0.06), enc(0.064), enc(0.078)], u32: false };      // acero pavonado
+  const part = { buf: b, tex: null, col: col || [enc(0.06), enc(0.064), enc(0.078)], u32: false };      // acero pavonado (o el color que se pida)
   for (const lod of ['near', 'far']) if (C.wp[key][lod]) C.wp[key][lod].push(part);
 }
 function skLegW(s) { const w = WEAPONS[s.wid]; return !!(w && w.leg) || !!(s.prim && WEAPONS[s.prim] && WEAPONS[s.prim].leg); }
@@ -7627,7 +8029,7 @@ function skLegFpDraw(vp, K, p, key, ex, ey, ez) {
   skGlobals(C, st);
   if (key === 'mauser') skLegMauserFix(C, st);       // la derecha, a la manija y al peine del Mauser
   if (key !== 'revolver') skLegGrip(C, st, key, key === 'thompson' || key === 'mp' || car || key === 'breda' ? 1 - ow : 1);       // la mano izquierda, agarrando el arma
-  if (lev < 0.05 && bolt < 0.05 && !((car || key === 'rifle') && ow > 0.05)) skFingers(C, st, { Right: key === 'revolver' ? 'pistol' : 'stock' });       // la derecha, cerrada en la empuñadura
+  if (lev < 0.05 && bolt < 0.05 && !((car || key === 'rifle') && ow > 0.05)) skFingers(C, st, { Right: key === 'revolver' ? 'revolver' : 'stock' });       // la derecha, cerrada en la empuñadura
   if (key === 'rifle' && ow < 0.05) skHideFinger(C, st, 'Right', 'Index');       // con la carabina, el índice derecho atravesaba el cajón del arma: no se ve
   skBonesTo(C, st, _lfp.B);
   m4trs(_lfp.D, _lfp.t, _lfp.q, 1);
@@ -8511,9 +8913,14 @@ function destroyVehicle(v, att) {
   boomFx(v.x, v.y + 1, v.z, 1.4);
   if (v.riders) for (const s of v.riders.slice()) { const inb = s.ride.phase === 'in'; rideOff(s, null); if (inb) applyDamage(s, rnd(50, 140), att && att !== s ? att : null, false, 'Vehículo destruido'); }       // la tropa de la caja sale despedida
   const d = v.driver;
-  if (d) {      // la dotación sale despedida junto al vehículo: así se ve el cuerpo desde arriba y no queda dentro de los restos
+  if (d) {
     d.veh = null; v.driver = null;
-    const es = v.kind === 'plane' ? [v.x - Math.cos(v.yaw) * 5.8, v.z + Math.sin(v.yaw) * 5.8] : exitSpot(v); d.x = es[0];       // del avión, fuera del ala d.z = es[1]; d.y = Math.max(groundAt(es[0], es[1]), waterY); d.yaw = v.yaw;
+    if (v.kind === 'tank') {       // el carro: la dotación muere dentro y no se ve su cuerpo; la cámara de la muerte mira los restos desde arriba
+      d.x = v.x; d.z = v.z; d.y = Math.max(groundAt(v.x, v.z), waterY); d.yaw = v.yaw; d.wreck = v;
+    } else {       // los demás: la dotación sale despedida junto al vehículo (del avión, fuera del ala)
+      const es = v.kind === 'plane' ? [v.x - Math.cos(v.yaw) * 5.8, v.z + Math.sin(v.yaw) * 5.8] : exitSpot(v);
+      d.x = es[0]; d.z = es[1]; d.y = Math.max(groundAt(es[0], es[1]), waterY); d.yaw = v.yaw;
+    }
     applyDamage(d, 400, att && att !== d ? att : null, false, 'Vehículo destruido');
   }
 }
@@ -10546,7 +10953,7 @@ function duoHostRemote(s, dt) {
   const a = A.d, c = B.d, L = duo.lastG;
   if (L && L.life !== duo.gLife) {       // ha vuelto a desplegar
     duo.gLife = L.life;
-    if (L.fl & 1) { s.alive = true; s.spawned = true; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; if (CLASSES[s.team][L.ci]) setClass(s, L.ci); s.x = L.x; s.z = L.z; s.y = L.y; }
+    if (L.fl & 1) { s.alive = true; s.spawned = true; s.wreck = null; s.hp = 100; s.fall = 0; s.enemy = null; s.crouch = false; s.prone = false; s.proneT = 0; if (CLASSES[s.team][L.ci]) setClass(s, L.ci); s.x = L.x; s.z = L.z; s.y = L.y; }
   }
   if (!s.alive) { s.fall = Math.min(1, s.fall + dt * 2.6); return; }
   s.supT = (s.supT || 0) - dt;       // junto a una bandera propia se cura, como el jugador
@@ -10847,7 +11254,7 @@ function deathCamera(dt) {
   const e = x => x * x * (3 - 2 * x), k = e(clamp(d.t / DEATH_RISE, 0, 1)), kl = e(clamp(d.t / (DEATH_RISE * 0.6), 0, 1));
   /* se mira a la cadera del cuerpo caído (con el modelo 3D; si no, a donde cayó), siguiéndola con suavidad mientras cae */
   const st = P.sk, C = st && st.C, hip = C && C.J && C.J.Hips >= 0 && st.gp ? M4.tp(st.model, M4.tp(C.base, [st.gp[C.J.Hips * 3], st.gp[C.J.Hips * 3 + 1], st.gp[C.J.Hips * 3 + 2]])) : null;
-  const f = hip && Math.hypot(hip[0] - P.x, hip[2] - P.z) < 3 ? hip : [P.x, P.y + 0.3, P.z];
+  const wk = P.wreck, f = wk ? [wk.x, wk.y + 1.2, wk.z] : hip && Math.hypot(hip[0] - P.x, hip[2] - P.z) < 3 ? hip : [P.x, P.y + 0.3, P.z];       // muerto dentro de un carro: sus restos
   if (!d.f) d.f = f.slice(); else for (let i = 0; i < 3; i++) d.f[i] = lerp(d.f[i], f[i], Math.min(1, dt * 6));
   const H = game.dcamH || 8.5, gx = d.f[0], gz = d.f[2], gy = d.f[1];
   /* desde arriba, casi en vertical (un poco inclinada para que se lea el suelo); al subir da un cuarto de vuelta y luego se queda quieta:
@@ -10901,7 +11308,7 @@ function camSetup(dt) {
       cam.y = Math.max(a.y + 0.42 - Math.sin(P.pitch) * 0.7, groundAt(cam.x, cam.z) + 0.6); cam.yaw = P.yaw; cam.pitch = P.pitch; fov = BASE_FOV * 0.85;
     } else if (P.alive) {
       const c = camBasis(); cam.x = c.ex; cam.y = c.ey; cam.z = c.ez; cam.yaw = c.yaw; cam.pitch = c.pitch;
-      fov = BASE_FOV * lerp(1, P.weps[P.cur].def.zoom, P.aimT); fp = true;
+      fov = BASE_FOV * lerp(1, skLegFpKey(P) === 'revolver' ? 0.76 : P.weps[P.cur].def.zoom, P.aimT); fp = true;       // con el revólver se acerca algo más: la mira es muy pequeña
     } else deathCamera(dt);
   } else {
     const f = game.selSpawn || FLAGS[3], a = performance.now() / 1000 * 0.07, gy = terrainH(f.x, f.z);
@@ -11017,12 +11424,13 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   gl.enable(gl.DEPTH_TEST); gl.uniform2f(U.uFog, FOG_N, FOG_F);
   matState(1, 1, 0.5); gl.uniform1f(U.uTer, GFX.ground); drawMesh(world.terrain); gl.uniform1f(U.uTer, 0);
   matState(1, 1, 0.1); drawMesh(world.staticMesh); drawMesh(pontoon.mesh); if (pasarela.on) drawMesh(pasarela.mesh);
+  for (const it of world.interiors) if ((it.x - ex) * (it.x - ex) + (it.z - ez) * (it.z - ez) < 65 * 65) drawMesh(it.mesh);       // muebles de las casas cercanas
   matState(1, 1, 0.02); drawStone(); matState(1, 1, 0.1);
   vegDrawAll(vp, ex, ey, ez, dt > 0, cull ? xr.headFw : null);
   matState(1, 1, 0.05);
   drawVehicles(vp, ex, ey, ez); drawAA(); matState(1, 1, 0.05);
   const vis = _visSoldiers; vis.length = 0;
-  for (const s of soldiers) if (s.spawned && !s.veh && !(hideP && s === P) && !(s.aa && s === P && xr.on) && (!cull || cull(s))) vis.push(s);
+  for (const s of soldiers) if (s.spawned && !s.veh && !(s.wreck && !s.alive) && !(hideP && s === P) && !(s.aa && s === P && xr.on) && (!cull || cull(s))) vis.push(s);
   if (!skDrawSoldiers(vis, vp, ex, ey, ez, dt > 0)) for (const s of vis) drawSoldier(s);
   for (const p of projectiles) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); if (p.kind !== 'shell') M4.rotX(TMP, p.spin); if (p.kind === 'bomb') M4.scale(TMP, 3.2, 7, 3.2); else if (p.kind === 'shell') M4.scale(TMP, 2, 2, 2); drawMesh(world.nade, TMP); }
   for (const p of planes) { M4.identity(TMP); M4.translate(TMP, p.x, p.y, p.z); M4.rotY(TMP, Math.PI); drawModel(world.plane, TMP); }
