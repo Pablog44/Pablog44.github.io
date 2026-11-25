@@ -7050,7 +7050,7 @@ const SK_LEG_RELIEF = { rifle: 0.32, thompson: 0.28, mp: 0.36, revolver: 0, carc
 /* a la cadera y al recargar, la cámara va este tanto más adelante (hacia las manos) que la del modelo: el hombro izquierdo, que con el
    cuerpo de perfil queda delante del ojo, y el corte de la manga pasan a quedar a un lado y detrás, también en pantallas muy anchas.
    Al apuntar no se toca (la mira la coloca fpFix) */
-const SK_LEG_FWD = { rifle: 0.12, thompson: 0.06, mp: 0.12, revolver: 0, carcano: 0.12, breda: 0.08, mauser: 0.06 };       // (la Thompson sube mucho para cambiar el tambor: con 6 cm basta)
+const SK_LEG_FWD = { rifle: 0.12, thompson: 0.06, mp: 0.12, revolver: 0, carcano: 0.12, breda: 0.08, mauser: 0.10 };       // (la Thompson sube mucho para cambiar el tambor: con 6 cm basta)
 function skLegFwdNow(p) { const lk = skLegFpKey(p); return lk ? (SK_LEG_FWD[lk] || 0) * (1 - (p.aimT || 0)) : 0; }
 /* medidas en la malla: la carabina, del borde de arriba de la muesca del alza (la que se le pone, ver skLegSights) a la punta del punto de
    mira; la Thompson, de lo alto de las orejas del alza Lyman a la punta de su hoja; el revólver, de la ranura del puente a la punta del
@@ -7405,8 +7405,8 @@ const SK_LEGGRIP = {
     flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
     body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0199, 0.0425], [-0.0097, 0.0326], [0.0077, 0.032], [0.0211, 0.0454], [0.0195, 0.0645], [0.01, 0.0732], [-0.001, 0.0753], [-0.0107, 0.0729], [-0.0221, 0.0576], [-0.0226, 0.054]] }] },
   /* Carcano: bajo el guardamanos, a un palmo del cajón; Breda: bajo la caja del cargador (las patas del bípode van plegadas hacia delante) */
-  /* Mauser 93: la izquierda bajo el guardamanos, a mitad de camino entre el alza y la abrazadera (más adelante que en el Carcano) */
-  mauser: { pc: [0.19, 0.012, 0.003], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
+  /* Mauser 93: la izquierda bajo el guardamanos, delante del alza (algo más adelante que en el Carcano; más lejos, el brazo se estiraba y se retorcía) */
+  mauser: { pc: [0.14, 0.012, 0.001], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
     flex: [[4, 95], [8, 105], [5, 75]], thumb: [[1, 0.06, 0.2]],
     body: [{ o: [0, 0, 0], ax: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], h: [[-0.0242, 0.0616], [-0.0241, 0.0538], [-0.0218, 0.0464], [-0.0162, 0.0422], [-0.001, 0.039], [0.006, 0.039], [0.0131, 0.0405], [0.0193, 0.0443], [0.023, 0.0509], [0.024, 0.0607], [0.023, 0.0711], [0.0175, 0.0869], [0.0131, 0.0924], [0.0061, 0.0952], [-0.0032, 0.0957], [-0.0122, 0.0934], [-0.017, 0.0887], [-0.0222, 0.0766], [-0.0241, 0.0649]] }] },
   carcano: { pc: [0.10, 0.012, -0.007], n: [0, -0.15, 1], f: [0.3, -0.95, -0.4], pole: [-0.25, 0.75, -1], clav: 0.49, hs: 0.92, fs: 0.93, fr: [0.0135, 0.0122, 0.011, 0.017],
