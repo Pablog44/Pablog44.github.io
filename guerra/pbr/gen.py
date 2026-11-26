@@ -148,3 +148,42 @@ cimg = cimg * (1 - moss[..., None] * 0.85) + mcol * moss[..., None] * 0.85
 ao = np.clip(1 + blur(h - blur(h, 12), 3) * 14, 0.6, 1.08); cimg *= ao[..., None]
 nrm(blur(h + moss * 0.003, 0.7) * (N / 2.2), 1.6, 0.8 + 0.14 * moss + 0.04 * t2[..., 0], 'roca'); save(cimg, 'roca_c')
 print('ok sillar roca')
+
+# ---- 7. madera: pino y chopo viejos (vigas, puertas, muebles, cubas): veta a lo largo de X, anillos, poros, nudos y fendas ----
+S = 1.2; px = N / S
+y, x = np.mgrid[0:N, 0:N].astype(np.float32)
+def anoise(n, beta, seed, ax):       # ruido repetible alargado ax veces a lo largo de X
+    r = np.random.default_rng(seed); w = r.standard_normal((n, n))
+    fy = np.fft.fftfreq(n)[:, None]; fx = np.fft.fftfreq(n)[None, :] * ax; f = np.sqrt(fx * fx + fy * fy); f[0, 0] = 1
+    a = np.real(np.fft.ifft2(np.fft.fft2(w) / f ** beta)); a -= a.mean(); return a / (a.std() + 1e-9)
+def sst(a, b, v): t = np.clip((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
+NR = 70       # anillos por baldosa (entero: repite sin costura)
+ring = y / N * NR + anoise(N, 1.9, 71, 6) * 3.0 + anoise(N, 1.3, 72, 10) * 0.3       # anillos ondulados (y alguna catedral)
+kin = np.zeros((N, N), np.float32); krim = np.zeros((N, N), np.float32); kring = np.zeros((N, N), np.float32)
+for kx, ky, rk in ((0.23, 0.31, 17), (0.71, 0.74, 24), (0.58, 0.12, 11), (0.05, 0.86, 13)):
+    dx = (x - kx * N + N / 2) % N - N / 2; dy = (y - ky * N + N / 2) % N - N / 2
+    d = np.sqrt((dx / 1.5) ** 2 + dy ** 2)
+    ring += rk * 1.5 * np.tanh(dy / (0.7 * rk)) * np.exp(-(d / (2.8 * rk)) ** 2) / (N / NR)       # la veta rodea el nudo
+    k = np.clip(1 - d / rk, 0, 1); kin = np.maximum(kin, k)
+    krim = np.maximum(krim, np.exp(-((d - rk) / 1.6) ** 2) * (0.5 + 0.5 * np.clip(anoise(N, 1.5, 80 + int(rk), 1) + 0.3, 0, 1)))
+    kring = np.where(k > 0, np.sin(d / rk * 2 * np.pi * 3.5) * 0.5 + 0.5, kring)
+p = ring % 1
+late = sst(0.5, 0.88, p) * (1 - sst(0.9, 0.99, p))       # madera de verano: banda fina y oscura
+fib = anoise(N, 0.85, 73, 28)       # fibras
+dash = np.clip(anoise(N, 0.25, 74, 14) - 1.9, 0, None)       # poros
+crn = anoise(N, 1.25, 75, 26); crm = np.clip((anoise(N, 1.7, 76, 3) - 0.85) * 2.2, 0, 1)
+crack = np.exp(-(crn / 0.03) ** 2) * crm       # fendas a lo largo de la veta
+grey = np.clip(fnoise(N, 1.3, 77) * 0.35 + 0.3, 0, 1)       # madera vieja, agrisada a manchas
+tone = anoise(N, 1.6, 78, 3)
+early = np.array([0.6, 0.45, 0.3]); latec = np.array([0.34, 0.22, 0.13])
+cimg = early * (1 - late[..., None]) + latec * late[..., None]
+cimg *= (0.93 + 0.05 * tone + 0.045 * fib)[..., None] * (1 - np.clip(dash, 0, 1) * 0.35)[..., None]
+cimg = cimg * (1 - grey[..., None] * 0.4) + np.array([0.5, 0.47, 0.42]) * (cimg.mean(-1, keepdims=True) / 0.42) * grey[..., None] * 0.4
+kc = np.array([0.29, 0.18, 0.1]) * (0.8 + 0.3 * kring)[..., None]
+km = sst(0.0, 0.3, kin)[..., None]; cimg = cimg * (1 - km * 0.9) + kc * km * 0.9
+cimg *= (1 - krim * 0.55)[..., None] * (1 - crack * 0.7)[..., None]
+cimg *= (1 - blur(crack + krim * 0.6, 2.5) * 0.25)[..., None]       # sucio en fendas y alrededor de los nudos
+h = late * 0.00035 + fib * 0.00007 - crack * 0.0016 - np.clip(dash, 0, 1) * 0.00025 + kin * 0.0003 - krim * 0.0008 + fnoise(N, 1.8, 79) * 0.00008
+rough = np.clip(0.84 - late * 0.12 + crack * 0.12 + grey * 0.05 - km[..., 0] * 0.15, 0, 1)
+nrm(blur(h, 0.6) * px, 1.7, rough, 'madera'); save(cimg, 'madera_c')
+print('ok madera', np.round(cimg.reshape(-1, 3).mean(0), 3))

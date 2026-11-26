@@ -675,7 +675,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 const hex = h => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const shade = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+const shade = (c, f) => { const r = [c[0] * f, c[1] * f, c[2] * f]; if (c.wd) r.wd = 1; return r; };
+/* color de madera: en una Geo con malla de madera al lado (geo.wg), lo de este color va a ella, con la textura PBR de la madera */
+const wd = c => (c.wd = 1, c);
 function seeded(seed) {
   return function () {
     seed |= 0; seed = seed + 0x6D2B79F5 | 0;
@@ -730,8 +732,9 @@ const IDENT = M4.create();
 
 /* ============ constructor de geometría (triángulos sueltos, normales planas) ============ */
 class Geo {
-  constructor() { this.a = []; this.m = null; }
+  constructor() { this.a = []; this.m = null; this.wg = null; this.gr = null; this.gr2 = null; this.go = 0; }
   tri(p0, p1, p2, col, ref) {
+    if (col.wd && this.wg) { const W = this.wg; W.m = this.m; W.gr = this.gr; W.gr2 = this.gr2; W.go = this.go; W.tri(p0, p1, p2, col, ref); W.m = null; return; }
     if (this.m) { p0 = M4.tp(this.m, p0); p1 = M4.tp(this.m, p1); p2 = M4.tp(this.m, p2); if (ref) ref = M4.tp(this.m, ref); }
     const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -743,12 +746,26 @@ class Geo {
     const a = this.a, r = col[0], g = col[1], b = col[2];
     a.push(p0[0], p0[1], p0[2], nx, ny, nz, r, g, b, p1[0], p1[1], p1[2], nx, ny, nz, r, g, b, p2[0], p2[1], p2[2], nx, ny, nz, r, g, b);
   }
-  quad(a, b, c, d, col, ref) { this.tri(a, b, c, col, ref); this.tri(a, c, d, col, ref); }
+  quad(a, b, c, d, col, ref) {
+    if (col.wd && this.wg && !this.gr) {       // cara suelta de madera: la veta, a lo largo de su primer lado
+      this.gr = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; this.gr2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+      this.tri(a, b, c, col, ref); this.tri(a, c, d, col, ref); this.gr = this.gr2 = null; return;
+    }
+    this.tri(a, b, c, col, ref); this.tri(a, c, d, col, ref);
+  }
+  /* veta de una pieza de madera: a lo largo de su lado más largo (en las testas, del siguiente); go la desplaza de una pieza a otra */
+  grain(sx, sy, sz, cx, cy, cz, ax) {
+    if (ax) { this.gr = ax[0]; this.gr2 = ax[1]; }
+    else { const A = [[sx, [1, 0, 0]], [sy, [0, 1, 0]], [sz, [0, 0, 1]]].sort((p, q) => q[0] - p[0]); this.gr = A[0][1]; this.gr2 = A[1][1]; }
+    const c = this.m ? M4.tp(this.m, [cx, cy, cz]) : [cx, cy, cz], h = Math.sin(c[0] * 12.9898 + c[1] * 78.233 + c[2] * 37.719) * 43758.5453; this.go = h - Math.floor(h);
+  }
   box(cx, cy, cz, sx, sy, sz, col, colTop) {
+    const w = this.wg && (col.wd || (colTop && colTop.wd)); if (w) this.grain(sx, sy, sz, cx, cy, cz);
     const x0 = cx - sx / 2, x1 = cx + sx / 2, y0 = cy - sy / 2, y1 = cy + sy / 2, z0 = cz - sz / 2, z1 = cz + sz / 2, c = [cx, cy, cz];
     const P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
     const F = [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]];
     for (let i = 0; i < 6; i++) { const f = F[i]; this.quad(P[f[0]], P[f[1]], P[f[2]], P[f[3]], (i === 4 && colTop) ? colTop : col, c); }
+    if (w) this.gr = this.gr2 = null;
   }
   /* caja sin las caras de skip (0: -z, 1: +z, 2: -x, 3: +x, 4: arriba, 5: abajo) */
   boxSkip(cx, cy, cz, sx, sy, sz, col, skip) {
@@ -771,7 +788,7 @@ class Geo {
   with(mat, fn) { const o = this.m; this.m = o ? M4.mul(M4.create(), o, mat) : mat; fn(); this.m = o; }
   /* cilindro / cono a lo largo de Y */
   cyl(cx, cy, cz, r0, r1, h, n, col, caps) {
-    const y0 = cy - h / 2, y1 = cy + h / 2;
+    const y0 = cy - h / 2, y1 = cy + h / 2, w = this.wg && col.wd; if (w) this.grain(0, 0, 0, cx, cy, cz, [[0, 1, 0], [1, 0, 0]]);       // de madera: veta a lo largo del eje (duelas, postes, troncos)
     for (let i = 0; i < n; i++) {
       const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2;
       const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
@@ -780,6 +797,7 @@ class Geo {
       if (r1 > 1e-4) this.quad(A, B, C, D, col, ref); else this.tri(A, B, [cx, y1, cz], col, ref);
       if (caps) { if (r1 > 1e-4) this.tri(D, C, [cx, y1, cz], col, [cx, y0, cz]); this.tri(A, B, [cx, y0, cz], col, [cx, y1, cz]); }
     }
+    if (w) this.gr = this.gr2 = null;
   }
   /* elipsoide de pocos polígonos con vértices desplazados */
   blob(cx, cy, cz, rx, ry, rz, col, seg, rings, jit, rng, vary) {
@@ -814,6 +832,32 @@ class Geo {
       const xm = (x0 + x1) / 2, a = [x0, y, z0], b = [x1, y, z0], c = [x1, y, z1], d = [x0, y, z1], e = [xm, y + rh, z0], f = [xm, y + rh, z1];
       this.quad(a, d, f, e, col, ref); this.quad(b, c, f, e, col, ref); this.tri(a, b, e, ce, ref); this.tri(d, c, f, ce, ref);
     }
+  }
+}
+
+/* Malla de madera: como Geo, pero cada vértice lleva también la dirección de la veta (12 números). Su largo, 1 + 3·go, mueve la textura
+   de una pieza a otra, para que dos tablas vecinas no tengan la misma veta. */
+class WoodGeo extends Geo {
+  tri(p0, p1, p2, col, ref) {
+    let t = this.gr, t2 = this.gr2;
+    if (!t) { t = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]]; t2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]]; }
+    const m = this.m;
+    if (m) {
+      p0 = M4.tp(m, p0); p1 = M4.tp(m, p1); p2 = M4.tp(m, p2); if (ref) ref = M4.tp(m, ref);
+      const dv = v => [m[0] * v[0] + m[4] * v[1] + m[8] * v[2], m[1] * v[0] + m[5] * v[1] + m[9] * v[2], m[2] * v[0] + m[6] * v[1] + m[10] * v[2]];
+      t = dv(t); t2 = dv(t2);
+    }
+    const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    if (ref) {
+      const cx = (p0[0] + p1[0] + p2[0]) / 3 - ref[0], cy = (p0[1] + p1[1] + p2[1]) / 3 - ref[1], cz = (p0[2] + p1[2] + p2[2]) / 3 - ref[2];
+      if (nx * cx + ny * cy + nz * cz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    }
+    const tg = v => { const d = v[0] * nx + v[1] * ny + v[2] * nz, x = v[0] - nx * d, y = v[1] - ny * d, z = v[2] - nz * d, L = Math.hypot(x, y, z); return L > 0.3 * (Math.hypot(v[0], v[1], v[2]) || 1) ? [x / L, y / L, z / L] : null; };
+    const T = tg(t) || tg(t2) || tg(Math.abs(ny) < 0.9 ? [0, 1, 0] : [1, 0, 0]), s = 1 + 3 * (this.go || 0), tx = T[0] * s, ty = T[1] * s, tz = T[2] * s;
+    const a = this.a, r = col[0], g = col[1], b = col[2];
+    a.push(p0[0], p0[1], p0[2], nx, ny, nz, r, g, b, tx, ty, tz, p1[0], p1[1], p1[2], nx, ny, nz, r, g, b, tx, ty, tz, p2[0], p2[1], p2[2], nx, ny, nz, r, g, b, tx, ty, tz);
   }
 }
 
@@ -1722,11 +1766,11 @@ let progMesh, progPart, glLost = false;
 const U = {}, UP = {}, allMeshes = [];
 function initPrograms() {
 progMesh = compile(
-  `attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol;
+  `attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol; attribute vec3 aTan;
    uniform mat4 uVP; uniform mat4 uM;
-   varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
-   void main(){ vec4 w = uM*vec4(aPos,1.0); vW = w.xyz; vNor = (uM*vec4(aNor,0.0)).xyz; vCol = aCol; vO = aPos; vNO = aNor; gl_Position = uVP*w; }`,
-  PREC + `varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO;
+   varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO; varying vec3 vTan;
+   void main(){ vec4 w = uM*vec4(aPos,1.0); vW = w.xyz; vNor = (uM*vec4(aNor,0.0)).xyz; vCol = aCol; vO = aPos; vNO = aNor; vTan = aTan; gl_Position = uVP*w; }`,
+  PREC + `varying vec3 vCol; varying vec3 vNor; varying vec3 vW; varying vec3 vO; varying vec3 vNO; varying vec3 vTan;
    uniform sampler2D uTx; uniform sampler2D uTxN; uniform float uTxMode; uniform vec4 uTxA; uniform vec4 uTxB; uniform float uSpec;
    uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uFogC; uniform vec2 uFog;
    uniform float uLit; uniform float uAlpha; uniform float uDetail; uniform vec3 uTint; uniform vec2 uScroll; uniform float uTer;
@@ -1741,7 +1785,15 @@ progMesh = compile(
      /* materiales PBR (4): color, normal y rugosidad de un solo material por muro, proyectado en la cara dominante (sin mezclar
         proyecciones); los tejados, a lo largo de su pendiente. uTxA: x escala (1/m), y tejado, z fuerza del relieve, w musgo;
         uTxB: color de referencia y, en w, las tres proyecciones mezcladas (rocas: formas redondas, sin costuras) */
-     if(uTxMode>3.5){
+     /* madera (5): la textura sigue la veta de cada pieza (aTan, que da también su desplazamiento); el color de la pieza la tiñe */
+     if(uTxMode>4.5){
+       vec3 nn = normalize(vNO); float L = length(vTan); vec3 T = normalize(vTan - nn*dot(vTan, nn) + vec3(1e-5)), Bw = cross(nn, T);
+       vec2 uv = vec2(dot(vO, T), dot(vO, Bw))*uTxA.x + (L - 1.0)*vec2(2.37, 5.71);
+       vec3 tn = texture2D(uTxN, uv).rgb; vec2 nxy = (tn.xy*2.0-1.0)*uTxA.z; rgh = tn.b;
+       nP = normalize(T*nxy.x + Bw*nxy.y + nn*sqrt(max(0.0, 1.0-dot(nxy,nxy))));
+       c = texture2D(uTx, uv).rgb*clamp(vCol/uTxB.rgb, 0.05, 3.0)*uTint;
+     }
+     else if(uTxMode>3.5){
        vec3 nn = normalize(vNO), aw = abs(nn), T, B; vec2 uv; float ts = uTxA.x;
        if(uTxB.w > 0.5){
          vec3 tw = aw*aw*aw*aw; tw /= (tw.x+tw.y+tw.z);
@@ -1801,7 +1853,7 @@ progMesh = compile(
      float f = clamp((length(vW-uCam)-uFog.x)/(uFog.y-uFog.x),0.0,1.0);
      c = mix(c,uFogC,f*(2.0-f)*0.92);
      gl_FragColor = vec4(c,uAlpha);
-   }`, ['aPos', 'aNor', 'aCol']);
+   }`, ['aPos', 'aNor', 'aCol', 'aTan']);
 progPart = compile(
   `attribute vec3 aPos; attribute float aSize; attribute vec4 aCol;
    uniform mat4 uVP; uniform float uScale; varying vec4 vCol;
@@ -1852,7 +1904,8 @@ const PBR = {
   roca: { ts: 1 / 2.2, ref: [0.66, 0.63, 0.55], k: 0.75, moss: 1.0, tri: 1 },
   teja: { ts: 1 / 2.0, ref: [0.65, 0.34, 0.23], k: 1.0, roof: 1 },
   sacos: { ts: 1 / 1.6, ref: [0.66, 0.6, 0.44], k: 1.0 },
-  hormigon: { ts: 1 / 3.0, ref: [0.6, 0.59, 0.54], k: 1.0 }
+  hormigon: { ts: 1 / 3.0, ref: [0.6, 0.59, 0.54], k: 1.0 },
+  madera: { ts: 1 / 1.2, ref: [0.483, 0.366, 0.254], k: 1.0 }       // pino viejo: vigas, puertas, muebles, escaleras, cubas, carros...
 };
 function stoneTexLoad() {
   const m = GFX_TOUCH || gfxTexLevel() === 0 ? '_m' : '';
@@ -1875,6 +1928,26 @@ function drawStone() {
     drawMesh(mesh);
     if (on) gl.uniform1f(U.uTxMode, 0);
   }
+}
+/* la madera (mallas de 12 números por vértice: lleva la veta): la de fuera, toda; los muebles, solo los de las casas cercanas */
+function drawWoodMesh(m) {
+  gl.uniformMatrix4fv(U.uM, false, IDENT); gl.bindBuffer(gl.ARRAY_BUFFER, m.vbo);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 48, 0); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 48, 12); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 48, 24); gl.vertexAttribPointer(3, 3, gl.FLOAT, false, 48, 36);
+  gl.drawArrays(gl.TRIANGLES, 0, m.n);
+}
+function drawWood(ex, ez) {
+  if (!world.wood) return;
+  const M = PBR.madera, tc = TX.mat_madera_c, tn = TX.mat_madera_n, on = !!(tc && tc.tex && tn && tn.tex);
+  if (on) {
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tn.tex); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tc.tex);
+    gl.uniform1f(U.uTxMode, 5); gl.uniform4f(U.uTxA, M.ts, 0, M.k, 0); gl.uniform4f(U.uTxB, M.ref[0], M.ref[1], M.ref[2], 0);
+  }
+  gl.enableVertexAttribArray(3);
+  drawWoodMesh(world.wood);
+  for (const it of world.interiors) if (it.wmesh && (it.x - ex) * (it.x - ex) + (it.z - ez) * (it.z - ez) < 65 * 65) drawWoodMesh(it.wmesh);
+  if (pontoon.wmesh) drawWoodMesh(pontoon.wmesh); if (pasarela.wmesh && pasarela.on) drawWoodMesh(pasarela.wmesh);
+  gl.disableVertexAttribArray(3);
+  if (on) gl.uniform1f(U.uTxMode, 0);
 }
 function txInit() {
   const R = seeded(77), g = (v, a = 1) => 'rgba(' + v + ',' + v + ',' + v + ',' + a + ')';
@@ -2114,6 +2187,7 @@ function makeMesh(arr, idx) {
   uploadMesh(m); allMeshes.push(m);
   return m;
 }
+function makeMesh12(arr) { const f = new Float32Array(arr); const m = { vbo: null, n: f.length / 12, ibo: null, src: f, isrc: null }; uploadMesh(m); allMeshes.push(m); return m; }
 function drawMesh(m, model) {
   gl.uniformMatrix4fv(U.uM, false, model || IDENT);
   gl.bindBuffer(gl.ARRAY_BUFFER, m.vbo);
@@ -2654,13 +2728,14 @@ function roadDist(x, z) {
 const world = { houses: [], interiors: [] };       // interiors: los muebles de cada casa, en su malla (solo se dibujan de cerca)
 (function buildWorld() {
   const R = seeded(1938); let g = new Geo();
+  const GW = new WoodGeo(); g.wg = GW;       // todo lo de madera (colores marcados con wd) va a su malla, con la textura de la madera
   const rr = (a, b) => a + R() * (b - a);
   /* muros, tejados, sacos y hormigón van aparte, una malla por material PBR (ver «materiales PBR de la zona»); los tejados se separan
      de los muros al final, por su inclinación */
   const GS = { seca: new Geo(), mamp: new Geo(), sillar: new Geo(), roca: new Geo(), sacos: new Geo(), hormigon: new Geo(), teja: new Geo() };
   const stone = (k, f) => { const o = g; g = GS[k]; try { return f(); } finally { g = o; } };
   const WALLS = [0xcbb994, 0xbfa780, 0xd6c7a4, 0xb89f7a, 0xc9b08a].map(hex), ROOF = [0xa5573a, 0x9a4f36, 0xb0623f].map(hex);
-  const STONE = hex(0x9c917c), WOOD = hex(0x6a4b2e), DARK = hex(0x2a241d), BURLAP = hex(0xa8996f);
+  const STONE = hex(0x9c917c), WOOD = wd(hex(0x6a4b2e)), DARK = hex(0x2a241d), BURLAP = hex(0xa8996f);
   const trees = [], shadeMap = new Float32Array(W.NX * W.NZ).fill(1);
   const noGo = [];   // zonas despejadas (plazas, banderas)
   world.treeInst = []; world.noGo = noGo;      // árboles y cepas (los modelos los pone la vegetación)
@@ -2782,7 +2857,7 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     const La = (alongX ? x1 - x0 : z1 - z0) / 2, S = (alongX ? z1 - z0 : x1 - x0) / 2, k = rh / S;
     const P = (a, b, yy) => alongX ? [ca + a, yy, cb + b] : [cb + b, yy, ca + a];
     const a0 = -La - (gab[0] ? ov2 : 0), a1 = La + (gab[1] ? ov2 : 0), yR = y + rh + th, yE = y + th - k * ov;
-    const edge = shade(col, 0.6), WOODR = hex(0x5c4329), WOODK = hex(0x3d2b1a);
+    const edge = shade(col, 0.6), WOODR = wd(hex(0x5c4329)), WOODK = wd(hex(0x3d2b1a));
     for (const sd of [-1, 1]) {
       const bE = sd * (S + ov);
       stone('teja', () => g.quad(P(a0, bE, yE), P(a1, bE, yE), P(a1, 0, yR), P(a0, 0, yR), col, P(0, 0, y - 3)));       // faldón de teja
@@ -2855,9 +2930,9 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
   }
   /* ---- casas por dentro ----
      Casa de pueblo de la Terra Alta y la Ribera d'Ebre hacia 1938. En la planta baja, por el portal ancho, la cuadra: el pesebre
-     contra una pared, la paja, los aperos y, a veces, la mula; al otro lado las botas de vino y las tinajas. Por una escalera de obra
-     contra la pared del fondo se sube al piso, donde vive la familia: el hogar con su campana, la mesa con sus sillas de enea, la alcoba
-     tras un tabique, el arca, el armario, la pica bajo la ventana. Abajo, ventanucos con reja; arriba, ventanas con porticones y, sobre
+     contra una pared, el abrevadero, la paja y los aperos; al otro lado las botas de vino y las tinajas. Por una escalera de madera,
+     exenta, apartada de las paredes y con la leña debajo, se sube al piso, donde vive la familia: el hogar con su campana, la mesa con
+     sus sillas de enea, la alcoba tras un tabique, el arca, el armario, la pica bajo la ventana. Abajo, ventanucos con reja; arriba, ventanas y, sobre
      el portal, a veces un balcón con barandilla de hierro. Las de una sola altura son casas pobres: todo en una pieza. La bodega
      cooperativa (cubos, botas y la prensa) y la venta (taberna con mostrador, cuadra y camas arriba) tienen lo suyo.
      No hay sombras: todo lo de dentro va más oscuro (IN) para que se lea como penumbra.
@@ -2883,9 +2958,9 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     const SB = (a0, a1, y0, y1, b0, b1, col, top) => { const r = rectW(a0, a1, b0, b1); stone(V, () => g.box((r[0] + r[1]) / 2, (y0 + y1) / 2, (r[2] + r[3]) / 2, r[1] - r[0], y1 - y0, r[3] - r[2], col, top)); };       // obra, con la textura de la piedra
     /* colores: lo de dentro, en penumbra */
     const IN = 0.62, dk = (c, f) => shade(c, (f || 1) * IN);
-    const WOODC = dk(hex(0x6e4c2e)), WOODL = dk(hex(0x8f6a43)), WOODD = dk(hex(0x3f2c1c)), IRONC = dk(hex(0x2c2a27)), STRAW = dk(hex(0xc8a95c)), CLAY = dk(hex(0xa5603c));
+    const WOODC = wd(dk(hex(0x6e4c2e))), WOODL = wd(dk(hex(0x8f6a43))), WOODD = wd(dk(hex(0x3f2c1c))), IRONC = dk(hex(0x2c2a27)), STRAW = dk(hex(0xc8a95c)), CLAY = dk(hex(0xa5603c));
     const LINEN = dk(hex(0xd8d0bd)), WHITE = dk(hex(0xe3dccb)), TILE = dk(hex(0x9c5536)), EARTH = dk(hex(0x6c5a45)), PLAST = dk(hex(0xcfc6b2)), STN = dk(hex(0xa39883));
-    const SOC = dk(hex(pk([0x6f8590, 0x8a7350, 0x7a8a6a]))), SHUT = hex(pk([0x4d6b4b, 0x4a6680, 0x6a4b2e, 0x758a66, 0x5a7a86])), IRONX = hex(0x2c2a27);
+    const SOC = dk(hex(pk([0x6f8590, 0x8a7350, 0x7a8a6a]))), IRONX = hex(0x2c2a27);
     const BLANK = () => dk(hex(pk([0x7a3a2c, 0x3d5372, 0x6b6838, 0x8a5a2a, 0x8c7a5c])));
     const LIND = shade(wall, 0.5);
 
@@ -2900,11 +2975,12 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     const dw = kind === 'bodega' ? 2.4 : 1.6, dh = kind === 'bodega' ? 3.2 : Math.min(2.45, H1 - 0.4);
     const dlx = big ? 0 : (Q() < 0.5 ? -1 : 1) * Wi * 0.2, sd = dlx > 0 ? 1 : dlx < 0 ? -1 : (Q() < 0.5 ? -1 : 1);     // sd: lado del portal (y del pie de la escalera)
     op('F', dlx, dw, 0, dh, 'door');
-    /* escalera de obra contra la pared del fondo: sube desde el lado del portal hacia el otro */
+    /* escalera de madera, exenta: paralela a la pared del fondo pero apartada de ella (45 cm) y de la del portal (1 m); sube desde el
+       lado del portal hacia el otro, y arriba desembarca a 1,4 m por lo menos de la pared de enfrente */
     let S = null;
     if (two) {
-      const run = clamp(H1 / 0.72, 3.8, Wi - 1.8), lb = sd * (hW - 0.03), lt = lb - sd * run;
-      S = { run, lb, lt, z0: hD - 0.97, a: Math.min(lb, lt), b: Math.max(lb, lt), n: Math.max(10, Math.round(H1 / 0.19)) };
+      const run = Math.min(Wi - 2.4, Math.max(3.6, H1 / 0.72)), lb = sd * (hW - 1.0), lt = lb - sd * run, z1 = hD - 0.45;
+      S = { run, lb, lt, z0: z1 - 1.0, z1, a: Math.min(lb, lt), b: Math.max(lb, lt), n: Math.max(10, Math.round(H1 / 0.19)) };
     }
     const pl = two ? Math.min(2.7, S.z0 + hD - 1.0) : 0, px = sd * (hW - 2.45);       // tabique de la alcoba (largo y sitio)
     const hz = -hD + clamp(Di * 0.36, 1.5, 2.4);       // centro del hogar, en la pared M
@@ -2922,7 +2998,7 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
       GW('F', -sd * (hW - 1.1)); if (big) GW('F', sd * hW * 0.5);
       GW('P', -hD * 0.2); GW('M', -hD * 0.2);
       const gb = -sd * (hW - 0.8); if (gb < S.a - 0.6 || gb > S.b + 0.6) GW('B', gb);
-      /* arriba, ventanas con porticones y, a veces, el balcón */
+      /* arriba, ventanas y, a veces, el balcón */
       UW('F', sd * (hW - 1.2));
       const bx = -sd * clamp(Wi * 0.14, 0.6, 1.5), balc = kind === 'venta' || (Wi >= 6.9 && Q() < 0.6);
       if (balc) op('F', bx, 1.0, H1 + 0.02, H1 + 2.25, 'bal'); else UW('F', bx);
@@ -2977,19 +3053,11 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     wallRun(true, x, z - hd + t / 2, w, OPS.n, 1); wallRun(true, x, z + hd - t / 2, w, OPS.s, -1);
     wallRun(false, x - hw + t / 2, z, d - 2 * t, OPS.w, 1); wallRun(false, x + hw - t / 2, z, d - 2 * t, OPS.e, -1);
 
-    /* ---- por fuera: sillería de los huecos, porticones, rejas, balcón, poyo y esquinales ---- */
+    /* ---- por fuera: sillería de los huecos, rejas, balcón, poyo y esquinales ---- */
     for (const [sn, nx, nz] of [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0]]) for (const p of OPS[sn]) {
       const ax = nz ? 1 : 0, az = nx ? 1 : 0, ox = x + nx * hw + ax * p.c, oz = z + nz * hd + az * p.c, y0 = yf + p.y0, y1 = yf + p.y1;
       const at = (c, n) => [ox + ax * c + nx * n, oz + az * c + nz * n];
       recerco(ox, oz, nx, nz, p.w, y0, y1, p.k === 'w0' || p.k === 'w1');
-      if (p.k === 'w1' || p.k === 'bal') {       // porticones abiertos contra la fachada (alguno falta)
-        for (const s of [-1, 1]) {
-          if (Q() < 0.1) continue;
-          const c = at(s * (p.w / 2 + 0.22 + p.w / 4), 0.1), ww = p.w / 2;
-          g.box(c[0], (y0 + y1) / 2, c[1], ax * ww + az * 0.035, y1 - y0 + 0.02, az * ww + ax * 0.035, SHUT);
-          for (const yy of [y0 + 0.25, y1 - 0.25]) g.box(c[0] + nx * 0.02, yy, c[1] + nz * 0.02, ax * ww * 0.9 + az * 0.02, 0.04, az * ww * 0.9 + ax * 0.02, IRONX);       // pernios
-        }
-      }
       if (p.k === 'w0') {       // reja
         for (let k = 1; k <= 3; k++) { const c = at(-p.w / 2 + k * p.w / 4, -t / 2 + 0.06); g.box(c[0], (y0 + y1) / 2, c[1], 0.03, y1 - y0, 0.03, IRONX); }
         const c = at(0, -t / 2 + 0.06); g.box(c[0], (y0 + y1) / 2, c[1], ax * p.w + az * 0.03, 0.03, az * p.w + ax * 0.03, IRONX);
@@ -3092,6 +3160,7 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     }
     /* en el marco de la casa */
     function bota(cx, cy, cz, r, len, col) {       // bota de vino tumbada, a lo largo de X, con sus aros
+      col = wd(col);
       const m = rot(cx, cy, cz, 0); M4.rotZ(m, Math.PI / 2);
       g.with(m, () => {
         g.cyl(0, -len * 0.25, 0, r * 0.87, r, len * 0.5, 10, col); g.cyl(0, len * 0.25, 0, r, r * 0.87, len * 0.5, 10, col);
@@ -3125,31 +3194,10 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
       g.blob(cx - 0.35, yb + 0.85, cz + 0.15, 0.13, 0.07, 0.09, dk(hex(0xb8894e)), 6, 3, 0.1, Q, 0.1);       // pan
     }
     const lamp = (cx, yc, cz) => { g.limb([cx, yc, cz], [cx, yc - 0.55, cz], 0.012, 0.012, IRONC); g.cyl(cx, yc - 0.62, cz, 0.09, 0.03, 0.12, 6, IRONC, true); };
-    function mula(cx, yb, cz, face) {       // mula atada al pesebre (mira a +x)
-      const m = rot(cx, yb, cz, face < 0 ? Math.PI : 0), C = dk(hex(pk([0x5a4a3c, 0x6b5844, 0x4a3f36]))), C2 = shade(C, 0.75);
-      g.with(m, () => {
-        g.blob(0, 1.08, 0, 0.74, 0.3, 0.27, C, 9, 5, 0, null, 0);
-        for (const a of [-0.5, 0.46]) for (const s of [-1, 1]) { g.limb([a, 1.0, s * 0.14], [a + 0.03, 0.08, s * 0.14], 0.11, 0.11, C); B(a + 0.03, 0.05, s * 0.14, 0.12, 0.1, 0.12, dk(hex(0x24201c))); }
-        g.limb([0.55, 1.15, 0], [0.92, 1.58, 0], 0.22, 0.3, C); g.limb([0.9, 1.66, 0], [1.26, 1.3, 0], 0.2, 0.26, C); B(1.24, 1.27, 0, 0.16, 0.16, 0.2, shade(C, 1.25));
-        for (const s of [-1, 1]) g.limb([0.88, 1.74, s * 0.06], [0.82, 2.02, s * 0.11], 0.05, 0.08, C2);
-        g.limb([0.62, 1.42, 0], [0.88, 1.78, 0], 0.05, 0.06, C2);       // crin
-        g.limb([-0.72, 1.18, 0], [-0.8, 0.6, 0], 0.05, 0.05, C2);
-        g.limb([1.0, 1.42, 0], [1.2, 1.3, 0], 0.27, 0.02, dk(hex(0x3a2818)));       // cabezada
-      });
-    }
-    function gallina(cx, yb, cz, r) {
-      const C = dk(hex(pk([0x8a5a32, 0xd8cfc0, 0x3a3028, 0xa8783c]))), Y = dk(hex(0xc89a30));
-      g.with(rot(cx, yb, cz, r), () => {
-        g.blob(0, 0.21, 0, 0.17, 0.12, 0.1, C, 7, 4, 0, null, 0); g.blob(0.15, 0.34, 0, 0.06, 0.06, 0.05, C, 6, 3, 0, null, 0);
-        B(0.16, 0.41, 0, 0.06, 0.04, 0.015, dk(hex(0xb02a1c))); B(0.22, 0.34, 0, 0.04, 0.02, 0.02, Y);
-        for (const s of [-1, 1]) g.limb([0, 0.11, s * 0.03], [0, 0, s * 0.03], 0.015, 0.015, Y);
-        g.limb([-0.13, 0.24, 0], [-0.24, 0.36, 0], 0.05, 0.1, C);
-      });
-    }
     const palla = (cx, cz, s) => g.with(rot(cx, yf + 0.006, cz, q(0, 3.14)), () => B(0, 0, 0, q(0.4, 1.0) * s, 0.012, q(0.3, 0.8) * s, shade(STRAW, q(0.62, 0.8))));       // paja por el suelo
 
     /* los muebles van en una malla propia de la casa: solo se dibuja cuando la cámara está cerca (de lejos no se ven por las ventanas) */
-    const gMain = g; g = new Geo();
+    const gMain = g; g = new Geo(); g.wg = new WoodGeo();
     g.with(HM, () => {
       /* hojas del portal, abiertas hacia dentro */
       for (const s of [-1, 1]) {
@@ -3206,23 +3254,37 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
       }
 
       if (two) {
-        /* ---- la escalera de obra, con su barandilla ---- */
-        const kS = H1 / S.run, yAt = u => yf + Math.abs(u - S.lb) * kS, zc = (S.z0 + hD) / 2;
+        /* ---- la escalera de madera: dos zancas, peldaños con su tabica, barandilla a los dos lados y la leña debajo ---- */
+        const kS = H1 / S.run, st = S.run / S.n, hs = H1 / S.n, zc = (S.z0 + S.z1) / 2, dz = S.z1 - S.z0, uD = d => S.lb - sd * d;       // d: distancia desde el pie
+        { const off = 0.08 - 0.13 * Math.sqrt(1 + kS * kS);       // zancas: el canto de arriba, 8 cm sobre la línea de los peldaños
+          for (const zs of [S.z0 + 0.025, S.z1 - 0.025]) g.limb([uD(-0.12), yf - 0.12 * kS + off, zs], [uD(S.run - 0.12), y2 - 0.12 * kS + off, zs], 0.26, 0.05, WOODD); }
         for (let i = 0; i < S.n; i++) {
-          const yt = yf + (i + 1) * H1 / S.n, ua = S.lb - sd * i * S.run / S.n, ub = S.lb - sd * (i + 1) * S.run / S.n;
-          SB(Math.min(ua, ub) - 0.002, Math.max(ua, ub) + 0.002, yf - 0.02, yt, S.z0, hD, shade(wall, 0.55), shade(wall, 0.72));
-          B(ub + sd * 0.015, yt - 0.02, S.z0 + 0.012, 0.03, 0.04, 0.025, WOODD);       // canto del peldaño
+          const yt = yf + (i + 1) * hs, ua = uD(i * st);       // ua: el canto de delante del peldaño
+          B(ua - sd * (st / 2 - 0.015), yt - 0.025, zc, st + 0.03, 0.05, dz - 0.01, WOODL);       // huella, que vuela 3 cm
+          B(ua - sd * 0.03, yt - hs / 2 - 0.025, zc, 0.025, hs - 0.05, dz - 0.06, WOODC);       // tabica
         }
-        lev(S.a, S.b, S.z0, hD, S.lb > S.lt ? y2 : yf, (S.lb > S.lt ? -1 : 1) * kS);
-        const nc = Math.ceil(S.run / 0.5);
-        for (let k = 0; k < nc; k++) {       // el macizo de la escalera (no se pasa por debajo) y la barandilla
-          const d0 = k * S.run / nc, d1 = (k + 1) * S.run / nc, yl = yf + d0 * kS, u0 = S.lb - sd * d0, u1 = S.lb - sd * d1;
-          if (yl > yf + 0.42) sol(Math.min(u0, u1), Math.max(u0, u1), yf - 1, yl - 0.03, S.z0, hD);       // los primeros peldaños se suben también de lado
-          if (yl > yf + 0.75) sol(Math.min(u0, u1), Math.max(u0, u1), yl, yl + 1.0, S.z0 - 0.05, S.z0 + 0.04);
+        lev(S.a, S.b, S.z0, S.z1, S.lb > S.lt ? y2 : yf, (S.lb > S.lt ? -1 : 1) * kS);
+        const nc = Math.ceil(S.run / 0.5), dF = 2 * st - 0.01;
+        for (let k = 0; k < nc; k++) {       // bajo la escalera (la leña) y en el hueco de detrás no se entra; barandillas a los dos lados
+          const d0 = k * S.run / nc, yl = yf + d0 * kS, u0 = uD(d0), u1 = uD((k + 1) * S.run / nc), ua = Math.min(u0, u1), ub = Math.max(u0, u1);
+          if (yl > yf + 0.42) sol(ua, ub, yf - 1, yl - 0.03, S.z0, hD);       // los dos primeros peldaños se suben también de lado
+          if (d0 >= dF) sol(ua, ub, yl, yl + 1.0, S.z0 - 0.07, S.z0 + 0.03);
+          sol(ua, ub, yl > yf + 0.42 ? yl - 0.05 : yf - 1, yl + 1.0, S.z1 - 0.03, hD);
         }
-        const uR = S.lb - sd * Math.min(S.run, 0.8 / kS);
-        for (let u = uR; sd > 0 ? u >= S.lt - 0.01 : u <= S.lt + 0.01; u -= sd * 0.75) B(u, yAt(u) + 0.47, S.z0 + 0.03, 0.05, 0.94, 0.05, WOODC);
-        g.limb([uR, yAt(uR) + 0.95, S.z0 + 0.03], [S.lt, y2 + 0.95, S.z0 + 0.03], 0.06, 0.05, WOODL);
+        const rail = (zr, d0) => {       // barandilla de la escalera: pilarote, balaustres, pilar de arriba, pasamanos y larguero
+          const u0 = uD(d0), y0 = yf + d0 * kS;
+          B(u0, y0 + 0.5, zr, 0.08, 1.1, 0.08, WOODD);
+          for (let d = d0 + 0.7; d < S.run - 0.25; d += 0.7) B(uD(d), yf + d * kS + 0.47, zr, 0.045, 0.94, 0.045, WOODC);
+          B(S.lt, y2 + 0.5, zr, 0.07, 1.0, 0.07, WOODD);
+          g.limb([u0, y0 + 0.95, zr], [S.lt, y2 + 0.95, zr], 0.07, 0.05, WOODL); g.limb([u0, y0 + 0.45, zr], [S.lt, y2 + 0.45, zr], 0.04, 0.03, WOODL);
+        };
+        rail(S.z0 - 0.035, dF + 0.01); rail(S.z1 + 0.035, 0);       // delante, desde el tercer peldaño; detrás, de punta a punta
+        { const dA = Math.min(S.run - 0.6, 1.05 / kS + 0.15), nl = Math.max(0, Math.floor((S.run - 0.3 - dA) / 0.16));       // leña apilada bajo la escalera
+          for (let row = 0; row < 4; row++) for (let i = 0; i < nl - row; i++) {
+            const r = q(0.06, 0.075), m = M4.create();
+            M4.translate(m, uD(dA + (i + 0.5 + row * 0.5) * 0.16), yf + 0.075 + row * 0.13, S.z0 + 0.34 + q(-0.04, 0.04)); M4.rotX(m, Math.PI / 2);
+            g.with(m, () => g.cyl(0, 0, 0, r, r * 0.96, q(0.46, 0.56), 6, shade(WOODC, q(0.8, 1.2)), true));
+          } }
         /* ---- el forjado: vigas y tablas por abajo, baldosas por arriba; el hueco de la escalera con barandilla ---- */
         const rects = [[-hW, hW, -hD, S.z0], [-hW, S.a, S.z0, hD], [S.b, hW, S.z0, hD]].filter(r => r[1] - r[0] > 0.05 && r[3] - r[2] > 0.05);
         for (const r of rects) {
@@ -3243,6 +3305,13 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
         sol(S.a, S.b, y2, y2 + 1.0, S.z0 - 0.06, S.z0);
         for (let u = S.a + 0.05; u <= S.b; u += 0.6) B(u, y2 + 0.47, S.z0 - 0.03, 0.05, 0.94, 0.05, WOODC);
         B((S.a + S.b) / 2, y2 + 0.95, S.z0 - 0.03, S.b - S.a, 0.06, 0.06, WOODL); B((S.a + S.b) / 2, y2 + 0.45, S.z0 - 0.03, S.b - S.a, 0.04, 0.04, WOODL);
+        { const xr = S.lb + sd * 0.03, zm = (S.z0 + hD) / 2, L = hD - S.z0;       // en la cabeza de abajo del hueco, de delante a la pared
+          sol(Math.min(S.lb, S.lb + sd * 0.06), Math.max(S.lb, S.lb + sd * 0.06), y2, y2 + 1.0, S.z0 - 0.06, hD);
+          for (let v = S.z0 + 0.6; v < hD - 0.1; v += 0.6) B(xr, y2 + 0.47, v, 0.05, 0.94, 0.05, WOODC);
+          B(xr, y2 + 0.95, zm, 0.06, 0.06, L, WOODL); B(xr, y2 + 0.45, zm, 0.04, 0.04, L, WOODL); }
+        { const zm = (S.z1 + hD) / 2, L = hD - S.z1;       // y en la de arriba, de la escalera a la pared (el hueco de detrás)
+          sol(Math.min(S.lt, S.lt + sd * 0.06), Math.max(S.lt, S.lt + sd * 0.06), y2, y2 + 1.0, S.z1, hD);
+          B(S.lt + sd * 0.02, y2 + 0.95, zm, 0.06, 0.06, L, WOODL); B(S.lt + sd * 0.02, y2 + 0.45, zm, 0.04, 0.04, L, WOODL); }
       }
       ceil(yTop);
 
@@ -3252,11 +3321,16 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
         const m0 = -hD + 0.45, m1 = stairM ? S.z0 - 0.15 : hD - 0.35, Lm = Math.min(m1 - m0, big ? 4.5 : 4.0), mz = m0 + Lm / 2;
         onWall('M', mz, yf, () => menjadora(Lm)); WS('M', mz, 0.66, Lm, yf - 0.1, yf + 0.88);
         onWall('M', m0 + Lm - 0.5, yf, collera);
-        const mule = kind === 'venta' || Q() < 0.45;
-        if (mule) { mula(-sd * (hW - 1.95), yf, mz, -sd); sol(Math.min(-sd * (hW - 0.66), -sd * (hW - 2.75)), Math.max(-sd * (hW - 0.66), -sd * (hW - 2.75)), yf - 0.1, yf + 1.8, mz - 0.38, mz + 0.38); }
-        else for (let i = 0; i < 3; i++) gallina(-sd * (hW - q(1.1, 2.4)), yf, q(m0 + 0.3, m0 + Lm - 0.3), q(0, 6.28));
         for (let i = 0; i < 7; i++) palla(-sd * (hW - q(0.8, 2.4)), q(m0, m0 + Lm), 1);
-        if (!stairM && hD - (m0 + Lm) > 1.3) { g.blob(-sd * (hW - 0.75), yf + 0.08, hD - 0.75, 0.75, 0.5, 0.6, STRAW, 9, 4, 0.25, Q, 0.15); sol(Math.min(-sd * hW, -sd * (hW - 1.3)), Math.max(-sd * hW, -sd * (hW - 1.3)), yf - 0.1, yf + 0.45, hD - 1.35, hD); }
+        let zf = m0 + Lm + 0.1;
+        if (!stairM && hD - 0.1 - zf >= 1.2) {       // abrevadero de piedra, con agua, a continuación del pesebre
+          const cx = -sd * (hW - 0.32), az = zf + 0.55;
+          B(cx, yf + 0.06, az, 0.62, 0.12, 1.1, STN);
+          for (const s of [-1, 1]) { B(cx + s * 0.27, yf + 0.3, az, 0.08, 0.6, 1.1, STN, dk(hex(0x8f8574))); B(cx, yf + 0.3, az + s * 0.51, 0.46, 0.6, 0.08, STN, dk(hex(0x8f8574))); }
+          B(cx, yf + 0.45, az, 0.46, 0.012, 0.94, dk(hex(0x33433e)));
+          sol(Math.min(-sd * hW, -sd * (hW - 0.64)), Math.max(-sd * hW, -sd * (hW - 0.64)), yf - 0.1, yf + 0.6, az - 0.55, az + 0.55); zf += 1.2;
+        }
+        if (!stairM && hD - zf > 1.3) { g.blob(-sd * (hW - 0.75), yf + 0.08, hD - 0.75, 0.75, 0.5, 0.6, STRAW, 9, 4, 0.25, Q, 0.15); sol(Math.min(-sd * hW, -sd * (hW - 1.3)), Math.max(-sd * hW, -sd * (hW - 1.3)), yf - 0.1, yf + 0.45, hD - 1.35, hD); }
         g.limb([-sd * (hW - 0.3), yf, -hD + 0.3], [-sd * (hW - 0.06), yf + 1.75, -hD + 0.1], 0.035, 0.035, WOODL);       // horca
         for (const s of [-1, 0, 1]) g.limb([-sd * (hW - 0.06), yf + 1.75, -hD + 0.1 + s * 0.05], [-sd * (hW - 0.04), yf + 2.05, -hD + 0.08 + s * 0.08], 0.015, 0.015, WOODL);
         /* rueda del carro y tinajas contra la fachada, entre el rincón y el portal */
@@ -3270,8 +3344,6 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
           for (let i = 0; i < nbt; i++) { const cz = p0 + 0.425 + i * 0.85; bota(sd * (hW - 0.62), yf + 0.62, cz, 0.36, 1.0, dk(hex(0x6e4c2e))); B(sd * (hW - 0.06), yf + 0.42, cz, 0.08, 0.05, 0.05, WOODD); }
           for (const a of [0.25, 0.98]) B(sd * (hW - a), yf + 0.12, p0 + nbt * 0.425, 0.1, 0.24, nbt * 0.85, WOODD);
           WS('P', p0 + nbt * 0.425, 1.14, nbt * 0.85, yf - 0.1, yf + 1.0);
-          g.limb([sd * (hW - 0.25), yf, p0 + nbt * 0.85 + 0.12], [sd * (hW - 0.05), yf + 1.4, p0 + nbt * 0.85 + 0.2], 0.03, 0.03, WOODL);       // azada
-          B(sd * (hW - 0.07), yf + 1.4, p0 + nbt * 0.85 + 0.2, 0.04, 0.2, 0.22, IRONC);
         }
         { const sx = sd > 0 ? S.a - 0.42 : S.b + 0.42; sac(sx, yf, hD - 0.35); sac(sx + sd * 0.05, yf, hD - 0.9); sac(sx, yf + 0.42, hD - 0.6); sol(sx - 0.32, sx + 0.32, yf - 0.1, yf + 0.8, hD - 1.2, hD); }       // sacos de grano junto a la escalera
         if (kind === 'venta') {
@@ -3319,10 +3391,9 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
         onWall('P', -hD + 0.85, yf, platera);
         gerra(sd * (hW - 0.4), yf, -hD + 0.4, 0.85); sac(sd * (hW - 0.45), yf, -hD + 1.05);
         sol(sd * (hW - 0.8), sd * hW, yf - 0.1, yf + 0.9, -hD, -hD + 0.8);
-        for (let i = 0; i < 2; i++) gallina(dlx - sd * q(0.4, 1.2), yf, -hD + q(0.9, 1.8), q(0, 6.28));
       }
     });
-    world.interiors.push({ x, z, a: g.a, mesh: null }); g = gMain;
+    world.interiors.push({ x, z, a: g.a, wa: g.wg.a, mesh: null, wmesh: null }); g = gMain;
   }
   function parapet(x, z, len, alongX) {
     const sx = alongX ? len : 0.8, sz = alongX ? 0.8 : len, y = Math.max(terrainH(x - sx / 2, z - sz / 2), terrainH(x + sx / 2, z + sz / 2), terrainH(x, z));
@@ -3349,7 +3420,7 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
   function pole(x, z) {
     const y = terrainH(x, z), yb = tmin(x, z, 0.9, 0.9), STB = hex(0xddd2b6);
     stone('sillar', () => { g.box(x, (yb - 0.3 + y + 0.32) / 2, z, 0.95, y + 0.32 - yb + 0.3, 0.95, STB); g.box(x, y + 0.42, z, 0.62, 0.2, 0.62, STB); });
-    g.cyl(x, y + 4.4, z, 0.11, 0.07, 7.9, 8, hex(0x8c7a5e)); g.blob(x, y + 8.4, z, 0.11, 0.11, 0.11, hex(0x9a7a42), 6, 3, 0, null, 0);
+    g.cyl(x, y + 4.4, z, 0.11, 0.07, 7.9, 8, wd(hex(0x8c7a5e))); g.blob(x, y + 8.4, z, 0.11, 0.11, 0.11, hex(0x9a7a42), 6, 3, 0, null, 0);
     addCircle(x, z, 0.5);
   }
 
@@ -3783,14 +3854,15 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
     }
   }
   world.staticMesh = makeMesh(g.a);
-  for (const it of world.interiors) { it.mesh = makeMesh(it.a); it.a = null; }
+  for (const it of world.interiors) { it.mesh = makeMesh(it.a); it.wmesh = it.wa.length ? makeMesh12(it.wa) : null; it.a = it.wa = null; }
+  world.wood = makeMesh12(GW.a.length ? GW.a : [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]);
   /* una malla por material PBR (los faldones de los tejados van a la teja al construirlos) */
   world.mat = {};
   for (const k of ['seca', 'mamp', 'sillar', 'roca', 'sacos', 'hormigon', 'teja']) if (GS[k].a.length) world.mat[k] = makeMesh(GS[k].a);
 
   /* ---- puentes ---- */
   function bridgeGeo(b, boats) {
-    const bg = new Geo(), pl = hex(0x8a6a44);
+    const bg = new Geo(), pl = wd(hex(0x8a6a44)); bg.wg = new WoodGeo();
     bg.box((b.x0 + b.x1) / 2, b.y - 0.08, b.z, b.x1 - b.x0, 0.16, b.half * 2, pl, shade(pl, 1.12));
     for (let x = b.x0 + 3; x < b.x1 - 2; x += 5) {
       if (terrainH(x, b.z) > -0.4) continue;
@@ -3799,6 +3871,7 @@ const world = { houses: [], interiors: [] };       // interiors: los muebles de 
       for (const s of [-1, 1]) bg.box(x, b.y + 0.45, b.z + s * (b.half - 0.06), 0.08, 0.9, 0.08, WOOD);
     }
     for (const s of [-1, 1]) bg.box((b.x0 + b.x1) / 2, b.y + 0.85, b.z + s * (b.half - 0.06), b.x1 - b.x0 - 8, 0.04, 0.04, hex(0xb9ab85));
+    b.wmesh = bg.wg.a.length ? makeMesh12(bg.wg.a) : null;
     return makeMesh(bg.a);
   }
   pontoon.mesh = bridgeGeo(pontoon, true); pasarela.mesh = bridgeGeo(pasarela, false);
@@ -11425,7 +11498,7 @@ function drawWorld(vp, ex, ey, ez, pscale, dt, hideP, cull) {
   matState(1, 1, 0.5); gl.uniform1f(U.uTer, GFX.ground); drawMesh(world.terrain); gl.uniform1f(U.uTer, 0);
   matState(1, 1, 0.1); drawMesh(world.staticMesh); drawMesh(pontoon.mesh); if (pasarela.on) drawMesh(pasarela.mesh);
   for (const it of world.interiors) if ((it.x - ex) * (it.x - ex) + (it.z - ez) * (it.z - ez) < 65 * 65) drawMesh(it.mesh);       // muebles de las casas cercanas
-  matState(1, 1, 0.02); drawStone(); matState(1, 1, 0.1);
+  matState(1, 1, 0.02); drawStone(); drawWood(ex, ez); matState(1, 1, 0.1);
   vegDrawAll(vp, ex, ey, ez, dt > 0, cull ? xr.headFw : null);
   matState(1, 1, 0.05);
   drawVehicles(vp, ex, ey, ez); drawAA(); matState(1, 1, 0.05);
